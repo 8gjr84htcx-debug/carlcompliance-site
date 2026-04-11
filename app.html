@@ -8,466 +8,392 @@
 <title>CARL - Field Inspection</title>
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
   :root {
-    --bg: #f5f5f0;
-    --header-bg: #1a1a2e;
-    --header-text: #ffffff;
-    --card-bg: #ffffff;
-    --text: #1a1a1a;
-    --text-secondary: #4a4a4a;
-    --border: #c0c0c0;
-    --accent: #1a1a2e;
-    --accent-hover: #2d2d4e;
-    --confirmed: #1b6e2a;
-    --challenged: #b8860b;
-    --insufficient: #a02020;
-    --parametric: #8b4513;
-    --label: #555555;
-    --citation-bg: #f0f0e8;
+    --bg: #f8f6f0; --bg-elevated: #ffffff; --header-bg: #1c2b4a; --header-text: #ffffff;
+    --card-bg: #ffffff; --text: #1a1a1a; --text-secondary: #555555; --border: #d4d0c8;
+    --accent: #1c2b4a; --accent-hover: #263a5e; --gold: #8b6914; --gold-hover: #a07a1a;
+    --gold-light: #b8960f; --confirmed: #1b6e2a; --challenged: #8b6914;
+    --insufficient: #a02020; --parametric: #8b5e14; --label: #777068;
+    --citation-bg: #f0ede4; --citation-border: #d8d3c6; --input-bg: #ffffff;
   }
-
   html { font-size: 18px; }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.5;
-    min-height: 100vh;
-  }
-
-  header {
-    background: var(--header-bg);
-    color: var(--header-text);
-    padding: 14px 20px;
-    display: flex;
-    align-items: baseline;
-    gap: 14px;
-    position: sticky;
-    top: 0;
-    z-index: 100;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-  }
-
-  header h1 {
-    font-size: 1.8rem;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-  }
-
-  header span {
-    font-size: 0.85rem;
-    opacity: 0.7;
-    font-weight: 400;
-  }
-
-  main {
-    max-width: 800px;
-    margin: 0 auto;
-    padding: 20px 16px 60px;
-  }
-
-  .section-label {
-    font-size: 0.75rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--label);
-    margin-bottom: 6px;
-  }
-
-  textarea {
-    width: 100%;
-    min-height: 130px;
-    padding: 14px;
-    font-size: 1.05rem;
-    font-family: inherit;
-    line-height: 1.5;
-    border: 2px solid var(--border);
-    border-radius: 6px;
-    background: var(--card-bg);
-    color: var(--text);
-    resize: vertical;
-    -webkit-appearance: none;
-  }
-
-  textarea:focus {
-    outline: none;
-    border-color: var(--accent);
-    box-shadow: 0 0 0 3px rgba(26,26,46,0.15);
-  }
-
-  .btn-row {
-    display: flex;
-    gap: 10px;
-    margin-top: 12px;
-  }
-
-  button {
-    font-family: inherit;
-    font-size: 1.05rem;
-    font-weight: 700;
-    padding: 14px 28px;
-    border: none;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: background 0.15s;
-    -webkit-appearance: none;
-  }
-
-  .btn-submit {
-    background: var(--accent);
-    color: #fff;
-    flex: 1;
-    letter-spacing: 0.04em;
-  }
-
-  .btn-submit:hover { background: var(--accent-hover); }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background: var(--bg); color: var(--text); line-height: 1.5; min-height: 100vh; }
+  h1, h2, .auth-brand h1, .result-header h2 { font-family: Georgia, "Times New Roman", Times, serif; }
+  header { background: var(--header-bg); color: var(--header-text); padding: 16px 24px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; border-bottom: 3px solid var(--gold); box-shadow: 0 2px 8px rgba(0,0,0,0.15); flex-wrap: wrap; }
+  header h1 { font-size: 1.8rem; font-weight: 700; letter-spacing: 0.12em; color: #ffffff; }
+  header span { font-size: 0.82rem; opacity: 0.75; font-weight: 400; letter-spacing: 0.04em; color: #d0ccc0; }
+  .status-bar { display: flex; gap: 12px; margin-left: auto; align-items: center; }
+  .status-dot-wrap { display: flex; align-items: center; gap: 4px; position: relative; cursor: default; }
+  .status-dot { width: 8px; height: 8px; border-radius: 50%; background: #666; flex-shrink: 0; }
+  .status-dot.green { background: #4caf50; box-shadow: 0 0 4px rgba(76,175,80,0.5); }
+  .status-dot.yellow { background: #ffc107; box-shadow: 0 0 4px rgba(255,193,7,0.5); }
+  .status-dot.red { background: #f44336; box-shadow: 0 0 4px rgba(244,67,54,0.5); }
+  .status-label { font-size: 0.58rem; font-weight: 600; letter-spacing: 0.04em; color: rgba(255,255,255,0.6); text-transform: uppercase; white-space: nowrap; }
+  .status-dot-wrap .status-tooltip { display: none; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); margin-top: 6px; background: #222; color: #ddd; font-size: 0.65rem; padding: 4px 8px; border-radius: 3px; white-space: nowrap; z-index: 200; pointer-events: none; }
+  .status-dot-wrap:hover .status-tooltip { display: block; }
+  main { max-width: 800px; margin: 0 auto; padding: 24px 16px 60px; }
+  .section-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: var(--gold); margin-bottom: 8px; font-family: Georgia, "Times New Roman", Times, serif; }
+  textarea, input[type="password"] { width: 100%; padding: 14px; font-size: 1.05rem; font-family: inherit; line-height: 1.5; border: 1px solid var(--border); border-radius: 4px; background: var(--input-bg); color: var(--text); -webkit-appearance: none; }
+  textarea { min-height: 130px; resize: vertical; }
+  textarea:focus, input[type="password"]:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px rgba(28,43,74,0.12); }
+  textarea::placeholder, input[type="password"]::placeholder { color: #999; }
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; }
+  button { font-family: inherit; font-size: 1.05rem; font-weight: 700; padding: 14px 28px; border: none; border-radius: 4px; cursor: pointer; transition: background 0.15s, box-shadow 0.15s; -webkit-appearance: none; }
+  .btn-submit { background: var(--accent); color: #ffffff; flex: 1; letter-spacing: 0.06em; }
+  .btn-submit:hover { background: var(--accent-hover); box-shadow: 0 2px 8px rgba(28,43,74,0.25); }
   .btn-submit:active { transform: scale(0.98); }
-  .btn-submit:disabled {
-    background: #888;
-    cursor: not-allowed;
-    transform: none;
-  }
-
-  .btn-clear {
-    background: #e0e0e0;
-    color: var(--text);
-    padding: 14px 20px;
-  }
-
-  .btn-clear:hover { background: #d0d0d0; }
-
-  /* Loading */
-  .loading {
-    display: none;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    padding: 40px 20px;
-    color: var(--text-secondary);
-    font-size: 1rem;
-  }
-
+  .btn-submit:disabled { background: #9a9a9a; color: #fff; cursor: not-allowed; transform: none; box-shadow: none; }
+  .btn-clear { background: #e8e5de; color: var(--text); padding: 14px 20px; }
+  .btn-clear:hover { background: #dbd7ce; }
+  .btn-mic { background: var(--gold); color: #ffffff; padding: 14px 16px; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; min-width: 52px; }
+  .btn-mic:hover { background: var(--gold-hover); }
+  .btn-photo { background: var(--accent); color: #ffffff; padding: 14px 16px; font-size: 1.2rem; line-height: 1; display: flex; align-items: center; justify-content: center; min-width: 52px; }
+  .btn-photo:hover { background: var(--accent-hover); }
+  .photo-preview { display: none; position: relative; margin-top: 10px; margin-bottom: 4px; }
+  .photo-preview.visible { display: block; }
+  .photo-preview img { max-width: 100%; max-height: 200px; border-radius: 4px; border: 1px solid var(--border); }
+  .photo-remove { position: absolute; top: 6px; right: 6px; background: rgba(0,0,0,0.6); color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; }
+  .photo-remove:hover { background: rgba(0,0,0,0.8); }
+  .btn-mic.recording { background: #c43030; color: #fff; animation: pulse-rec 1s ease-in-out infinite; }
+  .btn-mic.transcribing { background: var(--gold); color: #fff; animation: pulse-transcribe 1.2s ease-in-out infinite; cursor: wait; }
+  @keyframes pulse-rec { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,80,80,0.4); } 50% { box-shadow: 0 0 0 10px rgba(255,80,80,0); } }
+  @keyframes pulse-transcribe { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+  .auth-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; padding: 40px 20px; background: url("data:image/svg+xml,%3Csvg width='60' height='60' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"), #0d1b2e; }
+  @keyframes authFadeUp { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: translateY(0); } }
+  .auth-brand { text-align: center; margin-bottom: 8px; animation: authFadeUp 0.6s ease-out both; }
+  .auth-seal { display: block; margin: 0 auto 18px; opacity: 0; animation: authFadeUp 0.6s ease-out 0.1s both; }
+  .auth-brand h1 { font-family: Georgia, "Times New Roman", Times, serif; font-size: 3.6rem; font-weight: 400; letter-spacing: 0.32em; color: #f5f0e8; margin-bottom: 0; padding-right: 0.32em; position: relative; display: inline-block; }
+  .auth-brand h1::after { content: ''; position: absolute; bottom: -4px; left: 0; height: 1px; background: #c9a84c; animation: drawLine 0.8s ease-out 0.4s both; }
+  @keyframes drawLine { from { width: 0; } to { width: 100%; } }
+  .auth-brand .subtitle { font-size: 0.7rem; color: #c9a84c; letter-spacing: 0.18em; text-transform: uppercase; font-weight: 400; font-variant: small-caps; margin-top: 14px; }
+  .auth-rule { width: 60px; height: 1px; background: #c9a84c; margin: 28px auto 32px; opacity: 0.4; animation: authFadeUp 0.6s ease-out 0.2s both; }
+  .auth-panel { width: 100%; max-width: 800px; background: #fcfbf8; border-top: 3px solid #c9a84c; border-radius: 2px; box-shadow: 0 16px 70px rgba(0,0,0,0.4), 0 2px 10px rgba(0,0,0,0.12); overflow: hidden; animation: authFadeUp 0.6s ease-out 0.15s both; }
+  .auth-panel-header { padding: 36px 48px 32px; }
+  .auth-input-label { font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.62rem; font-weight: 400; letter-spacing: 0.16em; text-transform: uppercase; color: #9a8c6e; margin-bottom: 12px; text-align: left; }
+  .auth-panel-header input[type="password"] { border: none; border-bottom: 1px solid #d4d0c8; border-radius: 0; padding: 12px 0; font-size: 1.05rem; font-family: Georgia, "Times New Roman", Times, serif; letter-spacing: 0.08em; background: transparent; color: #1a1a1a; width: 100%; outline: none; transition: border-color 0.3s; -webkit-appearance: none; }
+  .auth-panel-header input[type="password"]:focus { border-bottom-color: #c9a84c; box-shadow: none; }
+  .auth-panel-header input[type="password"]::placeholder { color: #bbb; font-style: italic; letter-spacing: 0.04em; }
+  .auth-terms { padding: 32px 48px; border-top: 1px solid #ece8e0; border-bottom: 1px solid #ece8e0; background: url("data:image/svg+xml,%3Csvg width='40' height='40' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)' opacity='0.025'/%3E%3C/svg%3E"), #f7f5f0; }
+  .auth-terms-title { font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.72rem; font-weight: 400; letter-spacing: 0.12em; text-transform: uppercase; color: #9a8c6e; margin-bottom: 22px; text-align: left; }
+  .auth-term { text-align: left; margin-bottom: 16px; font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.76rem; line-height: 1.75; color: #555; text-indent: -24px; padding-left: 24px; }
+  .auth-term:last-child { margin-bottom: 0; }
+  .auth-term-num { display: inline; font-family: Georgia, "Times New Roman", Times, serif; font-weight: 400; color: #9a8c6e; margin-right: 6px; }
+  .auth-term strong { color: #333; font-weight: 600; }
+  .auth-panel-footer { padding: 28px 48px 36px; }
+  .auth-ack { display: flex; align-items: flex-start; gap: 12px; text-align: left; margin-bottom: 24px; cursor: pointer; }
+  .auth-ack input[type="checkbox"] { margin-top: 3px; flex-shrink: 0; width: 15px; height: 15px; accent-color: #0d1b2e; }
+  .auth-ack-label { font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.76rem; font-weight: 400; font-style: italic; color: #555; line-height: 1.55; }
+  .auth-btn { width: 100%; padding: 16px 28px; font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.84rem; font-weight: 400; letter-spacing: 0.14em; text-transform: uppercase; background: #0d1b2e; color: #f5f0e8; border: 2px solid #c9a84c; border-radius: 2px; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; }
+  .auth-btn::before { content: ''; position: absolute; top: 0; left: -100%; width: 100%; height: 100%; background: linear-gradient(90deg, transparent 0%, rgba(201,168,76,0.15) 40%, rgba(201,168,76,0.3) 50%, rgba(201,168,76,0.15) 60%, transparent 100%); transition: left 0.5s ease; }
+  .auth-btn:hover:not(:disabled)::before { left: 100%; }
+  .auth-btn:hover:not(:disabled) { background: #122440; border-color: #d4b65c; color: #f5f0e8; box-shadow: 0 0 20px rgba(201,168,76,0.15), inset 0 0 20px rgba(201,168,76,0.06); }
+  .auth-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+  .auth-error { display: none; font-family: Georgia, "Times New Roman", Times, serif; color: #a02020; font-weight: 400; font-size: 0.78rem; margin-top: 14px; text-align: center; }
+  .auth-error.visible { display: block; }
+  .auth-back { display: block; text-align: center; margin-top: 1.5rem; font-family: Georgia, "Times New Roman", Times, serif; font-size: 0.72rem; color: rgba(201,168,76,0.5); text-decoration: none; letter-spacing: 0.1em; transition: color 0.2s; }
+  .auth-back:hover { color: #c9a84c; }
+  .app-content { display: none; }
+  .app-content.visible { display: block; }
+  .loading { display: none; align-items: center; justify-content: center; gap: 12px; padding: 40px 20px; color: var(--text-secondary); font-size: 1rem; }
   .loading.visible { display: flex; }
-
-  .spinner {
-    width: 28px;
-    height: 28px;
-    border: 3px solid var(--border);
-    border-top-color: var(--accent);
-    border-radius: 50%;
-    animation: spin 0.8s linear infinite;
-  }
-
+  .spinner { width: 28px; height: 28px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.8s linear infinite; }
   @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* Error */
-  .error-msg {
-    display: none;
-    background: #fdecea;
-    border: 2px solid #d32f2f;
-    border-radius: 6px;
-    padding: 14px 18px;
-    margin-top: 20px;
-    color: #b71c1c;
-    font-weight: 600;
-    font-size: 0.95rem;
-  }
-
+  .error-msg { display: none; background: #fdf0f0; border: 1px solid #d4a0a0; border-radius: 4px; padding: 14px 18px; margin-top: 20px; color: #a02020; font-weight: 600; font-size: 0.95rem; }
   .error-msg.visible { display: block; }
-
-  /* Results */
-  .results {
-    display: none;
-    margin-top: 24px;
-  }
-
+  .results { display: none; margin-top: 24px; }
   .results.visible { display: block; }
-
-  .result-card {
-    background: var(--card-bg);
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.08);
-  }
-
-  .result-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 14px 18px;
-    background: var(--header-bg);
-    color: var(--header-text);
-    flex-wrap: wrap;
-    gap: 8px;
-  }
-
-  .result-header h2 {
-    font-size: 1.1rem;
-    font-weight: 700;
-  }
-
-  .eval-badge {
-    font-size: 0.85rem;
-    font-weight: 800;
-    padding: 4px 14px;
-    border-radius: 4px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
+  .result-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px; overflow: hidden; box-shadow: 0 2px 12px rgba(0,0,0,0.06); }
+  .result-header { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--header-bg); color: #ffffff; border-bottom: 2px solid var(--gold); flex-wrap: wrap; gap: 8px; }
+  .result-header h2 { font-size: 1.1rem; font-weight: 700; letter-spacing: 0.04em; }
+  .btn-tts { display: none; background: transparent; border: 1px solid rgba(255,255,255,0.3); color: #ffffff; padding: 4px 10px; font-size: 1.1rem; line-height: 1; border-radius: 4px; cursor: pointer; min-width: 36px; text-align: center; transition: background 0.15s, border-color 0.15s; }
+  .btn-tts:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.5); }
+  .btn-tts.visible { display: inline-flex; align-items: center; justify-content: center; }
+  .btn-tts.loading { opacity: 0.5; cursor: wait; }
+  .eval-badge { font-size: 0.8rem; font-weight: 800; padding: 4px 14px; border-radius: 3px; letter-spacing: 0.06em; text-transform: uppercase; }
+  .eval-COMPLIANT { background: #2e8b57; color: #fff; }
   .eval-CONFIRMED { background: var(--confirmed); color: #fff; }
   .eval-CHALLENGED { background: var(--challenged); color: #fff; }
   .eval-INSUFFICIENT { background: var(--insufficient); color: #fff; }
-
   .result-body { padding: 16px 18px; }
-
-  .field {
-    padding: 10px 0;
-    border-bottom: 1px solid #e8e8e8;
-  }
-
+  .field { padding: 10px 0; border-bottom: 1px solid #e8e5de; }
   .field:last-child { border-bottom: none; }
-
-  .field-label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    color: var(--label);
-    margin-bottom: 3px;
-  }
-
-  .field-value {
-    font-size: 1rem;
-    color: var(--text);
-    word-break: break-word;
-  }
-
-  .field-value.mono {
-    font-family: "SF Mono", "Menlo", "Consolas", monospace;
-    font-size: 0.92rem;
-  }
-
-  .metrics-row {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 0;
-  }
-
-  .metrics-row .field {
-    text-align: center;
-    border-bottom: none;
-    border-right: 1px solid #e8e8e8;
-    padding: 12px 8px;
-  }
-
+  .field-label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--label); margin-bottom: 3px; }
+  .field-value { font-size: 1rem; color: var(--text); word-break: break-word; }
+  .field-value.mono { font-family: "SF Mono", "Menlo", "Consolas", monospace; font-size: 0.92rem; color: var(--accent); }
+  .metrics-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .metrics-row .field { text-align: center; border-bottom: none; border-right: 1px solid #e8e5de; padding: 12px 8px; }
   .metrics-row .field:last-child { border-right: none; }
-
-  .metrics-row .field-value {
-    font-size: 1.3rem;
-    font-weight: 800;
-  }
-
+  .metrics-row .field-value { font-size: 1.3rem; font-weight: 800; }
   .confidence-high { color: var(--confirmed); }
   .confidence-mid { color: var(--challenged); }
   .confidence-low { color: var(--insufficient); }
-
-  .provenance {
-    font-weight: 700;
-  }
-
+  .provenance { font-weight: 700; }
+  .prov-compliant { color: #2e8b57; }
   .prov-loop { color: var(--confirmed); }
+  .prov-triple { color: var(--gold); }
   .prov-parametric { color: var(--parametric); }
-
-  /* Citations list */
-  .citations-section {
-    margin-top: 16px;
-  }
-
-  .citation-item {
-    background: var(--citation-bg);
-    border: 1px solid #d8d8d0;
-    border-radius: 5px;
-    padding: 12px 14px;
-    margin-bottom: 8px;
-  }
-
+  .verification-badge { display: inline-block; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 8px; border-radius: 3px; margin-left: 8px; vertical-align: middle; }
+  .badge-compliant { background: #2e8b57; color: #fff; }
+  .badge-dual { background: var(--gold); color: #fff; }
+  .badge-triple { background: var(--confirmed); color: #fff; }
+  .badge-ref { background: #999; color: #fff; }
+  .badge-unverified { background: #bbb; color: #fff; font-style: italic; }
+  .citations-section { margin-top: 16px; }
+  .citation-item { background: var(--citation-bg); border: 1px solid var(--citation-border); border-left: 3px solid var(--gold); border-radius: 3px; padding: 12px 14px; margin-bottom: 8px; }
   .citation-item:last-child { margin-bottom: 0; }
-
-  .citation-source {
-    font-size: 0.78rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--accent);
-    margin-bottom: 4px;
+  .citation-source { font-size: 0.76rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin-bottom: 4px; }
+  .citation-text { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.45; }
+  .result-thumbnail { max-width: 200px; max-height: 200px; border-radius: 4px; border: 1px solid var(--border); }
+  .log-detail-thumbnail { max-width: 160px; max-height: 160px; border-radius: 4px; border: 1px solid var(--border); margin-top: 4px; }
+  .timestamp { font-size: 0.75rem; color: var(--label); text-align: right; padding-top: 8px; }
+  .btn-dailylog { background: var(--accent); color: #fff; padding: 10px 20px; font-size: 0.9rem; letter-spacing: 0.06em; margin-top: 16px; width: 100%; }
+  .btn-dailylog:hover { background: var(--accent-hover); }
+  .daily-log { display: none; margin-top: 20px; }
+  .daily-log.visible { display: block; }
+  .log-summary { background: var(--card-bg); border: 1px solid var(--border); border-top: 3px solid var(--gold); border-radius: 6px; padding: 18px; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+  .log-summary h3 { font-family: Georgia, "Times New Roman", Times, serif; font-size: 1.1rem; color: var(--accent); margin-bottom: 10px; }
+  .log-stat { font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 4px; }
+  .log-stat strong { color: var(--text); }
+  .log-entry { background: var(--card-bg); border: 1px solid var(--border); border-radius: 4px; margin-bottom: 8px; overflow: hidden; }
+  .log-entry-summary { padding: 12px 14px; cursor: pointer; -webkit-user-select: none; user-select: none; }
+  .log-entry-summary:hover { background: #f5f3ed; }
+  .log-entry-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; flex-wrap: wrap; gap: 6px; }
+  .log-entry-disc { display: flex; align-items: center; gap: 8px; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); }
+  .log-expand-arrow { display: inline-block; font-size: 0.6rem; color: var(--label); transition: transform 0.2s ease; }
+  .log-entry.expanded .log-expand-arrow { transform: rotate(90deg); }
+  .log-entry-prov { font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 3px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .log-prov-compliant { background: #2e8b57; color: #fff; }
+  .log-prov-triple { background: var(--confirmed); color: #fff; }
+  .log-prov-dual { background: var(--gold); color: #fff; }
+  .log-prov-parametric { background: #999; color: #fff; }
+  .log-prov-other { background: var(--border); color: var(--text); }
+  .log-entry-delete { background: transparent; border: 1px solid var(--border); color: #999; font-size: 0.85rem; line-height: 1; width: 22px; height: 22px; border-radius: 3px; cursor: pointer; display: flex; align-items: center; justify-content: center; padding: 0; transition: background 0.15s, color 0.15s, border-color 0.15s; }
+  .log-entry-delete:hover { background: var(--insufficient); color: #fff; border-color: var(--insufficient); }
+  .log-entry-obs { font-size: 0.88rem; color: var(--text); margin-bottom: 4px; }
+  .log-entry-cite { font-size: 0.8rem; color: var(--text-secondary); font-family: "SF Mono", "Menlo", "Consolas", monospace; }
+  .log-entry-time { font-size: 0.72rem; color: var(--label); }
+  .log-entry-detail { display: none; border-top: 1px solid var(--border); padding: 14px; background: #faf9f6; }
+  .log-entry.expanded .log-entry-detail { display: block; }
+  .log-detail-field { padding: 8px 0; border-bottom: 1px solid #e8e5de; }
+  .log-detail-field:last-child { border-bottom: none; }
+  .log-detail-label { font-size: 0.68rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--label); margin-bottom: 2px; }
+  .log-detail-value { font-size: 0.9rem; color: var(--text); word-break: break-word; }
+  .log-detail-cite { background: var(--citation-bg); border: 1px solid var(--citation-border); border-left: 3px solid var(--gold); border-radius: 3px; padding: 10px 12px; margin-top: 6px; margin-bottom: 6px; }
+  .log-detail-cite:last-child { margin-bottom: 0; }
+  .log-detail-cite-source { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--gold); margin-bottom: 3px; }
+  .log-detail-cite-text { font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4; }
+  .log-loading { text-align: center; padding: 20px; color: var(--text-secondary); }
+  .lightbox { display: none; position: fixed; inset: 0; z-index: 1000; background: rgba(0,0,0,0.88); align-items: center; justify-content: center; padding: 20px; }
+  .lightbox.visible { display: flex; }
+  .lightbox-inner { position: relative; max-width: 95vw; max-height: 90vh; }
+  .lightbox-inner img { max-width: 95vw; max-height: 85vh; border-radius: 6px; box-shadow: 0 4px 30px rgba(0,0,0,0.5); }
+  .lightbox-controls { position: absolute; top: -40px; right: 0; display: flex; gap: 10px; }
+  .lightbox-btn { background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); color: #fff; font-size: 0.85rem; font-weight: 700; padding: 6px 14px; border-radius: 4px; cursor: pointer; font-family: inherit; letter-spacing: 0.04em; }
+  .lightbox-btn:hover { background: rgba(255,255,255,0.25); }
+  .btn-export { background: var(--gold); color: #fff; padding: 10px 20px; font-size: 0.9rem; letter-spacing: 0.06em; margin-top: 16px; width: 100%; }
+  .btn-export:hover { background: var(--gold-hover); }
+  @media print {
+    body * { visibility: hidden; }
+    #shiftReport, #shiftReport * { visibility: visible; }
+    #shiftReport { position: absolute; left: 0; top: 0; width: 100%; }
   }
-
-  .citation-text {
-    font-size: 0.88rem;
-    color: var(--text-secondary);
-    line-height: 1.45;
-  }
-
-  .timestamp {
-    font-size: 0.75rem;
-    color: var(--label);
-    text-align: right;
-    padding-top: 8px;
-  }
-
   @media (max-width: 500px) {
     html { font-size: 17px; }
     header h1 { font-size: 1.5rem; }
     header span { display: none; }
+    .auth-brand h1 { font-size: 2.6rem; letter-spacing: 0.24em; }
+    .auth-brand .subtitle { font-size: 0.6rem; letter-spacing: 0.12em; }
+    .auth-seal { width: 44px; height: 44px; }
+    .auth-panel-header, .auth-terms, .auth-panel-footer { padding-left: 24px; padding-right: 24px; }
+    .auth-panel-header { padding-top: 28px; padding-bottom: 24px; }
+    .auth-terms { padding-top: 24px; padding-bottom: 24px; }
+    .auth-panel-footer { padding-top: 22px; padding-bottom: 28px; }
+    .auth-term { font-size: 0.7rem; }
     .metrics-row { grid-template-columns: 1fr; }
-    .metrics-row .field {
-      border-right: none;
-      border-bottom: 1px solid #e8e8e8;
-      text-align: left;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-    }
+    .metrics-row .field { border-right: none; border-bottom: 1px solid #e8e5de; text-align: left; display: flex; justify-content: space-between; align-items: center; }
   }
 </style>
 </head>
 <body>
 
+<div class="auth-screen" id="authScreen">
+  <div class="auth-brand">
+    <svg class="auth-seal" width="56" height="56" viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="28" cy="28" r="26" stroke="#c9a84c" stroke-width="1.2" opacity="0.7"/>
+      <circle cx="28" cy="28" r="22" stroke="#c9a84c" stroke-width="0.5" opacity="0.35"/>
+      <line x1="28" y1="10" x2="28" y2="46" stroke="#c9a84c" stroke-width="0.6" opacity="0.5"/>
+      <line x1="10" y1="28" x2="46" y2="28" stroke="#c9a84c" stroke-width="0.6" opacity="0.5"/>
+      <polygon points="28,12 26.5,18 29.5,18" fill="#c9a84c" opacity="0.6"/>
+      <polygon points="28,44 26.5,38 29.5,38" fill="#c9a84c" opacity="0.6"/>
+      <polygon points="12,28 18,26.5 18,29.5" fill="#c9a84c" opacity="0.6"/>
+      <polygon points="44,28 38,26.5 38,29.5" fill="#c9a84c" opacity="0.6"/>
+      <circle cx="28" cy="28" r="5" stroke="#c9a84c" stroke-width="0.8" opacity="0.5"/>
+      <circle cx="28" cy="28" r="1.5" fill="#c9a84c" opacity="0.5"/>
+    </svg>
+    <h1>CARL</h1>
+    <div class="subtitle">Compliance Assistance and Regulatory Liaison</div>
+  </div>
+  <div class="auth-rule"></div>
+  <div class="auth-panel">
+    <div class="auth-panel-header">
+      <div class="auth-input-label">Access Code</div>
+      <input type="password" id="passwordInput" placeholder="Enter access code" autocomplete="off">
+    </div>
+    <div class="auth-terms">
+      <div class="auth-terms-title">Terms of Use</div>
+      <div class="auth-term"><span class="auth-term-num">I.</span> <strong>Reference Tool Only.</strong> CARL is an automated reference tool that retrieves and evaluates regulatory citations. It does not replace professional engineering judgment, code authority interpretation, or official inspection findings.</div>
+      <div class="auth-term"><span class="auth-term-num">II.</span> <strong>Citation Verification Required.</strong> All citations, regulatory references, and compliance evaluations generated by CARL must be independently verified against current editions of the applicable standards before use in official documentation.</div>
+      <div class="auth-term"><span class="auth-term-num">III.</span> <strong>Inspector Responsibility.</strong> The inspector of record retains full responsibility for all findings, non-conformance determinations, and corrective action directives. CARL output does not constitute an official inspection result.</div>
+      <div class="auth-term"><span class="auth-term-num">IV.</span> <strong>Data Handling.</strong> Observations, photos, and evaluation results are transmitted to cloud-based processing services. Do not submit classified, controlled unclassified information, or personally identifiable information through this tool.</div>
+      <div class="auth-term"><span class="auth-term-num">V.</span> <strong>No Warranty.</strong> CARL is provided as-is with no warranty of accuracy, completeness, or fitness for any particular purpose. Citation accuracy depends on the quality and currency of the reference library.</div>
+    </div>
+    <div class="auth-panel-footer">
+      <label class="auth-ack">
+        <input type="checkbox" id="disclaimerCheck" onchange="document.getElementById('authBtn').disabled = !this.checked">
+        <span class="auth-ack-label">I have read and acknowledge the terms of use set forth above.</span>
+      </label>
+      <button class="auth-btn" id="authBtn" onclick="authenticate()" disabled>Authenticate</button>
+      <div class="auth-error" id="authError">Invalid access code.</div>
+    </div>
+  </div>
+  <a href="index.html" class="auth-back">&larr; Return to carlcompliance.com</a>
+</div>
+
+<div class="app-content" id="appContent">
 <header>
   <h1>CARL</h1>
-  <span>Construction Assistance and Reference Library</span>
+  <span>Compliance Assistance and Regulatory Liaison</span>
+  <div class="status-bar">
+    <div class="status-dot-wrap"><div class="status-dot" id="dotDocLib"></div><span class="status-label">Doc Library</span><span class="status-tooltip" id="tipDocLib">Awaiting first query</span></div>
+    <div class="status-dot-wrap"><div class="status-dot" id="dotEval"></div><span class="status-label">Eval Engine</span><span class="status-tooltip" id="tipEval">Awaiting first query</span></div>
+    <div class="status-dot-wrap"><div class="status-dot" id="dotCrossCheck"></div><span class="status-label">CrossCheck</span><span class="status-tooltip" id="tipCrossCheck">Awaiting first query</span></div>
+  </div>
 </header>
-
 <main>
-  <div style="margin-bottom: 20px;">
+  <div style="margin-bottom:20px;">
     <div class="section-label">Field Observation</div>
     <textarea id="observation" placeholder="Enter field observation..." autocomplete="off" spellcheck="true"></textarea>
+    <div class="photo-preview" id="photoPreview">
+      <img id="photoThumb" src="" alt="Attached photo">
+      <button class="photo-remove" onclick="removePhoto()">&#x2715;</button>
+    </div>
     <div class="btn-row">
       <button class="btn-submit" id="submitBtn" onclick="submitObservation()">SUBMIT</button>
       <button class="btn-clear" onclick="clearAll()">CLEAR</button>
+      <button class="btn-mic" id="micBtn" onclick="toggleMic()" title="Voice input">&#x1F3A4;</button>
+      <button class="btn-photo" onclick="document.getElementById('photoInput').click()" title="Attach photo">&#x1F4F7;</button>
+      <input type="file" id="photoInput" accept="image/*" style="display:none" onchange="handlePhoto(this)">
     </div>
   </div>
-
-  <div class="loading" id="loading">
-    <div class="spinner"></div>
-    <span>Querying NotebookLM and evaluating citations...</span>
-  </div>
-
+  <div class="loading" id="loading"><div class="spinner"></div><span>Searching compliance library... Evaluating regulatory requirements... Verifying citations...</span></div>
   <div class="error-msg" id="errorMsg"></div>
-
   <div class="results" id="results">
     <div class="section-label">Evaluation Result</div>
     <div class="result-card">
       <div class="result-header">
-        <h2>AF IMT 1477 — Page 2 Entry</h2>
+        <h2>Field Inspection Entry</h2>
+        <button class="btn-tts" id="ttsBtn" onclick="toggleTts()" title="Read result aloud">&#x1F50A;</button>
         <span class="eval-badge" id="evalBadge"></span>
       </div>
       <div class="result-body">
-        <div class="field">
-          <div class="field-label">Discipline</div>
-          <div class="field-value" id="rDiscipline"></div>
-        </div>
-        <div class="field">
-          <div class="field-label">Non-Conformance Description</div>
-          <div class="field-value" id="rDescription"></div>
-        </div>
-        <div class="field">
-          <div class="field-label">Primary Regulatory Citation</div>
-          <div class="field-value mono" id="rCitation"></div>
-        </div>
-
+        <div class="field"><div class="field-label">Discipline</div><div class="field-value" id="rDiscipline"></div></div>
+        <div class="field"><div class="field-label" id="rDescriptionLabel">Non-Conformance Description</div><div class="field-value" id="rDescription"></div></div>
+        <div class="field"><div class="field-label">Primary Regulatory Citation</div><div class="field-value mono" id="rCitation"></div></div>
         <div class="metrics-row">
-          <div class="field">
-            <div class="field-label">Confidence</div>
-            <div class="field-value" id="rConfidence"></div>
-          </div>
-          <div class="field">
-            <div class="field-label">Applicability</div>
-            <div class="field-value" id="rApplicability"></div>
-          </div>
-          <div class="field">
-            <div class="field-label">Provenance</div>
-            <div class="field-value provenance" id="rProvenance"></div>
-          </div>
+          <div class="field"><div class="field-label">Confidence</div><div class="field-value" id="rConfidence"></div></div>
+          <div class="field"><div class="field-label">Applicability</div><div class="field-value" id="rApplicability"></div></div>
+          <div class="field"><div class="field-label">Verified By</div><div class="field-value provenance" id="rProvenance"></div></div>
         </div>
-
-        <div class="field">
-          <div class="field-label">Evaluation Rationale</div>
-          <div class="field-value" id="rRationale"></div>
-        </div>
-        <div class="field">
-          <div class="field-label">Corrective Action Required</div>
-          <div class="field-value" id="rAction"></div>
-        </div>
-
-        <div class="citations-section" id="citationsSection">
-          <div class="field-label">Retrieved Citations</div>
-          <div id="citationsList"></div>
-        </div>
-
+        <div class="citations-section" id="additionalCitationsSection" style="display:none;"><div class="field-label">Additional Regulatory Citations <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:0.68rem;color:var(--label);">(supplemental references)</span></div><div id="additionalCitationsList"></div></div>
+        <div class="field"><div class="field-label">Evaluation Rationale</div><div class="field-value" id="rRationale"></div></div>
+        <div class="field" id="rActionField"><div class="field-label">Corrective Action Required</div><div class="field-value" id="rAction"></div></div>
+        <div class="field" id="rPhotoField" style="display:none;"><div class="field-label">Site Photo</div><div class="field-value"><img id="rPhoto" class="result-thumbnail" src="" alt="Site photo" style="cursor:pointer;" onclick="openLightbox(this.src)"></div></div>
         <div class="timestamp" id="rTimestamp"></div>
       </div>
     </div>
   </div>
+  <div style="display:flex;gap:10px;">
+    <button class="btn-dailylog" style="flex:1;" onclick="loadDailyLog()">DAILY LOG</button>
+    <button class="btn-export" style="flex:1;" onclick="exportShiftReport()">EXPORT SHIFT REPORT</button>
+  </div>
+  <div class="daily-log" id="dailyLog"><div class="section-label">Daily Log</div><div id="dailyLogContent"><div class="log-loading">Loading...</div></div></div>
 </main>
+<div class="lightbox" id="lightbox" onclick="closeLightbox(event)">
+  <div class="lightbox-inner">
+    <div class="lightbox-controls">
+      <button class="lightbox-btn" id="lightboxDownload" onclick="downloadLightboxImage(event)">&#x2B07; SAVE</button>
+      <button class="lightbox-btn" onclick="closeLightbox(event,true)">&times; CLOSE</button>
+    </div>
+    <img id="lightboxImg" src="" alt="Full size photo">
+  </div>
+</div>
+<div id="shiftReport" style="display:none;"></div>
+</div>
 
 <script>
-const WEBHOOK_URL = 'http://localhost:8081/carl-verify';
+var WEBHOOK_URL = 'https://n8n.gjbishop.com/webhook/carl-verify';
+var DAILY_REPORT_URL = 'https://n8n.gjbishop.com/webhook/carl-daily-report';
+var ACCESS_CODE = 'CARL2026';
+var ELEVENLABS_API_KEY = 'sk_09414f333a8dd1011bc283498604214bf5e95ce85d270000';
+var attachedPhotoBase64 = null;
+var attachedThumbBase64 = null;
+var lastResultData = null;
+var ttsAudio = null;
+var ttsPlaying = false;
+var micRecording = false;
+var mediaRecorder = null;
+var audioChunks = [];
+var lightboxMeta = {};
+
+function authenticate() {
+  var input = document.getElementById('passwordInput');
+  var error = document.getElementById('authError');
+  if (input.value === ACCESS_CODE) {
+    document.getElementById('authScreen').style.display = 'none';
+    document.getElementById('appContent').classList.add('visible');
+    document.getElementById('observation').focus();
+  } else {
+    error.classList.add('visible');
+    input.value = '';
+    input.focus();
+  }
+}
+
+document.getElementById('passwordInput').addEventListener('keydown', function(e) {
+  if (e.key === 'Enter') { e.preventDefault(); authenticate(); }
+});
 
 async function submitObservation() {
-  const textarea = document.getElementById('observation');
-  const text = textarea.value.trim();
+  var textarea = document.getElementById('observation');
+  var text = textarea.value.trim();
   if (!text) { textarea.focus(); return; }
-
-  const btn = document.getElementById('submitBtn');
-  const loading = document.getElementById('loading');
-  const errorMsg = document.getElementById('errorMsg');
-  const results = document.getElementById('results');
-
+  var btn = document.getElementById('submitBtn');
+  var loading = document.getElementById('loading');
+  var errorMsg = document.getElementById('errorMsg');
+  var results = document.getElementById('results');
   btn.disabled = true;
   loading.classList.add('visible');
   errorMsg.classList.remove('visible');
   results.classList.remove('visible');
-
   try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 180000);
-
-    const resp = await fetch(WEBHOOK_URL, {
-      method: 'POST',
-      mode: 'cors',
+    var controller = new AbortController();
+    var timeout = setTimeout(function() { controller.abort(); }, 180000);
+    var resp = await fetch(WEBHOOK_URL, {
+      method: 'POST', mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ observation: text }),
+      body: JSON.stringify(attachedPhotoBase64 ? { observation: text, image: attachedPhotoBase64, image_thumbnail: attachedThumbBase64 } : { observation: text }),
       signal: controller.signal
     });
-
     clearTimeout(timeout);
-
-    if (!resp.ok) {
-      throw new Error('Webhook returned HTTP ' + resp.status);
-    }
-
-    const data = await resp.json();
-
-    if (data.error && !data.discipline) {
-      throw new Error(data.error);
-    }
-
+    if (!resp.ok) throw new Error('Webhook returned HTTP ' + resp.status);
+    var data = await resp.json();
+    if (data.error && !data.discipline) throw new Error(data.error);
     renderResults(data);
   } catch (err) {
-    let msg = 'Request failed: ';
-    if (err.name === 'AbortError') {
-      msg += 'Request timed out (180s). The server may be busy.';
-    } else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) {
-      msg += 'Unable to reach the CARL webhook. Check your network connection.';
-    } else {
-      msg += err.message;
-    }
+    var msg = 'Request failed: ';
+    if (err.name === 'AbortError') msg += 'Request timed out (180s).';
+    else if (err.message.includes('Failed to fetch') || err.message.includes('NetworkError')) msg += 'Unable to reach the CARL webhook. Check your network connection.';
+    else msg += err.message;
     errorMsg.textContent = msg;
     errorMsg.classList.add('visible');
   } finally {
@@ -476,98 +402,297 @@ async function submitObservation() {
   }
 }
 
+function escapeHtml(str) { var div = document.createElement('div'); div.textContent = str; return div.innerHTML; }
+
 function renderResults(d) {
-  const results = document.getElementById('results');
-
-  // Eval badge
-  const badge = document.getElementById('evalBadge');
-  const evalType = d.citation_evaluation || 'UNKNOWN';
-  badge.textContent = evalType;
+  var badge = document.getElementById('evalBadge');
+  var evalType = d.citation_evaluation || 'UNKNOWN';
+  badge.textContent = displayEvalType(evalType);
   badge.className = 'eval-badge eval-' + evalType;
-
-  // Fields
+  var descLabel = evalType === 'COMPLIANT' ? 'Compliance Observation' : evalType === 'CONFIRMED' ? 'Non-Conformance Description' : evalType === 'CHALLENGED' ? 'Field Observation' : 'Observation Summary';
+  document.getElementById('rDescriptionLabel').textContent = descLabel;
   document.getElementById('rDiscipline').textContent = d.discipline || '—';
-  document.getElementById('rDescription').textContent = d.non_conformance_description || '—';
+  document.getElementById('rDescription').textContent = d.non_conformance_description || d.observation_summary || '—';
   document.getElementById('rCitation').textContent = d.primary_regulatory_citation || '—';
-
-  // Confidence with color
-  const conf = document.getElementById('rConfidence');
-  const score = d.confidence_score;
+  var addCitList = document.getElementById('additionalCitationsList');
+  var addCitSection = document.getElementById('additionalCitationsSection');
+  addCitList.innerHTML = '';
+  var addCitations = d.additional_regulatory_citations || [];
+  if (addCitations.length === 0) { addCitSection.style.display = 'none'; } else {
+    addCitSection.style.display = 'block';
+    addCitations.forEach(function(c) {
+      var item = document.createElement('div'); item.className = 'citation-item';
+      var source = (c.sourceName || 'Unknown') + ' ' + (c.section || '');
+      var status = c.verification_status || '';
+      var badgeClass = status === 'DUAL CONFIRMED' ? 'badge-dual' : status === 'TRIPLE CONFIRMED' ? 'badge-triple' : status === 'UNVERIFIED' ? 'badge-unverified' : 'badge-ref';
+      var confDisplay = (typeof c.verification_confidence === 'number') ? ' ' + c.verification_confidence.toFixed(2) : '';
+      var displayStatus = displayVerificationStatus(status);
+      var badgeHtml = displayStatus ? '<span class="verification-badge ' + badgeClass + '">' + escapeHtml(displayStatus) + confDisplay + '</span>' : '';
+      item.innerHTML = '<div class="citation-source">' + escapeHtml(source.trim()) + badgeHtml + '</div><div class="citation-text">' + escapeHtml(c.requirement || '') + '</div>';
+      addCitList.appendChild(item);
+    });
+  }
+  var conf = document.getElementById('rConfidence');
+  var score = d.confidence_score;
   conf.textContent = score != null ? score.toFixed(2) : '—';
   conf.className = 'field-value';
   if (score >= 0.90) conf.classList.add('confidence-high');
   else if (score >= 0.60) conf.classList.add('confidence-mid');
   else if (score != null) conf.classList.add('confidence-low');
-
   document.getElementById('rApplicability').textContent = d.applicability || '—';
-
-  // Provenance with color
-  const prov = document.getElementById('rProvenance');
-  prov.textContent = d.provenance || '—';
+  var prov = document.getElementById('rProvenance');
+  prov.textContent = displayProvenance(d.provenance);
   prov.className = 'field-value provenance';
-  if (d.provenance === 'LOOP CONFIRMED') prov.classList.add('prov-loop');
+  if (evalType === 'COMPLIANT') prov.classList.add('prov-compliant');
+  else if (d.provenance === 'TRIPLE CONFIRMED') prov.classList.add('prov-triple');
+  else if (d.provenance === 'LOOP CONFIRMED') prov.classList.add('prov-loop');
   else if (d.provenance && d.provenance.includes('PARAMETRIC')) prov.classList.add('prov-parametric');
-
   document.getElementById('rRationale').textContent = d.evaluation_rationale || '—';
-  document.getElementById('rAction').textContent = d.corrective_action_required || '—';
+  var actionField = document.getElementById('rActionField');
+  var actionText = d.corrective_action_required || '—';
+  if (evalType === 'COMPLIANT' && actionText === 'None -- observation meets applicable requirements') { actionField.style.display = 'none'; } else { actionField.style.display = ''; document.getElementById('rAction').textContent = actionText; }
+  updateStatusLights(d);
+  var photoField = document.getElementById('rPhotoField');
+  if (d.image_thumbnail) { document.getElementById('rPhoto').src = 'data:image/jpeg;base64,' + d.image_thumbnail; photoField.style.display = ''; } else { photoField.style.display = 'none'; }
+  document.getElementById('rTimestamp').textContent = d.processed_at ? 'Processed: ' + new Date(d.processed_at).toLocaleString() : '';
+  document.getElementById('results').classList.add('visible');
+  document.getElementById('results').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  lastResultData = d;
+  stopTtsAudio();
+  var ttsBtn = document.getElementById('ttsBtn');
+  ttsBtn.classList.add('visible'); ttsBtn.classList.remove('loading'); ttsBtn.innerHTML = '&#x1F50A;';
+}
 
-  // Citations
-  const citList = document.getElementById('citationsList');
-  const citSection = document.getElementById('citationsSection');
-  citList.innerHTML = '';
-  const citations = d.retrieved_citations || [];
+function clearAll() { document.getElementById('observation').value = ''; document.getElementById('results').classList.remove('visible'); document.getElementById('errorMsg').classList.remove('visible'); removePhoto(); document.getElementById('observation').focus(); }
 
-  if (citations.length === 0) {
-    citSection.style.display = 'none';
-  } else {
-    citSection.style.display = 'block';
-    citations.forEach(c => {
-      const item = document.createElement('div');
-      item.className = 'citation-item';
+function handlePhoto(input) {
+  var file = input.files && input.files[0]; if (!file) return;
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    var img = new Image();
+    img.onload = function() {
+      var maxDim = 1024, w = img.width, h = img.height;
+      if (w > maxDim || h > maxDim) { if (w > h) { h = Math.round(h * maxDim / w); w = maxDim; } else { w = Math.round(w * maxDim / h); h = maxDim; } }
+      var canvas = document.createElement('canvas'); canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      var dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+      attachedPhotoBase64 = dataUrl.split(',')[1];
+      var tw = img.width, th = img.height, thumbMax = 600;
+      if (tw > thumbMax || th > thumbMax) { if (tw > th) { th = Math.round(th * thumbMax / tw); tw = thumbMax; } else { tw = Math.round(tw * thumbMax / th); th = thumbMax; } }
+      var tc = document.createElement('canvas'); tc.width = tw; tc.height = th;
+      tc.getContext('2d').drawImage(img, 0, 0, tw, th);
+      attachedThumbBase64 = tc.toDataURL('image/jpeg', 0.85).split(',')[1];
+      document.getElementById('photoThumb').src = dataUrl;
+      document.getElementById('photoPreview').classList.add('visible');
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file); input.value = '';
+}
 
-      const docName = c.sourceName || c.standard || '';
-      const section = c.section || '';
-      const source = docName && section ? docName + ' ' + section : docName || section || 'Unknown Source';
-      const text = c.sourceText || c.relevance || '';
+function removePhoto() { attachedPhotoBase64 = null; attachedThumbBase64 = null; document.getElementById('photoThumb').src = ''; document.getElementById('photoPreview').classList.remove('visible'); document.getElementById('photoInput').value = ''; }
 
-      item.innerHTML =
-        '<div class="citation-source">' + escapeHtml(source) + '</div>' +
-        '<div class="citation-text">' + escapeHtml(text.substring(0, 400)) +
-        (text.length > 400 ? '...' : '') + '</div>';
+document.getElementById('observation').addEventListener('keydown', function(e) { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); submitObservation(); } });
 
-      citList.appendChild(item);
+function toggleMic() { var btn = document.getElementById('micBtn'); if (btn.classList.contains('transcribing')) return; if (micRecording) stopMic(); else startMic(); }
+
+function startMic() {
+  navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream) {
+    mediaRecorder = new MediaRecorder(stream); audioChunks = [];
+    mediaRecorder.ondataavailable = function(e) { if (e.data.size > 0) audioChunks.push(e.data); };
+    mediaRecorder.onstop = function() { stream.getTracks().forEach(function(t) { t.stop(); }); transcribeAudio(new Blob(audioChunks, { type: mediaRecorder.mimeType })); };
+    mediaRecorder.start(); micRecording = true;
+    var btn = document.getElementById('micBtn'); btn.classList.add('recording'); btn.innerHTML = '&#x23F9;'; btn.title = 'Stop recording';
+  }).catch(function(err) { alert('Microphone access denied: ' + err.message); });
+}
+
+function stopMic() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  micRecording = false;
+  var btn = document.getElementById('micBtn'); btn.classList.remove('recording'); btn.classList.add('transcribing'); btn.innerHTML = '&#x23F3;'; btn.title = 'Transcribing...';
+}
+
+async function transcribeAudio(blob) {
+  var btn = document.getElementById('micBtn'); var textarea = document.getElementById('observation'); var savedValue = textarea.value;
+  textarea.value = 'Transcribing...'; textarea.disabled = true;
+  try {
+    var ext = 'webm', mime = blob.type || '';
+    if (mime.includes('mp4')) ext = 'mp4'; else if (mime.includes('ogg')) ext = 'ogg';
+    var formData = new FormData(); formData.append('file', blob, 'recording.' + ext); formData.append('model_id', 'scribe_v1');
+    var resp = await fetch('https://api.elevenlabs.io/v1/speech-to-text', { method: 'POST', headers: { 'xi-api-key': ELEVENLABS_API_KEY }, body: formData });
+    if (!resp.ok) throw new Error('Transcription failed HTTP ' + resp.status);
+    var data = await resp.json(); var transcribed = data.text || '';
+    if (transcribed) { if (savedValue && !savedValue.endsWith(' ') && !savedValue.endsWith('\n')) savedValue += ' '; textarea.value = savedValue + transcribed; } else { textarea.value = savedValue; }
+    textarea.focus();
+  } catch (err) { textarea.value = savedValue; document.getElementById('errorMsg').textContent = 'Transcription error: ' + err.message; document.getElementById('errorMsg').classList.add('visible'); }
+  finally { textarea.disabled = false; btn.classList.remove('transcribing'); btn.innerHTML = '&#x1F3A4;'; btn.title = 'Voice input'; }
+}
+
+function stopTtsAudio() { if (ttsAudio) { ttsAudio.pause(); if (ttsAudio.src) URL.revokeObjectURL(ttsAudio.src); ttsAudio = null; } ttsPlaying = false; }
+
+async function toggleTts() {
+  var btn = document.getElementById('ttsBtn');
+  if (ttsPlaying) { stopTtsAudio(); btn.innerHTML = '&#x1F50A;'; return; }
+  if (!lastResultData) return;
+  var d = lastResultData;
+  var summary = 'Discipline: ' + (d.discipline || 'unknown') + '. Citation: ' + (d.primary_regulatory_citation || 'no citation') + '. Action: ' + (d.corrective_action_required || 'no corrective action') + '.';
+  btn.classList.add('loading'); btn.innerHTML = '&#x23F3;';
+  try {
+    var resp = await fetch('https://api.elevenlabs.io/v1/text-to-speech/LyZq9ggDlPpK7b17wpjG', { method: 'POST', headers: { 'xi-api-key': ELEVENLABS_API_KEY, 'Content-Type': 'application/json' }, body: JSON.stringify({ model_id: 'eleven_turbo_v2', text: summary }) });
+    if (!resp.ok) { btn.classList.remove('loading'); btn.innerHTML = '&#x1F50A;'; return; }
+    var url = URL.createObjectURL(await resp.blob());
+    stopTtsAudio(); ttsAudio = new Audio(url); ttsPlaying = true;
+    btn.classList.remove('loading'); btn.innerHTML = '&#x23F8;';
+    ttsAudio.onended = function() { URL.revokeObjectURL(url); ttsAudio = null; ttsPlaying = false; btn.innerHTML = '&#x1F50A;'; };
+    ttsAudio.play().catch(function() { ttsPlaying = false; btn.innerHTML = '&#x1F50A;'; });
+  } catch (err) { btn.classList.remove('loading'); btn.innerHTML = '&#x1F50A;'; }
+}
+
+async function loadDailyLog() {
+  var logDiv = document.getElementById('dailyLog'); var content = document.getElementById('dailyLogContent');
+  if (logDiv.classList.contains('visible')) { logDiv.classList.remove('visible'); return; }
+  logDiv.classList.add('visible'); content.innerHTML = '<div class="log-loading">Loading daily log...</div>';
+  try {
+    var resp = await fetch(DAILY_REPORT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: new Date().toISOString().split('T')[0] }) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json();
+    var html = '<div class="log-summary"><h3>Report: ' + escapeHtml(data.report_date) + '</h3><div class="log-stat"><strong>' + data.total_observations + '</strong> observations today</div>';
+    var disc = data.discipline_breakdown || {}; var discKeys = Object.keys(disc);
+    if (discKeys.length > 0) html += '<div class="log-stat">Disciplines: ' + discKeys.map(function(k) { return escapeHtml(k) + ' (' + disc[k] + ')'; }).join(', ') + '</div>';
+    if (data.verification_count > 0) html += '<div class="log-stat" style="color:var(--insufficient);font-weight:600;">' + data.verification_count + ' entries need manual citation verification</div>';
+    html += '</div>';
+    var entries = data.entries || [];
+    if (entries.length === 0) { html += '<div class="log-loading">No entries for today.</div>'; } else {
+      entries.forEach(function(e, idx) {
+        var prov = e.provenance || ''; var citeEval = e.citation_evaluation || '';
+        var provClass = citeEval === 'COMPLIANT' ? 'log-prov-compliant' : prov === 'TRIPLE CONFIRMED' ? 'log-prov-triple' : prov === 'DUAL CONFIRMED' ? 'log-prov-dual' : prov.includes('PARAMETRIC') ? 'log-prov-parametric' : prov.includes('TIEBREAKER') ? 'log-prov-dual' : 'log-prov-other';
+        var entryId = 'logEntry' + idx;
+        html += '<div class="log-entry" id="' + entryId + '"><div class="log-entry-summary" onclick="toggleLogEntry(\'' + entryId + '\')">';
+        html += '<div class="log-entry-header"><span class="log-entry-disc"><span class="log-expand-arrow">&#x25B6;</span> ' + escapeHtml(e.discipline) + '</span>';
+        html += '<span style="display:flex;align-items:center;gap:6px;"><span class="log-entry-prov ' + provClass + '">' + escapeHtml(displayProvenance(prov)) + '</span>';
+        if (e.processed_at) html += '<button class="log-entry-delete" onclick="event.stopPropagation();deleteLogEntry(\'' + escapeHtml(e.processed_at) + '\')">&times;</button>';
+        html += '</span></div><div class="log-entry-obs">' + escapeHtml((e.observation_text || '').substring(0, 200)) + '</div>';
+        if (e.primary_regulatory_citation) html += '<div class="log-entry-cite">' + escapeHtml(e.primary_regulatory_citation) + '</div>';
+        html += '<div class="log-entry-time">' + escapeHtml(e.entry_time || '') + ' &middot; Confidence: ' + (e.confidence_score != null ? e.confidence_score.toFixed(2) : '?') + '</div></div>';
+        html += '<div class="log-entry-detail">';
+        var descLabel = citeEval === 'COMPLIANT' ? 'Compliance Observation' : citeEval === 'CONFIRMED' ? 'Non-Conformance Description' : citeEval === 'CHALLENGED' ? 'Field Observation' : 'Observation Summary';
+        var descText = e.non_conformance_description || e.observation_summary || e.observation_text || '';
+        if (descText) html += '<div class="log-detail-field"><div class="log-detail-label">' + escapeHtml(descLabel) + '</div><div class="log-detail-value">' + escapeHtml(descText) + '</div></div>';
+        if (e.evaluation_rationale) html += '<div class="log-detail-field"><div class="log-detail-label">Evaluation Rationale</div><div class="log-detail-value">' + escapeHtml(e.evaluation_rationale) + '</div></div>';
+        var actionText = e.corrective_action_required || '';
+        if (actionText && !(citeEval === 'COMPLIANT' && actionText === 'None -- observation meets applicable requirements')) html += '<div class="log-detail-field"><div class="log-detail-label">Corrective Action Required</div><div class="log-detail-value">' + escapeHtml(actionText) + '</div></div>';
+        if (e.image_thumbnail) html += '<div class="log-detail-field"><div class="log-detail-label">Site Photo</div><img class="log-detail-thumbnail" src="data:image/jpeg;base64,' + e.image_thumbnail + '" alt="Site photo" style="cursor:pointer;" onclick="openLightbox(this.src)"></div>';
+        html += '</div></div>';
+      });
+    }
+    content.innerHTML = html;
+  } catch (err) { content.innerHTML = '<div class="log-loading" style="color:var(--insufficient);">Failed to load: ' + escapeHtml(err.message) + '</div>'; }
+}
+
+function toggleLogEntry(id) { document.getElementById(id).classList.toggle('expanded'); }
+
+async function deleteLogEntry(processedAt) {
+  if (!confirm('Delete this entry?')) return;
+  try {
+    var resp = await fetch(DAILY_REPORT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action: 'delete', processed_at: processedAt }) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json(); if (!data.success) throw new Error(data.error || 'Delete failed');
+    document.getElementById('dailyLog').classList.remove('visible'); loadDailyLog();
+  } catch (err) { alert('Failed to delete: ' + err.message); }
+}
+
+function displayProvenance(prov) {
+  if (!prov) return '—';
+  if (prov === 'TRIPLE CONFIRMED') return 'Primary \u2014 Dual Verified';
+  if (prov === 'LOOP CONFIRMED') return 'Primary \u2014 Verified';
+  if (prov === 'DUAL CONFIRMED') return 'Standards \u2014 Dual Verified';
+  if (prov === 'TIEBREAKER CONFIRMED') return 'Conflict Resolved';
+  if (prov.includes('TIEBREAKER REJECTED')) return 'Conflict \u2014 Verify';
+  if (prov.includes('PARAMETRIC')) return 'Standards \u2014 Verify';
+  return prov;
+}
+
+function displayVerificationStatus(status) {
+  if (!status) return '';
+  if (status === 'DUAL CONFIRMED') return 'Standards \u2014 Dual Verified';
+  if (status === 'TRIPLE CONFIRMED') return 'Primary \u2014 Dual Verified';
+  if (status === 'REFERENCE ONLY') return 'Standards \u2014 Verified';
+  if (status === 'UNVERIFIED') return 'Pending Verification';
+  return status;
+}
+
+function displayEvalType(evalType) {
+  if (evalType === 'CONFIRMED') return 'Non-Compliant';
+  if (evalType === 'COMPLIANT') return 'Compliant';
+  if (evalType === 'CHALLENGED') return 'Under Review';
+  if (evalType === 'INSUFFICIENT') return 'Inconclusive';
+  return evalType;
+}
+
+function updateStatusLights(d) {
+  var dotDoc = document.getElementById('dotDocLib'); var tipDoc = document.getElementById('tipDocLib');
+  var dotEval = document.getElementById('dotEval'); var tipEval = document.getElementById('tipEval');
+  var dotCC = document.getElementById('dotCrossCheck'); var tipCC = document.getElementById('tipCrossCheck');
+  var prov = d.provenance || ''; var hasCitations = (d.retrieved_citations || []).length > 0;
+  var isParametric = prov.includes('PARAMETRIC') || (d.primary_citation_source === 'parametric');
+  if (hasCitations) { dotDoc.className = 'status-dot green'; tipDoc.textContent = 'Library returned ' + d.retrieved_citations.length + ' citations'; }
+  else if (isParametric) { dotDoc.className = 'status-dot red'; tipDoc.textContent = 'Library unavailable \u2014 using standards knowledge base'; }
+  else { dotDoc.className = 'status-dot yellow'; tipDoc.textContent = 'No citations retrieved'; }
+  dotEval.className = 'status-dot green'; tipEval.textContent = displayEvalType(d.citation_evaluation || 'Unknown') + ' \u2014 confidence ' + (d.confidence_score != null ? d.confidence_score.toFixed(2) : '?');
+  var ccConf = d.crosscheck_confidence; var ccConfirmed = d.crosscheck_confirmed; var gemUnavail = d.gemini_unavailable === true;
+  if (gemUnavail) { dotCC.className = 'status-dot red'; tipCC.textContent = 'Cross-check unavailable'; }
+  else if (ccConfirmed && typeof ccConf === 'number' && ccConf > 0.75) { dotCC.className = 'status-dot green'; tipCC.textContent = 'Cross-check passed \u2014 confidence ' + ccConf.toFixed(2); }
+  else if (typeof ccConf === 'number') { dotCC.className = 'status-dot yellow'; tipCC.textContent = 'Cross-check low confidence \u2014 ' + ccConf.toFixed(2); }
+  else { dotCC.className = 'status-dot yellow'; tipCC.textContent = 'Cross-check status unknown'; }
+}
+
+function openLightbox(src) { document.getElementById('lightboxImg').src = src; lightboxMeta.src = src; document.getElementById('lightbox').classList.add('visible'); document.body.style.overflow = 'hidden'; }
+function closeLightbox(e, force) { if (!force && e.target !== document.getElementById('lightbox')) return; document.getElementById('lightbox').classList.remove('visible'); document.body.style.overflow = ''; }
+function downloadLightboxImage(e) {
+  e.stopPropagation();
+  var now = new Date(); var dateStr = now.toISOString().split('T')[0].replace(/-/g,''); var timeStr = now.toTimeString().split(' ')[0].replace(/:/g,'');
+  var disc = (lastResultData && lastResultData.discipline) ? lastResultData.discipline.replace(/\s+/g,'_') : 'observation';
+  var a = document.createElement('a'); a.href = lightboxMeta.src || ''; a.download = 'CARL_' + dateStr + '_' + timeStr + '_' + disc + '.jpg';
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+async function exportShiftReport() {
+  var today = new Date().toISOString().split('T')[0];
+  var reportDiv = document.getElementById('shiftReport');
+  try {
+    var resp = await fetch(DAILY_REPORT_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ date: today }) });
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    var data = await resp.json(); var entries = data.entries || [];
+    var now = new Date(); var dateDisplay = now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    var h = '<style>@page{size:letter;margin:0.75in}#shiftReport{font-family:Georgia,serif;color:#1a1a1a;font-size:11pt;line-height:1.5}.sr-cover{page-break-after:always;text-align:center;padding-top:2in}.sr-cover h1{font-size:36pt;letter-spacing:0.15em;color:#1c2b4a}.sr-subtitle{font-size:10pt;letter-spacing:0.1em;text-transform:uppercase;color:#777;margin-bottom:40px}.sr-date{font-size:14pt;color:#333;margin-bottom:30px}.sr-meta{font-size:10pt;color:#555;margin-bottom:6px}.sr-field{border-bottom:1px solid #ccc;display:inline-block;min-width:250px;padding:2px 0;margin-left:6px}.sr-summary{margin-bottom:20px;padding:12px 16px;border:1px solid #ccc;background:#f8f6f0}.sr-entry{page-break-inside:avoid;border:1px solid #ccc;margin-bottom:14px;overflow:hidden}.sr-entry-header{background:#1c2b4a;color:#fff;padding:8px 14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:6px}.sr-entry-header h4{font-size:11pt;margin:0}.sr-badge{font-size:8pt;font-weight:800;padding:2px 10px;border-radius:3px;text-transform:uppercase}.sr-badge-COMPLIANT{background:#2e8b57;color:#fff}.sr-badge-CONFIRMED{background:#1b6e2a;color:#fff}.sr-badge-CHALLENGED{background:#8b6914;color:#fff}.sr-badge-INSUFFICIENT{background:#a02020;color:#fff}.sr-entry-body{padding:10px 14px}.sr-field-row{padding:6px 0;border-bottom:1px solid #eee}.sr-field-row:last-child{border-bottom:none}.sr-label{font-size:8pt;font-weight:700;text-transform:uppercase;letter-spacing:0.08em;color:#888;margin-bottom:2px}.sr-value{font-size:10pt}.sr-cite-block{background:#f5f3ed;border-left:3px solid #8b6914;padding:6px 10px;margin:4px 0}.sr-cite-src{font-size:8pt;font-weight:700;text-transform:uppercase;color:#8b6914}.sr-cite-text{font-size:9pt;color:#555}.sr-thumb{max-width:180px;max-height:140px;border-radius:4px;border:1px solid #ccc;margin-top:4px}.sr-prov{font-size:9pt;font-weight:700;color:#555;text-align:right;padding-top:6px}.sr-footer{font-size:8pt;color:#999;text-align:center;margin-top:30px;border-top:1px solid #ddd;padding-top:10px}</style>';
+    h += '<div class="sr-cover"><h1>CARL</h1><div class="sr-subtitle">Compliance Assistance and Regulatory Liaison</div><div class="sr-date">' + escapeHtml(dateDisplay) + '</div>';
+    h += '<div class="sr-meta">Project: <span class="sr-field" contenteditable="true">&nbsp;</span></div><div class="sr-meta">Inspector: <span class="sr-field" contenteditable="true">&nbsp;</span></div>';
+    h += '<div class="sr-meta" style="margin-top:20px;">Total Observations: <strong>' + entries.length + '</strong></div></div>';
+    var disc = data.discipline_breakdown || {}; var discKeys = Object.keys(disc);
+    h += '<div class="sr-summary"><strong>' + entries.length + '</strong> observations';
+    if (discKeys.length > 0) h += ' &mdash; ' + discKeys.map(function(k) { return escapeHtml(k) + ' (' + disc[k] + ')'; }).join(', ');
+    h += '</div>';
+    entries.forEach(function(e, idx) {
+      var citeEval = e.citation_evaluation || 'UNKNOWN';
+      var descLabel = citeEval === 'COMPLIANT' ? 'Compliance Observation' : citeEval === 'CONFIRMED' ? 'Non-Conformance Description' : 'Observation';
+      var descText = e.non_conformance_description || e.observation_summary || e.observation_text || '';
+      h += '<div class="sr-entry"><div class="sr-entry-header"><h4>#' + (idx+1) + ' &mdash; ' + escapeHtml(e.discipline||'') + ' &mdash; ' + escapeHtml(e.entry_time||'') + '</h4><span class="sr-badge sr-badge-' + citeEval + '">' + escapeHtml(displayEvalType(citeEval)) + '</span></div><div class="sr-entry-body">';
+      h += '<div class="sr-field-row"><div class="sr-label">' + escapeHtml(descLabel) + '</div><div class="sr-value">' + escapeHtml(descText) + '</div></div>';
+      if (e.primary_regulatory_citation) h += '<div class="sr-field-row"><div class="sr-label">Primary Citation</div><div class="sr-value" style="font-family:monospace;font-size:9pt;">' + escapeHtml(e.primary_regulatory_citation) + '</div></div>';
+      h += '<div class="sr-field-row" style="display:flex;gap:30px;"><div><div class="sr-label">Confidence</div><div class="sr-value">' + (e.confidence_score!=null?e.confidence_score.toFixed(2):'—') + '</div></div>';
+      if (e.applicability) h += '<div><div class="sr-label">Applicability</div><div class="sr-value">' + escapeHtml(e.applicability) + '</div></div>';
+      h += '</div>';
+      if (e.evaluation_rationale) h += '<div class="sr-field-row"><div class="sr-label">Evaluation Rationale</div><div class="sr-value">' + escapeHtml(e.evaluation_rationale) + '</div></div>';
+      var actionText = e.corrective_action_required || '';
+      if (actionText && !(citeEval === 'COMPLIANT' && actionText === 'None -- observation meets applicable requirements')) h += '<div class="sr-field-row"><div class="sr-label">Corrective Action</div><div class="sr-value">' + escapeHtml(actionText) + '</div></div>';
+      if (e.image_thumbnail) h += '<div class="sr-field-row"><div class="sr-label">Site Photo</div><img class="sr-thumb" src="data:image/jpeg;base64,' + e.image_thumbnail + '" alt="Site photo"></div>';
+      h += '<div class="sr-prov">Verified: ' + escapeHtml(displayProvenance(e.provenance)) + '</div></div></div>';
     });
-  }
-
-  // Timestamp
-  document.getElementById('rTimestamp').textContent =
-    d.processed_at ? 'Processed: ' + new Date(d.processed_at).toLocaleString() : '';
-
-  results.classList.add('visible');
-  results.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    h += '<div class="sr-footer">Generated by CARL &mdash; Compliance Assistance and Regulatory Liaison<br>' + escapeHtml(now.toLocaleString()) + '</div>';
+    reportDiv.innerHTML = h; reportDiv.style.display = 'block';
+    setTimeout(function() { window.print(); reportDiv.style.display = 'none'; }, 300);
+  } catch (err) { alert('Failed to generate shift report: ' + err.message); }
 }
-
-function escapeHtml(str) {
-  const div = document.createElement('div');
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function clearAll() {
-  document.getElementById('observation').value = '';
-  document.getElementById('results').classList.remove('visible');
-  document.getElementById('errorMsg').classList.remove('visible');
-  document.getElementById('observation').focus();
-}
-
-// Submit on Ctrl+Enter / Cmd+Enter
-document.getElementById('observation').addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-    e.preventDefault();
-    submitObservation();
-  }
-});
 </script>
-
 </body>
 </html>
