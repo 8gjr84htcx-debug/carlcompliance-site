@@ -381,7 +381,7 @@ async function submitObservation() {
     var resp = await fetch(WEBHOOK_URL, {
       method: 'POST', mode: 'cors',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(attachedPhotoBase64 ? { observation: text, image: attachedPhotoBase64, image_thumbnail: attachedThumbBase64 } : { observation: text }),
+      body: JSON.stringify(attachedPhotoBase64 ? { mode: "query", observation: text, image: attachedPhotoBase64, image_thumbnail: attachedThumbBase64 } : { mode: "query", observation: text }),
       signal: controller.signal
     });
     clearTimeout(timeout);
