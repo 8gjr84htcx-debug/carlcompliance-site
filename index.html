@@ -3,1650 +3,538 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>CARL — Compliance Assistance and Regulatory Liaison</title>
+  <title>The Bishop Foundry &mdash; Force multipliers for professional teams</title>
+  <meta name="description" content="A small house of professional software. Force multipliers for professional teams. Built to multiply what you already do well." />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Spectral:ital,wght@0,300;0,400;0,500;1,300&family=Jost:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,wght@0,400;0,500;0,700;1,400;1,500&family=Lora:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
     :root {
-      --navy:        #0f1c2e;
-      --navy-mid:    #162032;
-      --navy-light:  #1e2d42;
-      --gold:        #b8943a;
-      --gold-light:  #d4ad5a;
-      --gold-dim:    #7a6128;
-      --cream:       #f4f0e6;
-      --cream-warm:  #ede8db;
-      --text-light:  #c8c0ae;
-      --text-mid:    #8a8070;
-      --white:       #ffffff;
+      --oxblood:        #5C1A1A;
+      --oxblood-deep:   #3D0F0F;
+      --cream:          #F5EFE3;
+      --cream-warm:     #E8D5A8;
+      --cream-divider:  #D8C8A8;
+      --ink:            #1A1410;
+      --ink-soft:       #2A1F18;
+      --taupe-warm:     #5C4A33;
+      --taupe-soft:     #8B6F3D;
+      --footer:         #C9B998;
+      --green-status:   #1F3A2C;
     }
 
     html { scroll-behavior: smooth; }
 
     body {
-      background: var(--navy);
-      color: var(--cream);
-      font-family: 'Spectral', Georgia, serif;
-      font-weight: 300;
-      line-height: 1.7;
-      overflow-x: hidden;
+      background: var(--cream);
+      color: var(--ink);
+      font-family: 'Lora', Georgia, serif;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
-    /* ─── NOISE TEXTURE OVERLAY ─── */
-    body::before {
-      content: '';
-      position: fixed;
-      inset: 0;
-      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-      pointer-events: none;
-      z-index: 0;
-      opacity: 0.35;
-    }
+    a { color: inherit; text-decoration: none; }
 
-    /* ─── NAV ─── */
-    nav {
-      position: fixed;
-      top: 0; left: 0; right: 0;
-      z-index: 100;
+    /* ============ HEADER ============ */
+    .header {
+      background: var(--oxblood);
+      padding: 18px 36px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-      padding: 1.25rem 3rem;
-      background: rgba(15, 28, 46, 0.92);
-      backdrop-filter: blur(12px);
-      border-bottom: 1px solid rgba(184, 148, 58, 0.15);
-    }
-
-    .nav-brand {
-      display: flex;
-      align-items: baseline;
-      gap: 0.9rem;
-    }
-
-    .nav-logo {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.5rem;
-      font-weight: 500;
-      letter-spacing: 0.35em;
-      color: var(--white);
-    }
-
-    .nav-tagline {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.2em;
-      color: var(--gold);
-      text-transform: uppercase;
-      opacity: 0.8;
-    }
-
-    .nav-links {
-      display: flex;
       align-items: center;
-      gap: 2.5rem;
-      list-style: none;
+      border-bottom: 0.5px solid var(--oxblood-deep);
     }
 
-    .nav-links a {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-light);
-      text-decoration: none;
-      transition: color 0.25s;
-    }
-
-    .nav-links a:hover { color: var(--gold-light); }
-
-    .nav-cta {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--navy) !important;
-      background: var(--gold);
-      padding: 0.55rem 1.4rem;
-      text-decoration: none;
-      transition: background 0.25s, color 0.25s;
-    }
-
-    .nav-cta:hover { background: var(--gold-light) !important; color: var(--navy) !important; }
-
-    /* ─── HERO ─── */
-    .hero {
-      position: relative;
-      min-height: 100vh;
-      display: flex;
-      flex-direction: column;
+    .header-mark {
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 8rem 2rem 5rem;
-      overflow: hidden;
+      gap: 10px;
     }
 
-    /* radial glow behind hero content */
-    .hero::after {
-      content: '';
-      position: absolute;
-      top: 40%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 700px;
-      height: 700px;
-      background: radial-gradient(ellipse, rgba(184, 148, 58, 0.07) 0%, transparent 70%);
-      pointer-events: none;
+    .bf-small {
+      border-top: 0.5px solid var(--cream-warm);
+      border-bottom: 0.5px solid var(--cream-warm);
+      padding: 1px 8px;
+      font-family: 'Bodoni Moda', serif;
+      font-weight: 700;
+      font-size: 18px;
+      color: var(--cream-warm);
+      letter-spacing: 0.04em;
+      line-height: 1.2;
     }
 
-    /* compass icon */
-    .hero-icon {
-      width: 52px;
-      height: 52px;
-      margin-bottom: 2.5rem;
+    .header-nav {
+      display: flex;
+      gap: 32px;
+      font-family: 'Bodoni Moda', serif;
+      font-size: 11px;
+      letter-spacing: 0.28em;
+      text-transform: uppercase;
+      color: var(--cream-warm);
+    }
+
+    .header-nav a {
+      transition: opacity 0.2s ease;
+    }
+
+    .header-nav a:hover {
       opacity: 0.7;
-      animation: fadeUp 1s ease both;
     }
 
-    .hero-wordmark {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: clamp(4.5rem, 12vw, 9rem);
-      font-weight: 300;
-      letter-spacing: 0.55em;
-      color: var(--white);
-      line-height: 1;
-      animation: fadeUp 1s 0.1s ease both;
+    .header-nav .nav-secondary {
+      opacity: 0.7;
+    }
+
+    /* ============ HERO ============ */
+    .hero {
+      background: var(--oxblood);
+      padding: 96px 48px 96px 48px;
+      text-align: center;
+    }
+
+    .hero-mark {
+      display: inline-block;
+      padding: 0 36px;
     }
 
     .hero-rule {
-      width: 60px;
-      height: 1px;
-      background: var(--gold);
-      margin: 1.5rem auto;
-      animation: scaleIn 1s 0.3s ease both;
+      height: 2px;
+      background: var(--cream-warm);
     }
 
-    .hero-subtitle {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 3rem;
-      animation: fadeUp 1s 0.25s ease both;
+    .hero-rule-top {
+      margin-bottom: 24px;
     }
 
-    .hero-lead {
-      max-width: 640px;
-      font-size: 1.25rem;
-      font-weight: 300;
-      color: var(--text-light);
-      line-height: 1.8;
-      font-style: italic;
-      animation: fadeUp 1s 0.35s ease both;
-      margin-bottom: 3.5rem;
+    .hero-rule-bottom {
+      margin-top: 24px;
     }
 
-    .hero-lead em {
+    .hero-bf {
+      font-family: 'Bodoni Moda', serif;
+      font-weight: 700;
+      font-size: 168px;
+      color: var(--cream-warm);
+      letter-spacing: 0.02em;
+      line-height: 0.9;
+    }
+
+    .hero-statement {
+      font-family: 'Bodoni Moda', serif;
+      font-weight: 500;
+      font-size: 32px;
       color: var(--cream);
-      font-style: normal;
-    }
-
-    .hero-actions {
-      display: flex;
-      gap: 1.25rem;
-      align-items: center;
-      animation: fadeUp 1s 0.45s ease both;
-    }
-
-    .btn-primary {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      background: var(--gold);
-      color: var(--navy);
-      padding: 1rem 2.5rem;
-      text-decoration: none;
-      font-weight: 500;
-      transition: background 0.25s, transform 0.2s;
-      display: inline-block;
-    }
-
-    .btn-primary:hover {
-      background: var(--gold-light);
-      transform: translateY(-1px);
-    }
-
-    .btn-ghost {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.72rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-light);
-      padding: 1rem 2rem;
-      text-decoration: none;
-      border: 1px solid rgba(184, 148, 58, 0.3);
-      transition: border-color 0.25s, color 0.25s;
-      display: inline-block;
-    }
-
-    .btn-ghost:hover {
-      border-color: var(--gold);
-      color: var(--gold-light);
-    }
-
-    .hero-scroll {
-      position: absolute;
-      bottom: 2.5rem;
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-      animation: fadeUp 1s 0.7s ease both;
-    }
-
-    .hero-scroll span {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.6rem;
-      letter-spacing: 0.3em;
-      text-transform: uppercase;
-      color: var(--text-mid);
-    }
-
-    .scroll-line {
-      width: 1px;
-      height: 40px;
-      background: linear-gradient(to bottom, var(--gold-dim), transparent);
-      animation: scrollDrop 2s 1.5s ease infinite;
-    }
-
-    /* ─── DIVIDER ─── */
-    .section-divider {
-      width: 100%;
-      height: 1px;
-      background: linear-gradient(to right, transparent, rgba(184,148,58,0.3), transparent);
-    }
-
-    /* ─── WHAT CARL DOES ─── */
-    .section {
-      position: relative;
-      padding: 7rem 3rem;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .section-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.62rem;
-      letter-spacing: 0.35em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 1.5rem;
-    }
-
-    .section-heading {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: clamp(2.2rem, 4vw, 3.5rem);
-      font-weight: 400;
-      color: var(--white);
-      line-height: 1.2;
-      margin-bottom: 1.5rem;
-    }
-
-    .section-heading em {
-      color: var(--gold-light);
-      font-style: italic;
-    }
-
-    .section-body {
-      color: var(--text-light);
-      font-size: 1.05rem;
-      max-width: 560px;
-      line-height: 1.9;
-    }
-
-    /* two-column intro */
-    .intro-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 6rem;
-      align-items: center;
-    }
-
-    .intro-right {
-      display: flex;
-      flex-direction: column;
-      gap: 2rem;
-    }
-
-    .stat-block {
-      border-left: 2px solid var(--gold-dim);
-      padding-left: 1.5rem;
-    }
-
-    .stat-number {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 3rem;
-      font-weight: 300;
-      color: var(--gold-light);
-      line-height: 1;
-    }
-
-    .stat-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--text-mid);
-      margin-top: 0.3rem;
-    }
-
-    /* ─── HOW IT WORKS ─── */
-    .pipeline-section {
-      background: var(--navy-mid);
-      border-top: 1px solid rgba(184,148,58,0.12);
-      border-bottom: 1px solid rgba(184,148,58,0.12);
-    }
-
-    .pipeline-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 2px;
-      margin-top: 4rem;
-    }
-
-    .pipeline-step {
-      background: rgba(255,255,255,0.02);
-      border: 1px solid rgba(184,148,58,0.1);
-      padding: 2.5rem 2rem;
-      position: relative;
-      transition: background 0.3s, border-color 0.3s;
-    }
-
-    .pipeline-step:hover {
-      background: rgba(184,148,58,0.04);
-      border-color: rgba(184,148,58,0.25);
-    }
-
-    .step-number {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 4rem;
-      font-weight: 300;
-      color: rgba(184,148,58,0.12);
-      line-height: 1;
-      margin-bottom: 1rem;
-    }
-
-    .step-title {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 0.75rem;
-    }
-
-    .step-body {
-      font-size: 0.92rem;
-      color: var(--text-light);
-      line-height: 1.7;
-    }
-
-    /* ─── WHO USES CARL ─── */
-    .buyer-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.5px;
-      background: rgba(184,148,58,0.1);
-      border: 1px solid rgba(184,148,58,0.1);
-      margin-bottom: 2.5rem;
-    }
-
-    .buyer-card {
-      background: var(--navy-mid);
-      padding: 2.5rem 2rem;
-      transition: background 0.3s;
-    }
-
-    .buyer-card:hover { background: rgba(255,255,255,0.02); }
-
-    .buyer-card--mid {
-      background: rgba(184,148,58,0.04);
-      border-left: 1px solid rgba(184,148,58,0.15);
-      border-right: 1px solid rgba(184,148,58,0.15);
-    }
-
-    .buyer-role {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.4rem;
-      font-weight: 500;
-      color: var(--white);
-      margin-bottom: 1rem;
-      padding-bottom: 1rem;
-      border-bottom: 1px solid rgba(184,148,58,0.15);
-    }
-
-    .buyer-pain {
-      font-size: 0.88rem;
-      color: var(--text-mid);
-      line-height: 1.7;
-      font-style: italic;
-      margin-bottom: 1.25rem;
-    }
-
-    .buyer-gain {
-      font-size: 0.92rem;
-      color: var(--text-light);
-      line-height: 1.75;
-    }
-
-    .buyer-individual {
-      border: 1px solid rgba(184,148,58,0.15);
-      background: rgba(184,148,58,0.03);
-    }
-
-    .buyer-individual-inner {
-      padding: 2rem 2.5rem;
-      display: grid;
-      grid-template-columns: 220px 1fr;
-      gap: 2.5rem;
-      align-items: center;
-    }
-
-    .buyer-individual-label {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.2rem;
-      font-weight: 500;
-      color: var(--gold-light);
+      margin: 56px auto 14px auto;
+      max-width: 620px;
       line-height: 1.3;
     }
 
-    .buyer-individual p {
-      font-size: 0.92rem;
-      color: var(--text-light);
-      line-height: 1.75;
-    }
-
-    /* ─── CAPABILITIES ─── */
-    .cap-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 1.5px;
-      background: rgba(184,148,58,0.08);
-      border: 1px solid rgba(184,148,58,0.1);
-      margin-bottom: 3rem;
-    }
-
-    .cap-card {
-      background: var(--navy);
-      padding: 2.5rem 2rem;
-      transition: background 0.3s;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .cap-card:hover { background: rgba(255,255,255,0.025); }
-
-    .cap-icon {
-      margin-bottom: 1.5rem;
-      opacity: 0.9;
-    }
-
-    .cap-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.35rem;
-      font-weight: 500;
-      color: var(--white);
-      margin-bottom: 0.75rem;
-    }
-
-    .cap-body {
-      font-size: 0.9rem;
-      color: var(--text-light);
-      line-height: 1.75;
-      flex: 1;
-    }
-
-    .cap-tag {
-      display: inline-block;
-      margin-top: 1.5rem;
-      font-family: 'Jost', sans-serif;
-      font-size: 0.58rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--gold-dim);
-      border-top: 1px solid rgba(184,148,58,0.15);
-      padding-top: 0.75rem;
-      width: 100%;
-    }
-
-    /* ─── WORKFLOW STRIP ─── */
-    .workflow-strip {
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 0;
-      padding: 2.5rem 2rem;
-      background: rgba(184,148,58,0.04);
-      border: 1px solid rgba(184,148,58,0.12);
-      flex-wrap: wrap;
-      row-gap: 1.5rem;
-    }
-
-    .workflow-step {
-      text-align: center;
-      padding: 0 1.25rem;
-    }
-
-    .workflow-icon {
-      color: var(--gold-dim);
-      font-size: 0.5rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .workflow-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
+    .hero-substatement {
+      font-family: 'Bodoni Moda', serif;
+      font-style: italic;
+      font-size: 22px;
       color: var(--cream);
-      margin-bottom: 0.2rem;
+      margin: 0 auto;
+      max-width: 580px;
+      line-height: 1.4;
+      opacity: 0.85;
     }
 
-    .workflow-sub {
-      font-family: 'Spectral', serif;
-      font-size: 0.75rem;
-      color: var(--text-mid);
+    /* ============ HOUSE LINE ============ */
+    .house-line {
+      padding: 56px 48px 32px 48px;
+      background: var(--cream);
+      text-align: center;
+      border-bottom: 0.5px solid var(--cream-divider);
+    }
+
+    .house-line p {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 16px;
+      line-height: 1.85;
+      color: var(--ink-soft);
+      max-width: 580px;
+      margin: 0 auto;
       font-style: italic;
     }
 
-    .workflow-arrow {
-      color: rgba(184,148,58,0.3);
-      font-size: 1.1rem;
-      flex-shrink: 0;
+    /* ============ TOOL SECTIONS ============ */
+    .tool-section {
+      padding: 56px 48px 32px 48px;
+      background: var(--cream);
     }
 
-
-    .selling-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 1.5px;
-      background: rgba(184,148,58,0.1);
-      border: 1px solid rgba(184,148,58,0.1);
+    .tool-section.first {
+      padding-top: 56px;
     }
 
-    .selling-card {
-      background: var(--navy);
-      padding: 2.5rem 2.25rem;
-      position: relative;
-      transition: background 0.3s;
+    .tool-section.last {
+      padding-bottom: 64px;
     }
 
-    .selling-card:hover { background: rgba(255,255,255,0.025); }
-
-    .selling-card--featured {
-      background: rgba(184,148,58,0.05);
+    .tool-inner {
+      display: flex;
+      gap: 48px;
+      align-items: flex-start;
+      max-width: 760px;
+      margin: 0 auto;
     }
 
-    .selling-card--featured:hover {
-      background: rgba(184,148,58,0.08);
+    .tool-meta {
+      flex: 0 0 200px;
     }
 
-    .selling-number {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 3.5rem;
-      font-weight: 300;
-      color: rgba(184,148,58,0.1);
+    .tool-name {
+      font-family: 'Bodoni Moda', serif;
+      font-size: 56px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: var(--ink);
       line-height: 1;
-      margin-bottom: 1rem;
+      margin-bottom: 14px;
     }
 
-    .selling-icon {
-      margin-bottom: 1.25rem;
-      opacity: 0.8;
+    .tool-name.dimmed {
+      color: var(--taupe-warm);
     }
 
-    .selling-title {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.5rem;
+    .tool-descriptor {
+      font-family: 'Bodoni Moda', serif;
+      font-style: italic;
+      font-size: 13px;
+      color: var(--taupe-warm);
+      line-height: 1.55;
+    }
+
+    .tool-status {
+      margin-top: 18px;
+      font-family: 'Bodoni Moda', serif;
+      font-size: 10px;
+      letter-spacing: 0.22em;
+      text-transform: uppercase;
       font-weight: 500;
-      color: var(--white);
-      margin-bottom: 0.85rem;
-      line-height: 1.2;
     }
 
-    .selling-body {
-      font-size: 0.92rem;
-      color: var(--text-light);
-      line-height: 1.75;
+    .tool-status.production {
+      color: var(--green-status);
     }
 
-    .selling-tag {
-      display: inline-block;
-      margin-top: 1.25rem;
-      font-family: 'Jost', sans-serif;
-      font-size: 0.6rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--gold);
-      border: 1px solid var(--gold-dim);
-      padding: 0.25rem 0.7rem;
-      opacity: 0.8;
+    .tool-status.beta {
+      color: var(--oxblood);
     }
 
-
-    .prov-table {
-      width: 100%;
-      border: 1px solid rgba(184,148,58,0.15);
+    .tool-status.development {
+      color: var(--taupe-soft);
     }
 
-    .prov-row {
-      display: grid;
-      grid-template-columns: 280px 1fr;
-      gap: 0;
-      border-bottom: 1px solid rgba(184,148,58,0.08);
+    .tool-body {
+      flex: 1;
+      padding-top: 4px;
     }
 
-    .prov-row:last-child { border-bottom: none; }
-
-    .prov-header {
-      background: rgba(184,148,58,0.06);
+    .tool-pitch {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 16px;
+      line-height: 1.8;
+      color: var(--ink);
+      margin: 0 0 28px 0;
     }
 
-    .prov-col-label,
-    .prov-col-desc {
-      padding: 1rem 1.5rem;
-      font-size: 0.85rem;
-      color: var(--text-light);
+    .tool-buttons {
       display: flex;
-      align-items: center;
-    }
-
-    .prov-col-label { border-right: 1px solid rgba(184,148,58,0.08); }
-
-    .prov-header .prov-col-label,
-    .prov-header .prov-col-desc {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.62rem;
-      letter-spacing: 0.2em;
-      text-transform: uppercase;
-      color: var(--gold);
-    }
-
-    .prov-badge {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.12em;
-      text-transform: uppercase;
-      padding: 0.3rem 0.75rem;
-      white-space: nowrap;
-    }
-
-    /* Gold family -- Library */
-    .prov-gold       { background: rgba(184,148,58,0.18); color: var(--gold-light); border: 1px solid var(--gold-dim); }
-    .prov-gold-dim   { background: rgba(184,148,58,0.10); color: #c9a84c; border: 1px solid rgba(184,148,58,0.25); }
-    .prov-gold-ghost { background: rgba(184,148,58,0.05); color: #a88c40; border: 1px solid rgba(184,148,58,0.15); }
-
-    /* Blue family -- Standards */
-    .prov-blue       { background: rgba(100,150,210,0.15); color: #90b8e0; border: 1px solid rgba(100,150,210,0.3); }
-    .prov-blue-dim   { background: rgba(100,150,210,0.09); color: #7aa4cc; border: 1px solid rgba(100,150,210,0.2); }
-    .prov-blue-ghost { background: rgba(100,150,210,0.04); color: #6892b8; border: 1px solid rgba(100,150,210,0.12); }
-
-    /* Conflict */
-    .prov-amber { background: rgba(210,140,50,0.12); color: #d4a060; border: 1px solid rgba(210,140,50,0.25); }
-    .prov-red   { background: rgba(200,70,70,0.12);  color: #d48888; border: 1px solid rgba(200,70,70,0.25); }
-
-    /* Pending */
-    .prov-grey { background: rgba(180,180,180,0.07); color: var(--text-mid); border: 1px solid rgba(180,180,180,0.15); }
-
-    /* ─── RESULT BADGES ─── */
-    .result-badges {
-      display: flex;
-      gap: 1rem;
+      gap: 12px;
       flex-wrap: wrap;
     }
 
-    .result-badge {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.68rem;
-      letter-spacing: 0.18em;
+    .btn {
+      padding: 12px 28px;
+      font-family: 'Bodoni Moda', serif;
+      font-size: 11px;
+      letter-spacing: 0.28em;
       text-transform: uppercase;
-      padding: 0.55rem 1.4rem;
+      font-weight: 500;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      border: 0.5px solid transparent;
+      display: inline-block;
     }
 
-    .result-noncompliant { background: rgba(200,70,70,0.12);  color: #d48888; border: 1px solid rgba(200,70,70,0.3); }
-    .result-compliant    { background: rgba(70,180,100,0.12); color: #80c890; border: 1px solid rgba(70,180,100,0.3); }
-    .result-review       { background: rgba(210,160,50,0.12); color: #d4aa60; border: 1px solid rgba(210,160,50,0.3); }
-    .result-inconclusive { background: rgba(180,180,180,0.08); color: var(--text-mid); border: 1px solid rgba(180,180,180,0.2); }
-
-    /* ─── DOMAINS ─── */
-    .domains-section {
-      background: var(--navy-mid);
-      border-top: 1px solid rgba(184,148,58,0.12);
-      border-bottom: 1px solid rgba(184,148,58,0.12);
+    .btn-primary {
+      background: var(--oxblood);
+      color: var(--cream);
     }
 
-    .domains-intro {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 5rem;
-      align-items: start;
+    .btn-primary:hover {
+      background: var(--oxblood-deep);
     }
 
-    .domain-list {
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-      margin-top: 0.5rem;
+    .btn-secondary {
+      background: transparent;
+      border-color: var(--ink);
+      color: var(--ink);
     }
 
-    .domain-item {
-      display: flex;
-      align-items: flex-start;
-      gap: 1.25rem;
-      padding: 1.25rem 0;
-      border-bottom: 1px solid rgba(184,148,58,0.08);
-      transition: padding-left 0.25s;
+    .btn-secondary:hover {
+      background: var(--ink);
+      color: var(--cream);
+    }
+
+    .btn-outline {
+      background: transparent;
+      border-color: var(--oxblood);
+      color: var(--oxblood);
+    }
+
+    .btn-outline:hover {
+      background: var(--oxblood);
+      color: var(--cream);
+    }
+
+    .btn-disabled {
+      background: transparent;
+      border-color: var(--taupe-soft);
+      border-style: dashed;
+      color: var(--taupe-soft);
       cursor: default;
     }
 
-    .domain-item:hover { padding-left: 0.5rem; }
-
-    .domain-dot {
-      width: 5px;
-      height: 5px;
-      background: var(--gold-dim);
-      border-radius: 50%;
-      margin-top: 0.55rem;
-      flex-shrink: 0;
+    /* Section dividers */
+    .tool-divider {
+      height: 1px;
+      background: var(--cream-divider);
+      margin: 16px 96px;
     }
 
-    .domain-name {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.7rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--cream);
-      margin-bottom: 0.2rem;
-    }
-
-    .domain-detail {
-      font-size: 0.85rem;
-      color: var(--text-mid);
-      line-height: 1.5;
-    }
-
-    /* ─── FINAL CTA ─── */
-    .cta-section {
+    /* ============ CLOSING BAND ============ */
+    .closing-band {
+      background: var(--oxblood);
+      padding: 56px 48px 56px 48px;
       text-align: center;
-      padding: 8rem 3rem;
-      position: relative;
-      overflow: hidden;
+      border-top: 0.5px solid var(--oxblood-deep);
     }
 
-    .cta-section::before {
-      content: '';
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      width: 800px;
-      height: 400px;
-      background: radial-gradient(ellipse, rgba(184,148,58,0.06) 0%, transparent 70%);
-      pointer-events: none;
-    }
-
-    .cta-super {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.65rem;
-      letter-spacing: 0.35em;
-      text-transform: uppercase;
-      color: var(--gold);
-      margin-bottom: 2rem;
-    }
-
-    .cta-heading {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: clamp(2.5rem, 5vw, 4.5rem);
-      font-weight: 300;
-      color: var(--white);
-      line-height: 1.15;
-      max-width: 700px;
-      margin: 0 auto 1.5rem;
-    }
-
-    .cta-sub {
-      color: var(--text-mid);
-      font-size: 1rem;
+    .closing-text {
+      font-family: 'Bodoni Moda', serif;
       font-style: italic;
-      margin-bottom: 3.5rem;
-    }
-
-    /* ─── FOOTER ─── */
-    footer {
-      border-top: 1px solid rgba(184,148,58,0.12);
-      padding: 2.5rem 3rem;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-
-    .footer-brand {
-      font-family: 'Cormorant Garamond', serif;
-      font-size: 1.1rem;
-      letter-spacing: 0.35em;
-      color: var(--text-mid);
-    }
-
-    .footer-note {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.62rem;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: var(--text-mid);
-      opacity: 0.5;
-    }
-
-    /* ─── ANIMATIONS ─── */
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(18px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-
-    @keyframes scaleIn {
-      from { transform: scaleX(0); opacity: 0; }
-      to   { transform: scaleX(1); opacity: 1; }
-    }
-
-    @keyframes scrollDrop {
-      0%   { transform: scaleY(0); transform-origin: top; opacity: 1; }
-      50%  { transform: scaleY(1); transform-origin: top; opacity: 1; }
-      100% { transform: scaleY(1); transform-origin: bottom; opacity: 0; }
-    }
-
-    /* scroll-reveal */
-    .reveal {
-      opacity: 0;
-      transform: translateY(24px);
-      transition: opacity 0.7s ease, transform 0.7s ease;
-    }
-    .reveal.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
-    /* ─── DEMO RESULT CARD ─── */
-    :root {
-      --demo-bg:       #f4f0e6;
-      --demo-cream:    #ede8db;
-      --demo-navy:     #162032;
-      --demo-gold:     #8a6c1e;
-      --demo-text:     #2a2a2a;
-      --demo-text-mid: #666058;
-      --demo-border:   #d8d0c0;
-    }
-
-    .demo-card {
-      max-width: 760px;
+      font-size: 19px;
+      color: var(--cream-warm);
+      line-height: 1.6;
+      max-width: 560px;
       margin: 0 auto;
-      background: var(--demo-bg);
-      border: 1px solid rgba(184,148,58,0.25);
-      box-shadow: 0 24px 80px rgba(0,0,0,0.4);
     }
 
-    .demo-card-header {
-      background: var(--demo-navy);
-      padding: 0.85rem 1.5rem;
+    .closing-rule {
+      height: 0.5px;
+      background: var(--cream-warm);
+      width: 64px;
+      margin: 32px auto 0 auto;
+      opacity: 0.6;
+    }
+
+    /* ============ FOOTER ============ */
+    .footer {
+      background: var(--ink-soft);
+      padding: 28px 48px 24px 48px;
       display: flex;
-      align-items: center;
       justify-content: space-between;
-    }
-
-    .demo-card-title {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.78rem;
-      font-weight: 600;
-      letter-spacing: 0.05em;
-      color: var(--cream);
-    }
-
-    .demo-result-badge {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.65rem;
-      font-weight: 600;
-      letter-spacing: 0.18em;
-      text-transform: uppercase;
-      padding: 0.3rem 0.85rem;
-    }
-
-    .badge-compliant    { background: #2a7a40; color: #fff; }
-    .badge-noncompliant { background: #8a2020; color: #fff; }
-    .badge-review       { background: #7a5010; color: #fff; }
-    .badge-inconclusive { background: #555; color: #ddd; }
-
-    .demo-card-body {
-      padding: 1.75rem 2rem;
-      display: flex;
-      flex-direction: column;
-      gap: 0;
-    }
-
-    .demo-field {
-      padding: 1rem 0;
-      border-bottom: 1px solid var(--demo-border);
-    }
-
-    .demo-field-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--demo-gold);
-      margin-bottom: 0.4rem;
-    }
-
-    .demo-field-value {
-      font-family: 'Spectral', serif;
-      font-size: 0.92rem;
-      color: var(--demo-text);
-      line-height: 1.65;
-    }
-
-    .demo-citation {
-      font-family: 'Courier New', monospace;
-      font-size: 0.82rem;
-      color: var(--demo-navy);
-      line-height: 1.6;
-    }
-
-    .demo-meta-row {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      border-bottom: 1px solid var(--demo-border);
-      margin-bottom: 1.25rem;
-    }
-
-    .demo-meta-cell {
-      padding: 1rem 0.5rem;
-      text-align: center;
-      border-right: 1px solid var(--demo-border);
-    }
-
-    .demo-meta-cell:last-child { border-right: none; }
-
-    .demo-meta-label {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.58rem;
-      letter-spacing: 0.22em;
-      text-transform: uppercase;
-      color: var(--demo-text-mid);
-      margin-bottom: 0.3rem;
-    }
-
-    .demo-meta-value {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.82rem;
-      font-weight: 600;
-      color: var(--demo-navy);
-    }
-
-    .demo-confidence { color: #2a7a40; font-size: 1.2rem; }
-
-    .demo-cite-card {
-      border: 1px solid rgba(138,108,30,0.3);
-      background: rgba(138,108,30,0.04);
-      padding: 0.85rem 1rem;
-      margin-bottom: 0.6rem;
-    }
-
-    .demo-cite-header {
-      display: flex;
       align-items: center;
-      gap: 0.75rem;
       flex-wrap: wrap;
-      margin-bottom: 0.4rem;
+      gap: 12px;
     }
 
-    .demo-cite-ref {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.68rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--demo-gold);
-    }
-
-    .demo-cite-badge {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.6rem;
-      font-weight: 600;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      background: var(--demo-gold);
-      color: #fff;
-      padding: 0.2rem 0.6rem;
-    }
-
-    .demo-cite-body {
-      font-family: 'Spectral', serif;
-      font-size: 0.85rem;
-      color: var(--demo-text);
-      line-height: 1.6;
-    }
-
-    .demo-timestamp {
-      font-family: 'Jost', sans-serif;
-      font-size: 0.62rem;
-      color: var(--demo-text-mid);
-      text-align: right;
-      padding-top: 1rem;
-      opacity: 0.6;
-    }
-
-    .demo-disclaimer {
-      text-align: center;
-      font-family: 'Jost', sans-serif;
-      font-size: 0.62rem;
-      letter-spacing: 0.12em;
-      color: var(--text-mid);
-      margin-top: 2rem;
-      opacity: 0.6;
+    .footer-text {
+      font-family: 'Bodoni Moda', serif;
       font-style: italic;
+      font-size: 11px;
+      color: var(--footer);
+      letter-spacing: 0.04em;
     }
 
-
+    /* ============ RESPONSIVE ============ */
     @media (max-width: 900px) {
-      nav { padding: 1rem 1.5rem; }
-      .nav-links { display: none; }
-      .buyer-grid,
-      .cap-grid,
-      .selling-grid { grid-template-columns: 1fr; }
-      .buyer-individual-inner { grid-template-columns: 1fr; gap: 1rem; }
-      .domains-intro { grid-template-columns: 1fr; gap: 3rem; }
-      .pipeline-grid { grid-template-columns: 1fr 1fr; }
-      .section { padding: 5rem 1.5rem; }
+      .header {
+        padding: 16px 24px;
+      }
+      .header-nav {
+        gap: 20px;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+      }
+      .hero {
+        padding: 64px 24px 64px 24px;
+      }
+      .hero-bf {
+        font-size: 112px;
+      }
+      .hero-statement {
+        font-size: 24px;
+      }
+      .hero-substatement {
+        font-size: 17px;
+      }
+      .house-line {
+        padding: 40px 24px 24px 24px;
+      }
+      .tool-section {
+        padding: 40px 24px 24px 24px;
+      }
+      .tool-section.last {
+        padding-bottom: 48px;
+      }
+      .tool-inner {
+        flex-direction: column;
+        gap: 20px;
+      }
+      .tool-meta {
+        flex: 1;
+      }
+      .tool-name {
+        font-size: 44px;
+      }
+      .tool-divider {
+        margin: 8px 48px;
+      }
+      .closing-band {
+        padding: 40px 24px 40px 24px;
+      }
+      .closing-text {
+        font-size: 16px;
+      }
+      .footer {
+        padding: 24px 24px 20px 24px;
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+      }
     }
 
-    @media (max-width: 560px) {
-      .pipeline-grid,
-      .tiers-grid { grid-template-columns: 1fr; }
-      footer { flex-direction: column; gap: 1rem; text-align: center; }
+    @media (max-width: 500px) {
+      .hero-bf {
+        font-size: 88px;
+      }
+      .hero-mark {
+        padding: 0 18px;
+      }
+      .header-nav {
+        gap: 14px;
+        font-size: 9px;
+      }
+      .tool-name {
+        font-size: 38px;
+      }
+      .btn {
+        padding: 11px 20px;
+        font-size: 10px;
+        letter-spacing: 0.22em;
+      }
     }
   </style>
 </head>
 <body>
 
-  <!-- NAV -->
-  <nav>
-    <div class="nav-brand">
-      <span class="nav-logo">CARL</span>
-      <span class="nav-tagline">Compliance Assistance &amp; Regulatory Liaison</span>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="header-mark">
+      <a href="/" aria-label="The Bishop Foundry home">
+        <span class="bf-small">BF</span>
+      </a>
     </div>
-    <ul class="nav-links">
-      <li><a href="#who">Who Uses CARL</a></li>
-      <li><a href="#capabilities">Capabilities</a></li>
-      <li><a href="#provenance">Provenance</a></li>
-      <li><a href="#domains">Domains</a></li>
-      <li><a href="https://carl.carlcompliance.com" class="nav-cta">Access CARL</a></li>
-    </ul>
-  </nav>
+    <nav class="header-nav">
+      <a href="/why-carl.html">Carl</a>
+      <a href="#cadense">Cadense</a>
+      <a href="#grant">Grant</a>
+      <a href="#about" class="nav-secondary">About</a>
+    </nav>
+  </header>
 
   <!-- HERO -->
   <section class="hero">
-    <!-- compass SVG -->
-    <svg class="hero-icon" viewBox="0 0 52 52" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="26" cy="26" r="24.5" stroke="#b8943a" stroke-width="1"/>
-      <circle cx="26" cy="26" r="2" fill="#b8943a" opacity="0.6"/>
-      <line x1="26" y1="4" x2="26" y2="14" stroke="#b8943a" stroke-width="1" opacity="0.5"/>
-      <line x1="26" y1="38" x2="26" y2="48" stroke="#b8943a" stroke-width="1" opacity="0.5"/>
-      <line x1="4" y1="26" x2="14" y2="26" stroke="#b8943a" stroke-width="1" opacity="0.5"/>
-      <line x1="38" y1="26" x2="48" y2="26" stroke="#b8943a" stroke-width="1" opacity="0.5"/>
-      <polygon points="26,8 28.5,24 26,22 23.5,24" fill="#b8943a" opacity="0.8"/>
-      <polygon points="26,44 23.5,28 26,30 28.5,28" fill="#b8943a" opacity="0.3"/>
-    </svg>
-
-    <h1 class="hero-wordmark">CARL</h1>
-    <div class="hero-rule"></div>
-    <p class="hero-subtitle">Compliance Assistance and Regulatory Liaison</p>
-    <p class="hero-lead">
-      The standards that govern your work fill dozens of references &mdash; codes, contracts, internal procedures, client specifications. Every professional on your team carries that library under time pressure, making decisions that get documented and defended.
-      <br/><br/>
-      <em>CARL carries it for them.</em> Configured for your program. Verified before delivery. Documented automatically. Ready wherever the work happens.
-    </p>
-    <div class="hero-actions">
-      <a href="https://carl.carlcompliance.com" class="btn-primary">Access CARL</a>
-      <a href="learn-more.html" class="btn-ghost">Learn More</a>
+    <div class="hero-mark">
+      <div class="hero-rule hero-rule-top"></div>
+      <div class="hero-bf">BF</div>
+      <div class="hero-rule hero-rule-bottom"></div>
     </div>
+    <p class="hero-statement">Force multipliers for professional teams.</p>
+    <p class="hero-substatement">Built to multiply what you already do well.</p>
+  </section>
 
-    <div class="hero-scroll">
-      <span>Scroll</span>
-      <div class="scroll-line"></div>
+  <!-- HOUSE LINE -->
+  <section class="house-line">
+    <p>A small house of professional software. Each tool is a discipline made executable &mdash; built once, built well, built to be lived with.</p>
+  </section>
+
+  <!-- CARL -->
+  <section class="tool-section first" id="carl">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Carl</div>
+        <div class="tool-descriptor">Compliance Assistance and Regulatory Liaison</div>
+        <div class="tool-status production">In production</div>
+      </div>
+      <div class="tool-body">
+        <p class="tool-pitch">Verifies your work against the standards that govern it. CARL returns answers grounded in your authoritative document library, with citations you can defend in an audit and confidence scores you can trust. Built for any field where getting compliance right has consequences.</p>
+        <div class="tool-buttons">
+          <a href="https://carl.carlcompliance.com" class="btn btn-primary">Access Carl</a>
+          <a href="/why-carl.html" class="btn btn-secondary">Why Carl</a>
+        </div>
+      </div>
     </div>
   </section>
 
-  <div class="section-divider"></div>
+  <div class="tool-divider"></div>
 
-  <!-- WHY CARL -->
-  <div id="about">
-    <div class="section">
-      <div class="reveal" style="text-align: center; max-width: 640px; margin: 0 auto 4.5rem;">
-        <p class="section-label">Why CARL</p>
-        <h2 class="section-heading" style="margin-bottom: 1rem;">Built for the professional<br/>in the field, not the office.</h2>
-        <p class="section-body" style="margin: 0 auto;">Regulated environments share a common problem: the standards are voluminous, updated frequently, and spread across codes, contracts, internal procedures, and client specifications. CARL gives the professional carrying that library a tool built for how they actually work -- in the field, under time pressure, with real consequences attached to the answer.</p>
+  <!-- CADENSE -->
+  <section class="tool-section" id="cadense">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Cadense</div>
+        <div class="tool-descriptor">Cascading Allocation of Daily Events, Notation, Scheduling, and Execution</div>
+        <div class="tool-status beta">Beta opens summer 2026</div>
       </div>
-
-      <div class="selling-grid reveal">
-
-        <!-- 1. Bespoke -->
-        <div class="selling-card selling-card--featured">
-          <div class="selling-number">01</div>
-          <div class="selling-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="4" y="4" width="24" height="24" rx="1" stroke="#b8943a" stroke-width="1.2"/><line x1="4" y1="10" x2="28" y2="10" stroke="#b8943a" stroke-width="1.2"/><line x1="10" y1="16" x2="22" y2="16" stroke="#b8943a" stroke-width="0.8" opacity="0.6"/><line x1="10" y1="20" x2="19" y2="20" stroke="#b8943a" stroke-width="0.8" opacity="0.4"/></svg>
-          </div>
-          <div class="selling-title">Your library. Your standards. Your rules.</div>
-          <div class="selling-body">
-            CARL's document library is yours to define. Federal codes and regulations. UFC and UFGS standards. Client technical requirements. Contract deliverable specifications. Internal QA procedures and company guidelines. Program-specific SOPs. Professional standards like PMBOK.
-            <br/><br/>
-            If it governs your work, it belongs in the library. CARL doesn't impose a document set -- it works from yours. When CARL returns a Primary result, that answer came from the specific documents your program is held to. Not a generic database. Not the open web. Yours.
-          </div>
-          <div class="selling-tag">Your differentiator</div>
-        </div>
-
-        <!-- 2. Time savings -->
-        <div class="selling-card">
-          <div class="selling-number">02</div>
-          <div class="selling-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="#b8943a" stroke-width="1.2"/><line x1="16" y1="8" x2="16" y2="16" stroke="#b8943a" stroke-width="1.5"/><line x1="16" y1="16" x2="21" y2="20" stroke="#b8943a" stroke-width="1.2"/><circle cx="16" cy="16" r="1.5" fill="#b8943a" opacity="0.6"/></svg>
-          </div>
-          <div class="selling-title">Minutes, not hours</div>
-          <div class="selling-body">
-            Manually searching across a stack of codes, specifications, and contract documents for a single citation takes time you don't always have. CARL returns a sourced, verified result in minutes -- without you leaving the field, opening a binder, or waiting for someone back at the office to look it up.
-          </div>
-        </div>
-
-        <!-- 3. Layered verification -->
-        <div class="selling-card">
-          <div class="selling-number">03</div>
-          <div class="selling-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><path d="M16 4 L28 10 L28 22 L16 28 L4 22 L4 10 Z" stroke="#b8943a" stroke-width="1.2" fill="none"/><path d="M16 9 L23 13 L23 21 L16 25 L9 21 L9 13 Z" stroke="#b8943a" stroke-width="0.8" opacity="0.5" fill="none"/><circle cx="16" cy="17" r="2" stroke="#b8943a" stroke-width="0.8" opacity="0.5"/></svg>
-          </div>
-          <div class="selling-title">Verified, not just retrieved</div>
-          <div class="selling-body">
-            Retrieval is not verification. Every CARL result passes through layered confirmation before it reaches you -- your configured library first, then independent validation passes that either agree or surface a flag. Disagreements never pass silently.
-          </div>
-        </div>
-
-        <!-- 4. Accuracy / transparency -->
-        <div class="selling-card">
-          <div class="selling-number">04</div>
-          <div class="selling-icon">
-            <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="16" r="11" stroke="#b8943a" stroke-width="1.2"/><polyline points="10,16 14,20 22,12" stroke="#b8943a" stroke-width="1.5" fill="none"/></svg>
-          </div>
-          <div class="selling-title">You always know what you're holding</div>
-          <div class="selling-body">
-            Every result arrives with a provenance label that tells you exactly how it was confirmed and how much confidence to place in it. The human operator remains the final verification authority. CARL never pretends otherwise.
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- WHO USES CARL -->
-  <div id="who" style="background: var(--navy-mid); border-top: 1px solid rgba(184,148,58,0.12); border-bottom: 1px solid rgba(184,148,58,0.12);">
-    <div class="section">
-      <div class="reveal" style="text-align: center; max-width: 580px; margin: 0 auto 4rem;">
-        <p class="section-label">Who Uses CARL</p>
-        <h2 class="section-heading">The same problem.<br/><em>Different desks.</em></h2>
-      </div>
-      <div class="buyer-grid reveal">
-
-        <div class="buyer-card">
-          <div class="buyer-role">The Field Inspector</div>
-          <div class="buyer-pain">Making real-time compliance calls on a job site, under time pressure, with no practical way to search a stack of references mid-observation.</div>
-          <div class="buyer-gain">CARL listens to observations, analyzes photographs, returns a verified determination, and logs everything automatically. End of shift -- the report is already written.</div>
-        </div>
-
-        <div class="buyer-card buyer-card--mid">
-          <div class="buyer-role">The Compliance Officer</div>
-          <div class="buyer-pain">Managing audit cycles, contract reviews, and regulatory inquiries across a body of standards too large to hold in memory -- and too consequential to get wrong.</div>
-          <div class="buyer-gain">CARL queries your configured library, returns cited and verified findings, and produces a defensible audit trail. Every determination documented. Every source traceable.</div>
-        </div>
-
-        <div class="buyer-card">
-          <div class="buyer-role">The Program Manager</div>
-          <div class="buyer-pain">Responsible for compliance across a team of professionals who may interpret the same standard differently -- and accountable when the deliverable doesn't hold up.</div>
-          <div class="buyer-gain">Every professional on the program running the same verified library means no variance between inspectors. The exported report is a formatted, cited deliverable -- ready to submit.</div>
-        </div>
-
-      </div>
-
-      <div class="buyer-individual reveal">
-        <div class="buyer-individual-inner">
-          <div class="buyer-individual-label">Also built for the individual professional</div>
-          <p>If you work against written standards and spend meaningful time on documentation, CARL reduces that burden significantly -- whether your organization has deployed it or not. A single professional running CARL on their own program can realistically reclaim 40% or more of the hours currently spent on post-shift documentation alone.</p>
+      <div class="tool-body">
+        <p class="tool-pitch">Converts your annual goals into today's first task. CADENSE is hierarchical scheduling for serious planners &mdash; you set goals at any level, the system handles the cascade, and your daily view always reflects what matters. Every morning, a structured triage produces a fully ordered worklist. Every evening, a reflection closes the day.</p>
+        <div class="tool-buttons">
+          <a href="https://cadense.carlcompliance.com" class="btn btn-outline">Beta access</a>
+          <a href="#cadense" class="btn btn-secondary">Why Cadense</a>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- CAPABILITIES -->
-  <div id="capabilities">
-    <div class="section">
-      <div class="reveal" style="text-align: center; max-width: 600px; margin: 0 auto 4.5rem;">
-        <p class="section-label">Full Capability Set</p>
-        <h2 class="section-heading">More than a query tool.<br/><em>A complete work system.</em></h2>
-        <p class="section-body" style="margin: 1rem auto 0;">CARL meets you where the work is -- voice, camera, keyboard, or all three. Every interaction is logged. Every shift ends with a report already compiled.</p>
+  <div class="tool-divider"></div>
+
+  <!-- GRANT -->
+  <section class="tool-section last" id="grant">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name dimmed">Grant</div>
+        <div class="tool-descriptor">General Record and Administrative Notation Tool</div>
+        <div class="tool-status development">In development</div>
       </div>
-
-      <div class="cap-grid reveal">
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="13" y="4" width="10" height="18" rx="5" stroke="#b8943a" stroke-width="1.3"/><path d="M7 19c0 6.075 4.925 11 11 11s11-4.925 11-11" stroke="#b8943a" stroke-width="1.3" stroke-linecap="round"/><line x1="18" y1="30" x2="18" y2="34" stroke="#b8943a" stroke-width="1.3"/><line x1="13" y1="34" x2="23" y2="34" stroke="#b8943a" stroke-width="1.3"/></svg>
-          </div>
-          <div class="cap-title">Voice Input</div>
-          <div class="cap-body">Speak your observation directly into CARL. No typing required -- critical when your hands are occupied, conditions are demanding, or you need to move fast.</div>
-          <div class="cap-tag">Speech-to-Text</div>
-        </div>
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="3" y="8" width="30" height="22" rx="2" stroke="#b8943a" stroke-width="1.3"/><circle cx="18" cy="19" r="6" stroke="#b8943a" stroke-width="1.3"/><circle cx="18" cy="19" r="2.5" fill="#b8943a" opacity="0.4"/><rect x="23" y="4" width="6" height="5" rx="1" stroke="#b8943a" stroke-width="1"/></svg>
-          </div>
-          <div class="cap-title">Photo Analysis</div>
-          <div class="cap-body">Photograph the condition. Add notes. CARL analyzes the image for compliance against your configured library and returns a full determination with citations -- no manual description required.</div>
-          <div class="cap-tag">Visual Compliance Analysis</div>
-        </div>
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M8 12 L28 12 M8 18 L22 18 M8 24 L25 24" stroke="#b8943a" stroke-width="1.3" stroke-linecap="round"/><circle cx="30" cy="24" r="4" stroke="#b8943a" stroke-width="1" opacity="0.6"/><line x1="30" y1="22" x2="30" y2="24" stroke="#b8943a" stroke-width="1"/><line x1="30" y1="24" x2="32" y2="25" stroke="#b8943a" stroke-width="1"/></svg>
-          </div>
-          <div class="cap-title">Text Query</div>
-          <div class="cap-body">Type an observation, a regulation reference, a material specification, an inspection checkpoint, or a procedural question. CARL processes it against your library and returns a cited, verified result.</div>
-          <div class="cap-tag">Standard Input</div>
-        </div>
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><path d="M10 14 Q18 8 26 14 Q30 17 28 22 Q26 28 18 28 Q10 28 8 22 Q6 17 10 14Z" stroke="#b8943a" stroke-width="1.3" fill="none"/><line x1="13" y1="19" x2="23" y2="19" stroke="#b8943a" stroke-width="1" opacity="0.5"/><line x1="13" y1="22" x2="20" y2="22" stroke="#b8943a" stroke-width="1" opacity="0.4"/><circle cx="26" cy="10" r="4" stroke="#b8943a" stroke-width="1"/><path d="M24 10 L26 12 L29 8" stroke="#b8943a" stroke-width="1" stroke-linecap="round"/></svg>
-          </div>
-          <div class="cap-title">Voice Output</div>
-          <div class="cap-body">When reading isn't practical -- noisy environments, both hands occupied, eyes on the work -- CARL reads its findings aloud. The determination reaches you regardless of conditions.</div>
-          <div class="cap-tag">Text-to-Speech</div>
-        </div>
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="6" y="4" width="24" height="28" rx="2" stroke="#b8943a" stroke-width="1.3"/><line x1="11" y1="12" x2="25" y2="12" stroke="#b8943a" stroke-width="1" opacity="0.6"/><line x1="11" y1="16" x2="25" y2="16" stroke="#b8943a" stroke-width="1" opacity="0.4"/><line x1="11" y1="20" x2="20" y2="20" stroke="#b8943a" stroke-width="1" opacity="0.4"/><circle cx="25" cy="24" r="4" fill="rgba(184,148,58,0.15)" stroke="#b8943a" stroke-width="1"/><polyline points="22.5,24 24.5,26 28,22" stroke="#b8943a" stroke-width="1" fill="none"/></svg>
-          </div>
-          <div class="cap-title">Automatic Shift Log</div>
-          <div class="cap-body">Every observation submitted through CARL is logged automatically as you work. Nothing falls through the cracks. Nothing requires a second entry. The record builds itself in real time.</div>
-          <div class="cap-tag">Continuous Documentation</div>
-        </div>
-
-        <div class="cap-card">
-          <div class="cap-icon">
-            <svg width="36" height="36" viewBox="0 0 36 36" fill="none"><rect x="6" y="4" width="24" height="28" rx="2" stroke="#b8943a" stroke-width="1.3"/><line x1="11" y1="12" x2="25" y2="12" stroke="#b8943a" stroke-width="1" opacity="0.6"/><line x1="11" y1="16" x2="25" y2="16" stroke="#b8943a" stroke-width="1" opacity="0.4"/><line x1="11" y1="20" x2="20" y2="20" stroke="#b8943a" stroke-width="1" opacity="0.4"/><path d="M18 26 L18 32 M15 29 L18 32 L21 29" stroke="#b8943a" stroke-width="1.3" stroke-linecap="round"/></svg>
-          </div>
-          <div class="cap-title">Shift Report Export</div>
-          <div class="cap-body">At the end of the shift, export the complete log as a formatted report -- every observation, every determination, every citation, timestamped and ready to submit. The report writes itself while you work.</div>
-          <div class="cap-tag">Export-Ready Documentation</div>
-        </div>
-
-      </div>
-
-      <!-- Workflow strip -->
-      <div class="workflow-strip reveal">
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Observe</div>
-          <div class="workflow-sub">Voice, photo, or text</div>
-        </div>
-        <div class="workflow-arrow">&rarr;</div>
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Evaluate</div>
-          <div class="workflow-sub">Against your library</div>
-        </div>
-        <div class="workflow-arrow">&rarr;</div>
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Verify</div>
-          <div class="workflow-sub">Independent confirmation</div>
-        </div>
-        <div class="workflow-arrow">&rarr;</div>
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Deliver</div>
-          <div class="workflow-sub">Cited determination</div>
-        </div>
-        <div class="workflow-arrow">&rarr;</div>
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Log</div>
-          <div class="workflow-sub">Automatically recorded</div>
-        </div>
-        <div class="workflow-arrow">&rarr;</div>
-        <div class="workflow-step">
-          <div class="workflow-icon">&#9670;</div>
-          <div class="workflow-label">Report</div>
-          <div class="workflow-sub">Export at shift end</div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-
-  <div class="pipeline-section" id="how-it-works">
-    <div class="section">
-      <div class="reveal">
-        <p class="section-label">How It Works</p>
-        <h2 class="section-heading">A verification process that<br/><em>challenges its own conclusions.</em></h2>
-      </div>
-      <div class="pipeline-grid">
-        <div class="pipeline-step reveal">
-          <div class="step-number">01</div>
-          <div class="step-title">Submit</div>
-          <div class="step-body">A field professional submits a query -- a regulation reference, a material specification, an inspection checkpoint, a procedural question.</div>
-        </div>
-        <div class="pipeline-step reveal">
-          <div class="step-number">02</div>
-          <div class="step-title">Evaluate</div>
-          <div class="step-body">CARL evaluates the query against a curated library of governing standards for the deployment domain -- not the open web. Every finding is traced to a source.</div>
-        </div>
-        <div class="pipeline-step reveal">
-          <div class="step-number">03</div>
-          <div class="step-title">Verify</div>
-          <div class="step-body">The initial finding is challenged by independent verification. Agreements build confidence. Disagreements surface as flags -- never silently passed through.</div>
-        </div>
-        <div class="pipeline-step reveal">
-          <div class="step-number">04</div>
-          <div class="step-title">Deliver</div>
-          <div class="step-body">The result arrives with a provenance label attached. The professional knows exactly how much weight to put on it -- and what still needs human judgment.</div>
+      <div class="tool-body">
+        <p class="tool-pitch">Turns finished work into the records your reviewers actually need. GRANT consumes the structured outputs from your professional tools and assembles them into the documentation that auditors, regulators, and contracting officers expect. Closes the loop between doing the work and proving it.</p>
+        <div class="tool-buttons">
+          <span class="btn btn-disabled">Notify me</span>
+          <a href="#grant" class="btn btn-secondary">Why Grant</a>
         </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <!-- PROVENANCE LABELS -->
-  <div id="provenance">
-    <div class="section">
-      <div class="reveal">
-        <p class="section-label">Built for Your Program</p>
-        <h2 class="section-heading">Not a generic compliance tool.<br/><em>Yours.</em></h2>
-        <p class="section-body">
-          Every CARL deployment is configured around a curated library of the governing standards for your specific field, program, and jurisdiction -- the actual documents that govern your work. That library becomes the first and highest source of truth for every query submitted.
-        </p>
-      </div>
-
-      <!-- Bespoke callout -->
-      <div class="bespoke-callout reveal">
-        <div class="bespoke-rule"></div>
-        <p>
-          When CARL returns a <strong>Primary</strong> result, the answer was traced directly to your configured library -- the standards your program is held to. When a result carries a <strong>Standards</strong> label, it was confirmed through broader regulatory knowledge rather than your library. Both are verified. The label tells you which ground truth answered the question.
-        </p>
-        <div class="bespoke-rule"></div>
-      </div>
-
-      <div class="reveal" style="margin-top: 1rem;">
-        <p class="section-label">Provenance Labels</p>
-        <p class="section-body" style="margin-bottom: 0;">Every output is labeled. You always know what you're working with -- and what still needs human eyes.</p>
-      </div>
-
-      <!-- Provenance label table -->
-      <div class="prov-table reveal" style="margin-top: 3.5rem;">
-        <div class="prov-row prov-header">
-          <div class="prov-col-label">Label</div>
-          <div class="prov-col-desc">What It Means for the Field Professional</div>
-        </div>
-        <div class="prov-row tier-library">
-          <div class="prov-col-label"><span class="prov-badge prov-gold">Primary &mdash; Dual Verified</span></div>
-          <div class="prov-col-desc">Highest confidence -- full source confirmation with multiple independent agreements</div>
-        </div>
-        <div class="prov-row tier-library">
-          <div class="prov-col-label"><span class="prov-badge prov-gold-dim">Primary &mdash; Verified</span></div>
-          <div class="prov-col-desc">High confidence -- source confirmed with independent agreement</div>
-        </div>
-        <div class="prov-row tier-library">
-          <div class="prov-col-label"><span class="prov-badge prov-gold-ghost">Primary</span></div>
-          <div class="prov-col-desc">Source retrieved -- verification in progress or not yet completed</div>
-        </div>
-        <div class="prov-row tier-standards">
-          <div class="prov-col-label"><span class="prov-badge prov-blue">Standards &mdash; Dual Verified</span></div>
-          <div class="prov-col-desc">High confidence -- multiple independent agreements, no direct source document</div>
-        </div>
-        <div class="prov-row tier-standards">
-          <div class="prov-col-label"><span class="prov-badge prov-blue-dim">Standards &mdash; Verified</span></div>
-          <div class="prov-col-desc">Moderate confidence -- independent agreement reached, no direct source document</div>
-        </div>
-        <div class="prov-row tier-standards">
-          <div class="prov-col-label"><span class="prov-badge prov-blue-ghost">Standards &mdash; Verify</span></div>
-          <div class="prov-col-desc">Knowledge-based only -- manual verification required before reliance</div>
-        </div>
-        <div class="prov-row tier-conflict">
-          <div class="prov-col-label"><span class="prov-badge prov-amber">Conflict Resolved</span></div>
-          <div class="prov-col-desc">Conflicting signals detected and resolved -- review tiebreaker reasoning before reliance</div>
-        </div>
-        <div class="prov-row tier-conflict">
-          <div class="prov-col-label"><span class="prov-badge prov-red">Conflict &mdash; Verify</span></div>
-          <div class="prov-col-desc">Conflicting signals unresolved -- escalate to inspector before any action is taken</div>
-        </div>
-        <div class="prov-row tier-pending">
-          <div class="prov-col-label"><span class="prov-badge prov-grey">Pending Verification</span></div>
-          <div class="prov-col-desc">Verification temporarily unavailable -- do not rely on this result</div>
-        </div>
-      </div>
-
-      <!-- Result badges -->
-      <div class="reveal" style="margin-top: 4rem;">
-        <p class="section-label" style="margin-bottom: 1.5rem;">Result Type Badges</p>
-        <div class="result-badges">
-          <div class="result-badge result-noncompliant">Non-Compliant</div>
-          <div class="result-badge result-compliant">Compliant</div>
-          <div class="result-badge result-review">Under Review</div>
-          <div class="result-badge result-inconclusive">Inconclusive</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- DOMAINS -->
-  <div class="domains-section" id="domains">
-    <div class="section">
-      <div class="domains-intro reveal">
-        <div>
-          <p class="section-label">Where It Applies</p>
-          <h2 class="section-heading">Any field governed by<br/><em>written standards.</em></h2>
-          <p class="section-body">
-            CARL is portable by design. Configure the document library for the governing standards of a new domain, adjust the pipeline vocabulary, and CARL speaks that field's language. The architecture doesn't change. The ground truth does.
-          </p>
-          <br/>
-          <a href="https://carl.carlcompliance.com" class="btn-primary" style="margin-top: 1rem; display: inline-block;">Request a Deployment</a>
-        </div>
-        <div class="domain-list">
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Construction &amp; Facilities</div>
-              <div class="domain-detail">Building codes, UFC/UFGS standards, ICD 705 SCIF requirements, AHJ compliance, fire and life safety</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Defense &amp; Government Contracting</div>
-              <div class="domain-detail">FAR/DFARS clauses, security classification guides, program-specific technical requirements</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Environmental &amp; Safety</div>
-              <div class="domain-detail">OSHA regulations, EPA standards, hazmat handling protocols, site remediation requirements</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Aviation &amp; Aerospace</div>
-              <div class="domain-detail">FAA airworthiness directives, maintenance manuals, Part 145 repair station requirements</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Healthcare</div>
-              <div class="domain-detail">Joint Commission standards, CMS conditions of participation, infection control guidelines</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Energy &amp; Utilities</div>
-              <div class="domain-detail">NERC CIP cybersecurity standards, NEC electrical code, pipeline safety regulations</div>
-            </div>
-          </div>
-          <div class="domain-item">
-            <div class="domain-dot"></div>
-            <div>
-              <div class="domain-name">Legal &amp; Financial</div>
-              <div class="domain-detail">SEC regulations, AML compliance frameworks, contract clause verification</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- DEMO RESULT CARD -->
-  <div id="demo" style="background: var(--navy-mid); border-top: 1px solid rgba(184,148,58,0.12); border-bottom: 1px solid rgba(184,148,58,0.12);">
-    <div class="section">
-      <div class="reveal" style="text-align: center; margin-bottom: 4rem;">
-        <p class="section-label">Sample Output</p>
-        <h2 class="section-heading" style="margin: 0 auto;">This is what CARL delivers.</h2>
-      </div>
-
-      <!-- Card wrapper -->
-      <div class="demo-card reveal">
-
-        <!-- Card header -->
-        <div class="demo-card-header">
-          <span class="demo-card-title">Field Inspection Entry</span>
-          <span class="demo-result-badge badge-compliant">COMPLIANT</span>
-        </div>
-
-        <!-- Card body -->
-        <div class="demo-card-body">
-
-          <div class="demo-field">
-            <div class="demo-field-label">Discipline</div>
-            <div class="demo-field-value">Construction &amp; Facilities</div>
-          </div>
-
-          <div class="demo-field">
-            <div class="demo-field-label">Observation</div>
-            <div class="demo-field-value">Penetration seals at exterior wall sleeves have been inspected. All conduit and pipe penetrations are sealed with listed firestop material appropriate to the annular space. Installation documentation and listing information are on file.</div>
-          </div>
-
-          <div class="demo-field">
-            <div class="demo-field-label">Primary Regulatory Citation</div>
-            <div class="demo-field-value demo-citation">UFC 3-600-01 Section 7-4.2 &mdash; All penetrations through fire-rated construction shall be protected with listed firestop systems installed in accordance with the listing and manufacturer's instructions</div>
-          </div>
-
-          <!-- Confidence row -->
-          <div class="demo-meta-row">
-            <div class="demo-meta-cell">
-              <div class="demo-meta-label">Confidence</div>
-              <div class="demo-meta-value demo-confidence">0.97</div>
-            </div>
-            <div class="demo-meta-cell">
-              <div class="demo-meta-label">Applicability</div>
-              <div class="demo-meta-value">Direct</div>
-            </div>
-            <div class="demo-meta-cell">
-              <div class="demo-meta-label">Verified By</div>
-              <div class="demo-meta-value">Primary &mdash; Dual Verified</div>
-            </div>
-          </div>
-
-          <!-- Additional citations -->
-          <div class="demo-field-label" style="margin-bottom: 0.5rem;">Additional Regulatory Citations <span style="font-family:'Jost',sans-serif; font-size:0.6rem; letter-spacing:0.1em; color:var(--demo-text-mid); font-weight:400; text-transform:none;">(supplemental references)</span></div>
-
-          <div class="demo-cite-card">
-            <div class="demo-cite-header">
-              <span class="demo-cite-ref">NFPA 101 Section 8.3.5</span>
-              <span class="demo-cite-badge">PRIMARY &mdash; DUAL VERIFIED &nbsp; 1.00</span>
-            </div>
-            <div class="demo-cite-body">Openings in fire barriers shall be protected by fire door assemblies, fire window assemblies, or fire dampers as required by the applicable code section</div>
-          </div>
-
-          <div class="demo-cite-card">
-            <div class="demo-cite-header">
-              <span class="demo-cite-ref">IBC Section 714.4</span>
-              <span class="demo-cite-badge">PRIMARY &mdash; DUAL VERIFIED &nbsp; 0.97</span>
-            </div>
-            <div class="demo-cite-body">Through-penetration firestop systems shall be tested in accordance with ASTM E814 or UL 1479 and shall have an F rating not less than the required fire-resistance rating of the assembly</div>
-          </div>
-
-          <div class="demo-field">
-            <div class="demo-field-label">Evaluation Rationale</div>
-            <div class="demo-field-value">The observation documents proper installation of listed firestop systems at all exterior wall penetrations. Installation is consistent with UFC requirements and supporting code references. Documentation is present and complete. No deficiencies identified.</div>
-          </div>
-
-          <div class="demo-field" style="border-bottom: none;">
-            <div class="demo-field-label">Inspector Action</div>
-            <div class="demo-field-value">No corrective action required. Retain installation documentation in project file. Confirm firestop installer certification is current and on file with QC records.</div>
-          </div>
-
-          <div class="demo-timestamp">Processed: 04/11/2026, 07:21:33 AM</div>
-
-        </div>
-      </div>
-
-      <p class="demo-disclaimer reveal">Representative sample only. Actual outputs reflect the governing standards library configured for the specific deployment domain.</p>
-    </div>
-  </div>
-
-
-  <section class="cta-section">
-    <div class="reveal">
-      <p class="cta-super">Ready to deploy</p>
-      <h2 class="cta-heading">A second opinion that cites its sources.</h2>
-      <p class="cta-sub">Built for professionals who can't afford to be wrong.</p>
-      <a href="https://carl.carlcompliance.com" class="btn-primary">Access CARL</a>
-    </div>
+  <!-- CLOSING BAND -->
+  <section class="closing-band">
+    <p class="closing-text">Built for the kind of professional who reads the fine print, keeps the receipts, and notices when the typography is set with care.</p>
+    <div class="closing-rule"></div>
   </section>
 
   <!-- FOOTER -->
-  <footer>
-    <div class="footer-brand">CARL</div>
-    <div class="footer-note">Compliance Assistance and Regulatory Liaison &nbsp;·&nbsp; carlcompliance.com</div>
-    <div class="footer-note">&copy; 2026 &nbsp;·&nbsp; All Rights Reserved</div>
+  <footer class="footer">
+    <div class="footer-text">carlcompliance.com</div>
+    <div class="footer-text">&copy; Two Thousand Twenty-Six &middot; All rights reserved</div>
   </footer>
-
-  <script>
-    // scroll reveal
-    const observer = new IntersectionObserver((entries) => {
-      entries.forEach(e => {
-        if (e.isIntersecting) {
-          e.target.classList.add('visible');
-        }
-      });
-    }, { threshold: 0.1 });
-
-    document.querySelectorAll('.reveal').forEach(el => observer.observe(el));
-  </script>
 
 </body>
 </html>
