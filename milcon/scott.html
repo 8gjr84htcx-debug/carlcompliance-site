@@ -1,0 +1,895 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SCOTT – Scope Content Organizer and Trigger Tracer</title>
+<style>
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;font-stretch:condensed;letter-spacing:.01em}
+header .sp{flex:1}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+main{max-width:1280px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:22px}
+@media(max-width:1050px){main{grid-template-columns:1fr}}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px 20px}
+h2{font:600 19px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+.lead{color:var(--mute);margin:0 0 12px;font-size:14px}
+textarea{width:100%;min-height:340px;font:14px/1.5 "Segoe UI",sans-serif;border:1px solid var(--line);border-radius:8px;padding:12px;resize:vertical;color:var(--ink)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.engines{display:grid;gap:8px;margin-top:14px}
+.eng{display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:8px;padding:8px 12px}
+.eng .nm{font-weight:600;min-width:84px}
+.eng .st{font-size:13px;color:var(--mute);flex:1}
+.dot{width:10px;height:10px;border-radius:50%;background:#c4cfcc;flex:none}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+.warn{font-size:13px;background:var(--warnbg);border-left:3px solid var(--warn);padding:8px 10px;border-radius:4px;margin-top:12px}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12.5px;color:var(--mute);font-weight:600}
+td.ck{width:30px}
+.src{display:flex;gap:4px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 7px;border:1px solid var(--line);color:var(--mute);white-space:nowrap}
+.pill.y{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.n{opacity:.45}
+.ev{font-size:12.5px;color:var(--mute);margin-top:2px}
+.ev q{background:#fff6d8;quotes:"\201C" "\201D"}
+.status{font-size:12px;font-weight:600;white-space:nowrap}
+.s-agree{color:var(--ok)}.s-single{color:var(--warn)}.s-bad{color:var(--bad)}
+.grp{margin:18px 0 6px;font:600 15px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.empty{color:var(--mute);padding:28px 8px;text-align:center}
+.basics{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.basics label{font-size:12.5px;color:var(--mute);display:block}
+.basics select,.basics input{width:100%;font:inherit;font-size:14px;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:#fff}
+.elements li{margin:3px 0}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h3{margin:0 0 8px;font:600 16px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.grid2 input,.grid2 select{width:100%;font:inherit;font-size:14px;padding:5px 7px;border:1px solid var(--line);border-radius:6px}
+.small{font-size:12.5px;color:var(--mute)}
+details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
+.reason{font-size:12px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/milcon/">MILCON</a>
+ <h1>SCOTT <span style="font-weight:400;font-size:15px;opacity:.75">Scope Content Organizer and Trigger Tracer</span></h1>
+ <div class="sp"></div>
+ <button id="bSettings">AI settings</button>
+</header>
+<main>
+ <section class="panel">
+  <h2>Scope of work</h2>
+  <p class="lead">Paste the scope, SOW, or DD1391 description. The parser finds work elements and triggers, shows the text that justifies each one, and sends the result to CORA.</p>
+  <textarea id="scope" placeholder="Paste scope text here, or open a .txt file."></textarea>
+  <div class="row">
+   <button class="go" id="bParse">Parse scope</button>
+   <button id="bFile">Open .txt…</button>
+   <input type="file" id="fFile" accept=".txt,.md,.csv" hidden>
+   <button id="bClear">Clear</button>
+   <span class="small" id="wc"></span>
+  </div>
+  <div class="engines" id="engines"></div>
+  <div class="warn" id="dataWarn" hidden></div>
+ </section>
+ <section class="panel" id="out">
+  <h2>Findings</h2>
+  <div class="empty">Parse a scope to see work elements and triggers here.</div>
+ </section>
+</main>
+
+<dialog id="dlg"><div class="dlg">
+ <h2>AI settings</h2>
+ <p class="lead">Up to three AI slots. Readers parse the scope independently; the arbiter sees only the items they disagree on and rules on each one, quoting the scope. The built-in keyword parser always runs as a baseline. Keys stay in this browser and are never written into the file.</p>
+ <div id="slots"></div>
+ <label class="small"><input type="checkbox" id="rememberKeys"> Remember keys on this computer (otherwise they are cleared when the browser closes)</label>
+ <div class="foot">
+  <button class="go" id="bSaveSet">Save settings</button>
+  <button id="bCloseSet">Cancel</button>
+ </div>
+</div></dialog>
+
+<script id="schema" type="application/json">{
+ "version": "0.3",
+ "questions": [
+  {
+   "id": "service",
+   "label": "Service / customer",
+   "type": "multi",
+   "options": [
+    "army",
+    "navy",
+    "usmc",
+    "af",
+    "ussf",
+    "dha",
+    "def_agency"
+   ]
+  },
+  {
+   "id": "design_agent",
+   "label": "Design / construction agent",
+   "type": "single",
+   "options": [
+    "usace",
+    "navfac",
+    "afcec",
+    "other"
+   ]
+  },
+  {
+   "id": "location",
+   "label": "Location type",
+   "type": "single",
+   "options": [
+    "us_state",
+    "us_territory",
+    "host_nation"
+   ]
+  },
+  {
+   "id": "country",
+   "label": "Country / territory",
+   "type": "single",
+   "options": [
+    "us_hawaii",
+    "us_alaska",
+    "guam",
+    "cnmi",
+    "american_samoa",
+    "wake",
+    "japan",
+    "korea",
+    "philippines",
+    "australia",
+    "palau",
+    "fsm",
+    "marshall_islands",
+    "papua_new_guinea",
+    "singapore",
+    "other_host_nation"
+   ]
+  },
+  {
+   "id": "arctic",
+   "label": "Arctic / subarctic site (permafrost, frost design)",
+   "type": "bool"
+  },
+  {
+   "id": "seismic",
+   "label": "Seismic design required (site Seismic Design Category C or higher)",
+   "type": "bool"
+  },
+  {
+   "id": "historic",
+   "label": "Historic property / NHPA Section 106 involvement",
+   "type": "bool"
+  },
+  {
+   "id": "level",
+   "label": "Level of construction (UFC 1-200-01 para 1-4.2)",
+   "type": "single",
+   "options": [
+    "permanent",
+    "temporary",
+    "non_permanent_ops",
+    "host_nation_use"
+   ]
+  },
+  {
+   "id": "work_type",
+   "label": "Work type",
+   "type": "multi",
+   "options": [
+    "new",
+    "addition",
+    "alteration",
+    "repair",
+    "demolition",
+    "om_services",
+    "study_design_only"
+   ]
+  },
+  {
+   "id": "phase",
+   "label": "Deliverables in this contract",
+   "type": "multi",
+   "options": [
+    "planning_1391",
+    "design",
+    "specifications",
+    "cost_estimate",
+    "construction",
+    "commissioning",
+    "closeout_transfer"
+   ]
+  },
+  {
+   "id": "delivery",
+   "label": "Delivery method",
+   "type": "single",
+   "options": [
+    "dbb",
+    "db",
+    "idiq_task_order",
+    "ae_services"
+   ]
+  },
+  {
+   "id": "facility",
+   "label": "Facility type(s)",
+   "type": "multi",
+   "options": [
+    "admin",
+    "legal",
+    "c5isr",
+    "ecf_acp",
+    "atc_airops",
+    "airfield_ops_support",
+    "hangar",
+    "corrosion_paint",
+    "engine_shop_af",
+    "pmel_af",
+    "vehicle_maint",
+    "vehicle_wash",
+    "armory",
+    "ammo_storage",
+    "nuclear_weapons",
+    "warehouse",
+    "cold_storage",
+    "fuels_lab",
+    "fuel_facility",
+    "medical",
+    "family_housing",
+    "lodging",
+    "unaccompanied_housing",
+    "dining",
+    "family_service",
+    "fire_station",
+    "fitness",
+    "youth_center",
+    "cdc",
+    "continuous_child_care",
+    "library",
+    "aquatic",
+    "small_arms_range_outdoor",
+    "small_arms_range_indoor",
+    "confinement",
+    "museum_historic",
+    "reserve_center_navy",
+    "drydock",
+    "industrial_siop",
+    "pier_wharf",
+    "small_craft_berthing",
+    "harbor_coastal",
+    "moorings",
+    "railroad",
+    "chapel",
+    "community_other",
+    "utility_plant",
+    "other_no_specific_ufc",
+    "civil_works",
+    "airfield"
+   ]
+  },
+  {
+   "id": "systems",
+   "label": "Systems / disciplines in scope",
+   "type": "multi",
+   "options": [
+    "architectural",
+    "interior",
+    "roofing",
+    "coatings",
+    "signage",
+    "civil_site",
+    "landscape",
+    "stormwater_lid",
+    "geotech",
+    "water",
+    "water_reuse",
+    "wastewater",
+    "roads_parking",
+    "airfield_pavement",
+    "airfield_marking",
+    "airfield_lighting",
+    "arresting_gear",
+    "bridges",
+    "structural",
+    "mechanical",
+    "hvac",
+    "ddc_controls",
+    "industrial_vent",
+    "plumbing",
+    "compressed_air",
+    "gas_distribution",
+    "exterior_mech_utilities",
+    "boiler_plant",
+    "renewables_facility",
+    "renewables_utility",
+    "fuel_systems",
+    "umcs",
+    "elevators",
+    "electrical",
+    "interior_electrical",
+    "lighting",
+    "exterior_power",
+    "batteries_ups",
+    "generators",
+    "microgrid",
+    "energy_storage",
+    "ev_charging",
+    "aircraft_power",
+    "cathodic",
+    "lightning",
+    "ict_telecom",
+    "fire_protection",
+    "mass_notification",
+    "ess",
+    "fences_gates",
+    "vehicle_barriers",
+    "ship_service_utilities",
+    "portal_crane",
+    "refrigeration_cold",
+    "environmental_hazmat",
+    "railroad_track",
+    "aviation_fuel",
+    "overhead_cranes",
+    "antenna_tower",
+    "termite_control"
+   ]
+  },
+  {
+   "id": "security",
+   "label": "Security / special requirements",
+   "type": "multi",
+   "options": [
+    "scif_sapf",
+    "high_risk_personnel",
+    "safe_haven",
+    "direct_fire",
+    "forced_entry",
+    "waterfront_security",
+    "expeditionary_at",
+    "risk_cat_v",
+    "hardened_conventional",
+    "accidental_explosion",
+    "nuclear_effects",
+    "cbr_protection",
+    "hemp",
+    "rf_shielding"
+   ]
+  },
+  {
+   "id": "value",
+   "label": "Estimated contract value (USD)",
+   "type": "number"
+  },
+  {
+   "id": "contract_type",
+   "label": "Contract type",
+   "type": "single",
+   "options": [
+    "ffp",
+    "cost_reimb",
+    "t_and_m",
+    "idiq"
+   ]
+  },
+  {
+   "id": "hazards",
+   "label": "Hazardous activities",
+   "type": "multi",
+   "options": [
+    "work_at_height",
+    "roof_work",
+    "scaffolding",
+    "rope_access",
+    "excavation",
+    "underground",
+    "cranes_rigging",
+    "critical_lift",
+    "steel_erection",
+    "concrete_formwork",
+    "demolition",
+    "hot_work",
+    "electrical_energized",
+    "hazardous_energy_loto",
+    "confined_space",
+    "lead_asbestos_hazmat",
+    "hazwoper",
+    "marine_floating_plant",
+    "diving",
+    "blasting_explosives",
+    "tree_work",
+    "airfield_ops",
+    "uas_drones",
+    "pressurized_systems",
+    "night_work",
+    "traffic_control",
+    "heavy_equipment"
+   ]
+  },
+  {
+   "id": "funding",
+   "label": "Appropriation",
+   "type": "single",
+   "options": [
+    "milcon",
+    "om_frsm",
+    "host_nation_funded",
+    "other"
+   ]
+  },
+  {
+   "id": "solicitation",
+   "label": "Solicitation method",
+   "type": "single",
+   "options": [
+    "sealed_bid",
+    "negotiated",
+    "task_order"
+   ]
+  },
+  {
+   "id": "set_aside",
+   "label": "Set-aside",
+   "type": "single",
+   "options": [
+    "none",
+    "small_business",
+    "8a",
+    "hubzone",
+    "sdvosb",
+    "wosb"
+   ]
+  },
+  {
+   "id": "duration_days",
+   "label": "Period of performance (days)",
+   "type": "number"
+  },
+  {
+   "id": "cui",
+   "label": "Contractor will handle CUI / covered defense information (drawings, security plans)",
+   "type": "bool"
+  },
+  {
+   "id": "on_installation",
+   "label": "Work on a Government installation",
+   "type": "bool"
+  },
+  {
+   "id": "lds",
+   "label": "Liquidated damages",
+   "type": "bool"
+  },
+  {
+   "id": "unit_prices",
+   "label": "Unit-priced bid items",
+   "type": "bool"
+  },
+  {
+   "id": "mobilization_item",
+   "label": "Separate mobilization bid item",
+   "type": "bool"
+  },
+  {
+   "id": "cor",
+   "label": "COR will be appointed",
+   "type": "bool"
+  },
+  {
+   "id": "foreign_offerors",
+   "label": "Award may go to a foreign / host-nation firm",
+   "type": "bool"
+  }
+ ]
+}</script>
+<script>
+"use strict";
+const SCHEMA=JSON.parse(document.getElementById('schema').textContent);
+const Q={};SCHEMA.questions.forEach(q=>Q[q.id]=q);
+const LBL={af:'Air Force',ussf:'Space Force',usmc:'USMC',navy:'Navy',army:'Army',dha:'DHA',usace:'USACE',navfac:'NAVFAC',afcec:'AFCEC',us_state:'U.S. State',us_territory:'U.S. territory',host_nation:'Host nation',us_hawaii:'Hawaii',us_alaska:'Alaska',cnmi:'CNMI',fsm:'FSM',om_services:'O&M services',study_design_only:'Study / design only',planning_1391:'Planning / DD1391',closeout_transfer:'Closeout / transfer',dbb:'Design-bid-build',db:'Design-build',ae_services:'A-E services',ffp:'Firm-fixed-price',cost_reimb:'Cost-reimbursement',milcon:'MILCON',om_frsm:'O&M / FSRM',c5isr:'C5ISR',ecf_acp:'ECF / ACP',atc_airops:'ATC / air ops',cdc:'Child development center',ddc_controls:'DDC controls',umcs:'UMCS',hvac:'HVAC',ict_telecom:'ICT / telecom',ess:'Electronic security',ev_charging:'EV charging',batteries_ups:'Batteries / UPS',stormwater_lid:'Stormwater / LID',scif_sapf:'SCIF / SAPF',risk_cat_v:'Risk Category V',cbr_protection:'CBR protection',hemp:'HEMP',rf_shielding:'RF / TEMPEST shielding',lead_asbestos_hazmat:'Lead / asbestos / hazmat',hazwoper:'HAZWOPER',uas_drones:'UAS / drones',hazardous_energy_loto:'Hazardous energy / LOTO',electrical_energized:'Energized electrical work',non_permanent_ops:'Non-permanent (military ops)'};
+const lab=v=>LBL[v]||String(v).replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
+const MULTI=['work_type','phase','facility','systems','security','hazards','service'];
+const SCALAR=['service','design_agent','location','country','level','delivery','contract_type','funding','solicitation','set_aside','value','duration_days','seismic','historic','arctic','cui'];
+
+// ---------------- keyword dictionary (offline engine) ----------------
+// [field, value, regex source, note]
+const K=[
+ ['work_type','new','\\b(new|construct(?:ion of)? (?:a|an) (?:new )?)\\b(?=[^.]{0,60}\\b(facility|building|hangar|barracks|dormitor|warehouse|complex|structure))'],
+ ['work_type','new','\\bnew construction\\b'],
+ ['work_type','addition','\\b(addition to|building addition|expand(?:ing|sion of)? the (?:existing )?(?:facility|building))\\b'],
+ ['work_type','alteration','\\b(renovat\\w*|alteration\\w*|moderni[sz]\\w*|reconfigur\\w*|upgrade the (?:facility|building)|interior fit[- ]?out)\\b'],
+ ['work_type','repair','\\b(repair\\w*|replace(?:ment)?|restor\\w*|re-?roof\\w*|recoat\\w*|refurbish\\w*)\\b'],
+ ['work_type','demolition','\\b(demoli\\w+|demo(?:lish)?\\b|tear[- ]?down|remove the existing (?:building|structure|facility))'],
+ ['work_type','om_services','\\b(preventive maintenance|operation and maintenance|O&M services|maintenance services)\\b'],
+ ['work_type','study_design_only','\\b(study|feasibility|charrette|35% design|concept design|design only)\\b'],
+ ['delivery','db','\\b(design[- ]build|DB contract|two[- ]phase design)\\b'],
+ ['delivery','dbb','\\b(design[- ]bid[- ]build|DBB)\\b'],
+ ['delivery','ae_services','\\b(architect[- ]engineer|A-?E services|A/E)\\b'],
+ ['funding','milcon','\\b(MILCON|military construction)\\b'],
+ ['funding','om_frsm','\\b(FSRM|SRM|O&M funds?|O&M,? ?[A-Z]{2,4})\\b'],
+ ['funding','host_nation_funded','\\b(host[- ]nation fund\\w*|HNF|Japanese facilities improvement|FIP|mission support facilities? funded by)\\b'],
+ ['level','temporary','\\b(temporary (?:facility|building|structure)s?|relocatable)\\b'],
+ ['level','non_permanent_ops','\\b(contingency|expeditionary|base camp|non-?permanent)\\b'],
+ ['seismic','true','\\b(seismic|earthquake)\\b'],
+ ['historic','true','\\b(historic\\w*|section 106|NHPA|SHPO|national register)\\b'],
+ ['arctic','true','\\b(permafrost|arctic|subarctic|frost heave)\\b'],
+ ['cui','true','\\b(CUI|controlled unclassified|FOUO|covered defense information)\\b'],
+ // facilities
+ ['facility','admin','\\b(administrative|admin(?:istration)? building|headquarters|HQ building|office building)\\b'],
+ ['facility','c5isr','\\b(C5ISR|C4ISR|command and control|operations center|C2 facility)\\b'],
+ ['facility','ecf_acp','\\b(entry control|access control point|ECF|ACP|main gate)\\b'],
+ ['facility','atc_airops','\\b(air traffic control|control tower|ATC tower|base operations)\\b'],
+ ['facility','airfield_ops_support','\\b(squadron operations|airfield operations|fire crash rescue)\\b'],
+ ['facility','hangar','\\bhangars?\\b'],
+ ['facility','corrosion_paint','\\b(corrosion control facility|paint (?:hangar|booth|facility)|wash rack)\\b'],
+ ['facility','vehicle_maint','\\b(vehicle maintenance|motor pool|TEMF|auto(?:motive)? shop)\\b'],
+ ['facility','vehicle_wash','\\b(vehicle wash|wash facility)\\b'],
+ ['facility','armory','\\b(armor(?:y|ies)|arms room)\\b'],
+ ['facility','ammo_storage','\\b(munitions storage|ammunition|magazine|igloo|explosives? (?:storage|area)|MSA|earth[- ]covered)\\b'],
+ ['facility','nuclear_weapons','\\b(nuclear weapons|WSA)\\b'],
+ ['facility','warehouse','\\b(warehouse|storage (?:building|facility)|supply (?:building|facility))\\b'],
+ ['facility','cold_storage','\\b(cold storage|freezer|refrigerated warehouse|cold room)\\b'],
+ ['facility','fuels_lab','\\bfuels? lab\\w*\\b'],
+ ['facility','fuel_facility','\\b(fuel farm|bulk fuel|POL|hydrant fuel|fuel(?:ing)? (?:system|facility|station)|tank farm)\\b'],
+ ['facility','medical','\\b(medical|clinic|hospital|dental)\\b'],
+ ['facility','family_housing','\\b(family housing|military housing|housing units?)\\b'],
+ ['facility','lodging','\\b(lodging|TLF|transient (?:quarters|lodging)|visiting quarters)\\b'],
+ ['facility','unaccompanied_housing','\\b(unaccompanied housing|barracks|dormitor(?:y|ies)|BEQ|BOQ|UEPH|UH)\\b'],
+ ['facility','dining','\\b(dining facility|DFAC|galley|mess hall|kitchen)\\b'],
+ ['facility','family_service','\\b(family (?:service|support) cent(?:er|re)|airman and family readiness|fleet and family)\\b'],
+ ['facility','fire_station','\\bfire (?:station|house)\\b'],
+ ['facility','fitness','\\b(fitness cent(?:er|re)|gym(?:nasium)?)\\b'],
+ ['facility','youth_center','\\byouth cent(?:er|re)\\b'],
+ ['facility','cdc','\\b(child development cent(?:er|re)|CDC)\\b'],
+ ['facility','library','\\blibrar(?:y|ies)\\b'],
+ ['facility','aquatic','\\b(pool|aquatic|natatorium)\\b'],
+ ['facility','small_arms_range_outdoor','\\b(small arms range|firing range|rifle range|KD range)\\b'],
+ ['facility','small_arms_range_indoor','\\bindoor (?:small arms |firing )?range\\b'],
+ ['facility','confinement','\\b(confinement|brig|detention)\\b'],
+ ['facility','museum_historic','\\bmuseum\\b'],
+ ['facility','drydock','\\b(dry ?dock|graving dock)\\b'],
+ ['facility','industrial_siop','\\b(SIOP|shipyard|industrial operations)\\b'],
+ ['facility','pier_wharf','\\b(pier|wharf|quay|berth(?:ing)? (?:structure|facility))\\b'],
+ ['facility','small_craft_berthing','\\b(small craft|marina|boat ramp|floating dock)\\b'],
+ ['facility','harbor_coastal','\\b(harbor|harbour|breakwater|seawall|revetment|shoreline)\\b'],
+ ['facility','moorings','\\bmoorings?\\b'],
+ ['facility','railroad','\\b(railroad|railway|rail spur)\\b'],
+ ['facility','chapel','\\b(chapel|religious (?:ministry|education))\\b'],
+ ['facility','utility_plant','\\b(central (?:plant|utility plant)|power plant|wastewater treatment plant|water treatment plant)\\b'],
+ ['facility','airfield','\\b(airfield|runway|taxiway|apron|parking ramp|flightline|flight line)\\b'],
+ ['facility','civil_works','\\b(lock and dam|levee|navigation lock|spillway)\\b'],
+ // systems
+ ['systems','roofing','\\b(roof\\w*|re-?roof\\w*|TPO|EPDM|PVC membrane|built-?up roof|modified bitumen|standing seam|SPF roof)\\b'],
+ ['systems','architectural','\\b(exterior wall|envelope|windows?|doors?|storefront|curtain wall|facade|façade|cladding)\\b'],
+ ['systems','interior','\\b(interior|ceiling|flooring|carpet|partition|finishes|drywall|gypsum board|restroom)\\b'],
+ ['systems','coatings','\\b(paint\\w*|coating\\w*|recoat\\w*|primer)\\b'],
+ ['systems','signage','\\bsign(?:age|s)\\b'],
+ ['systems','civil_site','\\b(site ?work|grading|earthwork|site improvements|sidewalks?|curb|site utilities)\\b'],
+ ['systems','landscape','\\b(landscap\\w*|irrigation|planting|turf|sod)\\b'],
+ ['systems','stormwater_lid','\\b(storm ?water|storm drain\\w*|LID|low impact development|detention pond|drainage)\\b'],
+ ['systems','geotech','\\b(geotechnical|soil boring|borings|subsurface investigation|foundation investigation)\\b'],
+ ['systems','water','\\b(domestic water|potable water|water (?:line|main|distribution|storage|tank)|waterline)\\b'],
+ ['systems','water_reuse','\\b(water reuse|reclaimed water|greywater|gray water)\\b'],
+ ['systems','wastewater','\\b(sanitary sewer|wastewater|sewer (?:line|main)|lift station|septic)\\b'],
+ ['systems','roads_parking','\\b(road(?:way)?s?|parking (?:lot|area)|pavement|asphalt|paving)\\b'],
+ ['systems','airfield_pavement','\\b(runway|taxiway|apron|airfield pavement|PCC airfield)\\b'],
+ ['systems','airfield_marking','\\b(airfield marking|runway marking|pavement marking)\\b'],
+ ['systems','airfield_lighting','\\b(airfield lighting|runway (?:edge )?light\\w*|taxiway light\\w*|NAVAID|PAPI|approach lighting)\\b'],
+ ['systems','arresting_gear','\\b(arresting (?:gear|system)|BAK-12|MAAS)\\b'],
+ ['systems','bridges','\\bbridges?\\b'],
+ ['systems','structural','\\b(structural|structure|beam|column|joist|truss|deck|foundation|slab|framing|steel frame)\\b'],
+ ['systems','mechanical','\\b(mechanical)\\b'],
+ ['systems','hvac','\\b(HVAC|air[- ]condition\\w*|chiller|air handl\\w*|AHU|DOAS|ductwork|VRF|split system|cooling tower|ventilation)\\b'],
+ ['systems','ddc_controls','\\b(DDC|BACnet|building automation|BAS|controls system|EMCS)\\b'],
+ ['systems','industrial_vent','\\b(industrial ventilation|fume exhaust|paint booth exhaust|welding exhaust)\\b'],
+ ['systems','plumbing','\\b(plumbing|restrooms?|fixtures|water heater|domestic hot water|eyewash)\\b'],
+ ['systems','compressed_air','\\bcompressed air\\b'],
+ ['systems','gas_distribution','\\b(natural gas|LPG|propane|gas line|gas piping)\\b'],
+ ['systems','exterior_mech_utilities','\\b(chilled water distribution|steam distribution|heat distribution|utility tunnel)\\b'],
+ ['systems','boiler_plant','\\b(boiler|steam plant|HTW)\\b'],
+ ['systems','renewables_facility','\\b(solar (?:PV|panel|array)|photovoltaic|solar water)\\b'],
+ ['systems','renewables_utility','\\b(utility[- ]scale solar|solar farm|wind turbine)\\b'],
+ ['systems','fuel_systems','\\b(fuel (?:system|line|tank|piping)|diesel tank|UST|AST|day tank)\\b'],
+ ['systems','aviation_fuel','\\b(aviation fuel|JP-8|JP-5|Jet A|hydrant (?:fuel|system)|aircraft fueling)\\b'],
+ ['systems','umcs','\\b(UMCS|utility monitoring)\\b'],
+ ['systems','elevators','\\b(elevators?|lifts?)\\b'],
+ ['systems','electrical','\\b(electrical|power distribution|panelboard|switchboard|wiring|receptacles?)\\b'],
+ ['systems','interior_electrical','\\b(panelboards?|branch circuit|interior electrical|receptacles?)\\b'],
+ ['systems','lighting','\\b(lighting|light fixtures?|luminaires?|LED)\\b'],
+ ['systems','exterior_power','\\b(medium voltage|primary (?:power|distribution)|transformer|switchgear|substation|overhead (?:power|lines?)|duct ?bank)\\b'],
+ ['systems','batteries_ups','\\b(UPS|uninterruptible|battery (?:system|room)|stationary batter\\w*)\\b'],
+ ['systems','generators','\\b(generator|genset|engine[- ]generator|standby power|emergency power)\\b'],
+ ['systems','microgrid','\\bmicrogrid\\b'],
+ ['systems','energy_storage','\\b(energy storage|BESS)\\b'],
+ ['systems','ev_charging','\\b(EV charg\\w*|electric vehicle)\\b'],
+ ['systems','aircraft_power','\\b(400 ?Hz|aircraft power|ground power|pre-?conditioned air|PCA)\\b'],
+ ['systems','cathodic','\\bcathodic\\b'],
+ ['systems','lightning','\\blightning (?:protection|arrest\\w*)\\b'],
+ ['systems','ict_telecom','\\b(telecom\\w*|communications? (?:room|cabling)|IT (?:room|cabling)|structured cabling|fiber|LAN|SIPRNet|NIPRNet|data outlets?)\\b'],
+ ['systems','fire_protection','\\b(fire (?:protection|suppression|sprinkler\\w*|alarm|pump)|sprinklers?|standpipe|CO2 (?:fire |suppression |system)|carbon dioxide|clean agent|FM-?200|Novec|AFFF|foam (?:fire|system)|deluge|pre-?action|wet pipe|dry pipe)\\b'],
+ ['systems','mass_notification','\\b(mass notification|MNS|giant voice)\\b'],
+ ['systems','ess','\\b(ESS|IDS|intrusion detection|access control system|card readers?|CCTV|video surveillance|electronic security)\\b'],
+ ['systems','fences_gates','\\b(fenc(?:e|ing)|gates?)\\b'],
+ ['systems','vehicle_barriers','\\b(vehicle barrier|bollards?|wedge barrier|crash[- ]rated)\\b'],
+ ['systems','ship_service_utilities','\\b(shore power|ship service|dockside utilities)\\b'],
+ ['systems','portal_crane','\\bportal crane\\b'],
+ ['systems','overhead_cranes','\\b(overhead crane|bridge crane|monorail hoist|jib crane)\\b'],
+ ['systems','antenna_tower','\\b(antenna tower|comm(?:unications)? tower|radio tower)\\b'],
+ ['systems','termite_control','\\btermit\\w*\\b'],
+ ['systems','refrigeration_cold','\\b(refrigeration|walk-?in (?:cooler|freezer))\\b'],
+ ['systems','environmental_hazmat','\\b(hazardous (?:material|waste)|contaminat\\w*|remediat\\w*|asbestos|lead[- ]based paint|LBP|PCBs?|mold|ACM)\\b'],
+ ['systems','railroad_track','\\b(rail track|track rehabilitation)\\b'],
+ // security
+ ['security','scif_sapf','\\b(SCIF|SAPF|ICD[- ]?705|sensitive compartmented|special access program)\\b'],
+ ['security','high_risk_personnel','\\bhigh[- ]risk personnel\\b'],
+ ['security','safe_haven','\\bsafe haven\\b'],
+ ['security','direct_fire','\\b(ballistic|bullet[- ]resist\\w*|direct fire)\\b'],
+ ['security','forced_entry','\\bforced[- ]entry\\b'],
+ ['security','waterfront_security','\\bwaterfront security\\b'],
+ ['security','risk_cat_v','\\b(risk category V|RC ?V)\\b'],
+ ['security','hardened_conventional','\\b(hardened|weapons effects)\\b'],
+ ['security','accidental_explosion','\\b(explosives? safety|blast resist\\w*|QD arc|quantity[- ]distance)\\b'],
+ ['security','cbr_protection','\\b(CBR|chemical,? biological|collective protection|COLPRO)\\b'],
+ ['security','hemp','\\b(HEMP|EMP)\\b'],
+ ['security','rf_shielding','\\b(RF shield\\w*|TEMPEST|Faraday)\\b'],
+ // hazards
+ ['hazards','roof_work','\\b(roof\\w*|re-?roof\\w*)\\b'],
+ ['hazards','work_at_height','\\b(roof\\w*|elevated|at height|aerial lift|boom lift|scissor lift|ladders?|mezzanine|high bay)\\b'],
+ ['hazards','scaffolding','\\bscaffold\\w*\\b'],
+ ['hazards','rope_access','\\brope access\\b'],
+ ['hazards','excavation','\\b(excavat\\w*|trench\\w*|dig\\w*|underground utilit\\w*|duct ?bank|foundation)\\b'],
+ ['hazards','underground','\\b(tunnel\\w*|shaft|caisson)\\b'],
+ ['hazards','cranes_rigging','\\b(crane|rigging|hoist\\w*|lift(?:ing)? (?:of )?(?:equipment|units?|HVAC)|rooftop unit)\\b'],
+ ['hazards','critical_lift','\\b(critical lift|tandem lift)\\b'],
+ ['hazards','steel_erection','\\b(steel erection|structural steel|steel framing|pre-?engineered metal building)\\b'],
+ ['hazards','concrete_formwork','\\b(formwork|cast[- ]in[- ]place|concrete placement|shoring)\\b'],
+ ['hazards','demolition','\\b(demoli\\w+|tear[- ]?(?:off|down)|remove existing)\\b'],
+ ['hazards','hot_work','\\b(hot work|weld\\w*|torch\\w*|brazing|cutting torch|torch[- ]applied|hot[- ]mopped|burn(?:ing)? )\\b'],
+ ['hazards','electrical_energized','\\b(energized|live electrical|hot work on electrical)\\b'],
+ ['hazards','hazardous_energy_loto','\\b(lock ?out|tag ?out|LOTO|de-?energiz\\w*|outage)\\b'],
+ ['hazards','confined_space','\\b(confined space|manhole|vault|crawl ?space|tank interior)\\b'],
+ ['hazards','lead_asbestos_hazmat','\\b(asbestos|ACM|lead[- ]based paint|LBP|lead paint|PCBs?|mercury|mold|transite|floor tile mastic|hazardous material)\\b'],
+ ['hazards','hazwoper','\\b(HAZWOPER|contaminated (?:soil|site|groundwater)|remediation)\\b'],
+ ['hazards','marine_floating_plant','\\b(barge|floating plant|marine (?:work|construction)|dredg\\w*)\\b'],
+ ['hazards','diving','\\b(diver|diving|underwater)\\b'],
+ ['hazards','blasting_explosives','\\bblast(?:ing)? (?:rock|operations)|\\bexplosive demolition\\b'],
+ ['hazards','tree_work','\\b(tree (?:removal|trimming|work)|clearing and grubbing)\\b'],
+ ['hazards','airfield_ops','\\b(airfield|flightline|flight line|runway|taxiway|apron)\\b'],
+ ['hazards','uas_drones','\\b(UAS|drone|sUAS|unmanned aircraft)\\b'],
+ ['hazards','pressurized_systems','\\b(pressure test\\w*|hydrostatic|pneumatic test|compressed gas)\\b'],
+ ['hazards','night_work','\\b(night work|nighttime|night shift|after hours)\\b'],
+ ['hazards','traffic_control','\\b(traffic control|lane closure|road closure|detour)\\b'],
+ ['hazards','heavy_equipment','\\b(heavy equipment|excavator|dozer|loader|grader|paver|roller|crane)\\b'],
+ // services / agents / location
+ ['service','af','\\b(Air Force|USAF|AFB|wing|CES)\\b'],
+ ['service','ussf','\\b(Space Force|USSF|SFB)\\b'],
+ ['service','navy','\\b(Navy|NAVFAC|NAVBASE|Naval)\\b'],
+ ['service','usmc','\\b(Marine Corps|USMC|MCB|MCAS|Camp Blaz)\\b'],
+ ['service','army','\\b(Army|USACE|USAG|Fort)\\b'],
+ ['service','dha','\\b(DHA|Defense Health Agency)\\b'],
+ ['design_agent','navfac','\\bNAVFAC\\b'],
+ ['design_agent','usace','\\b(USACE|Corps of Engineers|POD|POJ|POH|POF|POA)\\b'],
+ ['design_agent','afcec','\\bAFCEC\\b'],
+ ['country','guam','\\b(Guam|Andersen|NBG|Apra|Camp Blaz|Finegayan)\\b'],
+ ['country','cnmi','\\b(CNMI|Saipan|Tinian|Rota|Northern Mariana)\\b'],
+ ['country','us_hawaii','\\b(Hawaii|Hawai\'i|Oahu|Pearl Harbor|Hickam|Kaneohe|Schofield)\\b'],
+ ['country','us_alaska','\\b(Alaska|Elmendorf|Eielson|Wainwright)\\b'],
+ ['country','japan','\\b(Japan|Okinawa|Kadena|Yokota|Misawa|Iwakuni|Yokosuka|Sasebo|Atsugi|Futenma|Camp Hansen|Camp Schwab|Zama)\\b'],
+ ['country','korea','\\b(Korea|ROK|Osan|Kunsan|Humphreys|Daegu|Chinhae)\\b'],
+ ['country','philippines','\\b(Philippines|EDCA|Luzon|Palawan|Subic|Basa Air Base)\\b'],
+ ['country','australia','\\b(Australia|Darwin|Tindal|RAAF)\\b'],
+ ['country','palau','\\bPalau\\b'],['country','fsm','\\b(Micronesia|FSM|Yap|Pohnpei|Chuuk|Kosrae)\\b'],
+ ['country','marshall_islands','\\b(Marshall Islands|Kwajalein|RTS)\\b'],['country','papua_new_guinea','\\b(Papua New Guinea|PNG|Lombrum|Manus)\\b'],
+ ['country','american_samoa','\\bAmerican Samoa\\b'],['country','wake','\\bWake Island\\b'],['country','singapore','\\bSingapore\\b'],
+ ['set_aside','small_business','\\b(small business set[- ]aside|total small business)\\b'],['set_aside','8a','\\b8\\(a\\)'],
+ ['set_aside','hubzone','\\bHUBZone\\b'],['set_aside','sdvosb','\\bSDVOSB\\b'],['set_aside','wosb','\\b(WOSB|EDWOSB)\\b'],
+ ['contract_type','cost_reimb','\\b(cost[- ]reimburs\\w*|cost[- ]plus)\\b'],['contract_type','ffp','\\b(firm[- ]fixed[- ]price|FFP)\\b'],
+ ['solicitation','sealed_bid','\\b(sealed bid|IFB|invitation for bids?)\\b'],['solicitation','negotiated','\\b(RFP|request for proposals?|best value|LPTA)\\b'],['solicitation','task_order','\\b(task order|MACC|IDIQ)\\b'],
+];
+const LOCATION_OF={guam:'us_territory',cnmi:'us_territory',american_samoa:'us_territory',wake:'us_territory',us_hawaii:'us_state',us_alaska:'us_state'};
+const NOTES={'fire_protection':t=>/CO2|carbon dioxide/i.test(t)?'CO2 system: see UFGS 21 21 01':/clean agent|FM-?200|Novec/i.test(t)?'Clean agent system: see UFGS 21 22 00':/AFFF|foam/i.test(t)?'Foam system: see UFGS 21 13 24/25':''};
+const COMPILED=K.map(([f,v,re])=>({f,v,re:new RegExp(re,'gi')}));
+
+function sentenceAround(text,i,len){let s=text.lastIndexOf('.',i);s=s<0?0:s+1;let e=text.indexOf('.',i+len);e=e<0?text.length:e+1;return text.slice(s,e).trim().slice(0,260);}
+function offline(text){
+ const found=[];
+ for(const k of COMPILED){k.re.lastIndex=0;const m=k.re.exec(text);if(!m) continue;
+  const quote=m[0].trim();found.push({field:k.f,value:k.v,evidence:quote,context:sentenceAround(text,m.index,m[0].length),note:(NOTES[k.v]?NOTES[k.v](text):'')});}
+ // value $
+ const money=[...text.matchAll(/\$\s?([\d,.]+)\s*(million|M|MM|billion|B|K|thousand)?\b/gi)].map(m=>{let n=parseFloat(m[1].replace(/,/g,''));const u=(m[2]||'').toLowerCase();if(u.startsWith('b'))n*=1e9;else if(u==='million'||u==='m'||u==='mm')n*=1e6;else if(u==='k'||u==='thousand')n*=1e3;return {n,q:m[0]};}).filter(x=>x.n>=1000);
+ if(money.length){const best=money.sort((a,b)=>b.n-a.n)[0];found.push({field:'value',value:best.n,evidence:best.q.trim(),context:sentenceAround(text,text.indexOf(best.q),best.q.length)});}
+ const dur=text.match(/(\d{2,4})\s*(?:calendar\s*)?days/i);if(dur) found.push({field:'duration_days',value:Number(dur[1]),evidence:dur[0],context:sentenceAround(text,text.indexOf(dur[0]),dur[0].length)});
+ return found;
+}
+
+// ---------------- AI engines ----------------
+const PROVIDERS={anthropic:'Anthropic (Claude)',openai:'OpenAI-compatible (OpenAI, GenAI.mil if OpenAI-style, Ask Sage, Azure, local)',gemini:'Google Gemini',custom:'Custom endpoint (OpenAI request format)'};
+const SLOT_DEF={provider:'anthropic',label:'',role:'reader',base:'',model:'',key:'',header:'Authorization',prefix:'Bearer ',enabled:false};
+let SET=loadSettings();
+function loadSettings(){let s={slots:[{...SLOT_DEF,label:'Reader 1'},{...SLOT_DEF,label:'Reader 2',provider:'openai'},{...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'}],remember:false};
+ try{const j=JSON.parse(localStorage.getItem('pmt_ai')||'null');if(j){s=j;while(s.slots.length<3) s.slots.push({...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'});s.slots.forEach(x=>x.role=x.role||'reader');}const k=JSON.parse(sessionStorage.getItem('pmt_ai_keys')||localStorage.getItem('pmt_ai_keys')||'null');if(k) s.slots.forEach((x,i)=>x.key=k[i]||'');}catch(e){}
+ return s;}
+function saveSettings(){try{const keys=SET.slots.map(s=>s.key);const noKeys={...SET,slots:SET.slots.map(s=>({...s,key:''}))};localStorage.setItem('pmt_ai',JSON.stringify(noKeys));
+ sessionStorage.setItem('pmt_ai_keys',JSON.stringify(keys));if(SET.remember) localStorage.setItem('pmt_ai_keys',JSON.stringify(keys));else localStorage.removeItem('pmt_ai_keys');}catch(e){}}
+function vocab(){const o={};MULTI.concat(['design_agent','location','country','level','delivery','contract_type','funding','solicitation','set_aside']).forEach(id=>{if(Q[id]) o[id]=Q[id].options;});return o;}
+function systemPrompt(){return `You extract construction scope data for U.S. DoD military construction contracts. Read the scope and return ONLY a JSON object, no prose, with this shape:
+{"work_elements":[{"name":"short name","description":"one sentence","evidence":"exact quote from the scope"}],
+ "triggers":[{"field":"<field id>","value":"<allowed value>","evidence":"exact quote from the scope, 3-25 words, copied character for character","reason":"why this applies"}],
+ "scalars":{"value":<number or null>,"duration_days":<number or null>,"seismic":<true/false/null>,"historic":<true/false/null>,"cui":<true/false/null>}}
+Rules: use only the fields and values listed below. Every trigger needs an evidence quote that appears verbatim in the scope. Include implied hazards only when the scope text clearly implies them (for example tear-off of a roof implies roof_work and work_at_height) and quote the text that implies them. Do not guess facts the scope does not support.
+Allowed fields and values: ${JSON.stringify(vocab())}`;}
+async function callAI(slot,sys,user){
+ const p=slot.provider;let url,headers={'Content-Type':'application/json'},body;
+ if(p==='anthropic'){url=(slot.base||'https://api.anthropic.com').replace(/\/$/,'')+'/v1/messages';headers['x-api-key']=slot.key;headers['anthropic-version']='2023-06-01';headers['anthropic-dangerous-direct-browser-access']='true';
+  body={model:slot.model,max_tokens:4000,system:sys,messages:[{role:'user',content:user}]};}
+ else if(p==='gemini'){url=(slot.base||'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/,'')+'/models/'+encodeURIComponent(slot.model)+':generateContent?key='+encodeURIComponent(slot.key);
+  body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{responseMimeType:'application/json'}};}
+ else{url=(slot.base||'https://api.openai.com/v1').replace(/\/$/,'')+'/chat/completions';if(slot.key) headers[slot.header||'Authorization']=(slot.prefix??'Bearer ')+slot.key;
+  body={model:slot.model,messages:[{role:'system',content:sys},{role:'user',content:user}]};}
+ const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+ const t=await r.text();if(!r.ok) throw new Error('HTTP '+r.status+': '+t.slice(0,200));
+ const j=JSON.parse(t);
+ const txt=p==='anthropic'?(j.content||[]).map(c=>c.text||'').join(''):p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):(j.choices?.[0]?.message?.content||'');
+ return parseJSON(txt);
+}
+function parseJSON(s){const a=s.indexOf('{'),b=s.lastIndexOf('}');if(a<0||b<0) throw new Error('No JSON in reply');return JSON.parse(s.slice(a,b+1));}
+
+// ---------------- verification + merge ----------------
+const norm=s=>String(s||'').toLowerCase().replace(/[\u2018\u2019]/g,"'").replace(/[\u201C\u201D]/g,'"').replace(/\s+/g,' ').trim();
+function verified(scope,quote){const q=norm(quote);return q.length>=3&&norm(scope).includes(q);}
+function validPair(f,v){if(['value','duration_days'].includes(f)) return typeof v==='number'&&v>0;if(['seismic','historic','arctic','cui'].includes(f)) return true;return Q[f]&&Q[f].options&&Q[f].options.includes(v);}
+let STATE=null;
+function merge(scope,results){
+ const map=new Map();
+ const add=(src,t)=>{let {field,value}=t;if(['seismic','historic','arctic','cui'].includes(field)) value=true;
+  if(!validPair(field,value)) return;const key=field+'|'+value;
+  if(!map.has(key)) map.set(key,{field,value,by:{},ev:{},why:{},note:''});
+  const e=map.get(key);const ok=verified(scope,t.evidence);e.by[src]=ok?'y':'bad';e.ev[src]=t.evidence;if(t.reason) e.why[src]=t.reason;if(t.note) e.note=t.note;if(t.context) e.ctx=t.context;};
+ for(const [src,r] of Object.entries(results)){if(!r||r.error) continue;(r.triggers||[]).forEach(t=>add(src,t));
+  if(r.scalars){for(const [f,v] of Object.entries(r.scalars)){if(v===null||v===false||v===undefined) continue;add(src,{field:f,value:v,evidence:(r.scalars_evidence||{})[f]||'',reason:'scalar'});}}}
+ const engines=Object.keys(results).filter(k=>results[k]&&!results[k].error);
+ const items=[...map.values()].map(e=>{const yes=Object.values(e.by).filter(x=>x==='y').length;const bad=Object.values(e.by).filter(x=>x==='bad').length;
+  let status=yes>=2?'agree':yes===1?'single':'unverified';
+  if(['value','duration_days'].includes(e.field)&&!yes&&bad) status='single';
+  return {...e,yes,status,use:status==='agree'||(status==='single'&&e.by.offline==='y')};});
+ return {engines,items};
+}
+
+// ---------------- UI ----------------
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+function engineList(){const e=[{id:'offline',name:'Keywords',desc:'Built-in, works offline'}];SET.slots.forEach((s,i)=>{if(s.enabled&&s.model&&s.role!=='arbiter') e.push({id:'ai'+(i+1),name:s.label||('AI '+(i+1)),desc:(PROVIDERS[s.provider]||'').split(' (')[0]+' · '+s.model,slot:s});});return e;}
+function arbiter(){const i=SET.slots.findIndex(s=>s.enabled&&s.model&&s.role==='arbiter');return i<0?null:{id:'ai'+(i+1),name:SET.slots[i].label||'Arbiter',slot:SET.slots[i],desc:(PROVIDERS[SET.slots[i].provider]||'').split(' (')[0]+' · '+SET.slots[i].model};}
+function renderEngines(status={}){const box=$('#engines');box.innerHTML='';
+ [...engineList(),...(arbiter()?[{...arbiter(),name:arbiter().name+' (arbiter)'}]:[])].forEach(e=>{const st=status[e.id]||{};const d=document.createElement('div');d.className='eng';
+  d.innerHTML='<span class="dot '+(st.state||'')+'"></span><span class="nm">'+esc(e.name)+'</span><span class="st">'+esc(st.msg||e.desc)+'</span>';box.appendChild(d);});
+ if(SET.slots.every(s=>!s.enabled)) box.insertAdjacentHTML('beforeend','<div class="small">No AI configured. In AI settings, add up to two readers and an arbiter; the readers parse the scope and the arbiter settles any disagreement.</div>');
+ const ai=[...engineList().filter(e=>e.slot),...(arbiter()?[arbiter()]:[])];const w=$('#dataWarn');
+ if(ai.length){w.hidden=false;w.innerHTML='Parsing will send the scope text to: <b>'+ai.map(e=>esc(e.name)+' ('+esc(e.slot.base||defaultBase(e.slot.provider))+')').join(', ')+'</b>. Send CUI only to an AI approved for CUI.';}else w.hidden=true;}
+function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?'generativelanguage.googleapis.com':'api.openai.com';}
+
+async function parse(){
+ const scope=$('#scope').value.trim();if(!scope){$('#scope').focus();return;}
+ $('#bParse').disabled=true;const status={};const results={};
+ const engines=engineList();
+ status.offline={state:'ok',msg:'Done'};results.offline={triggers:offline(scope)};
+ renderEngines(status);
+ const sys=systemPrompt();
+ await Promise.all(engines.filter(e=>e.slot).map(async e=>{status[e.id]={state:'run',msg:'Reading the scope…'};renderEngines(status);
+  try{const r=await callAI(e.slot,sys,'SCOPE OF WORK:\n'+scope);results[e.id]=r;status[e.id]={state:'ok',msg:'Done: '+((r.triggers||[]).length)+' triggers'};}
+  catch(err){results[e.id]={error:String(err.message||err)};status[e.id]={state:'err',msg:'Failed: '+String(err.message||err).slice(0,140)};}
+  renderEngines(status);}));
+ STATE={scope,results,...merge(scope,results),names:Object.fromEntries(engines.map(e=>[e.id,e.name]))};
+ STATE.elements=collectElements();
+ $('#bParse').disabled=false;renderOut();
+ if(arbiter()&&STATE.items.some(i=>i.status==='single'&&!['value','duration_days'].includes(i.field))){STATE.arbStatus=status;await reconcile();}
+}
+function collectElements(){const els=[];for(const [src,r] of Object.entries(STATE.results)){if(src==='offline'||!r||r.error) continue;(r.work_elements||[]).forEach(w=>els.push({...w,src,ok:verified(STATE.scope,w.evidence)}));}
+ const seen=new Set();for(let i=els.length-1;i>=0;i--){const k=els[i].name.toLowerCase();if(seen.has(k)){const keep=els.find(x=>x.name.toLowerCase()===k);if(!keep.srcs) keep.srcs=[keep.src];keep.srcs.push(els[i].src);els.splice(i,1);}else seen.add(k);}
+ if(!els.length){const groups={};STATE.items.filter(i=>i.field==='systems'&&i.by.offline==='y').forEach(i=>groups[i.value]=i);Object.values(groups).forEach(i=>els.push({name:lab(i.value),description:i.ctx||'',evidence:i.ev.offline,src:'offline',ok:true}));}
+ return els;}
+
+async function reconcile(){
+ const disputed=STATE.items.filter(i=>i.status==='single'&&!['value','duration_days'].includes(i.field));const arb=arbiter();
+ const ai=arb?[arb]:engineList().filter(e=>e.slot&&STATE.results[e.id]&&!STATE.results[e.id].error);
+ if(!disputed.length||!ai.length) return;
+ if(arb){STATE.names[arb.id]=arb.name+' (arbiter)';const st=STATE.arbStatus||{};st[arb.id]={state:'run',msg:'Ruling on '+disputed.length+' disputed items…'};renderEngines(st);}
+ const rb0=$('#bRecon');if(rb0){rb0.disabled=true;rb0.textContent=arb?'Arbiter is ruling…':'Comparing notes…';}
+ const list=disputed.map((d,n)=>({n,field:d.field,value:d.value,found_by:Object.keys(d.by).map(k=>STATE.names[k]),evidence:Object.values(d.ev)[0]}));
+ const sys=(arb?'You are the arbiter between two independent reviewers of a DoD construction scope. They disagreed on the items below; each item lists who found it and the text they quoted. Rule on each item using only the scope text. ':'You are reviewing disputed findings from other reviewers of a DoD construction scope. For each item decide whether it truly applies to the scope. ')+'Return ONLY JSON: {"votes":[{"n":<item number>,"applies":true|false,"evidence":"exact quote from the scope supporting your answer (required when applies is true)","reason":"one sentence"}]}';
+ await Promise.all(ai.map(async e=>{try{const r=await callAI(e.slot,sys,'SCOPE OF WORK:\n'+STATE.scope+'\n\nDISPUTED ITEMS:\n'+JSON.stringify(list));
+   (r.votes||[]).forEach(v=>{const d=disputed[v.n];if(!d) return;d.votes=d.votes||{};const ok=v.evidence?verified(STATE.scope,v.evidence):!v.applies;d.votes[e.id]=(v.applies&&!ok)?{abstain:true,reason:(v.reason||'')+' [not counted: no supporting quote found in the scope]'}:{applies:!!v.applies,reason:v.reason||'',ok};});}
+  catch(err){disputed.forEach(d=>{d.votes=d.votes||{};d.votes[e.id]={error:String(err.message||err).slice(0,80)};});}}));
+ if(arb){const st=STATE.arbStatus||{};st[arb.id]={state:Object.values(disputed[0].votes||{}).some(x=>x.error)?'err':'ok',msg:'Ruled on '+disputed.length+' items'};renderEngines(st);}
+ disputed.forEach(d=>{const v=Object.values(d.votes||{}).filter(x=>!x.error&&!x.abstain);if(v.length){const yes=v.filter(x=>x.applies).length;d.use=yes>v.length/2||(yes===v.length/2&&d.by.offline==='y');d.reconciled=true;}});
+ renderOut();
+}
+
+function renderOut(){
+ const o=$('#out');const S=STATE;const eng=Object.keys(S.names).filter(e=>e===('offline')||engineList().some(x=>x.id===e));
+ const cnt=s=>S.items.filter(i=>i.status===s).length;
+ let h='<h2>Findings</h2><p class="lead">'+S.items.length+' triggers from '+S.engines.length+' reader'+(S.engines.length>1?'s':'')+': '+cnt('agree')+' agreed, '+cnt('single')+' found by one reader, '+cnt('unverified')+' rejected because the quoted text is not in the scope. Checked items go to the selector.</p>';
+ h+='<div class="grp">Project basics</div><div class="basics" id="basics"></div>';
+ h+='<div class="grp">Work elements</div><ul class="elements">'+(S.elements.length?S.elements.map(w=>'<li><b>'+esc(w.name)+'</b>'+(w.description?': '+esc(w.description):'')+(w.ok?'':' <span class="s-bad">(quote not found)</span>')+' '+(w.srcs||[w.src]).map(x=>'<span class="pill">'+esc(S.names[x]||x)+'</span>').join(' ')+'</li>').join(''):'<li class="small">None identified.</li>')+'</ul>';
+ const groups=[['agree','Agreed by two or more readers','s-agree'],['single','Found by one reader — review','s-single'],['unverified','Rejected — quoted text not found in the scope','s-bad']];
+ const fields=['work_type','facility','systems','security','hazards','service','design_agent','country','delivery','funding','level','contract_type','solicitation','set_aside','seismic','historic','arctic','cui'];
+ groups.forEach(([st,title,cls])=>{const it=S.items.filter(i=>i.status===st&&!['value','duration_days'].includes(i.field)).sort((a,b)=>fields.indexOf(a.field)-fields.indexOf(b.field));if(!it.length) return;
+  const body=it.map(i=>{const k=S.items.indexOf(i);const src=eng.map(e=>'<span class="pill '+(i.by[e]==='y'?'y':i.by[e]==='bad'?'':'n')+'" title="'+(i.by[e]==='bad'?'quote not found':'')+'">'+esc(S.names[e])+'</span>').join('');
+   const evs=Object.entries(i.ev).filter(([e])=>i.by[e]==='y').map(([e,q])=>'<div class="ev">'+esc(S.names[e])+': <q>'+esc(q)+'</q>'+(i.why[e]&&i.why[e]!=='scalar'?' — '+esc(i.why[e]):'')+'</div>').join('')||Object.entries(i.ev).map(([e,q])=>'<div class="ev">'+esc(S.names[e])+' quoted: <q>'+esc(q)+'</q></div>').join('');
+   const votes=i.votes?Object.entries(i.votes).map(([e,v])=>'<div class="reason">'+esc(S.names[e])+' '+(e===arbiter()?.id?'ruling':'second look')+': '+(v.error?'failed':v.abstain?'no ruling'+(v.reason?' — '+esc(v.reason):''):(v.applies?'applies':'does not apply')+(v.reason?' — '+esc(v.reason):''))+'</div>').join(''):'';
+   return '<tr><td class="ck"><input type="checkbox" data-k="'+k+'" '+(i.use?'checked':'')+(st==='unverified'?' disabled':'')+'></td><td><b>'+esc(lab(i.value===true?i.field:i.value))+'</b> <span class="small">'+esc(Q[i.field]?Q[i.field].label:i.field)+'</span>'+(i.note?'<div class="reason">'+esc(i.note)+'</div>':'')+evs+votes+'</td><td><div class="src">'+src+'</div></td></tr>';}).join('');
+  h+='<div class="grp '+cls+'">'+title+' ('+it.length+')</div><table><thead><tr><th></th><th>Trigger and evidence</th><th>Readers</th></tr></thead><tbody>'+body+'</tbody></table>';});
+ const nAI=engineList().filter(e=>e.slot).length+(arbiter()?1:0);
+ h+='<div class="foot"><button class="go" id="bSend">Send to CORA</button><button id="bDl">Download project file</button>'+(cnt('single')&&nAI?'<button id="bRecon">'+(arbiter()?'Ask the arbiter to rule again':'Have the AIs compare notes on disputed items')+'</button>':'')+'</div>';
+ o.innerHTML=h;
+ renderBasics();
+ o.querySelectorAll('input[data-k]').forEach(cb=>cb.onchange=()=>{S.items[cb.dataset.k].use=cb.checked;});
+ $('#bSend').onclick=send;$('#bDl').onclick=()=>download();const rb=$('#bRecon');if(rb) rb.onclick=reconcile;
+}
+function guessBasics(){const S=STATE;const pick=(f)=>{const c=S.items.filter(i=>i.field===f&&i.status!=='unverified');if(!c.length) return undefined;c.sort((a,b)=>b.yes-a.yes);return c[0].value;};
+ const b={};['design_agent','country','delivery','funding','level','contract_type','solicitation','set_aside','value','duration_days'].forEach(f=>{const v=pick(f);if(v!==undefined) b[f]=v;});
+ if(b.country) b.location=LOCATION_OF[b.country]||'host_nation';
+ if(!b.design_agent){const sv=S.items.filter(i=>i.field==='service'&&i.use).map(i=>i.value);if(sv.some(s=>s==='navy'||s==='usmc')) b.design_agent='navfac';else if(sv.includes('army')) b.design_agent='usace';else if(sv.includes('af')) b.design_agent='afcec';}
+ return b;}
+function renderBasics(){const box=$('#basics');const b=STATE.basics||(STATE.basics=guessBasics());box.innerHTML='';
+ ['location','country','design_agent','funding','delivery','solicitation','contract_type','set_aside','level','value','duration_days'].forEach(f=>{const q=Q[f];if(!q) return;const w=document.createElement('div');const l=document.createElement('label');l.textContent=q.label;w.appendChild(l);
+  if(q.type==='number'){const i=document.createElement('input');i.type='number';i.value=b[f]??'';i.oninput=()=>{b[f]=i.value===''?undefined:Number(i.value);};w.appendChild(i);}
+  else{const s=document.createElement('select');s.innerHTML='<option value="">(not stated)</option>'+q.options.map(o=>'<option value="'+o+'">'+esc(lab(o))+'</option>').join('');s.value=b[f]??'';s.onchange=()=>{b[f]=s.value||undefined;if(f==='country'&&s.value){b.location=LOCATION_OF[s.value]||'host_nation';renderBasics();}};w.appendChild(s);}
+  box.appendChild(w);});}
+function project(){const P={};const S=STATE;
+ MULTI.forEach(f=>P[f]=[...new Set(S.items.filter(i=>i.field===f&&i.use).map(i=>i.value))]);
+ ['seismic','historic','arctic','cui'].forEach(f=>{if(S.items.some(i=>i.field===f&&i.use)) P[f]=true;});
+ Object.assign(P,Object.fromEntries(Object.entries(S.basics||{}).filter(([k,v])=>v!==undefined)));
+ if(!P.work_type.length) delete P.work_type;
+ return P;}
+function send(){const P=project();if(!P.work_type&&!confirm('No work type (new, repair, alteration…) was selected. The selector will default to New construction. Continue?')) return;try{localStorage.setItem('ccs_project',JSON.stringify(P));localStorage.setItem('ccs_import',JSON.stringify({at:Date.now(),items:STATE.items.filter(i=>i.use).length}));}catch(e){download();alert('This browser blocked local storage. A project file was downloaded instead; open it in the selector with Open….');return;}
+ location.href='cora.html';}
+function download(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({answers:project(),source:'scope-parser',scope:STATE.scope.slice(0,20000)},null,1)],{type:'application/json'}));a.download='project-from-scope.json';document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+
+// settings dialog
+function renderSlots(){const box=$('#slots');box.innerHTML='';SET.slots.forEach((s,i)=>{const d=document.createElement('div');d.className='slot';
+ d.innerHTML='<h3><label><input type="checkbox" data-f="enabled" '+(s.enabled?'checked':'')+'> '+esc(s.label||('AI '+(i+1)))+'</label></h3><div class="grid2">'+
+ '<div><label>Display name</label><input data-f="label" value="'+esc(s.label)+'"></div>'+'<div><label>Role</label><select data-f="role"><option value="reader" '+(s.role!=='arbiter'?'selected':'')+'>Reader – parses the scope</option><option value="arbiter" '+(s.role==='arbiter'?'selected':'')+'>Arbiter – rules on disagreements</option></select></div>'+
+ '<div><label>Provider</label><select data-f="provider">'+Object.entries(PROVIDERS).map(([k,v])=>'<option value="'+k+'" '+(s.provider===k?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div>'+
+ '<div><label>Model</label><input data-f="model" value="'+esc(s.model)+'" placeholder="model name, e.g. claude-sonnet-5-5"></div>'+
+ '<div><label>API key</label><input data-f="key" type="password" value="'+esc(s.key)+'" autocomplete="off"></div>'+
+ '<div><label>Endpoint base URL (blank = provider default)</label><input data-f="base" value="'+esc(s.base)+'" placeholder="'+defaultBase(s.provider)+'"></div>'+
+ '<div><label>Auth header (custom / OpenAI-style)</label><input data-f="header" value="'+esc(s.header)+'"></div>'+
+ '<div><label>Auth prefix</label><input data-f="prefix" value="'+esc(s.prefix)+'"></div>'+
+ '<div style="align-self:end"><button data-test="'+i+'">Test connection</button> <span class="small" id="t'+i+'"></span></div></div>';
+ d.querySelectorAll('[data-f]').forEach(el=>{el.oninput=el.onchange=()=>{s[el.dataset.f]=el.type==='checkbox'?el.checked:el.value;};});
+ d.querySelector('[data-test]').onclick=async ev=>{ev.preventDefault();const t=document.getElementById('t'+i);t.textContent='Testing…';try{const r=await callAI(s,'Reply with JSON only.','Return {"ok":true}');t.textContent=r.ok?'Connected':'Replied, but unexpected output';}catch(err){t.textContent='Failed: '+String(err.message||err).slice(0,90);}};
+ box.appendChild(d);});
+ $('#rememberKeys').checked=!!SET.remember;}
+$('#bSettings').onclick=()=>{SET=loadSettings();renderSlots();$('#dlg').showModal();};
+$('#bCloseSet').onclick=()=>{$('#dlg').close();SET=loadSettings();};
+$('#bSaveSet').onclick=()=>{SET.remember=$('#rememberKeys').checked;saveSettings();$('#dlg').close();renderEngines();};
+$('#bParse').onclick=parse;
+$('#bClear').onclick=()=>{$('#scope').value='';wc();};
+$('#bFile').onclick=()=>$('#fFile').click();
+$('#fFile').onchange=e=>{const f=e.target.files[0];if(f) f.text().then(t=>{$('#scope').value=t;wc();});e.target.value='';};
+function wc(){const n=$('#scope').value.trim().split(/\s+/).filter(Boolean).length;$('#wc').textContent=n?n+' words':'';}
+$('#scope').addEventListener('input',wc);
+renderEngines();
+</script>
+</body>
+</html>
