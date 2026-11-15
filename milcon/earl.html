@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EARL – Economic Analysis and Recommendation Ledger</title>
+<style>
+
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;letter-spacing:.01em}
+header .sp{flex:1}
+header .saved{font-size:12.5px;color:var(--shoal)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+button.sm{font-size:12.5px;padding:3px 9px}
+button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
+nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
+nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
+nav.steps button.on{background:#fff;border-color:var(--line);font-weight:600}
+nav.steps button.on .n{background:var(--depth);border-color:var(--depth);color:#fff}
+nav.steps button .c{margin-left:auto;font-size:12px;color:var(--mute);font-weight:400}
+nav.steps .gate{margin-top:10px;font-size:12.5px;color:var(--mute);padding:10px 12px;border-top:1px solid var(--line)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+h2{font:600 21px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+h3{font:600 16px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:18px 0 8px;color:var(--depth)}
+.lead{color:var(--mute);margin:0 0 14px;font-size:14px;max-width:78ch}
+.mentor{font-size:13.5px;background:#f3f8f7;border-left:3px solid var(--shoal);padding:9px 12px;border-radius:4px;margin:0 0 14px;max-width:90ch}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px}
+.form .wide{grid-column:1/-1}
+label.f{font-size:12.5px;color:var(--mute);display:block;margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+textarea.tall{min-height:200px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap}
+td input,td select,td textarea{font-size:13px;padding:4px 6px}
+td textarea{min-height:44px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}
+.pill.ok{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.warn{background:var(--warnbg);border-color:#ecd59a;color:var(--warn)}
+.pill.bad{background:var(--badbg);border-color:#e6bcbc;color:var(--bad)}
+.small{font-size:12.5px;color:var(--mute)}
+.empty{color:var(--mute);padding:22px 8px;text-align:center;font-size:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.card.withdrawn{opacity:.55}
+.card .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.card .id{font:600 14px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+@media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.flags{margin-top:6px}
+q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+.check li{margin:4px 0;list-style:none}
+.check{padding-left:0}
+.check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
+.check .n::before{content:"\25CB";color:var(--warn);margin-right:8px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.quad div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:70px;font-size:13px}
+.quad b{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:3px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1000px){.cols2{grid-template-columns:1fr}}
+.qbank li{margin:5px 0;font-size:13.5px}
+.engines{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eng{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c4cfcc}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h4{margin:0 0 8px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.score{font-weight:700;padding:1px 7px;border-radius:5px}
+.s-hi{background:var(--badbg);color:var(--bad)}.s-md{background:var(--warnbg);color:var(--warn)}.s-lo{background:var(--okbg);color:var(--ok)}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.outs .card h4{margin:0 0 4px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,nav.steps{display:none}.wrap{display:block}}
+
+.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+td.num input{text-align:right}
+.matrix td,.matrix th{text-align:center}
+.matrix td:first-child,.matrix th:first-child{text-align:left}
+.matrix select{width:auto}
+.lead-alt{background:var(--okbg)}
+.out-alt{opacity:.55}
+.bar{height:16px;background:var(--depth);border-radius:3px}
+.bar.lo{background:var(--ok)}
+.chart{display:grid;grid-template-columns:200px 1fr 120px;gap:6px 10px;align-items:center;font-size:13.5px}
+.big{font:600 26px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;margin:10px 0}
+.kpis .card{margin:0}
+.kpis .small{display:block}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/milcon/">MILCON</a>
+ <h1>EARL <span style="font-weight:400;font-size:15px;opacity:.75">Economic Analysis and Recommendation Ledger</span></h1>
+ <div class="sp"></div>
+ <span class="saved" id="saved"></span>
+ <button id="bNew">New analysis</button>
+ <button id="bOpen">Open…</button>
+ <input type="file" id="fOpen" accept=".json" hidden>
+ <button id="bSave">Save file</button>
+</header>
+<div class="wrap">
+ <nav class="steps" id="steps" aria-label="EARL steps"></nav>
+ <main id="view"></main>
+</div>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toLocaleDateString('en-CA');
+const $$=(n,d=0)=>(n<0?'-':'')+'$'+Math.abs(n).toLocaleString('en-US',{maximumFractionDigits:d,minimumFractionDigits:d});
+const $k=n=>{const a=Math.abs(n);return (n<0?'-':'')+(a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(2)+'M':a>=1e3?'$'+(a/1e3).toFixed(0)+'K':'$'+a.toFixed(0));};
+
+// OMB Circular A-94 Appendix C, revised March 6, 2026, valid calendar year 2026
+const APPC={edition:'OMB Circular A-94 Appendix C, revised March 6, 2026 (calendar year 2026)',url:'https://www.whitehouse.gov/wp-content/uploads/2026/03/CircularA-94Appendix-C.pdf',
+ terms:[3,5,7,10,20,30],real:[1.1,1.3,1.4,1.6,2.0,2.0],nominal:[3.4,3.5,3.6,3.7,4.0,4.1]};
+function appcRate(years,kind){const T=APPC.terms,R=APPC[kind];if(years<=T[0]) return R[0];if(years>=30) return R[R.length-1];
+ for(let i=0;i<T.length-1;i++) if(years>=T[i]&&years<=T[i+1]) return R[i]+(R[i+1]-R[i])*(years-T[i])/(T[i+1]-T[i]);return R[R.length-1];}
+
+const ATYPES={status_quo:'Status quo (baseline)',renovate:'Renovate or modernize existing',convert:'Convert another existing facility',new:'New construction',addition:'Addition to existing',lease:'Lease',joint:'Joint use or other installation',host_nation:'Host-nation funded or provided',other:'Other'};
+const CATS={design:['Design and planning',false],construction:['Construction',false],sioh:['Supervision, inspection and overhead (SIOH)',false],contingency:['Contingency',false],equipment:['Equipment and furnishings',false],demolition:['Demolition',false],land:['Land acquisition',false],relocation:['Relocation and moving',false],om:['Operations and maintenance',true],srm:['Sustainment and repair',true],utilities:['Utilities and energy',true],personnel:['Personnel',true],lease:['Lease payments',true],mission:['Mission cost (workarounds, downtime)',true],other1:['Other one-time',false],otherR:['Other recurring',true]};
+const INVEST=['design','construction','sioh','contingency','equipment','demolition','land','relocation','other1'];
+const DEF_CRIT=[['Meets mission requirements',30],['Schedule to capability',20],['AT/FP and security',15],['Resilience (typhoon, seismic, utilities)',15],['Operational efficiency and layout',10],['Execution risk',10]];
+
+const BLANK=()=>({schema:'earl-1',id:uid(),created:new Date().toISOString(),
+ project:{name:'',installation:'',service:''},objective:'',assumptions:'',base_fy:new Date().getFullYear()+1,lead:3,life:25,dollars:'real',rate_override:'',convention:'mixed',
+ alts:[{id:uid(),name:'Status quo',type:'status_quo',desc:'Continue in the existing facilities with no new investment.',screen:'',screen_reason:'',costs:[],residual:{on:false,life:40},scores:{}}],
+ reqs:[],cells:{},criteria:DEF_CRIT.map(([n,w])=>({id:uid(),name:n,weight:w})),recommend:{alt:'',rationale:''},log:[]});
+let E=load()||BLANK();let STEP='basis';
+function load(){try{return JSON.parse(localStorage.getItem('earl_project')||'null');}catch(e){return null;}}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('earl_project',JSON.stringify(E));
+ const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');const R=results();const rec_alt=E.alts.find(a=>a.id===E.recommend.alt);
+ rec.earl={updated:new Date().toISOString(),rate:rate(),period:period(),base_fy:E.base_fy,alternatives:R.rows.map(r=>({name:r.a.name,type:r.a.type,npv:Math.round(r.npv),screened_out:!r.ok,weighted:r.ws})),recommended:rec_alt?{name:rec_alt.name,type:rec_alt.type,npv:Math.round(R.rows.find(r=>r.a===rec_alt).npv),rationale:E.recommend.rationale}:null};
+ if(rec_alt&&Array.isArray(rec.rtm)){const h=rec.rtm[0];const ci=h.indexOf('EARL alternative'),ri=h.indexOf('Req ID');if(ci>=0) rec.rtm.slice(1).forEach(row=>{const q=E.reqs.find(x=>x.src===row[ri]);row[ci]=q?rec_alt.name+': '+({pass:'meets',partial:'partly meets',fail:'does not meet'}[E.cells[rec_alt.id+'|'+q.id]]||'not assessed'):rec_alt.name;});}
+ localStorage.setItem('milcon_record',JSON.stringify(rec));
+ $('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){console.warn(e);$('#saved').textContent='Not saved – use Save file';}},300);}
+function log(what,detail){E.log.push({at:new Date().toISOString(),what,detail:detail||''});}
+
+// ---------- engine ----------
+const period=()=>Math.max(1,(Number(E.lead)||0)+(Number(E.life)||1));
+function rate(p){if(E.rate_override!==''&&!isNaN(Number(E.rate_override))) return Number(E.rate_override);return appcRate(p||period(),E.dollars==='nominal'?'nominal':'real');}
+function factor(n,i,mid){return 1/Math.pow(1+i/100,mid?n-0.5:n);}
+function invBasis(a){return a.costs.filter(c=>INVEST.includes(c.cat)&&c.cat!=='land'&&c.cat!=='demolition'&&c.cat!=='relocation').reduce((s,c)=>s+(Number(c.amount)||0)*Math.max(1,(Number(c.end)||Number(c.start)||1)-(Number(c.start)||1)+1),0);}
+function residual(a,N){if(!a.residual?.on) return 0;const L=Number(a.residual.life)||40;const inSvc=(Number(E.lead)||0)+1;const used=Math.max(0,N-inSvc+1);return invBasis(a)*Math.max(0,(L-used)/L);}
+function stream(a,opt={}){const N=opt.N||period();const y=new Array(N+1).fill(0);const yr=new Array(N+1).fill(0);const m=opt.mult||{};
+ a.costs.forEach(c=>{const s=Math.max(1,Number(c.start)||1),e=Math.min(N,Number(CATS[c.cat]?.[1]?(c.end||N):(c.end||c.start))||s);const amt=(Number(c.amount)||0)*(m[c.cat]??1)*(m._all??1)*(INVEST.includes(c.cat)?(m._inv??1):1);
+  for(let t=s;t<=e;t++){if(CATS[c.cat]?.[1]) yr[t]+=amt;else y[t]+=amt;}});
+ return {one:y,rec:yr,res:residual(a,N)*(m._inv??1)*(m._all??1),N};}
+function npv(a,opt={}){const i=opt.rate??rate(opt.N);const st=stream(a,opt);let pv=0,und=0;const cum=[0];
+ for(let t=1;t<=st.N;t++){const conv=E.convention;const f1=factor(t,i,conv==='mid');const f2=factor(t,i,conv!=='end');
+  const v=st.one[t]*f1+st.rec[t]*f2;pv+=v;und+=st.one[t]+st.rec[t];cum.push(pv);}
+ const rv=st.res*factor(st.N,i,false);pv-=rv;und-=st.res;cum[st.N]-=rv;
+ return {pv,und,rv:st.res,cum,inv:st.one.reduce((s,x)=>s+x,0),annRec:st.rec[st.N]||0};}
+function feasible(a){if(a.screen==='out') return false;return !E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail');}
+function failReasons(a){const r=[];if(a.screen==='out') r.push(a.screen_reason||'Screened out');E.reqs.filter(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail').forEach(q=>r.push('Fails: '+q.text));return r;}
+function wscore(a){const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0)||1;return E.criteria.reduce((s,c)=>s+(Number(c.weight)||0)*(Number(a.scores[c.id])||0),0)/W;}
+function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);return {a,ok:feasible(a),npv:n.pv,und:n.und,rv:n.rv,cum:n.cum,ws:wscore(a)};});
+ const ok=rows.filter(r=>r.ok).sort((x,y)=>x.npv-y.npv);ok.forEach((r,i)=>r.rank=i+1);return {rows,ok,lead:ok[0],second:ok[1]};}
+
+// ---------- steps ----------
+const STEPS=[['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
+function renderSteps(){const nav=$('#steps');
+ if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
+ const R=results();nav.querySelector('.gate').innerHTML='<b>Gate 2:</b> preferred alternative approved.<br>'+(R.lead?'Lowest life-cycle cost: <b>'+esc(R.lead.a.name)+'</b> '+$k(R.lead.npv):'No feasible alternative costed yet.');}
+function render(){renderSteps();({basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
+function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.type==='number'?(el.value===''?'':Number(el.value)):el.value;save();if(after) after(k,el);};});}
+const opts=(o,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(Array.isArray(v)?v[0]:v)+'</option>').join('');
+
+// ---------- 1 basis ----------
+function vBasis(){const v=$('#view');const nora=noraData();
+ v.innerHTML='<div class="panel"><h2>Objective and basis</h2><p class="lead">State the objective without naming a solution, then fix the ground rules every alternative is measured by. DoDI 7041.03 requires the status quo as the baseline and a net present value comparison in one dollar basis.</p>'+
+ (nora?'<div class="mentor">NORA has a project in this browser: <b>'+esc(nora.project.name||'(untitled)')+'</b>, '+nora.requirements.filter(r=>r.status!=='withdrawn').length+' requirements. <button class="sm go" id="bImp">Import from NORA</button> Brings in the title, the need statement as the objective, and Must-have requirements and constraints for screening.</div>':'<div class="mentor">Tip: build the requirement in NORA first. EARL can import its need statement and Must-have requirements for screening.</div>')+
+ '<div class="form"><div class="wide"><label class="f">Project title</label><input data-p="name"></div><div><label class="f">Installation</label><input data-p="installation"></div><div><label class="f">Service</label><input data-p="service"></div>'+
+ '<div class="wide"><label class="f">Objective (what must be achieved, not how)</label><textarea data-k="objective" placeholder="Provide maintenance capacity for two KC-46 aircraft at Andersen AFB by FY2030."></textarea></div>'+
+ '<div><label class="f">Base fiscal year (year 1 of the analysis)</label><input type="number" data-k="base_fy"></div><div><label class="f">Lead time to beneficial occupancy (years)</label><input type="number" data-k="lead" min="0"></div><div><label class="f">Economic life after occupancy (years)</label><input type="number" data-k="life" min="1"></div>'+
+ '<div><label class="f">Dollar basis</label><select data-k="dollars">'+opts({real:'Constant base-year dollars (real rate)',nominal:'Then-year dollars (nominal rate)'})+'</select></div>'+
+ '<div><label class="f">Discounting convention</label><select data-k="convention">'+opts({mixed:'Mid-year for recurring, end-of-year for one-time',mid:'Mid-year for all',end:'End-of-year for all'})+'</select></div>'+
+ '<div><label class="f">Discount rate override (%)</label><input data-k="rate_override" placeholder="blank = OMB rate"></div>'+
+ '<div class="wide"><label class="f">Assumptions (including sunk costs excluded and common costs left out)</label><textarea data-k="assumptions"></textarea></div></div>'+
+ '<h3>Discount rate</h3><div id="rateBox"></div></div>';
+ v.querySelectorAll('[data-p]').forEach(el=>{el.value=E.project[el.dataset.p]||'';el.oninput=()=>{E.project[el.dataset.p]=el.value;save();};});
+ bindAll(v,E,()=>{rb();renderSteps();});
+ if($('#bImp')) $('#bImp').onclick=()=>{importNora();vBasis();renderSteps();};
+ function rb(){const p=period(),r=rate();$('#rateBox').innerHTML='<div class="kpis"><div class="card"><span class="small">Period of analysis</span><span class="big">'+p+' yr</span><span class="small">FY'+E.base_fy+'–FY'+(Number(E.base_fy)+p-1)+'</span></div><div class="card"><span class="small">Rate applied</span><span class="big">'+r.toFixed(2)+'%</span><span class="small">'+(E.rate_override!==''?'Your override':(E.dollars==='nominal'?'Nominal':'Real')+', interpolated for '+p+' years')+'</span></div></div>'+
+  '<table style="max-width:620px"><tr><th>Term (years)</th>'+APPC.terms.map(t=>'<th class="num">'+t+'</th>').join('')+'</tr><tr><td>Real %</td>'+APPC.real.map(x=>'<td class="num">'+x.toFixed(1)+'</td>').join('')+'</tr><tr><td>Nominal %</td>'+APPC.nominal.map(x=>'<td class="num">'+x.toFixed(1)+'</td>').join('')+'</tr></table>'+
+  '<p class="small">Source: <a href="'+APPC.url+'" target="_blank" rel="noopener">'+esc(APPC.edition)+'</a>, per DoDI 7041.03. Linear interpolation between terms; 30-year rate beyond 30 years. Replace with the current year’s Appendix C when OMB updates it (usually early each year).</p>';}
+ rb();}
+function noraData(){try{const j=JSON.parse(localStorage.getItem('nora_project')||'null');return j&&j.schema==='nora-1'?j:null;}catch(e){return null;}}
+function importNora(){const n=noraData();if(!n) return;
+ E.project={name:n.project.name,installation:n.project.installation,service:n.project.service};if(n.need_statement&&(!E.objective||confirm('Replace the objective with NORA’s need statement?'))) E.objective=n.need_statement;
+ const have=new Set(E.reqs.map(q=>q.src));let k=0;
+ n.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').forEach(r=>{if(!have.has(r.id)){E.reqs.push({id:uid(),src:r.id,text:r.text,must:true});k++;}});
+ (n.constraints||[]).filter(c=>c.text).forEach(c=>{const s='C:'+c.text.slice(0,40);if(!have.has(s)){E.reqs.push({id:uid(),src:s,text:'Constraint: '+c.text,must:true});k++;}});
+ log('Imported from NORA',k+' screening criteria');save();}
+
+// ---------- 2 alternatives ----------
+function vAlts(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Alternatives</h2><p class="lead">List every reasonable way to meet the objective, including ones you expect to reject. Alternatives screened out stay in the analysis with the reason, as DoDI 7041.03 requires.</p>'+
+ '<div class="mentor">Reviewers look for: status quo, renovation, conversion of an existing facility, new construction, lease, and use of another installation or joint use. Overseas, add host-nation funded construction where an agreement allows it.</div>'+
+ '<table><thead><tr><th>Alternative</th><th>Type</th><th>Description</th><th>Screen</th><th></th></tr></thead><tbody id="ab"></tbody></table><div class="row"><button class="go" id="bAddA">Add alternative</button></div></div>'+
+ '<div class="panel"><h2>Screening</h2><p class="lead">Test each alternative against the Must-have requirements and hard constraints. One “Fails” removes an alternative from the cost comparison.</p>'+
+ '<div id="mx"></div><div class="row"><input id="nq" placeholder="Add a screening criterion" style="width:380px"><button id="bAddQ">Add</button></div></div>';
+ const tb=$('#ab');
+ E.alts.forEach(a=>{const tr=document.createElement('tr');const sq=a.type==='status_quo';
+  tr.innerHTML='<td><input data-k="name"></td><td><select data-k="type">'+opts(ATYPES,a.type)+'</select></td><td><textarea data-k="desc" style="min-height:40px"></textarea></td><td><select data-k="screen" style="width:auto">'+opts({'':'In',out:'Screened out'},a.screen)+'</select>'+(a.screen==='out'?'<input data-k="screen_reason" placeholder="Reason" style="margin-top:4px">':'')+'</td><td>'+(sq&&E.alts.filter(x=>x.type==='status_quo').length===1?'<span class="small">Required</span>':'<button class="sm" data-del>Remove</button>')+'</td>';
+  bindAll(tr,a,k=>{if(k==='screen'){log('Alternative screening changed',a.name+': '+(a.screen||'in'));vAlts();}renderSteps();});
+  const d=tr.querySelector('[data-del]');if(d) d.onclick=()=>{if(!confirm('Remove '+(a.name||'this alternative')+' and its costs?')) return;E.alts=E.alts.filter(x=>x!==a);log('Alternative removed',a.name);save();vAlts();renderSteps();};
+  tb.appendChild(tr);});
+ $('#bAddA').onclick=()=>{E.alts.push({id:uid(),name:'',type:'new',desc:'',screen:'',screen_reason:'',costs:[],residual:{on:true,life:40},scores:{}});save();vAlts();renderSteps();};
+ $('#bAddQ').onclick=()=>{const t=$('#nq').value.trim();if(!t) return;E.reqs.push({id:uid(),src:'manual',text:t,must:true});save();vAlts();};
+ const mx=$('#mx');if(!E.reqs.length){mx.innerHTML='<div class="empty">No screening criteria. Import Must-have requirements from NORA on step 1, or add criteria below.</div>';return;}
+ mx.innerHTML='<table class="matrix"><thead><tr><th>Criterion</th>'+E.alts.map(a=>'<th>'+esc(a.name||'(unnamed)')+'</th>').join('')+'<th></th></tr></thead><tbody>'+
+  E.reqs.map(q=>'<tr><td>'+(q.src&&q.src!=='manual'&&!q.src.startsWith('C:')?'<span class="pill">'+esc(q.src)+'</span> ':'')+esc(q.text)+'</td>'+E.alts.map(a=>'<td><select data-c="'+a.id+'|'+q.id+'">'+opts({'':'—',pass:'Meets',partial:'Partly',fail:'Fails'},E.cells[a.id+'|'+q.id]||'')+'</select></td>').join('')+'<td><button class="sm" data-dq="'+q.id+'">Remove</button></td></tr>').join('')+
+  '</tbody><tfoot><tr><th>Result</th>'+E.alts.map(a=>'<th>'+(feasible(a)?'<span class="pill ok">Carried forward</span>':'<span class="pill bad">Screened out</span>')+'</th>').join('')+'<th></th></tr></tfoot></table>';
+ mx.querySelectorAll('[data-c]').forEach(s=>s.onchange=()=>{E.cells[s.dataset.c]=s.value;save();vAlts();renderSteps();});
+ mx.querySelectorAll('[data-dq]').forEach(b=>b.onclick=()=>{E.reqs=E.reqs.filter(q=>q.id!==b.dataset.dq);save();vAlts();});}
+
+// ---------- 3 costs ----------
+let CA=null;
+function vCosts(){const v=$('#view');if(!CA||!E.alts.find(a=>a.id===CA)) CA=E.alts[0].id;const a=E.alts.find(x=>x.id===CA);const N=period();
+ v.innerHTML='<div class="panel"><h2>Life-cycle costs</h2><p class="lead">Enter each alternative’s costs in '+(E.dollars==='nominal'?'then-year':'constant FY'+E.base_fy)+' dollars, by analysis year. Year 1 is FY'+E.base_fy+'; occupancy is year '+((Number(E.lead)||0)+1)+'. Leave out sunk costs and costs identical in every alternative.</p>'+
+ '<div class="row" style="margin-top:0">'+E.alts.map(x=>'<button class="'+(x.id===CA?'go':'')+'" data-a="'+x.id+'">'+esc(x.name||'(unnamed)')+(feasible(x)?'':' ✕')+'</button>').join('')+'</div>'+
+ (!feasible(a)?'<div class="mentor">This alternative is screened out. Its costs are kept for the record but not ranked.</div>':'')+
+ '<table style="margin-top:12px"><thead><tr><th>Category</th><th>Description</th><th class="num">Amount per year ($)</th><th class="num">From year</th><th class="num">To year</th><th class="num">Undiscounted</th><th></th></tr></thead><tbody id="cb"></tbody></table>'+
+ '<div class="row"><select id="nc" style="width:auto">'+opts(CATS,'construction')+'</select><button class="go" id="bAddC">Add cost</button><button id="bQuick">Add typical lines</button></div>'+
+ '<h3>Residual value</h3><div class="row" style="margin-top:0"><label class="small"><input type="checkbox" id="rvOn" style="width:auto"> Credit residual value at the end of the period</label><label class="small">Physical life of new investment (years) <input type="number" id="rvL" style="width:80px"></label><span class="small" id="rvT"></span></div>'+
+ '<p class="small">Straight-line on design, construction, SIOH, contingency and equipment. DoDI 7041.03 also accepts appraisal; enter a negative “Other one-time” cost instead if you have one.</p>'+
+ '<div class="kpis" id="ak"></div></div>';
+ v.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{CA=b.dataset.a;vCosts();});
+ const tb=$('#cb');
+ a.costs.forEach(c=>{const tr=document.createElement('tr');const rec=CATS[c.cat]?.[1];
+  tr.innerHTML='<td><select data-k="cat">'+opts(CATS,c.cat)+'</select></td><td><input data-k="label"></td><td class="num"><input type="number" data-k="amount" step="1000"></td><td class="num"><input type="number" data-k="start" min="1" max="'+N+'" style="width:70px"></td><td class="num"><input type="number" data-k="end" min="1" max="'+N+'" style="width:70px" placeholder="'+(rec?N:'same')+'"></td><td class="num" data-u></td><td><button class="sm" data-del>Remove</button></td>';
+  const u=()=>{const s=Number(c.start)||1,e=Number(c.end)||(CATS[c.cat]?.[1]?N:s);tr.querySelector('[data-u]').textContent=$$((Number(c.amount)||0)*Math.max(0,Math.min(e,N)-s+1));kp();};
+  bindAll(tr,c,u);u();tr.querySelector('[data-del]').onclick=()=>{a.costs=a.costs.filter(x=>x!==c);save();vCosts();renderSteps();};tb.appendChild(tr);});
+ if(!a.costs.length) tb.innerHTML='<tr><td colspan="7" class="empty">No costs yet. “Add typical lines” fills the usual rows for this type of alternative with zero amounts.</td></tr>';
+ $('#bAddC').onclick=()=>{const cat=$('#nc').value;a.costs.push({id:uid(),cat,label:'',amount:'',start:CATS[cat][1]?(Number(E.lead)||0)+1:1,end:''});save();vCosts();renderSteps();};
+ $('#bQuick').onclick=()=>{const L=(Number(E.lead)||0),occ=L+1;const T={status_quo:[['srm',1],['om',1],['utilities',1],['mission',1]],lease:[['lease',occ],['om',occ],['utilities',occ],['relocation',L||1]],
+  default:[['design',1],['construction',Math.max(1,L)],['sioh',Math.max(1,L)],['contingency',Math.max(1,L)],['equipment',L||1],['om',occ],['srm',occ],['utilities',occ]]};
+  (T[a.type]||T.default).forEach(([cat,s])=>a.costs.push({id:uid(),cat,label:'',amount:'',start:s,end:''}));save();vCosts();renderSteps();};
+ const rv=$('#rvOn'),rl=$('#rvL');rv.checked=!!a.residual?.on;rl.value=a.residual?.life||40;
+ rv.onchange=()=>{a.residual=a.residual||{};a.residual.on=rv.checked;save();kp();};rl.oninput=()=>{a.residual.life=Number(rl.value)||40;save();kp();};
+ function kp(){const n=npv(a);$('#rvT').textContent=a.residual?.on?'Credit '+$$(n.rv)+' (undiscounted) in year '+N:'';
+  $('#ak').innerHTML='<div class="card"><span class="small">Net present value of cost</span><span class="big">'+$k(n.pv)+'</span><span class="small">at '+rate().toFixed(2)+'%</span></div><div class="card"><span class="small">Undiscounted life-cycle cost</span><span class="big">'+$k(n.und)+'</span></div><div class="card"><span class="small">One-time investment</span><span class="big">'+$k(n.inv)+'</span></div><div class="card"><span class="small">Recurring cost, final year</span><span class="big">'+$k(n.annRec)+'</span></div>';renderSteps();}
+ kp();}
+
+// ---------- 4 non-cost ----------
+function vBens(){const v=$('#view');const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0);
+ v.innerHTML='<div class="panel"><h2>Non-cost factors</h2><p class="lead">Benefits that are hard to price still decide many projects. Weight what matters, score each alternative 1 (poor) to 5 (excellent), and write down why. DoDI 7041.03 bases the decision on both the numbers and these factors.</p>'+
+ '<table class="matrix"><thead><tr><th>Factor</th><th>Weight</th>'+E.alts.map(a=>'<th class="'+(feasible(a)?'':'out-alt')+'">'+esc(a.name||'(unnamed)')+'</th>').join('')+'<th></th></tr></thead><tbody>'+
+ E.criteria.map(c=>'<tr><td><input data-cn="'+c.id+'" value="'+esc(c.name)+'"></td><td><input type="number" data-cw="'+c.id+'" value="'+esc(c.weight)+'" style="width:70px"></td>'+E.alts.map(a=>'<td><select data-sc="'+a.id+'|'+c.id+'">'+opts({'':'—',1:'1',2:'2',3:'3',4:'4',5:'5'},String(a.scores[c.id]??''))+'</select></td>').join('')+'<td><button class="sm" data-dc="'+c.id+'">Remove</button></td></tr>').join('')+
+ '</tbody><tfoot><tr><th>Weighted score</th><th class="'+(W===100?'':'s-md')+'">'+W+(W===100?'':' (≠100)')+'</th>'+E.alts.map(a=>'<th>'+wscore(a).toFixed(2)+'</th>').join('')+'<th></th></tr></tfoot></table>'+
+ '<div class="row"><button id="bAddCr">Add factor</button></div>'+
+ '<h3>Why each alternative scored as it did</h3><div class="form">'+E.alts.map(a=>'<div class="wide"><label class="f">'+esc(a.name||'(unnamed)')+'</label><textarea data-why="'+a.id+'">'+esc(a.why||'')+'</textarea></div>').join('')+'</div></div>';
+ v.querySelectorAll('[data-cn]').forEach(i=>i.oninput=()=>{E.criteria.find(c=>c.id===i.dataset.cn).name=i.value;save();});
+ v.querySelectorAll('[data-cw]').forEach(i=>i.onchange=()=>{E.criteria.find(c=>c.id===i.dataset.cw).weight=Number(i.value)||0;save();vBens();});
+ v.querySelectorAll('[data-sc]').forEach(s=>s.onchange=()=>{const [a,c]=s.dataset.sc.split('|');const A=E.alts.find(x=>x.id===a);if(s.value==='') delete A.scores[c];else A.scores[c]=Number(s.value);save();vBens();});
+ v.querySelectorAll('[data-dc]').forEach(b=>b.onclick=()=>{E.criteria=E.criteria.filter(c=>c.id!==b.dataset.dc);save();vBens();renderSteps();});
+ v.querySelectorAll('[data-why]').forEach(t=>t.oninput=()=>{E.alts.find(a=>a.id===t.dataset.why).why=t.value;save();});
+ $('#bAddCr').onclick=()=>{E.criteria.push({id:uid(),name:'',weight:0});save();vBens();renderSteps();};}
+
+// ---------- 5 results + sensitivity ----------
+function sensitivity(){const R=results();if(!R.lead) return null;const base=R.lead.a.id;const out=[];
+ const flip=(lbl,opt)=>{const r=results(opt);const nl=r.lead?.a;out.push({lbl,leader:nl?.name||'—',changes:nl&&nl.id!==base,npvs:Object.fromEntries(r.rows.map(x=>[x.a.id,x.npv]))});};
+ const p=period();[0,rate(),3,7].filter((x,i,a)=>a.indexOf(x)===i).forEach(i=>flip('Discount rate '+i.toFixed(2)+'%'+(i===7?' (Circular A-94, 1992, base rate)':i===rate()?' (base case)':''),{rate:i}));
+ [-5,5].forEach(d=>{const L=Math.max(1,Number(E.life)+d);flip('Economic life '+L+' years',{N:(Number(E.lead)||0)+L,rate:E.rate_override!==''?rate():appcRate((Number(E.lead)||0)+L,E.dollars==='nominal'?'nominal':'real')});});
+ const cats=[...new Set(E.alts.filter(feasible).flatMap(a=>a.costs.filter(c=>Number(c.amount)).map(c=>c.cat)))];
+ cats.forEach(c=>[-20,20].forEach(d=>flip((CATS[c]?.[0]||c)+' '+(d>0?'+':'')+d+'%',{mult:{[c]:1+d/100}})));
+ flip('All investment costs +20%',{mult:{_inv:1.2}});flip('All investment costs −20%',{mult:{_inv:0.8}});
+ let be=null;if(R.second){const L=R.lead.a,S=R.second;const inv=npv(L,{mult:{_inv:1}}).pv,inv2=npv(L,{mult:{_inv:2}}).pv;const dInv=inv2-inv;if(dInv>0) be=(S.npv-R.lead.npv)/dInv*100;}
+ return {R,rows:out,be};}
+function vRes(){const v=$('#view');const R=results();const S=sensitivity();const N=period();
+ if(!R.rows.some(r=>r.und)){v.innerHTML='<div class="panel"><h2>Results</h2><div class="empty">Enter costs on step 3 to see results.</div></div>';return;}
+ const max=Math.max(...R.rows.map(r=>Math.abs(r.npv)))||1;
+ v.innerHTML='<div class="panel"><h2>Results</h2><p class="lead">Net present value of cost over '+N+' years at '+rate().toFixed(2)+'%. Lower is better. Screened-out alternatives are shown greyed and not ranked.</p>'+
+ '<div class="chart">'+R.rows.slice().sort((a,b)=>(b.ok-a.ok)||(a.npv-b.npv)).map(r=>'<div class="'+(r.ok?'':'out-alt')+'">'+(r.rank?r.rank+'. ':'')+esc(r.a.name)+'</div><div><div class="bar '+(r===R.lead?'lo':'')+'" style="width:'+Math.max(1,Math.abs(r.npv)/max*100)+'%;'+(r.ok?'':'opacity:.4')+'"></div></div><div class="num">'+$k(r.npv)+'</div>').join('')+'</div>'+
+ '<table style="margin-top:16px"><thead><tr><th>Alternative</th><th>Status</th><th class="num">NPV of cost</th><th class="num">Undiscounted</th><th class="num">Residual credit</th><th class="num">Non-cost score</th><th class="num">NPV per score point</th><th class="num">vs. status quo</th></tr></thead><tbody>'+
+ R.rows.map(r=>{const sq=R.rows.find(x=>x.a.type==='status_quo');return '<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+esc(r.a.name)+'</td><td>'+(r.ok?'Rank '+r.rank:'Screened out')+'</td><td class="num">'+$$(r.npv)+'</td><td class="num">'+$$(r.und)+'</td><td class="num">'+$$(r.rv)+'</td><td class="num">'+r.ws.toFixed(2)+'</td><td class="num">'+(r.ws?$$(r.npv/r.ws):'—')+'</td><td class="num">'+(sq&&sq!==r?$$(r.npv-sq.npv):'—')+'</td></tr>';}).join('')+'</tbody></table>'+
+ (R.rows.some(r=>!r.ok)?'<p class="small">'+R.rows.filter(r=>!r.ok).map(r=>'<b>'+esc(r.a.name)+'</b>: '+esc(failReasons(r.a).join('; '))).join('<br>')+'</p>':'')+
+ savingsBlock(R)+'</div>'+
+ (S?'<div class="panel"><h2>Sensitivity</h2><p class="lead">Each line changes one input and re-ranks. Where the lowest-cost alternative changes, the decision is sensitive to that input and the memo must say so.</p>'+
+ (S.be!=null?'<div class="mentor"><b>Break-even:</b> '+esc(S.R.lead.a.name)+' stays lowest-cost until its investment costs rise '+S.be.toFixed(1)+'%, at which point it ties '+esc(S.R.second.a.name)+'.</div>':'')+
+ (R.ok.length<2?'<div class="mentor">Only one alternative is carried forward, so nothing can change rank. The table still shows how far its cost moves with each input; reviewers will ask why the others were screened out.</div>':'')+'<table><thead><tr><th>Case</th><th>Lowest-cost alternative</th>'+R.ok.map(r=>'<th class="num">'+esc(r.a.name)+'</th>').join('')+'</tr></thead><tbody>'+
+ S.rows.map(x=>'<tr><td>'+esc(x.lbl)+'</td><td>'+(x.changes?'<span class="pill bad">'+esc(x.leader)+'</span>':esc(x.leader))+'</td>'+R.ok.map(r=>'<td class="num">'+$k(x.npvs[r.a.id])+'</td>').join('')+'</tr>').join('')+'</tbody></table>'+
+ '<p class="small">'+(S.rows.some(x=>x.changes)?S.rows.filter(x=>x.changes).length+' of '+S.rows.length+' cases change the lowest-cost alternative.':'No tested case changes the lowest-cost alternative. The result is robust to these inputs.')+'</p></div>':'');}
+function savingsBlock(R){const sq=R.rows.find(r=>r.a.type==='status_quo');if(!sq||!R.lead||R.lead===sq) return '';const a=R.lead.a;const i=rate();const N=period();
+ const sA=stream(a),sS=stream(sq.a);let pvInv=0,pvSav=0,cumA=0,cumS=0,pay=null;
+ for(let t=1;t<=N;t++){const f1=factor(t,i,E.convention==='mid'),f2=factor(t,i,E.convention!=='end');pvInv+=(sA.one[t]-sS.one[t])*f1;pvSav+=(sS.rec[t]-sA.rec[t])*f2;cumA+=sA.one[t]*f1+sA.rec[t]*f2;cumS+=sS.one[t]*f1+sS.rec[t]*f2;if(cumA<=cumS){if(pay===null) pay=t;}else pay=null;}
+ const sir=pvInv>0?pvSav/pvInv:null;
+ return '<h3>'+esc(a.name)+' compared with the status quo</h3><div class="kpis"><div class="card"><span class="small">Savings-to-investment ratio</span><span class="big">'+(sir!=null?sir.toFixed(2):'—')+'</span><span class="small">PV of recurring savings ÷ PV of added investment</span></div><div class="card"><span class="small">Discounted payback</span><span class="big">'+(pay?'Year '+pay:'Beyond '+N)+'</span><span class="small">'+(pay?'FY'+(Number(E.base_fy)+pay-1):'within the period of analysis: no')+'</span></div><div class="card"><span class="small">Net present value saved</span><span class="big">'+$k(sq.npv-R.lead.npv)+'</span></div></div>';}
+
+// ---------- 6 recommendation + outputs ----------
+function vRec(){const v=$('#view');const R=results();
+ v.innerHTML='<div class="panel"><h2>Recommendation</h2><p class="lead">EARL ranks; you recommend. If you recommend something other than the lowest-cost alternative, the rationale must say what the extra cost buys.</p>'+
+ '<div class="form"><div><label class="f">Recommended alternative</label><select id="ra">'+'<option value="">Select</option>'+R.ok.map(r=>'<option value="'+r.a.id+'" '+(r.a.id===E.recommend.alt?'selected':'')+'>'+esc(r.rank+'. '+r.a.name+' – '+$k(r.npv))+'</option>').join('')+'</select></div>'+
+ '<div><label class="f">Prepared by</label><input id="pb"></div><div><label class="f">Decision authority</label><input id="da"></div>'+
+ '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button></div>'+
+ '<h3>Decision</h3><div class="form"><div><label class="f">Decision</label><select id="dd">'+opts({'':'Pending',approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'},E.recommend.decision||'')+'</select></div><div><label class="f">Date</label><input type="date" id="ddt"></div></div></div>'+
+ '<div class="panel"><h2>Outputs</h2><p class="lead">The memo supports the decision and the DD 1391; the tables and file are the record. The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p><div class="outs">'+
+ out('memo','Economic analysis and recommendation memo','Objective, assumptions, alternatives, screening, costs, sensitivity, non-cost factors and recommendation. Opens in Word.','Download .doc')+
+ out('print','Print or save as PDF','The same memo, formatted for printing.','Open printable')+
+ out('csv','Cost and results tables','Year-by-year cost streams, discount factors and present values for every alternative.','Download .csv')+
+ out('json','Analysis record','Everything, including the log. Reopen with Open….','Download .json')+'</div></div>'+
+ '<div class="panel"><h2>Record log</h2><div id="lg" class="small"></div></div>';
+ const ra=$('#ra'),rr=$('#rr'),pb=$('#pb'),da=$('#da'),dd=$('#dd'),ddt=$('#ddt');rr.value=E.recommend.rationale||'';pb.value=E.recommend.by||'';da.value=E.recommend.authority||'';ddt.value=E.recommend.date||'';
+ ra.onchange=()=>{E.recommend.alt=ra.value;log('Recommended alternative set',(E.alts.find(a=>a.id===ra.value)||{}).name||'none');save();renderSteps();};
+ rr.oninput=()=>{E.recommend.rationale=rr.value;save();};pb.oninput=()=>{E.recommend.by=pb.value;save();};da.oninput=()=>{E.recommend.authority=da.value;save();};
+ dd.onchange=()=>{E.recommend.decision=dd.value;log('Decision recorded',dd.options[dd.selectedIndex].text);save();};ddt.onchange=()=>{E.recommend.date=ddt.value;save();};
+ $('#bDr').onclick=()=>{if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();save();vRec();};
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({memo:()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(memoHTML());w.document.close();setTimeout(()=>w.print(),400);},csv:()=>dl(fname('EA-Tables','csv'),csv(tables()),'text/csv'),json:()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();}})[b.dataset.out]());
+ $('#lg').innerHTML=E.log.length?E.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
+ function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
+function draftRationale(){const R=results();const S=sensitivity();const a=E.alts.find(x=>x.id===E.recommend.alt)||R.lead?.a;if(!a) return '';const r=R.rows.find(x=>x.a===a);const sq=R.rows.find(x=>x.a.type==='status_quo');
+ const best=R.ok.slice().sort((x,y)=>y.ws-x.ws)[0];
+ let t=a.name+' is recommended. Over a '+period()+'-year period of analysis at a '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+' discount rate, its net present value of cost is '+$$(r.npv)+', ranking '+r.rank+' of '+R.ok.length+' feasible alternatives. ';
+ if(r.rank>1) t+='It costs '+$$(r.npv-R.lead.npv)+' more in present value than '+R.lead.a.name+'; [state what the added cost buys]. ';
+ else if(R.second) t+='It is '+$$(R.second.npv-r.npv)+' less in present value than the next alternative, '+R.second.a.name+'. ';
+ if(sq&&sq.a!==a) t+=(sq.ok?'Compared with the status quo, it '+(sq.npv>r.npv?'saves '+$$(sq.npv-r.npv):'costs '+$$(r.npv-sq.npv)+' more')+' in present value. ':'The status quo was screened out ('+failReasons(sq.a).map(x=>x.replace(/\.$/,'')).join('; ')+'). ');
+ if(best&&best.ws) t+=(best.a===a?'It also scores highest on non-cost factors ('+r.ws.toFixed(2)+' of 5). ':'On non-cost factors it scores '+r.ws.toFixed(2)+' of 5 against '+best.ws.toFixed(2)+' for '+best.a.name+'. ');
+ if(S){const ch=S.rows.filter(x=>x.changes);t+=ch.length?'The ranking is sensitive to: '+ch.map(x=>x.lbl).join('; ')+'. ':'No sensitivity case tested changes the lowest-cost alternative. ';if(S.be!=null&&r===R.lead) t+='Its investment cost could rise '+S.be.toFixed(1)+'% before another alternative becomes less costly. ';}
+ const out=R.rows.filter(x=>!x.ok);if(out.length) t+='Screened out: '+out.map(x=>x.a.name).join(', ')+'.';
+ return t.trim();}
+const fname=(k,ext)=>((E.project.name||'EARL').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+const csv=rows=>'﻿'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
+function tables(){const N=period(),i=rate();const rows=[['EARL economic analysis tables',E.project.name],['Rate %',i.toFixed(3),'Basis',E.dollars,'Convention',E.convention,'Source',E.edition||APPC.edition],[]];
+ E.alts.forEach(a=>{const st=stream(a);rows.push([a.name,ATYPES[a.type],feasible(a)?'Carried forward':'Screened out']);rows.push(['Year','FY','One-time','Recurring','Factor one-time','Factor recurring','Present value']);
+  for(let t=1;t<=N;t++){const f1=factor(t,i,E.convention==='mid'),f2=factor(t,i,E.convention!=='end');rows.push([t,'FY'+(Number(E.base_fy)+t-1),st.one[t].toFixed(0),st.rec[t].toFixed(0),f1.toFixed(5),f2.toFixed(5),(st.one[t]*f1+st.rec[t]*f2).toFixed(0)]);}
+  if(st.res) rows.push(['Residual','FY'+(Number(E.base_fy)+N-1),(-st.res).toFixed(0),'',factor(N,i,false).toFixed(5),'',(-st.res*factor(N,i,false)).toFixed(0)]);
+  rows.push(['NPV','','','','','',npv(a).pv.toFixed(0)]);rows.push([]);});
+ return rows;}
+function memoHTML(){const R=results();const S=sensitivity();const p=E.project;const N=period();const a=E.alts.find(x=>x.id===E.recommend.alt);
+ const tb=(h,rows)=>'<table><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
+ return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Economic Analysis</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:17pt;margin:0 0 4pt}h2{font-size:12.5pt;margin:14pt 0 5pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4pt 0}th,td{border:1px solid #999;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.cui{text-align:center;font-weight:bold;font-size:10pt}</style></head><body>'+
+ '<div class="cui">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN – MARK PER DoDI 5200.48 AS REQUIRED</div>'+
+ '<h1>Economic Analysis and Recommendation: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,p.service].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(E.recommend.by||'—')+', '+today()+', in accordance with DoDI 7041.03. Prepared with EARL; the decision rests with '+esc(E.recommend.authority||'the decision authority')+'.</div>'+
+ '<h2>1. Recommendation</h2><p>'+esc(E.recommend.rationale||(a?a.name+' is recommended.':'(not yet selected)'))+'</p>'+
+ '<h2>2. Objective</h2><p>'+esc(E.objective||'—')+'</p>'+
+ '<h2>3. Ground rules and assumptions</h2>'+tb(['Item','Value'],[['Base fiscal year','FY'+E.base_fy],['Period of analysis',N+' years (lead time '+E.lead+', economic life '+E.life+')'],['Dollars',E.dollars==='nominal'?'Then-year':'Constant FY'+E.base_fy],['Discount rate',rate().toFixed(2)+'% '+(E.rate_override!==''?'(override)':'('+APPC.edition+', interpolated)')],['Convention',{mixed:'Mid-year for recurring, end-of-year for one-time',mid:'Mid-year',end:'End-of-year'}[E.convention]]])+(E.assumptions?'<p>'+esc(E.assumptions).replace(/\n/g,'<br>')+'</p>':'')+
+ '<h2>4. Alternatives considered</h2>'+tb(['Alternative','Type','Description','Status'],E.alts.map(x=>[x.name,ATYPES[x.type],x.desc,feasible(x)?'Carried forward':'Screened out: '+failReasons(x).join('; ')]))+
+ (E.reqs.length?'<h2>5. Screening against requirements and constraints</h2>'+tb(['Criterion'].concat(E.alts.map(x=>x.name)),E.reqs.map(q=>[(q.src&&q.src!=='manual'&&!q.src.startsWith('C:')?q.src+' ':'')+q.text].concat(E.alts.map(x=>({pass:'Meets',partial:'Partly',fail:'Fails'}[E.cells[x.id+'|'+q.id]]||'—'))))):'')+
+ '<h2>6. Life-cycle cost comparison</h2>'+tb(['Rank','Alternative','NPV of cost','Undiscounted','Residual credit','Non-cost score'],R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>[r.rank||'—',r.a.name,$$(r.npv),$$(r.und),$$(r.rv),r.ws.toFixed(2)]))+
+ '<h2>7. Non-cost factors</h2>'+tb(['Factor','Weight'].concat(E.alts.map(x=>x.name)),E.criteria.map(c=>[c.name,c.weight].concat(E.alts.map(x=>x.scores[c.id]??'—'))))+E.alts.filter(x=>x.why).map(x=>'<p><b>'+esc(x.name)+':</b> '+esc(x.why)+'</p>').join('')+
+ (S?'<h2>8. Sensitivity</h2>'+(S.be!=null?'<p>Break-even: '+esc(S.R.lead.a.name)+' remains lowest-cost until its investment costs rise '+S.be.toFixed(1)+'%.</p>':'')+tb(['Case','Lowest-cost alternative'].concat(R.ok.map(r=>r.a.name)),S.rows.map(x=>[x.lbl,x.leader+(x.changes?' (changes)':'')].concat(R.ok.map(r=>$k(x.npvs[r.a.id]))))):'')+
+ '<h2>9. Decision</h2>'+tb(['Decision authority','Decision','Date'],[[E.recommend.authority||'',({approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'})[E.recommend.decision]||'Pending',E.recommend.date||'']])+
+ '<div class="cui" style="margin-top:14pt">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN</div></body></html>';}
+
+$('#bSave').onclick=()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();};
+$('#bNew').onclick=()=>{if(!confirm('Start a new analysis? Save a file of the current one first if you need it.')) return;E=BLANK();log('Analysis created');save();STEP='basis';render();};
+$('#bOpen').onclick=()=>$('#fOpen').click();
+$('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='earl-1') throw new Error('Not an EARL analysis file');E=Object.assign(BLANK(),j);log('Analysis file opened',f.name);save();STEP='basis';render();}catch(err){alert('Could not open: '+err.message);}});};
+if(!E.log.length) log('Analysis created');
+render();save();
+</script>
+</body>
+</html>
