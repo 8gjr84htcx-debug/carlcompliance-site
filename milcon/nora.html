@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NORA – Needs, Options, and Requirements Analyst</title>
+<style>
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;letter-spacing:.01em}
+header .sp{flex:1}
+header .saved{font-size:12.5px;color:var(--shoal)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+button.sm{font-size:12.5px;padding:3px 9px}
+button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
+nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
+nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
+nav.steps button.on{background:#fff;border-color:var(--line);font-weight:600}
+nav.steps button.on .n{background:var(--depth);border-color:var(--depth);color:#fff}
+nav.steps button .c{margin-left:auto;font-size:12px;color:var(--mute);font-weight:400}
+nav.steps .gate{margin-top:10px;font-size:12.5px;color:var(--mute);padding:10px 12px;border-top:1px solid var(--line)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+h2{font:600 21px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+h3{font:600 16px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:18px 0 8px;color:var(--depth)}
+.lead{color:var(--mute);margin:0 0 14px;font-size:14px;max-width:78ch}
+.mentor{font-size:13.5px;background:#f3f8f7;border-left:3px solid var(--shoal);padding:9px 12px;border-radius:4px;margin:0 0 14px;max-width:90ch}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px}
+.form .wide{grid-column:1/-1}
+label.f{font-size:12.5px;color:var(--mute);display:block;margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+textarea.tall{min-height:200px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap}
+td input,td select,td textarea{font-size:13px;padding:4px 6px}
+td textarea{min-height:44px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}
+.pill.ok{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.warn{background:var(--warnbg);border-color:#ecd59a;color:var(--warn)}
+.pill.bad{background:var(--badbg);border-color:#e6bcbc;color:var(--bad)}
+.small{font-size:12.5px;color:var(--mute)}
+.empty{color:var(--mute);padding:22px 8px;text-align:center;font-size:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.card.withdrawn{opacity:.55}
+.card .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.card .id{font:600 14px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+@media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.flags{margin-top:6px}
+q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+.check li{margin:4px 0;list-style:none}
+.check{padding-left:0}
+.check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
+.check .n::before{content:"\25CB";color:var(--warn);margin-right:8px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.quad div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:70px;font-size:13px}
+.quad b{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:3px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1000px){.cols2{grid-template-columns:1fr}}
+.qbank li{margin:5px 0;font-size:13.5px}
+.engines{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eng{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c4cfcc}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h4{margin:0 0 8px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.score{font-weight:700;padding:1px 7px;border-radius:5px}
+.s-hi{background:var(--badbg);color:var(--bad)}.s-md{background:var(--warnbg);color:var(--warn)}.s-lo{background:var(--okbg);color:var(--ok)}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.outs .card h4{margin:0 0 4px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,nav.steps{display:none}.wrap{display:block}}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/milcon/">MILCON</a>
+ <h1>NORA <span style="font-weight:400;font-size:15px;opacity:.75">Needs, Options, and Requirements Analyst</span></h1>
+ <div class="sp"></div>
+ <span class="saved" id="saved"></span>
+ <button id="bNew">New project</button>
+ <button id="bOpen">Open…</button>
+ <input type="file" id="fOpen" accept=".json" hidden>
+ <button id="bSave">Save file</button>
+ <button id="bSettings">AI settings</button>
+</header>
+<div class="wrap">
+ <nav class="steps" id="steps" aria-label="NORA steps"></nav>
+ <main id="view"></main>
+</div>
+
+<dialog id="dlg"><div class="dlg">
+ <h2>AI settings</h2>
+ <p class="lead">Shared with SCOTT. Readers each pull requirements from your notes; the arbiter rules only on the ones they disagree on. Every requirement must quote your notes word for word or it is rejected. Without AI, NORA still finds requirement sentences with built-in rules.</p>
+ <div id="slots"></div>
+ <label class="small"><input type="checkbox" id="rememberKeys" style="width:auto"> Remember keys on this computer (otherwise they clear when the browser closes)</label>
+ <div class="foot"><button class="go" id="bSaveSet">Save settings</button><button id="bCloseSet">Cancel</button></div>
+</div></dialog>
+
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toLocaleDateString('en-CA');
+
+// ---------------- vocabularies ----------------
+const SERVICES={army:'Army',navy:'Navy',usmc:'Marine Corps',af:'Air Force',ussf:'Space Force',dha:'Defense Health Agency',def_agency:'Defense agency',joint:'Joint'};
+const LOCS={us_hawaii:'Hawaii',us_alaska:'Alaska',guam:'Guam',cnmi:'CNMI',american_samoa:'American Samoa',wake:'Wake Island',japan:'Japan',korea:'Republic of Korea',australia:'Australia',philippines:'Philippines',palau:'Palau',fsm:'FSM',marshall_islands:'Marshall Islands',papua_new_guinea:'Papua New Guinea',singapore:'Singapore',other:'Other'};
+const DRIVERS={
+ new_mission:{t:'New mission or unit beddown',q:['What unit, platform or capability is arriving, and when is initial operating capability?','What does the unit need on day one versus at full operating capability?','What basing decision or stationing action directs this?']},
+ mission_change:{t:'Change to an existing mission',q:['What changed in the mission, and what document directs the change?','Which existing facilities no longer support the mission, and why?','Is the change permanent, or tied to a time-limited operation?']},
+ failing:{t:'Failing or obsolete facility',q:['What condition data exists (BUILDER, condition index, inspection reports)?','What has failed, how often, and what did repairs cost over the last five years?','At what point does the mission stop if nothing is done?']},
+ compliance:{t:'Code, safety or environmental compliance gap',q:['Which code, standard or regulation is not met, by section?','Has an inspection, citation or waiver documented the gap?','What interim measures are in place, and when do they expire?']},
+ atfp:{t:'Antiterrorism / force protection gap',q:['Which UFC 4-010-01 standards are not met (standoff, glazing, progressive collapse)?','Is there a vulnerability assessment documenting the gap?','What threat or tactic drives the requirement?']},
+ consolidation:{t:'Consolidation or footprint reduction',q:['Which facilities and functions are consolidating?','What demolition or disposal follows, and what does it save?','Which functions cannot co-locate, and why?']},
+ resilience:{t:'Resilience or mission assurance',q:['Which mission-critical loads must survive an outage, and for how long?','What hazards drive this (typhoon, seismic, flooding, grid loss)?','Is there an installation energy or water resilience plan that names this?']},
+ quality_of_life:{t:'Quality of life (housing, dining, fitness, child care)',q:['What is the current deficit (beds, seats, slots) and how was it counted?','What is the off-installation alternative, and why does it fall short?','How does the deficit affect readiness or retention?']},
+ other:{t:'Other',q:['What problem must this project solve?','What happens if it is not solved?']}};
+const ROLES=['Sponsor / requirement owner','Commander or decision authority','End user / operator','Installation public works (DPW, BCE, PWD)','Installation planner','Design / construction agent','Programmer (Service MILCON)','Comptroller / resource manager','Environmental','Safety / fire','Security / AT-FP','Communications / cyber','Real property','Regulator','Host nation','JPMO','Other'];
+const AUTH={decides:'Decides',approves:'Approves',validates:'Validates',consulted:'Consulted',informed:'Informed'};
+const SESSION_TYPES={interview:'Interview',workshop:'Workshop',charrette:'Charrette',site_visit:'Site visit',document:'Document review',survey:'Survey',other:'Other'};
+const RTYPES={mission:'Mission / operational',functional:'Functional',space:'Space and quantity',performance:'Performance',siting:'Siting and site',security:'Security and AT/FP',it_comm:'IT and communications',sustain:'Energy, sustainability, resilience',env:'Environmental and historic',schedule:'Schedule',cost:'Cost and funding',constraint:'Constraint',other:'Other'};
+const PRIOR={must:'Must have',should:'Should have',could:'Could have',wont:'Won’t have (this time)'};
+const RSTAT={draft:'Draft',confirmed:'Confirmed by source',validated:'Validated',withdrawn:'Withdrawn'};
+const GENERIC_Q={
+ 'End user / operator':['Walk me through a normal day in the facility. Where does work slow down today?','What work cannot be done at all today because of the facility?','How many people use the space, by shift, today and in five years?','What equipment, vehicles or aircraft must the facility hold? Give sizes and weights.','What must be next to what? What must be kept apart?'],
+ 'Installation public works (DPW, BCE, PWD)':['What utility capacity is available at the likely sites (power, water, sewer, comms)?','What maintenance burden does the existing facility create?','Which installation standards or design guides apply?','What can the installation actually operate and maintain afterward?'],
+ 'Security / AT-FP':['What is the asset value and threat level for this facility?','What standoff is achievable on the likely sites?','Is a SCIF, SAPF, arms room or vault involved?'],
+ 'Communications / cyber':['What networks and classification levels are needed in the facility?','Does any building control system need a cyber authorization?'],
+ 'Sponsor / requirement owner':['What mission outcome proves this project succeeded?','What is the latest acceptable date for the capability?','Which requirements could you give up if cost forced a choice?']};
+
+// ---------------- state ----------------
+const BLANK=()=>({schema:'nora-1',id:uid(),created:new Date().toISOString(),
+ project:{name:'',installation:'',service:'',location:'',unit:'',driver:'',driver_detail:'',mission:'',need_date:'',prepared_by:'',jpmo_role:'author'},
+ stakeholders:[],sessions:[],requirements:[],gaps:[],constraints:[],assumptions:[],risks:[],measures:[],
+ need_statement:'',validation:{installation:'',installation_date:'',service:'',service_date:''},
+ log:[],seq:{req:0}});
+let P=load()||BLANK();
+let STEP='project';
+function load(){try{return JSON.parse(localStorage.getItem('nora_project')||'null');}catch(e){return null;}}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('nora_project',JSON.stringify(P));
+ const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');rec.project=Object.assign(rec.project||{},{name:P.project.name,installation:P.project.installation,service:P.project.service,location:P.project.location});
+ rec.nora={updated:new Date().toISOString(),need_statement:P.need_statement,requirements:P.requirements.filter(r=>r.status!=='withdrawn').map(r=>({id:r.id,text:r.text,type:r.type,priority:r.priority,measure:r.measure}))};
+ rec.rtm=rtmRows();localStorage.setItem('milcon_record',JSON.stringify(rec));
+ $('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},300);}
+function log(what,detail){P.log.push({at:new Date().toISOString(),what,detail:detail||''});}
+const SH=id=>P.stakeholders.find(s=>s.id===id);
+const SS=id=>P.sessions.find(s=>s.id===id);
+
+// ---------------- steps ----------------
+const STEPS=[
+ ['project','Project and driver',()=>P.project.name?'✓':''],
+ ['stake','Stakeholders',()=>P.stakeholders.length||''],
+ ['elicit','Elicitation',()=>P.sessions.length||''],
+ ['reqs','Requirements',()=>P.requirements.filter(r=>r.status!=='withdrawn').length||''],
+ ['gap','Gap analysis',()=>P.gaps.length||''],
+ ['cars','Constraints and risks',()=>(P.constraints.length+P.assumptions.length+P.risks.length+P.measures.length)||''],
+ ['out','Need statement and outputs',()=>gateReady()?'✓':'']];
+function renderSteps(){const nav=$('#steps');
+ if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
+ nav.querySelector('.gate').innerHTML='<b>Gate 1:</b> requirement validated by the installation and the Service.<br>'+(gateReady()?'<span class="pill ok">Package ready for validation</span>':'<span class="pill warn">'+gateItems().filter(g=>!g[1]).length+' items open</span>');}
+function render(){renderSteps();({project:vProject,stake:vStake,elicit:vElicit,reqs:vReqs,gap:vGap,cars:vCars,out:vOut})[STEP]();}
+
+// generic bound input helper
+function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='number'?(el.value===''?'':Number(el.value)):el.value;save();if(after) after(k,el);};});}
+const opts=(o,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(v)+'</option>').join('');
+const optsArr=(a,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+a.map(v=>'<option '+(v===sel?'selected':'')+'>'+esc(v)+'</option>').join('');
+
+// ---------- 1 project ----------
+function vProject(){const v=$('#view');const d=DRIVERS[P.project.driver];
+ v.innerHTML='<div class="panel"><h2>Project and mission driver</h2><p class="lead">Start with why. Every requirement NORA records will trace back to the driver you name here, and reviewers will test the 1391 against it.</p>'+
+ '<div class="form">'+
+ '<div class="wide"><label class="f">Working project title</label><input data-k="name" placeholder="e.g. Aircraft Maintenance Hangar, Andersen AFB"></div>'+
+ '<div><label class="f">Installation</label><input data-k="installation"></div>'+
+ '<div><label class="f">Service</label><select data-k="service">'+opts(SERVICES,'','Select')+'</select></div>'+
+ '<div><label class="f">Location</label><select data-k="location">'+opts(LOCS,'','Select')+'</select></div>'+
+ '<div><label class="f">Requiring unit or organization</label><input data-k="unit"></div>'+
+ '<div><label class="f">Mission driver</label><select data-k="driver">'+opts(Object.fromEntries(Object.entries(DRIVERS).map(([k,x])=>[k,x.t])),'','Select')+'</select></div>'+
+ '<div><label class="f">Capability needed by</label><input type="date" data-k="need_date"></div>'+
+ '<div><label class="f">JPMO role on this requirement</label><select data-k="jpmo_role">'+opts({author:'Authoring the requirement',review:'Reviewing a Service requirement',support:'Supporting the installation'})+'</select></div>'+
+ '<div><label class="f">Prepared by</label><input data-k="prepared_by"></div>'+
+ '<div class="wide"><label class="f">Mission the facility supports</label><textarea data-k="mission" placeholder="What the unit does, in plain words, and why it matters to the theater."></textarea></div>'+
+ '<div class="wide"><label class="f">What is driving the need now</label><textarea data-k="driver_detail" placeholder="Directive, basing decision, failed inspection, condition data, threat assessment…"></textarea></div>'+
+ '</div>'+(d?'<h3>Questions to settle for this driver</h3><ul class="qbank">'+d.q.map(q=>'<li>'+esc(q)+'</li>').join('')+'</ul>':'')+
+ (P.project.jpmo_role==='review'?'<div class="mentor">Review mode: record the Service as a stakeholder, log their requirement document as a Document review session, and paste its requirements on the Requirements step. NORA will flag weak statements and missing sources.</div>':'')+'</div>';
+ bindAll(v,P.project,k=>{if(k==='driver'||k==='jpmo_role') vProject();renderSteps();});}
+
+// ---------- 2 stakeholders ----------
+function quadrant(s){const hiI=s.influence==='H',hiN=s.interest==='H';return hiI&&hiN?'Manage closely':hiI?'Keep satisfied':hiN?'Keep informed':'Monitor';}
+function stakeWarnings(){const w=[];const R=P.stakeholders.map(s=>s.role);
+ if(!P.stakeholders.some(s=>s.authority==='decides')) w.push('No one is recorded with decision authority. Who signs the requirement?');
+ if(!R.includes('End user / operator')) w.push('No end user. Requirements written without the people who use the facility are the most common source of change orders.');
+ if(!R.includes('Installation public works (DPW, BCE, PWD)')) w.push('No installation public works representative. They own siting, utilities and long-term sustainment.');
+ if(!R.some(r=>/Programmer|Comptroller/.test(r))) w.push('No programmer or resource manager. They decide whether the project fits the Service MILCON program.');
+ if(['japan','korea','philippines','australia','palau','fsm','marshall_islands','papua_new_guinea','singapore'].includes(P.project.location)&&!R.includes('Host nation')) w.push('Overseas location with no host-nation stakeholder. Host-nation approvals and cost sharing often set the schedule.');
+ return w;}
+function vStake(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Stakeholders</h2><p class="lead">Who needs the facility, who decides, who approves, and who can stop it. Influence and interest place each person on the engagement grid.</p>'+
+ '<div id="sw"></div><table><thead><tr><th>Name</th><th>Title / office</th><th>Organization</th><th>Role</th><th>Authority</th><th>Influence</th><th>Interest</th><th>Contact</th><th></th></tr></thead><tbody id="sb"></tbody></table>'+
+ '<div class="row"><button class="go" id="bAddS">Add stakeholder</button></div>'+
+ '<h3>Engagement grid</h3><div class="quad" id="quad"></div></div>';
+ const tb=$('#sb');
+ if(!P.stakeholders.length) tb.innerHTML='<tr><td colspan="9" class="empty">No stakeholders yet.</td></tr>';
+ P.stakeholders.forEach(s=>{const tr=document.createElement('tr');
+  tr.innerHTML='<td><input data-k="name"></td><td><input data-k="title"></td><td><input data-k="org"></td><td><select data-k="role">'+optsArr(ROLES,s.role,'Select')+'</select></td><td><select data-k="authority">'+opts(AUTH,s.authority,'—')+'</select></td><td><select data-k="influence">'+opts({H:'High',M:'Med',L:'Low'},s.influence,'—')+'</select></td><td><select data-k="interest">'+opts({H:'High',M:'Med',L:'Low'},s.interest,'—')+'</select></td><td><input data-k="contact"></td><td><button class="sm" data-del>Remove</button></td>';
+  bindAll(tr,s,()=>{quad();warn();renderSteps();});
+  tr.querySelector('[data-del]').onclick=()=>{const used=P.requirements.some(r=>(r.sources||[]).includes(s.id));if(used&&!confirm('Requirements cite this stakeholder as a source. Remove anyway? The requirements keep the name as text.')) return;
+   P.requirements.forEach(r=>{if((r.sources||[]).includes(s.id)){r.sources=r.sources.filter(x=>x!==s.id);r.source_names=(r.source_names||[]).concat(s.name);}});
+   P.stakeholders=P.stakeholders.filter(x=>x!==s);log('Stakeholder removed',s.name);save();vStake();renderSteps();};
+  tb.appendChild(tr);});
+ $('#bAddS').onclick=()=>{P.stakeholders.push({id:uid(),name:'',title:'',org:'',role:'',authority:'',influence:'',interest:'',contact:''});save();vStake();renderSteps();setTimeout(()=>{const ins=document.querySelectorAll('#sb tr:last-child input');if(ins[0]) ins[0].focus();},0);};
+ function quad(){const g={'Keep satisfied':[],'Manage closely':[],'Monitor':[],'Keep informed':[]};P.stakeholders.filter(s=>s.name).forEach(s=>g[quadrant(s)].push(s.name));
+  $('#quad').innerHTML=Object.entries(g).map(([k,a])=>'<div><b>'+k+'</b>'+(a.map(esc).join(', ')||'<span class="small">—</span>')+'</div>').join('');}
+ function warn(){const w=stakeWarnings();$('#sw').innerHTML=w.length?'<div class="mentor">'+w.map(esc).join('<br>')+'</div>':'';}
+ quad();warn();}
+
+// ---------- 3 elicitation ----------
+const REQ_RE=/\b(shall|must|need(s|ed)?|require[sd]?|requirement|should|has to|have to|want(s|ed)?|cannot|can't|no less than|at least|minimum|maximum)\b/i;
+function sentences(t){return t.replace(/\r/g,'').split(/(?<=[.!?])\s+|\n+/).map(s=>s.replace(/^[\s\-•*\d.)]+/,'').trim()).filter(s=>s.length>12);}
+function offlineFind(notes){return sentences(notes).filter(s=>REQ_RE.test(s)).map(s=>({statement:s,evidence:s,type:guessType(s),priority:/\b(shall|must|cannot|can't|has to|have to|need(s|ed)?|require[sd]?)\b/i.test(s)?'must':/\b(should|want(s|ed)?)\b/i.test(s)?'should':'could'}));}
+function guessType(s){const t=s.toLowerCase();
+ if(/standoff|at\/?fp|antiterror|blast|scif|sapf|vault|clearance|secure|access control|ids\b/.test(t)) return 'security';
+ if(/network|sipr|nipr|fiber|comm|cyber|it\b|telecom|radio/.test(t)) return 'it_comm';
+ if(/square feet|sf\b|sq ?ft|m2|seats|beds|bays|people|personnel|occupants|spaces|parking|capacity/.test(t)) return 'space';
+ if(/generator|backup|resilien|solar|energy|leed|sustainab|typhoon|seismic|water storage|outage/.test(t)) return 'sustain';
+ if(/site|located|adjacent|airfield|flightline|utility|utilities|setback|parcel/.test(t)) return 'siting';
+ if(/nepa|historic|wetland|species|environment|asbestos|lead paint/.test(t)) return 'env';
+ if(/by (fy|20)|ioc|foc|schedule|date|no later than|deadline/.test(t)) return 'schedule';
+ if(/\$|cost|budget|fund/.test(t)) return 'cost';
+ if(/temperature|humidity|load|lux|noise|db\b|psi|tons?\b|rated|hours|minutes/.test(t)) return 'performance';
+ return 'functional';}
+function vElicit(){const v=$('#view');
+ const roles=[...new Set(P.stakeholders.map(s=>s.role).filter(r=>GENERIC_Q[r]))];
+ v.innerHTML='<div class="panel"><h2>Elicitation</h2><p class="lead">Log each interview, workshop or document review with its notes. NORA pulls the requirement statements out of the notes and keeps the exact words each one came from, so every requirement can be traced back to a person and a date.</p>'+
+ '<div class="row" style="margin-top:0"><select id="nsType" style="width:auto">'+opts(SESSION_TYPES,'interview')+'</select><button class="go" id="bAddSess">Add session</button></div><div id="sessions"></div></div>'+
+ (roles.length?'<div class="panel"><h2>Question bank</h2><p class="lead">Questions experienced planners ask each role. Drawn from the roles on your stakeholder list.</p><div class="cols2">'+roles.map(r=>'<div><h3 style="margin-top:4px">'+esc(r)+'</h3><ul class="qbank">'+GENERIC_Q[r].map(q=>'<li>'+esc(q)+'</li>').join('')+'</ul></div>').join('')+'</div></div>':'');
+ $('#bAddSess').onclick=()=>{P.sessions.unshift({id:uid(),type:$('#nsType').value,date:today(),title:'',participants:[],notes:'',candidates:[]});save();vElicit();renderSteps();};
+ const box=$('#sessions');
+ if(!P.sessions.length){box.innerHTML='<div class="empty">No sessions yet. Add one, then type or paste the notes.</div>';return;}
+ P.sessions.forEach(s=>{const c=document.createElement('div');c.className='card';
+  c.innerHTML='<div class="hd"><span class="id">'+esc(SESSION_TYPES[s.type]||s.type)+'</span><input data-k="title" placeholder="Topic or document title" style="flex:1;min-width:200px"><input type="date" data-k="date" style="width:auto"><button class="sm" data-del>Remove</button></div>'+
+  '<div class="small" style="margin-bottom:4px">Participants</div><div class="pp">'+(P.stakeholders.length?P.stakeholders.map(x=>'<label class="pill" style="cursor:pointer"><input type="checkbox" style="width:auto;margin:0 4px 0 0" value="'+x.id+'" '+(s.participants.includes(x.id)?'checked':'')+'>'+esc(x.name||'(unnamed)')+'</label>').join(''):'<span class="small">Add stakeholders first to link participants.</span>')+'</div>'+
+  '<div style="margin-top:8px"><textarea class="tall" data-k="notes" placeholder="Notes, transcript, or pasted requirement document text."></textarea></div>'+
+  '<div class="row"><button class="go" data-find>Find requirements</button><span class="engines" data-eng></span></div><div data-cands></div>';
+  bindAll(c,s);
+  c.querySelectorAll('.pp input').forEach(i=>i.onchange=()=>{s.participants=[...c.querySelectorAll('.pp input:checked')].map(x=>x.value);save();});
+  c.querySelector('[data-del]').onclick=()=>{if(P.requirements.some(r=>r.session===s.id)&&!confirm('Requirements trace to this session. Remove it anyway? Their evidence quotes are kept.')) return;P.sessions=P.sessions.filter(x=>x!==s);log('Session removed',s.title||s.type);save();vElicit();renderSteps();};
+  c.querySelector('[data-find]').onclick=()=>findReqs(s,c);
+  renderCands(s,c);box.appendChild(c);});}
+function renderCands(s,c){const box=c.querySelector('[data-cands]');const cs=(s.candidates||[]).filter(x=>!x.done);
+ if(!cs.length){box.innerHTML='';return;}
+ box.innerHTML='<h3>Candidate requirements <span class="small" style="font-weight:400">– accept, edit, or dismiss each</span></h3>';
+ cs.forEach(k=>{const d=document.createElement('div');d.className='card';
+  const st=k.status==='agreed'?'<span class="pill ok">Readers agree</span>':k.status==='upheld'?'<span class="pill ok">Arbiter upheld</span>':k.status==='single'?'<span class="pill warn">One reader only</span>':k.status==='offline'?'<span class="pill">Built-in rules</span>':'';
+  d.innerHTML='<textarea data-t style="min-height:44px">'+esc(k.statement)+'</textarea><div class="flags"><q class="ev">'+esc(k.evidence)+'</q> '+st+' '+(k.by||[]).map(b=>'<span class="pill">'+esc(b)+'</span>').join('')+'</div>'+
+  '<div class="row" style="margin-top:6px"><select data-ty style="width:auto">'+opts(RTYPES,k.type)+'</select><select data-pr style="width:auto">'+opts(PRIOR,k.priority||'should')+'</select><button class="sm go" data-ok>Accept</button><button class="sm" data-no>Dismiss</button></div>';
+  d.querySelector('[data-ok]').onclick=()=>{const r=newReq({text:d.querySelector('[data-t]').value.trim(),type:d.querySelector('[data-ty]').value,priority:d.querySelector('[data-pr]').value,session:s.id,sources:[...s.participants],evidence:k.evidence,origin:k.status==='offline'?'Built-in rules':'AI: '+(k.by||[]).join(', ')+(k.status?' ('+k.status+')':'')});
+   k.done=true;log('Requirement accepted from elicitation',r.id+' · '+r.origin);save();renderCands(s,c);renderSteps();};
+  d.querySelector('[data-no]').onclick=()=>{k.done=true;log('Candidate dismissed',k.statement.slice(0,80));save();renderCands(s,c);};
+  box.appendChild(d);});}
+function newReq(o){P.seq.req=(P.seq.req||0)+1;const r=Object.assign({id:'R-'+String(P.seq.req).padStart(3,'0'),text:'',type:'functional',priority:'should',status:'draft',sources:[],session:'',evidence:'',rationale:'',measure:'',origin:'Manual',created:today()},o);P.requirements.push(r);return r;}
+
+// AI
+const PROVIDERS={anthropic:'Anthropic (Claude)',openai:'OpenAI-compatible (OpenAI, GenAI.mil if OpenAI-style, Ask Sage, Azure, local)',gemini:'Google Gemini',custom:'Custom endpoint (OpenAI request format)'};
+const SLOT_DEF={provider:'anthropic',label:'',role:'reader',base:'',model:'',key:'',header:'Authorization',prefix:'Bearer ',enabled:false};
+let SET=loadSettings();
+function loadSettings(){let s={slots:[{...SLOT_DEF,label:'Reader 1'},{...SLOT_DEF,label:'Reader 2',provider:'openai'},{...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'}],remember:false};
+ try{const j=JSON.parse(localStorage.getItem('pmt_ai')||'null');if(j){s=j;while(s.slots.length<3) s.slots.push({...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'});s.slots.forEach(x=>x.role=x.role||'reader');}const k=JSON.parse(sessionStorage.getItem('pmt_ai_keys')||localStorage.getItem('pmt_ai_keys')||'null');if(k) s.slots.forEach((x,i)=>x.key=k[i]||'');}catch(e){}
+ return s;}
+function saveSettings(){try{const keys=SET.slots.map(s=>s.key);const noKeys={...SET,slots:SET.slots.map(s=>({...s,key:''}))};localStorage.setItem('pmt_ai',JSON.stringify(noKeys));
+ sessionStorage.setItem('pmt_ai_keys',JSON.stringify(keys));if(SET.remember) localStorage.setItem('pmt_ai_keys',JSON.stringify(keys));else localStorage.removeItem('pmt_ai_keys');}catch(e){}}
+async function callAI(slot,sys,user){
+ const p=slot.provider;let url,headers={'Content-Type':'application/json'},body;
+ if(p==='anthropic'){url=(slot.base||'https://api.anthropic.com').replace(/\/$/,'')+'/v1/messages';headers['x-api-key']=slot.key;headers['anthropic-version']='2023-06-01';headers['anthropic-dangerous-direct-browser-access']='true';
+  body={model:slot.model,max_tokens:4000,system:sys,messages:[{role:'user',content:user}]};}
+ else if(p==='gemini'){url=(slot.base||'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/,'')+'/models/'+encodeURIComponent(slot.model)+':generateContent?key='+encodeURIComponent(slot.key);
+  body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{responseMimeType:'application/json'}};}
+ else{url=(slot.base||'https://api.openai.com/v1').replace(/\/$/,'')+'/chat/completions';if(slot.key) headers[slot.header||'Authorization']=(slot.prefix??'Bearer ')+slot.key;
+  body={model:slot.model,messages:[{role:'system',content:sys},{role:'user',content:user}]};}
+ const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});
+ const t=await r.text();if(!r.ok) throw new Error('HTTP '+r.status+': '+t.slice(0,200));
+ const j=JSON.parse(t);
+ const txt=p==='anthropic'?(j.content||[]).map(c=>c.text||'').join(''):p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):(j.choices?.[0]?.message?.content||'');
+ const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<0) throw new Error('No JSON in reply');return JSON.parse(txt.slice(a,b+1));}
+const norm=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
+const verified=(src,q)=>{const n=norm(q);return n.length>=6&&norm(src).includes(n);};
+const toks=s=>new Set(norm(s).replace(/[^a-z0-9 ]/g,' ').split(' ').filter(w=>w.length>2&&!['the','shall','must','and','for','with','will','that','facility','need','needs'].includes(w)));
+function sim(a,b){const A=toks(a),B=toks(b);if(!A.size||!B.size) return 0;let i=0;A.forEach(x=>{if(B.has(x)) i++;});return i/Math.min(A.size,B.size);}
+const READ_SYS=()=>`You are a requirements analyst for U.S. DoD military construction (MILCON). Read the elicitation notes and extract every distinct facility requirement the stakeholders stated or clearly implied. Return ONLY JSON:
+{"requirements":[{"statement":"one requirement, written as 'The facility shall …' or 'The project shall …', single need, measurable where the notes give a number","type":"<type id>","priority":"must|should|could|wont","evidence":"exact quote from the notes, 6-40 words, copied character for character"}]}
+Type ids: ${JSON.stringify(RTYPES)}.
+Rules: one need per item. Do not invent numbers, dates or features the notes do not support. Every item needs a verbatim evidence quote from the notes. Do not propose solutions the stakeholders did not ask for.`;
+const ARB_SYS=`You are the arbiter between two requirements analysts. For each disputed candidate requirement, decide whether the notes truly support it. Return ONLY JSON: {"rulings":[{"n":<number>,"keep":true|false,"evidence":"exact quote from the notes that supports it, copied character for character (required when keep is true)","reason":"short"}]}`;
+async function findReqs(s,c){const notes=s.notes||'';if(notes.trim().length<20){alert('Add notes to this session first.');return;}
+ const btn=c.querySelector('[data-find]');btn.disabled=true;const eng=c.querySelector('[data-eng]');
+ const readers=SET.slots.map((x,i)=>({...x,i})).filter(x=>x.enabled&&x.model&&x.role!=='arbiter');
+ const arb=SET.slots.find(x=>x.enabled&&x.model&&x.role==='arbiter');
+ const pill=(n,st)=>'<span class="eng"><span class="dot '+st+'"></span>'+esc(n)+'</span>';
+ const status={'Built-in':'ok'};readers.forEach(r=>status[r.label||'AI']='run');if(arb&&readers.length>1) status[arb.label||'Arbiter']='';
+ const draw=()=>eng.innerHTML=Object.entries(status).map(([n,st])=>pill(n,st)).join('');draw();
+ const existing=new Set((s.candidates||[]).map(k=>norm(k.evidence)));
+ let cands=[];
+ if(!readers.length){cands=offlineFind(notes).map(k=>({...k,status:'offline',by:['Built-in']}));}
+ else{
+  const res=await Promise.all(readers.map(async r=>{try{const j=await callAI(r,READ_SYS(),notes.slice(0,60000));status[r.label||'AI']='ok';draw();return {r,items:(j.requirements||[])};}catch(e){status[r.label||'AI']='err';draw();console.warn(e);return {r,items:[],err:e};}}));
+  const pool=[];
+  res.forEach(({r,items})=>items.forEach(it=>{if(!it||!it.statement) return;if(!verified(notes,it.evidence)){log('AI finding rejected (quote not in notes)',(r.label||'AI')+': '+String(it.statement).slice(0,90));return;}
+   const m=pool.find(p=>sim(p.statement,it.statement)>=.6&&!p.by.includes(r.label));if(m){m.by.push(r.label);}else pool.push({statement:String(it.statement),type:RTYPES[it.type]?it.type:guessType(it.statement),priority:PRIOR[it.priority]?it.priority:'should',evidence:String(it.evidence),by:[r.label]});}));
+  const ok=res.filter(x=>!x.err).length;
+  pool.forEach(p=>p.status=ok<2?'single':p.by.length>=2?'agreed':'single');
+  const disputed=pool.filter(p=>p.status==='single'&&ok>=2);
+  if(arb&&disputed.length){status[arb.label||'Arbiter']='run';draw();
+   try{const j=await callAI(arb,ARB_SYS,'NOTES:\n'+notes.slice(0,60000)+'\n\nDISPUTED CANDIDATES:\n'+disputed.map((p,i)=>(i+1)+'. '+p.statement).join('\n'));
+    (j.rulings||[]).forEach(rl=>{const p=disputed[(rl.n|0)-1];if(!p) return;if(rl.keep&&verified(notes,rl.evidence)){p.status='upheld';p.by.push(arb.label||'Arbiter');}else{p.status='dropped';log('Arbiter dropped candidate',p.statement.slice(0,90)+' – '+(rl.reason||''));}});
+    status[arb.label||'Arbiter']='ok';}catch(e){status[arb.label||'Arbiter']='err';}draw();}
+  cands=pool.filter(p=>p.status!=='dropped');
+  if(!ok){cands=offlineFind(notes).map(k=>({...k,status:'offline',by:['Built-in']}));eng.insertAdjacentHTML('beforeend','<span class="small">AI unavailable – showing built-in results.</span>');}}
+ const fresh=cands.filter(k=>!existing.has(norm(k.evidence))&&!P.requirements.some(r=>sim(r.text,k.statement)>=.85));
+ s.candidates=(s.candidates||[]).concat(fresh);log('Requirements search run',(SESSION_TYPES[s.type]||'')+' '+(s.title||'')+': '+fresh.length+' new candidates');save();
+ btn.disabled=false;renderCands(s,c);if(!fresh.length) c.querySelector('[data-cands]').innerHTML='<p class="small">No new requirement statements found.</p>';}
+
+// ---------- 4 requirements ----------
+const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
+function quality(r){const f=[];const t=r.text||'';const lt=' '+t.toLowerCase()+' ';
+ if(!t.trim()) return [['bad','Empty']];
+ const vg=VAGUE.filter(w=>new RegExp('(^|[^a-z])'+w.replace(/[.*+?^${}()|[\]\\\/]/g,'\\$&')+'([^a-z]|$)').test(lt));if(vg.length) f.push(['warn','Vague: '+vg.slice(0,3).join(', ')]);
+ if(!/\d/.test(t)&&!(r.measure||'').trim()) f.push(['warn','No measure: how will anyone verify it?']);
+ if(((t.match(/\b(shall|must)\b/gi)||[]).length>1)||/;\s*\w/.test(t)) f.push(['warn','May hold more than one requirement']);
+ if(['mission','functional'].includes(r.type)&&/\b(build|construct|renovate|install|purchase|demolish)\b/i.test(t)) f.push(['warn','States a solution; state the need it serves']);
+ if(!(r.sources||[]).length&&!(r.source_names||[]).length&&!r.session) f.push(['bad','No source']);
+ if(t.split(/\s+/).length>55) f.push(['warn','Long; split or tighten']);
+ if(!/\b(shall|must|will|requires?)\b/i.test(t)) f.push(['warn','Not phrased as a requirement']);
+ if(!f.length) f.push(['ok','Clear']);return f;}
+let RF={q:'',type:'',show:'active'};
+function vReqs(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Requirements</h2><p class="lead">Each requirement states one need, names who said it, and says how it will be verified. NORA checks every statement as you type. Withdrawn requirements stay on the record with the reason.</p>'+
+ '<div class="row" style="margin-top:0"><button class="go" id="bAddR">Add requirement</button><input id="rq" placeholder="Filter" style="width:200px" value="'+esc(RF.q)+'"><select id="rt" style="width:auto">'+opts(RTYPES,RF.type,'All types')+'</select><select id="rs" style="width:auto">'+opts({active:'Active',all:'All',withdrawn:'Withdrawn',flag:'Needs work'},RF.show)+'</select><span class="small" id="rcount"></span></div><div id="rlist"></div></div>'+
+ '<div class="panel"><h2>Review requirements someone else wrote</h2><p class="lead">Paste a list from a Service requirement document, a draft 1391, or an email. Each line or sentence becomes a requirement, linked to a Document review session, and is checked the same way.</p><textarea id="ext" class="tall" placeholder="One requirement per line"></textarea><div class="row"><input id="extSrc" placeholder="Document title" style="width:280px"><button id="bExt">Import and check</button></div></div>';
+ $('#bAddR').onclick=()=>{const r=newReq({});log('Requirement added',r.id);save();RF.show='active';vReqs();renderSteps();};
+ $('#rq').oninput=e=>{RF.q=e.target.value;list();};$('#rt').onchange=e=>{RF.type=e.target.value;list();};$('#rs').onchange=e=>{RF.show=e.target.value;list();};
+ $('#bExt').onclick=()=>{const t=$('#ext').value.trim();if(!t) return;const s={id:uid(),type:'document',date:today(),title:$('#extSrc').value||'Imported requirements',participants:[],notes:t,candidates:[]};P.sessions.unshift(s);
+  const lines=t.split(/\n+/).map(x=>x.replace(/^[\s\-•*\d.)]+/,'').trim()).filter(x=>x.length>8);const items=lines.length>1?lines:sentences(t);
+  items.forEach(x=>newReq({text:x,type:guessType(x),priority:/\b(shall|must)\b/i.test(x)?'must':'should',session:s.id,evidence:x,origin:'Imported: '+s.title}));
+  log('Requirements imported for review',items.length+' from '+s.title);save();$('#ext').value='';RF.show='all';vReqs();renderSteps();};
+ list();
+ function list(){const box=$('#rlist');box.innerHTML='';const q=norm(RF.q);
+  const rs=P.requirements.filter(r=>(RF.show==='all'||(RF.show==='withdrawn'?r.status==='withdrawn':r.status!=='withdrawn'))&&(!RF.type||r.type===RF.type)&&(!q||norm(r.id+' '+r.text).includes(q))&&(RF.show!=='flag'||quality(r).some(f=>f[0]!=='ok')));
+  $('#rcount').textContent=rs.length+' shown';
+  if(!rs.length){box.innerHTML='<div class="empty">No requirements here yet. Accept them from Elicitation, add one, or import a list below.</div>';return;}
+  rs.forEach(r=>{const d=document.createElement('div');d.className='card'+(r.status==='withdrawn'?' withdrawn':'');const s=SS(r.session);
+   d.innerHTML='<div class="hd"><span class="id">'+r.id+'</span><select data-k="status" style="width:auto">'+opts(RSTAT,r.status)+'</select><select data-k="type" style="width:auto">'+opts(RTYPES,r.type)+'</select><select data-k="priority" style="width:auto">'+opts(PRIOR,r.priority)+'</select><span class="small">'+esc(r.origin||'')+'</span></div>'+
+   '<textarea data-k="text" style="min-height:48px" placeholder="The facility shall…"></textarea><div class="flags" data-fl></div>'+
+   '<div class="grid4" style="margin-top:8px"><div><label class="f">How it will be verified</label><input data-k="measure" placeholder="Measure, test, or acceptance criterion"></div><div><label class="f">Rationale</label><input data-k="rationale" placeholder="Why it is needed"></div>'+
+   '<div><label class="f">Source stakeholders</label><select data-src multiple size="2">'+P.stakeholders.map(x=>'<option value="'+x.id+'" '+((r.sources||[]).includes(x.id)?'selected':'')+'>'+esc(x.name||'(unnamed)')+'</option>').join('')+'</select>'+((r.source_names||[]).length?'<div class="small">Former: '+esc(r.source_names.join(', '))+'</div>':'')+'</div>'+
+   '<div><label class="f">Source session</label><select data-sess>'+'<option value="">—</option>'+P.sessions.map(x=>'<option value="'+x.id+'" '+(x.id===r.session?'selected':'')+'>'+esc((SESSION_TYPES[x.type]||'')+' '+x.date+' '+(x.title||''))+'</option>').join('')+'</select></div></div>'+
+   (r.evidence?'<div class="small" style="margin-top:6px">Source words: <q class="ev">'+esc(r.evidence)+'</q></div>':'')+
+   (r.status==='withdrawn'?'<div style="margin-top:6px"><label class="f">Reason withdrawn</label><input data-k="withdrawn_reason"></div>':'');
+   const fl=()=>d.querySelector('[data-fl]').innerHTML=quality(r).map(([c,t])=>'<span class="pill '+c+'">'+esc(t)+'</span>').join('');
+   bindAll(d,r,k=>{fl();if(k==='status'){log('Requirement status changed',r.id+' → '+RSTAT[r.status]);vReqs();renderSteps();}});
+   d.querySelector('[data-src]').onchange=e=>{r.sources=[...e.target.selectedOptions].map(o=>o.value);save();fl();};
+   d.querySelector('[data-sess]').onchange=e=>{r.session=e.target.value;save();fl();};
+   fl();box.appendChild(d);});}}
+
+// ---------- 5 gap ----------
+function vGap(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Gap analysis</h2><p class="lead">For each capability, compare what exists today with what the mission needs. The gap and its impact become the heart of the need statement and the 1391 justification.</p>'+
+ '<div class="mentor">Use numbers wherever you can: square feet, bays, beds, kilowatts, condition index, years of remaining life. Reviewers trust a measured gap; they question an adjective.</div>'+
+ '<div id="gl"></div><div class="row"><button class="go" id="bAddG">Add capability</button></div></div>';
+ $('#bAddG').onclick=()=>{P.gaps.push({id:uid(),area:'',current:'',required:'',qty_have:'',qty_need:'',unit:'',impact:'',reqs:[]});save();vGap();renderSteps();};
+ const box=$('#gl');if(!P.gaps.length){box.innerHTML='<div class="empty">No capabilities recorded yet.</div>';return;}
+ const act=P.requirements.filter(r=>r.status!=='withdrawn');
+ P.gaps.forEach(g=>{const d=document.createElement('div');d.className='card';
+  d.innerHTML='<div class="hd"><input data-k="area" placeholder="Capability or function, e.g. Aircraft maintenance bays" style="flex:1"><button class="sm" data-del>Remove</button></div>'+
+  '<div class="cols2"><div><label class="f">What exists today</label><textarea data-k="current"></textarea></div><div><label class="f">What the mission requires</label><textarea data-k="required"></textarea></div></div>'+
+  '<div class="grid4" style="margin-top:8px"><div><label class="f">Quantity today</label><input type="number" data-k="qty_have"></div><div><label class="f">Quantity required</label><input type="number" data-k="qty_need"></div><div><label class="f">Unit</label><input data-k="unit" placeholder="SF, bays, beds, kW"></div><div><label class="f">Gap</label><div data-gap style="padding:6px 0;font-weight:600"></div></div></div>'+
+  '<div style="margin-top:8px"><label class="f">Impact on the mission if the gap is not closed</label><textarea data-k="impact"></textarea></div>'+
+  '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><select data-r multiple size="3">'+act.map(r=>'<option value="'+r.id+'" '+(g.reqs.includes(r.id)?'selected':'')+'>'+esc(r.id+' '+r.text.slice(0,90))+'</option>').join('')+'</select></div>';
+  const gp=()=>{const h=Number(g.qty_have),n=Number(g.qty_need);d.querySelector('[data-gap]').textContent=(g.qty_need!==''&&!isNaN(n))?((n-(isNaN(h)?0:h)).toLocaleString()+' '+(g.unit||'')):'—';};
+  bindAll(d,g,gp);gp();
+  d.querySelector('[data-r]').onchange=e=>{g.reqs=[...e.target.selectedOptions].map(o=>o.value);save();};
+  d.querySelector('[data-del]').onclick=()=>{P.gaps=P.gaps.filter(x=>x!==g);log('Gap removed',g.area);save();vGap();renderSteps();};
+  box.appendChild(d);});}
+
+// ---------- 6 constraints, assumptions, risks, measures ----------
+function vCars(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Constraints, assumptions, risks and success measures</h2><p class="lead">Constraints are limits you must work within. Assumptions are things taken as true that someone should confirm. Risks are what could go wrong. Success measures say how the sponsor will know the project worked.</p>'+
+ '<div class="mentor">Common Indo-Pacific items worth checking: typhoon and seismic design loads, host-nation approval lead times, labor and material availability on island sites, H-2B and off-island labor, shipping schedules, CUI handling, and Davis-Bacon not applying in Guam and CNMI.</div>'+
+ sec('constraints','Constraints',['text:Constraint','basis:Source or basis'])+sec('assumptions','Assumptions',['text:Assumption','owner:Who confirms','confirmed:Confirmed?'])+
+ '<h3>Risks</h3><table><thead><tr><th>Risk</th><th>Likelihood 1–5</th><th>Impact 1–5</th><th>Score</th><th>Response</th><th>Owner</th><th></th></tr></thead><tbody id="tb_risks"></tbody></table><div class="row"><button class="sm" data-add="risks">Add risk</button></div>'+
+ sec('measures','Success measures',['text:Measure','target:Target','how:How measured'])+'</div>';
+ function sec(key,title,cols){return '<h3>'+title+'</h3><table><thead><tr>'+cols.map(c=>'<th>'+c.split(':')[1]+'</th>').join('')+'<th></th></tr></thead><tbody id="tb_'+key+'" data-cols="'+cols.map(c=>c.split(':')[0]).join(',')+'"></tbody></table><div class="row"><button class="sm" data-add="'+key+'">Add</button></div>';}
+ ['constraints','assumptions','measures'].forEach(key=>{const tb=$('#tb_'+key);const cols=tb.dataset.cols.split(',');
+  P[key].forEach(it=>{const tr=document.createElement('tr');tr.innerHTML=cols.map(c=>c==='confirmed'?'<td><select data-k="confirmed">'+opts({no:'No',yes:'Yes'},it.confirmed||'no')+'</select></td>':'<td><input data-k="'+c+'"></td>').join('')+'<td><button class="sm" data-del>Remove</button></td>';
+   bindAll(tr,it);tr.querySelector('[data-del]').onclick=()=>{P[key]=P[key].filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});});
+ const tb=$('#tb_risks');P.risks.forEach(it=>{const tr=document.createElement('tr');
+  tr.innerHTML='<td><input data-k="text"></td><td><select data-k="l">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.l||3))+'</select></td><td><select data-k="i">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.i||3))+'</select></td><td data-sc></td><td><input data-k="response"></td><td><input data-k="owner"></td><td><button class="sm" data-del>Remove</button></td>';
+  const sc=()=>{const s=(Number(it.l)||3)*(Number(it.i)||3);tr.querySelector('[data-sc]').innerHTML='<span class="score '+(s>=15?'s-hi':s>=8?'s-md':'s-lo')+'">'+s+'</span>';};
+  bindAll(tr,it,sc);sc();tr.querySelector('[data-del]').onclick=()=>{P.risks=P.risks.filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});
+ v.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const k=b.dataset.add;P[k].push(k==='risks'?{id:uid(),text:'',l:'3',i:'3',response:'',owner:''}:{id:uid()});save();vCars();renderSteps();});}
+
+// ---------- 7 outputs ----------
+function gateItems(){const act=P.requirements.filter(r=>r.status!=='withdrawn');
+ return [['Project title, installation and Service recorded',!!(P.project.name&&P.project.installation&&P.project.service)],
+ ['Mission driver stated with supporting detail',!!(P.project.driver&&(P.project.driver_detail||'').trim().length>20)],
+ ['A stakeholder with decision authority is identified',P.stakeholders.some(s=>s.authority==='decides')],
+ ['End user and installation public works consulted',P.stakeholders.some(s=>s.role==='End user / operator')&&P.stakeholders.some(s=>/public works/.test(s.role))],
+ ['At least one elicitation session logged',P.sessions.length>0],
+ ['Requirements recorded',act.length>0],
+ ['Every requirement has a source',act.length>0&&act.every(r=>(r.sources||[]).length||(r.source_names||[]).length||r.session)],
+ ['Every Must-have requirement has a verification measure',act.filter(r=>r.priority==='must').every(r=>(r.measure||'').trim()||/\d/.test(r.text))&&act.some(r=>r.priority==='must')],
+ ['All requirements confirmed by their source',act.length>0&&act.every(r=>r.status==='confirmed'||r.status==='validated')],
+ ['Gap analysis completed with impact',P.gaps.length>0&&P.gaps.every(g=>(g.impact||'').trim())],
+ ['Constraints, assumptions and risks recorded',P.constraints.length>0&&P.assumptions.length>0&&P.risks.length>0],
+ ['Success measures defined',P.measures.length>0],
+ ['Need statement written',(P.need_statement||'').trim().length>80]];}
+function gateReady(){return gateItems().every(g=>g[1]);}
+function draftNeed(){const p=P.project;const loc=LOCS[p.location]||'';const act=P.requirements.filter(r=>r.status!=='withdrawn');
+ const gaps=P.gaps.filter(g=>g.area);const musts=act.filter(r=>r.priority==='must');
+ let t=(p.unit||'The requiring unit')+' at '+(p.installation||'the installation')+(loc?', '+loc:'')+', requires facilities to '+(((p.mission||'').trim().replace(/\.$/,'').replace(/^./,c=>c.toLowerCase()))||'support its assigned mission')+'. ';
+ if(p.driver&&DRIVERS[p.driver]) t+='The need is driven by '+DRIVERS[p.driver].t.toLowerCase()+(p.driver_detail?': '+p.driver_detail.trim().replace(/\.$/,'')+'.':'.')+' ';
+ if(gaps.length) t+='Today: '+gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return (g.area.toLowerCase())+(g.qty_need!==''?', '+(isNaN(h)?0:h).toLocaleString()+' available of '+n.toLocaleString()+(g.unit?' '+g.unit:'')+' required':', '+(g.current||'').trim().replace(/\.$/,''));}).join('; ')+'. ';
+ const imp=gaps.map(g=>(g.impact||'').trim().replace(/\.$/,'')).filter(Boolean);if(imp.length) t+='Without this project, '+imp.join('; ').replace(/^./,c=>c.toLowerCase())+'. ';
+ if(musts.length) t+='At minimum it must '+musts.slice(0,4).map(r=>r.text.replace(/^.{0,40}?\b(shall|must|needs? to|requires?|need)\b\s*/i,'').replace(/\.$/,'').replace(/^./,c=>c.toLowerCase())).join('; ')+'. ';
+ if(p.need_date) t+='The capability is required by '+new Date(p.need_date+'T00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})+'.';
+ return t.replace(/\s+/g,' ').trim();}
+function vOut(){const v=$('#view');const gi=gateItems();
+ v.innerHTML='<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
+ '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button id="bDraft">'+(P.need_statement?'Redraft from the record':'Draft from the record')+'</button><span class="small" id="nwc"></span></div></div>'+
+ '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
+ '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
+ '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package for validation; keep the rest for the record. The RTM and the requirements also pass to EARL, PIPER and SOPHIE through the shared project record in this browser.</p><div class="outs">'+
+ out('pkg','Requirement package','Need statement, stakeholders, requirements, gap analysis, constraints and risks, readiness. Opens in Word.','Download .doc')+
+ out('print','Print or save as PDF','The same package, formatted for printing.','Open printable')+
+ out('rtm','Requirements traceability matrix','Seeded RTM with columns for every later tool. Opens in Excel.','Download .csv')+
+ out('reg','Stakeholder register','Roles, authority, engagement and contact.','Download .csv')+
+ out('json','Project record','Everything, including the decision and AI log. Reopen with Open….','Download .json')+
+ '</div></div>'+
+ '<div class="panel"><h2>Record log</h2><p class="lead">Append-only history of what was added, accepted, rejected and changed.</p><div id="lg" class="small"></div></div>';
+ const n=$('#need');n.value=P.need_statement||'';const wc=()=>$('#nwc').textContent=(n.value.trim().split(/\s+/).filter(Boolean).length||0)+' words';wc();
+ n.oninput=()=>{P.need_statement=n.value;save();wc();renderSteps();};
+ $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();log('Need statement drafted from record');save();vOut();renderSteps();};
+ v.querySelectorAll('[data-v]').forEach(el=>{el.value=P.validation[el.dataset.v]||'';el.onchange=()=>{P.validation[el.dataset.v]=el.value;log('Validation recorded',el.dataset.v+': '+el.value);save();};});
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>dl(fname('Requirement-Package','doc'),wordWrap(pkgHTML()),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(pkgHTML(true));w.document.close();setTimeout(()=>w.print(),400);},
+  rtm:()=>dl(fname('RTM','csv'),csv(rtmRows()),'text/csv'),reg:()=>dl(fname('Stakeholder-Register','csv'),csv(regRows()),'text/csv'),json:()=>saveFile()})[b.dataset.out]());
+ $('#lg').innerHTML=P.log.length?P.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
+ function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
+const fname=(k,ext)=>((P.project.name||'NORA').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+const csv=rows=>'﻿'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
+function srcNames(r){return (r.sources||[]).map(id=>SH(id)?.name).filter(Boolean).concat(r.source_names||[]).join('; ');}
+function rtmRows(){const h=['Req ID','Requirement','Type','Priority','Status','Source stakeholder(s)','Source session','Source words','Rationale','Verification measure','Gap closed','Origin','EARL alternative','1391 paragraph (PIPER)','Criteria (CORA)','SOW paragraph (SOPHIE)','Specification section','Contract clause','QA verification (QUINN)','Closeout evidence'];
+ return [h].concat(P.requirements.map(r=>{const s=SS(r.session);return [r.id,r.text,RTYPES[r.type]||r.type,PRIOR[r.priority]||r.priority,RSTAT[r.status]+(r.status==='withdrawn'&&r.withdrawn_reason?' – '+r.withdrawn_reason:''),srcNames(r),s?(SESSION_TYPES[s.type]||'')+' '+s.date+' '+(s.title||''):'',r.evidence,r.rationale,r.measure,P.gaps.filter(g=>g.reqs.includes(r.id)).map(g=>g.area).join('; '),r.origin,'','','','','','','',''];}));}
+function regRows(){return [['Name','Title / office','Organization','Role','Authority','Influence','Interest','Engagement','Contact','Requirements sourced']].concat(P.stakeholders.map(s=>[s.name,s.title,s.org,s.role,AUTH[s.authority]||'',s.influence,s.interest,quadrant(s),s.contact,P.requirements.filter(r=>(r.sources||[]).includes(s.id)).map(r=>r.id).join(' ')]));}
+function wordWrap(body){return body.replace('<html>','<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">');}
+function pkgHTML(print){const p=P.project;const act=P.requirements.filter(r=>r.status!=='withdrawn');const tb=(h,rows)=>'<table><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
+ return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(p.name||'Requirement package')+'</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:13pt;margin:16pt 0 6pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4pt 0}th,td{border:1px solid #999;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.cui{text-align:center;font-weight:bold;font-size:10pt}</style></head><body>'+
+ '<div class="cui">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN – MARK PER DoDI 5200.48 AS REQUIRED</div>'+
+ '<h1>Requirement Package: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(p.prepared_by||'—')+', '+today()+'. Prepared with NORA; recommendations only. Validation authority rests with the installation and the Service.</div>'+
+ '<h2>1. Need statement</h2><p>'+esc(P.need_statement||'(not yet written)')+'</p>'+
+ '<h2>2. Mission and driver</h2><p><b>Mission:</b> '+esc(p.mission||'—')+'</p><p><b>Driver:</b> '+esc(DRIVERS[p.driver]?.t||'—')+'. '+esc(p.driver_detail||'')+'</p>'+(p.need_date?'<p><b>Capability needed by:</b> '+esc(p.need_date)+'</p>':'')+
+ '<h2>3. Stakeholders</h2>'+tb(['Name','Title / office','Organization','Role','Authority'],P.stakeholders.map(s=>[s.name,s.title,s.org,s.role,AUTH[s.authority]||'']))+
+ '<h2>4. Requirements</h2>'+tb(['ID','Requirement','Type','Priority','Verification','Source','Status'],act.map(r=>[r.id,r.text,RTYPES[r.type],PRIOR[r.priority],r.measure,srcNames(r)||(SS(r.session)?.title||''),RSTAT[r.status]]))+
+ '<h2>5. Gap analysis</h2>'+tb(['Capability','Today','Required','Gap','Impact if not closed'],P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [g.area,g.current+(g.qty_have!==''?' ('+g.qty_have+' '+g.unit+')':''),g.required+(g.qty_need!==''?' ('+g.qty_need+' '+g.unit+')':''),g.qty_need!==''?(n-(isNaN(h)?0:h))+' '+g.unit:'',g.impact];}))+
+ '<h2>6. Constraints</h2>'+tb(['Constraint','Basis'],P.constraints.map(c=>[c.text,c.basis]))+
+ '<h2>7. Assumptions</h2>'+tb(['Assumption','Confirmed by','Confirmed'],P.assumptions.map(c=>[c.text,c.owner,c.confirmed==='yes'?'Yes':'No']))+
+ '<h2>8. Risks</h2>'+tb(['Risk','L','I','Score','Response','Owner'],P.risks.map(c=>[c.text,c.l,c.i,(Number(c.l)||3)*(Number(c.i)||3),c.response,c.owner]))+
+ '<h2>9. Success measures</h2>'+tb(['Measure','Target','How measured'],P.measures.map(c=>[c.text,c.target,c.how]))+
+ '<h2>10. Readiness and validation</h2>'+tb(['Check','Status'],gateItems().map(([t,ok])=>[t,ok?'Met':'Open']))+
+ tb(['Validating office','Name','Date'],[['Installation',P.validation.installation||'',P.validation.installation_date||''],['Service',P.validation.service||'',P.validation.service_date||'']])+
+ '<div class="cui" style="margin-top:14pt">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN</div></body></html>';}
+function saveFile(){dl(fname('NORA','json'),JSON.stringify(P,null,1),'application/json');log('Project file saved');save();}
+
+// header actions
+$('#bSave').onclick=saveFile;
+$('#bNew').onclick=()=>{if(!confirm('Start a new project? Save a file of the current one first if you need it.')) return;P=BLANK();log('Project created');save();STEP='project';render();};
+$('#bOpen').onclick=()=>$('#fOpen').click();
+$('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='nora-1') throw new Error('Not a NORA project file');P=Object.assign(BLANK(),j);log('Project file opened',f.name);save();STEP='project';render();}catch(err){alert('Could not open: '+err.message);}});};
+
+// settings dialog
+function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?'generativelanguage.googleapis.com':'api.openai.com';}
+function renderSlots(){const box=$('#slots');box.innerHTML='';SET.slots.forEach((s,i)=>{const d=document.createElement('div');d.className='slot';
+ d.innerHTML='<h4><label><input type="checkbox" data-f="enabled" style="width:auto" '+(s.enabled?'checked':'')+'> '+esc(s.label||('AI '+(i+1)))+'</label></h4><div class="grid2">'+
+ '<div><label>Display name</label><input data-f="label" value="'+esc(s.label)+'"></div><div><label>Role</label><select data-f="role"><option value="reader" '+(s.role!=='arbiter'?'selected':'')+'>Reader</option><option value="arbiter" '+(s.role==='arbiter'?'selected':'')+'>Arbiter</option></select></div>'+
+ '<div><label>Provider</label><select data-f="provider">'+Object.entries(PROVIDERS).map(([k,v])=>'<option value="'+k+'" '+(s.provider===k?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div>'+
+ '<div><label>Model</label><input data-f="model" value="'+esc(s.model)+'"></div><div><label>API key</label><input data-f="key" type="password" value="'+esc(s.key)+'" autocomplete="off"></div>'+
+ '<div><label>Endpoint base URL (blank = default)</label><input data-f="base" value="'+esc(s.base)+'" placeholder="'+defaultBase(s.provider)+'"></div>'+
+ '<div><label>Auth header (custom)</label><input data-f="header" value="'+esc(s.header)+'"></div><div><label>Auth prefix</label><input data-f="prefix" value="'+esc(s.prefix)+'"></div>'+
+ '<div style="align-self:end"><button data-test="'+i+'">Test connection</button> <span class="small" id="t'+i+'"></span></div></div>';
+ d.querySelectorAll('[data-f]').forEach(el=>{el.oninput=el.onchange=()=>{s[el.dataset.f]=el.type==='checkbox'?el.checked:el.value;};});
+ d.querySelector('[data-test]').onclick=async ev=>{ev.preventDefault();const t=document.getElementById('t'+i);t.textContent='Testing…';try{const r=await callAI(s,'Reply with JSON only.','Return {"ok":true}');t.textContent=r.ok?'Connected':'Replied, unexpected output';}catch(err){t.textContent='Failed: '+String(err.message||err).slice(0,90);}};
+ box.appendChild(d);});$('#rememberKeys').checked=!!SET.remember;}
+$('#bSettings').onclick=()=>{SET=loadSettings();renderSlots();$('#dlg').showModal();};
+$('#bCloseSet').onclick=()=>{$('#dlg').close();SET=loadSettings();};
+$('#bSaveSet').onclick=()=>{SET.remember=$('#rememberKeys').checked;saveSettings();$('#dlg').close();};
+
+if(!P.log.length) log('Project created');
+render();save();
+</script>
+</body>
+</html>
