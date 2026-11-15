@@ -383,6 +383,7 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  (R.scope!=='portfolio'?'<select id="rk" style="width:auto">'+keys.map(k=>'<option '+(k===R.key?'selected':'')+'>'+esc(k)+'</option>').join('')+'</select>':'')+
  '<label class="small">From</label><input type="date" id="rf" style="width:150px"><label class="small">To</label><input type="date" id="rt2" style="width:150px"><select id="rmo" style="width:auto"><option value="">Pick a month</option>'+[...new Set(Q.records.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse().map(m=>'<option>'+m+'</option>').join('')+'</select></div>'+
  '<div class="row"><label class="small"><input type="checkbox" id="rbp" style="width:auto"> Leave out boilerplate</label><label class="small"><input type="checkbox" id="rsrc" style="width:auto"> Show report dates on each line</label>'+(R.scope!=='building'?'<button id="bAll">Download one report per building</button>':'')+'</div>'+
+ '<div class="row"><button id="bSum">Write the summary with AI</button><span class="small" id="sumMsg">'+(sumGet()?(sumGet().check?'<b style="color:#9b2c2c">'+esc(sumGet().check)+'</b> ':'')+'Summary included below. Write again to refresh it.':'Two or three paragraphs for the COR or PM, from this report only, through CARL. Every number is checked against the report.')+'</span></div>'+
  '<div class="row"><button class="go" id="bDoc">Download Word</button><button id="bPrint">Print or save as PDF</button></div><div class="preview" id="pv" style="margin-top:12px"></div></div>';
  v.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{R.scope=b.dataset.sc;R.key='';vRep();});
  if($('#rk')) $('#rk').onchange=e=>{R.key=e.target.value;pv();};
@@ -391,7 +392,22 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  $('#rbp').checked=R.boiler;$('#rsrc').checked=R.src;$('#rbp').onchange=e=>{R.boiler=e.target.checked;pv();};$('#rsrc').onchange=e=>{R.src=e.target.checked;pv();};
  $('#bDoc').onclick=()=>dl(fn('doc'),wrap(report()),'application/msword');$('#bPrint').onclick=()=>{const w=window.open('','_blank');w.document.write(wrap(report()));w.document.close();setTimeout(()=>w.print(),400);};
  if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('QUINN_'+b+'_'+R.from+'_to_'+R.to+'.doc',wrap(reportFor('building',b)),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
+ $('#bSum').onclick=writeSummary;
  pv();function pv(){$('#pv').innerHTML=report();}}
+// ---------- AI summary of the consolidated report ----------
+function sumKey(scope=R.scope,key=R.key){return scope+'|'+key+'|'+R.from+'|'+R.to;}
+function sumGet(scope,key){return (Q.summaries||{})[sumKey(scope,key)]||null;}
+const SUM_SYS=`You summarize a consolidated construction inspection report (AF IMT 1477 records) for a Government COR or program manager. Write two or three short paragraphs in plain, factual language: coverage and gaps in inspection days, the open deficiencies that matter most and how long they have been open, what was corrected, and anything that needs the reader's attention. Use ONLY facts in the REPORT. Do not add causes, recommendations of contract action, or anything the report does not say. No references to AI.
+Return ONLY JSON: {"summary":"the paragraphs, separated by a blank line"}`;
+async function writeSummary(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to write the summary with AI, then reload this page.');return;}
+ const prev=(Q.summaries||{})[sumKey()];if(prev) delete Q.summaries[sumKey()];
+ const tmp=document.createElement('div');tmp.innerHTML=reportFor(R.scope,R.key).replace(/<\/(p|h3|h4|tr)>/g,'\n').replace(/<\/t[dh]>/g,' | ');const txt=tmp.textContent.replace(/\n{3,}/g,'\n\n').slice(0,120000);
+ const b=$('#bSum');b.disabled=true;b.textContent='Writing…';
+ try{const j=await CARLAI.ask('claude',SUM_SYS,'REPORT:\n'+txt);const out=String(j.summary||'').trim();if(!out) throw new Error('No summary returned');
+  const S=txt.replace(/,/g,'');const bad=[...new Set((out.match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>!S.includes(x)))];
+  Q.summaries=Q.summaries||{};Q.summaries[sumKey()]={text:out,at:new Date().toISOString(),check:bad.length?'Check these numbers, not found in the report: '+bad.join(', '):''};
+  log('Summary written with AI',sumKey()+(bad.length?' – '+bad.length+' numbers to check':''));save();vRep();if(bad.length) alert(Q.summaries[sumKey()].check);}
+ catch(err){if(prev) Q.summaries[sumKey()]=prev;alert('Summary failed: '+err.message);b.disabled=false;b.textContent='Write the summary with AI';}}
 function fn(ext){return 'QUINN_'+(R.scope==='portfolio'?'Portfolio':R.key.replace(/[^\w\-]+/g,''))+'_'+R.from+'_to_'+R.to+'.'+ext;}
 function buildingsIn(scope=R.scope,key=R.key){const all=[...new Set(Q.registry.map(r=>r.building).concat(Q.records.map(r=>r.building)).filter(Boolean))].sort();return scope==='building'?[key]:scope==='to'?all.filter(b=>to(b)===key):all;}
 function recsFor(b){return Q.records.filter(r=>r.building===b&&r.date&&r.date>=R.from&&r.date<=R.to).sort((a,c)=>a.date.localeCompare(c.date));}
@@ -410,6 +426,7 @@ function reportFor(scope,key){const bs=buildingsIn(scope,key);const title=scope=
  const f=d=>{const x=new Date(d+'T00:00');return x.getDate()+' '+MON[x.getMonth()]+' '+x.getFullYear();};
  let h='<h3 style="text-align:center">CONSTRUCTION INSPECTION SUMMARY</h3><p style="text-align:center"><b>'+esc(title)+'</b><br>'+f(R.from)+' – '+f(R.to)+'</p>';
  const allRecs=bs.flatMap(recsFor);h+='<p>Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(bs.length>1?' across '+bs.length+' buildings':'')+'. The signed records remain the official copy; this summary is a derived working product.</p>';
+ const sm=sumGet(scope,key);if(sm) h+='<h3>Summary</h3>'+sm.text.split(/\n\s*\n/).map(p=>'<p>'+esc(p.trim())+'</p>').join('');
  h+='<h3>Coverage</h3>'+coverageHTML(bs);const zero=bs.filter(b=>!recsFor(b).length);if(zero.length) h+='<p><b>No inspection records in the period:</b> '+zero.map(esc).join(', ')+'.</p>';
  h+='<h3>Deficiencies and nonconformances</h3>'+issuesHTML(bs);
  bs.forEach(b=>{const rs=recsFor(b);if(!rs.length) return;h+=(bs.length>1?'<h3>'+esc(b)+(proj(b)?' – '+esc(proj(b)):'')+'</h3>':'<h3>Inspection detail</h3>')+'<p style="color:#666">'+rs.length+(rs.length===1?' report':' reports')+'; inspectors: '+esc([...new Set(rs.map(r=>String(r.inspector||'').trim()).filter(Boolean))].join(', ')||'not recorded')+'</p>'+SEC_ORDER.map(s=>sectionHTML(rs,s)).join('');});
@@ -431,6 +448,81 @@ $('#bSave').onclick=()=>{dl('QUINN_'+today()+'.json',JSON.stringify(Q,null,1),'a
 $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='quinn-1') throw new Error('Not a QUINN file');Q=Object.assign(BLANK(),j);log('File opened',f.name);save();STEP='load';render();}catch(err){alert('Could not open: '+err.message);}});};
 render();save();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default';bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+})();
 </script>
 </body>
 </html>

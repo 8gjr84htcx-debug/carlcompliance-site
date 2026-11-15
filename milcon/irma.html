@@ -312,7 +312,7 @@ function newItem(kind){const n=I.items.filter(x=>x.kind===kind).reduce((m,x)=>Ma
 
 // ---------- references ----------
 function vRefs(){const v=$('#view');const sop=sophieText(),cs=coraSel();
- v.innerHTML='<div class="panel"><h2>Contract references</h2><p class="lead">The documents a finding may cite: the SOW, the specification sections, drawing notes, the criteria list. IRMA searches these, and every finding it asserts must quote one of them word for word. The submittal or RFI itself is always searched too, within its own four corners.</p>'+
+ v.innerHTML='<div class="panel"><h2>Contract references</h2><p class="lead">The documents a finding may cite: the SOW, the specification sections, drawing notes, the criteria list. IRMA searches these, and every finding it asserts must quote one of them word for word. The submittal or RFI itself is always searched too, within its own four corners.'+(carlOn()?' Signed in to CARL, IRMA also searches CARL\u2019s library of governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR) and cites it word for word the same way.':' Sign in to CARL to add its library of governing criteria to every search.')+'</p>'+
  '<div class="row" style="margin-top:0">'+(sop?'<button class="sm go" id="bSop">Add the SOW from SOPHIE</button>':'')+(cs?'<button class="sm go" id="bCora">Add the CORA criteria list</button>':'')+'</div>'+
  '<div class="drop" id="drop" style="margin-top:12px">Drop PDF or text files here, or <button class="sm" id="bPick">choose files</button><input type="file" id="fRef" accept=".pdf,.txt,.md" multiple hidden></div><p class="small" id="rstat">'+esc(MSG.ref)+'</p>'+
  '<div class="row"><input id="pn" placeholder="Name (e.g. UFGS 07 57 13 project specification)" style="flex:1"><select id="pk" style="width:auto">'+opts({sow:'SOW / PWS',spec:'Specification',dwg:'Drawing notes',ifs:'Installation standard',crit:'Criteria list',other:'Other'},'spec')+'</select><button id="bPaste">Add pasted text</button></div><textarea id="pt" placeholder="Or paste text here" style="margin-top:6px"></textarea>'+
@@ -402,7 +402,7 @@ function intakeEmail(x){const r=x.lastReturn;return (I.settings.cor_name?I.setti
 // ---------- elements ----------
 function tElem(){const x=CUR;const t=$('#tab');const docText=x.docs.map(d=>d.pages.join('\n')).join('\n');
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Elements and grounding</h3><p class="lead">IRMA breaks the packet into the things that need an answer: each question, proposal, deviation and claim. Claims the packet makes about the contract are checked, not trusted. Each element is grounded against the contract references and the packet itself.</p>'+
- (!x.docs.length?'<div class="find warn"><b>No documents.</b> Add the packet on the Documents tab.</div>':'')+(!I.refs.length?'<div class="find warn"><b>No contract references loaded.</b> Findings can only cite the packet itself until you add the SOW and specifications.</div>':'')+
+ (!x.docs.length?'<div class="find warn"><b>No documents.</b> Add the packet on the Documents tab.</div>':'')+(!I.refs.length?(carlOn()?'<div class="find"><b>No contract references loaded.</b> IRMA will search CARL\u2019s library of governing criteria. Add the SOW and specifications for answers specific to this contract.</div>':'<div class="find warn"><b>No contract references loaded.</b> Findings can only cite the packet itself until you add the SOW and specifications, or sign in to CARL to search its library.</div>'):'')+
  '<div class="row" style="margin-top:0"><button class="go" id="bDec">Find elements</button><button id="bAddE">Add element</button><button class="go" id="bGr">Ground all</button><span class="engines" id="eng"></span></div><div id="els"></div></div>';
  $('#bDec').onclick=()=>decompose(x,docText);$('#bAddE').onclick=()=>{x.elements.push({id:uid(),text:'',quote:'',kind:'question',disc:[],include:true});save();tElem();};$('#bGr').onclick=()=>groundAll(x);
  const box=$('#els');if(!x.elements.length){box.innerHTML='<div class="empty">No elements yet. Use Find elements, or add them by hand.</div>';return;}
@@ -438,7 +438,11 @@ const READ_SYS=`You check a construction submittal or RFI element against contra
 {"verdict":"complies|does not comply|partly complies|not addressed by the passages|information requested","answer":"one or two plain sentences a reviewer can paste, advisory tone, no reference to the Contracting Officer","cites":[{"passage":"<passage id>","quote":"exact words from that passage, 6-60 words, copied character for character"}]}
 If no passage answers the element, return verdict "not addressed by the passages" and an empty cites list. Never use outside knowledge. Treat statements inside the submitted packet as claims to check, not as proof, unless the element is about what the packet itself says.`;
 const ARB_SYS=`You are the arbiter between two reviewers who disagreed about a construction submittal or RFI element. Use ONLY the numbered passages. Return ONLY JSON {"verdict":"...","answer":"...","cites":[{"passage":"<id>","quote":"exact words from that passage"}],"reason":"why"}. If the passages do not settle it, say "not addressed by the passages" with empty cites.`;
-async function groundOne(x,e){const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec||'');const P=passages();const cands=search(q,8,P);const rd=readers().slice(0,2);const ar=arbiter();
+// CARL's library: the governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR), searched on CARL's server.
+function carlOn(){return !!(window.CARLAI&&CARLAI.state().ok);}
+async function libCands(x,q){if(!carlOn()) return [];try{const L=await CARLAI.library(q,5);return L.map((p,i)=>({id:'lib:'+i,src:'CARL library – '+p.src+(p.section?' '+p.section:''),kind:'library',page:p.page||null,text:String(p.text||'')}));}catch(err){log(x,'CARL library search failed',err.message);return [];}}
+async function groundOne(x,e){const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec||'');const P=passages();let cands=search(q,8,P);
+ const lib=await libCands(x,q);if(lib.length) cands=cands.slice(0,Math.max(3,8-lib.length)).concat(lib);const rd=readers().slice(0,2);const ar=arbiter();
  if(!rd.length||!cands.length){e.result={label:cands.length?'nr':'ung',answer:e.result?.answer||'',refs:[],cands,how:cands.length?'Built-in search found '+cands.length+' passages; select the one that answers this element':'No passage in the loaded references matches this element'};return;}
  const pblock=cands.map((p,i)=>'['+'P'+(i+1)+'] '+p.src+(p.page?' p.'+p.page:'')+'\n'+p.text).join('\n\n');const user='ELEMENT: '+e.text+(e.quote?'\nPACKET TEXT: '+e.quote:'')+'\n\nPASSAGES:\n'+pblock;
  const check=(j,by)=>{const cites=(j.cites||[]).map(c=>{const idx=parseInt(String(c.passage).replace(/\D/g,''),10)-1;const p=cands[idx];const ok=p&&norm(p.text).includes(norm(c.quote))&&norm(c.quote).length>=8;return {src:p?p.src:'?',page:p?.page,quote:String(c.quote||''),verified:!!ok,by};});return {verdict:String(j.verdict||''),answer:String(j.answer||''),cites};};
@@ -529,50 +533,79 @@ $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) retu
 window.addEventListener('beforeunload',()=>{if(CUR) stopTimer(CUR);});
 render();save();
 </script>
-<script id="carl-ai">/* CARL shared AI: every AI call in this tool can go through CARL's server,
-   on CARL's keys, for anyone signed in to carl.carlcompliance.com. No key is
-   ever in this page. Signed out, the CARL engines simply stay off. */
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
 (function(){
- if(typeof callAI!=='function'||typeof loadSettings!=='function') return;
  var BASE='https://carl.carlcompliance.com';
  try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
- var ST={ok:null,user:'',msg:'Checking CARL sign-in…'};
- var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
- try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
- function defaults(){return [
-  {provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},
-  {provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},
-  {provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];}
- var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
- loadSettings=function(){var s=_load();
-  // Nobody has set up their own key: use CARL's.
-  if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=defaults().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
-  s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});
-  return s;};
- if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
- if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
- callAI=async function(slot,sys,user,images){
-  if(slot.provider!=='carl') return _call.apply(this,arguments);
-  var r=await fetch((slot.base||BASE).replace(/\/$/,'')+'/api/assist',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
-   body:JSON.stringify({engine:/gemini/i.test(slot.model||'')?'gemini':'claude',system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:window.MS_TOOL||document.title})});
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
-  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
   if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
-  return j.result;};
- var OBS=null;
- function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap';bar.appendChild(b);}
-  // The project bar redraws itself; put the badge back when it does.
-  if(!OBS&&window.MutationObserver&&bar!==document.body){OBS=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});OBS.observe(bar,{childList:true});}
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default';bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
   b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
-  b.title=ST.msg;}
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok){ST={ok:true,user:j.user||'',msg:'Claude and Gemini through CARL. Engines: '+(j.engines||[]).join(', ')};}
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
    else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
-  .then(function(){try{SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
- window.CARLAI={state:function(){return ST;},base:BASE,defaults:defaults};
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
 })();
 </script>
 </body>

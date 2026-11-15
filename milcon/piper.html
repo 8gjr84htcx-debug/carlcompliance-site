@@ -414,6 +414,7 @@ function vNarr(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Narrative (blocks 10–11)</h2><p class="lead">Reviewers read block 11 first. State the requirement in mission terms, show the gap with numbers, and say plainly what happens if the project is not funded.</p>'+
  '<div class="form"><div class="wide"><label class="f">10. Description of proposed construction</label><textarea class="tall" data-k="desc" placeholder="Construct a … Primary facilities include … Supporting facilities include … Facilities will be designed to meet UFC 1-200-01 … Antiterrorism measures per UFC 4-010-01 …"></textarea><button class="sm" id="bDesc">Draft from the estimate</button></div>'+
  '<div><label class="f">11. Unit of measure</label><input data-k="um"></div><div><label class="f">REQ</label><input data-k="req"></div><div><label class="f">ADQT</label><input data-k="adqt"></div><div><label class="f">SUBSTD</label><input data-k="substd"></div>'+
+ '<div class="wide"><button class="sm go" id="bAI11">Draft block 11 with AI</button> <span class="small">From NORA\u2019s requirements and gaps, EARL\u2019s recommendation and this estimate, through CARL. Every number is checked against those sources.</span>'+(P.n.ai_check?'<div class="find warn" style="margin-top:6px">'+esc(P.n.ai_check)+'</div>':'')+'</div>'+
  '<div class="wide"><label class="f">PROJECT:</label><textarea data-k="project" placeholder="One sentence: what the project constructs."></textarea></div>'+
  '<div class="wide"><label class="f">REQUIREMENT:</label><textarea class="tall" data-k="requirement"></textarea></div>'+
  '<div class="wide"><label class="f">CURRENT SITUATION:</label><textarea class="tall" data-k="current"></textarea></div>'+
@@ -425,7 +426,35 @@ function vNarr(){const v=$('#view');
   P.n.desc='Construct '+(P.pf.guc_name?('a '+P.pf.guc_name.toLowerCase().replace(/\s*\(.*?\)\s*/g,' ').trim()):'a facility')+(C.qty?' of approximately '+C.qty.toLocaleString()+' '+u:'')+' at '+(P.b.installation||'the installation')+'. '+
   (C.prim.length?'Primary facilities include '+C.prim.map(x=>x.item).filter(Boolean).join(', ').toLowerCase()+'. ':'')+(C.sup.length?'Supporting facilities include '+C.sup.map(x=>x.item).filter(Boolean).join(', ').toLowerCase()+'. ':'')+
   'Facilities will be designed and constructed in accordance with UFC 1-200-01, DoD Building Code, and the applicable core UFC, including UFC 4-010-01 minimum antiterrorism standards and UFC 1-200-02 high performance and sustainable building requirements. '+(/guam|marian|okinawa|japan|hawaii|philippin/i.test(P.loc.country+' '+P.b.installation)?'Design will address typhoon wind loads and seismic requirements for the site. ':'')+'Building control systems will meet UFC 4-010-06 cybersecurity requirements.';
-  log('Block 10 drafted');save();vNarr();};}
+  log('Block 10 drafted');save();vNarr();};
+ $('#bAI11').onclick=draft11;}
+
+// ---------- AI draft of block 11, from NORA, EARL and the estimate ----------
+function srcText11(){const n=nora(),R=rec(),C=calc(),L=[];
+ L.push('PROJECT DATA: '+[P.b.title,P.b.installation,P.b.component,'program FY'+P.b.fy,P.b.catcode&&('category code '+P.b.catcode)].filter(Boolean).join('; '));
+ if(C.qty) L.push('ESTIMATE: '+(P.pf.guc_name||'primary facility')+', '+C.qty.toLocaleString()+' '+(P.pf.um||'SF')+'; block 8 total $'+k$(C.rounded)+'K');
+ if(n){const pj=n.project||{};L.push('MISSION AND DRIVER: '+[pj.mission,pj.driver,pj.driver_detail,pj.unit,pj.need_date&&('need date '+pj.need_date)].filter(Boolean).join('; '));
+  if(n.need_statement) L.push('NEED STATEMENT: '+n.need_statement);
+  (n.requirements||[]).filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT {'+r.id+'} ('+(r.priority||'')+'): '+r.text));
+  (n.gaps||[]).forEach(g=>L.push('CAPABILITY GAP: '+[g.area,'current: '+g.current,'required: '+g.required,(g.qty_have||g.qty_need)&&('have '+(g.qty_have||0)+' / need '+(g.qty_need||0)+' '+(g.unit||'')),g.impact&&('impact: '+g.impact)].filter(Boolean).join('; ')));
+  (n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+(c.text||c)));}
+ const e=R.earl;if(e&&e.recommended) L.push('ECONOMIC ANALYSIS: '+e.recommended.name+' recommended, NPV $'+Math.round(e.recommended.npv/1000)+'K over '+e.period+' years at '+Number(e.rate).toFixed(2)+'%; alternatives: '+e.alternatives.map(a=>a.name+(a.screened_out?' (screened out)':' $'+Math.round(a.npv/1000)+'K')).join(', ')+(e.recommended.rationale?'; rationale: '+e.recommended.rationale:''));
+ ['project','requirement','current','impact','additional'].forEach(k=>{if(P.n[k]) L.push('AUTHOR DRAFT OF '+k.toUpperCase()+': '+P.n[k]);});
+ return L.join('\n');}
+const DRAFT11_SYS=`You draft block 11 of a DD Form 1391 (Military Construction Project Data) for a U.S. DoD reviewer. Write in plain, factual budget-justification style: mission terms, the gap in numbers, and what happens if the project is not funded. Use ONLY facts in SOURCES. Where a fact the block needs is missing, write [NEEDED: what is missing] instead of inventing it. End each sentence that rests on a stated requirement with its ID in braces, e.g. {R-003}. No marketing language, no references to AI.
+Return ONLY JSON: {"project":"one sentence","requirement":"paragraph","current":"paragraph","impact":"paragraph","additional":"paragraph covering the economic analysis and criteria, only from SOURCES","req":"quantity required or empty","adqt":"adequate quantity or empty","substd":"substandard quantity or empty"}`;
+async function draft11(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+ const src=srcText11();if(!nora()){if(!confirm('There is no NORA requirements record for this project, so the draft will have many [NEEDED] gaps. Draft anyway?')) return;}
+ const filled=['project','requirement','current','impact','additional'].filter(k=>P.n[k]);if(filled.length&&!confirm('Replace the text already in '+filled.join(', ')+' with a draft? Your text is sent along as a source.')) return;
+ const b=$('#bAI11');b.disabled=true;b.textContent='Drafting…';
+ try{const j=await CARLAI.ask('claude',DRAFT11_SYS,'SOURCES:\n'+src);
+  const norm=x=>String(x||'').replace(/[,$]/g,'');const S=norm(src);const bad=[];
+  ['project','requirement','current','impact','additional','req','adqt','substd'].forEach(k=>{if(typeof j[k]!=='string') return;P.n[k]=j[k];
+   (j[k].replace(/\{[A-Z]+-\d+\}/g,'').replace(/\b\d{1,2}-\d{3}-\d{2}\b/g,'').replace(/\b\d{2} \d{2} \d{2}\b/g,'').replace(/\b1391\b/g,'').replace(/\[NEEDED:[^\]]*\]/g,'').match(/\d[\d,.]*/g)||[]).forEach(nm=>{const v=norm(nm).replace(/\.$/,'');if(v.length>1&&!S.includes(v)) bad.push(nm+' ('+k+')');});});
+  P.n.ai_check=bad.length?'Check these numbers, not found in the sources: '+[...new Set(bad)].join(', '):'';
+  log('Block 11 drafted with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();vNarr();
+  if(bad.length) alert(P.n.ai_check);}
+ catch(err){alert('Draft failed: '+err.message);b.disabled=false;b.textContent='Draft block 11 with AI';}}
 
 // ---------- 5 block 12 ----------
 function vB12(){const v=$('#view');
@@ -559,6 +588,81 @@ $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='piper-1') throw new Error('Not a PIPER project file');P=Object.assign(BLANK(),j);log('Project file opened',f.name);save();STEP='blocks';render();}catch(err){alert('Could not open: '+err.message);}});};
 if(!P.log.length) log('Project created');
 render();save();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default';bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+})();
 </script>
 </body>
 </html>
