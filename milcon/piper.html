@@ -412,7 +412,7 @@ function block9HTML(){return '<table class="blk9"><thead><tr><th>Item</th><th>U/
 // ---------- 4 narrative ----------
 function vNarr(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Narrative (blocks 10–11)</h2><p class="lead">Reviewers read block 11 first. State the requirement in mission terms, show the gap with numbers, and say plainly what happens if the project is not funded.</p>'+
- '<div class="form"><div class="wide"><label class="f">10. Description of proposed construction</label><textarea class="tall" data-k="desc" placeholder="Construct a … Primary facilities include … Supporting facilities include … Facilities will be designed to meet UFC 1-200-01 … Antiterrorism measures per UFC 4-010-01 …"></textarea><button class="sm" id="bDesc">Draft from the estimate</button></div>'+
+ '<div class="form"><div class="wide"><label class="f">10. Description of proposed construction</label><textarea class="tall" data-k="desc" placeholder="Construct a … Primary facilities include … Supporting facilities include … Facilities will be designed to meet UFC 1-200-01 … Antiterrorism measures per UFC 4-010-01 …"></textarea><button class="sm" id="bDesc">Draft from the estimate</button> <button class="sm" id="bAI10">Draft block 10 with AI</button>'+(P.n.ai_check10?'<div class="find warn" style="margin-top:6px">'+esc(P.n.ai_check10)+'</div>':'')+'</div>'+
  '<div><label class="f">11. Unit of measure</label><input data-k="um"></div><div><label class="f">REQ</label><input data-k="req"></div><div><label class="f">ADQT</label><input data-k="adqt"></div><div><label class="f">SUBSTD</label><input data-k="substd"></div>'+
  '<div class="wide"><button class="sm go" id="bAI11">Draft block 11 with AI</button> <span class="small">From NORA\u2019s requirements and gaps, EARL\u2019s recommendation and this estimate, through CARL. Every number is checked against those sources.</span>'+(P.n.ai_check?'<div class="find warn" style="margin-top:6px">'+esc(P.n.ai_check)+'</div>':'')+'</div>'+
  '<div class="wide"><label class="f">PROJECT:</label><textarea data-k="project" placeholder="One sentence: what the project constructs."></textarea></div>'+
@@ -427,7 +427,7 @@ function vNarr(){const v=$('#view');
   (C.prim.length?'Primary facilities include '+C.prim.map(x=>x.item).filter(Boolean).join(', ').toLowerCase()+'. ':'')+(C.sup.length?'Supporting facilities include '+C.sup.map(x=>x.item).filter(Boolean).join(', ').toLowerCase()+'. ':'')+
   'Facilities will be designed and constructed in accordance with UFC 1-200-01, DoD Building Code, and the applicable core UFC, including UFC 4-010-01 minimum antiterrorism standards and UFC 1-200-02 high performance and sustainable building requirements. '+(/guam|marian|okinawa|japan|hawaii|philippin/i.test(P.loc.country+' '+P.b.installation)?'Design will address typhoon wind loads and seismic requirements for the site. ':'')+'Building control systems will meet UFC 4-010-06 cybersecurity requirements.';
   log('Block 10 drafted');save();vNarr();};
- $('#bAI11').onclick=draft11;}
+ $('#bAI11').onclick=draft11;$('#bAI10').onclick=draft10;}
 
 // ---------- AI draft of block 11, from NORA, EARL and the estimate ----------
 function srcText11(){const n=nora(),R=rec(),C=calc(),L=[];
@@ -441,6 +441,23 @@ function srcText11(){const n=nora(),R=rec(),C=calc(),L=[];
  const e=R.earl;if(e&&e.recommended) L.push('ECONOMIC ANALYSIS: '+e.recommended.name+' recommended, NPV $'+Math.round(e.recommended.npv/1000)+'K over '+e.period+' years at '+Number(e.rate).toFixed(2)+'%; alternatives: '+e.alternatives.map(a=>a.name+(a.screened_out?' (screened out)':' $'+Math.round(a.npv/1000)+'K')).join(', ')+(e.recommended.rationale?'; rationale: '+e.recommended.rationale:''));
  ['project','requirement','current','impact','additional'].forEach(k=>{if(P.n[k]) L.push('AUTHOR DRAFT OF '+k.toUpperCase()+': '+P.n[k]);});
  return L.join('\n');}
+function srcText10(){const C=calc(),L=[];let cs=null;try{cs=JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){}
+ L.push('PROJECT: '+[P.b.title,P.b.installation,P.loc.country,P.b.component].filter(Boolean).join('; '));
+ L.push('PRIMARY FACILITY: '+(P.pf.guc_name||'(type not set)')+(C.qty?', '+C.qty.toLocaleString()+' '+(P.pf.um||'SF'):''));
+ C.prim.forEach(x=>L.push('PRIMARY ITEM: '+[x.item,x.qty&&(x.qty+' '+(x.um||''))].filter(Boolean).join(', ')));
+ C.sup.forEach(x=>L.push('SUPPORTING ITEM: '+[x.item,x.qty&&(x.qty+' '+(x.um||''))].filter(Boolean).join(', ')));
+ if(cs&&cs.items) cs.items.slice(0,40).forEach(it=>L.push('SELECTED CRITERION: '+[it.number,it.title].filter(Boolean).join(' ')));
+ const n=nora();if(n) (n.requirements||[]).filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT {'+r.id+'}: '+r.text));
+ if(P.n.desc) L.push('AUTHOR DRAFT: '+P.n.desc);return L.join('\n');}
+const DRAFT10_SYS=`You draft block 10 (Description of Proposed Construction) of a DD Form 1391. One paragraph: what is constructed, its size, the primary and supporting facilities, and the governing criteria it will meet. Name only criteria listed in SOURCES as SELECTED CRITERION; if none are listed, write [NEEDED: criteria list from CORA]. Use ONLY facts in SOURCES. No references to AI.
+Return ONLY JSON: {"desc":"the paragraph"}`;
+async function draft10(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+ if(P.n.desc&&!confirm('Replace block 10 with an AI draft? Your text is sent along as a source.')) return;
+ const src=srcText10();const b=$('#bAI10');b.disabled=true;b.textContent='Drafting…';
+ try{const j=await CARLAI.ask('claude',DRAFT10_SYS,'SOURCES:\n'+src);const t=String(j.desc||'').trim();if(!t) throw new Error('Nothing returned');
+  const S=src.replace(/[,$]/g,'');const bad=[...new Set((t.replace(/\b\d{1,2}-\d{3}-\d{2}\b/g,'').replace(/\b\d{2} \d{2} \d{2}\b/g,'').replace(/\b1391\b/g,'').replace(/\[NEEDED:[^\]]*\]/g,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/[,$]/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];
+  P.n.desc=t;P.n.ai_check10=bad.length?'Check these numbers, not found in the sources: '+bad.join(', '):'';log('Block 10 drafted with AI');save();vNarr();}
+ catch(err){alert('Draft failed: '+err.message);b.disabled=false;b.textContent='Draft block 10 with AI';}}
 const DRAFT11_SYS=`You draft block 11 of a DD Form 1391 (Military Construction Project Data) for a U.S. DoD reviewer. Write in plain, factual budget-justification style: mission terms, the gap in numbers, and what happens if the project is not funded. Use ONLY facts in SOURCES. Where a fact the block needs is missing, write [NEEDED: what is missing] instead of inventing it. End each sentence that rests on a stated requirement with its ID in braces, e.g. {R-003}. No marketing language, no references to AI.
 Return ONLY JSON: {"project":"one sentence","requirement":"paragraph","current":"paragraph","impact":"paragraph","additional":"paragraph covering the economic analysis and criteria, only from SOURCES","req":"quantity required or empty","adqt":"adequate quantity or empty","substd":"substandard quantity or empty"}`;
 async function draft11(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
@@ -629,7 +646,7 @@ render();save();
  async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
  function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
-  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default';bar.appendChild(b);
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';

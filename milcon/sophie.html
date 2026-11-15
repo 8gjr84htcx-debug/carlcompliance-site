@@ -487,8 +487,26 @@ function vHarm(){const v=$('#view');const tm=traceMap();const p=piper();
  '<div class="row" style="margin-top:0"><button class="go" id="bScott">Send the SOW to SCOTT</button><span class="small">Opens SCOTT with this text loaded. Parse it there, then send the triggers to CORA.</span></div>'+
  (H.length?H.map(([s,t,d])=>'<div class="find '+s+'"><b>'+esc(t)+'</b> '+esc(d)+'</div>').join(''):'<div class="find ok"><b>Every requirement is covered and every item traces.</b></div>')+
  '<h3>Traceability</h3><table class="cov"><thead><tr><th>Req ID</th><th>Requirement</th><th>Priority</th><th>Where in the SOW</th></tr></thead><tbody>'+(S.reqs.map(r=>'<tr><td>'+esc(r.id)+'</td><td>'+esc(r.text)+'</td><td>'+esc(r.priority||'')+'</td><td>'+(tm[r.id]?esc(tm[r.id].join('; ')):'<span class="pill bad">Not covered</span>')+'</td></tr>').join('')||'<tr><td colspan="4" class="empty">No requirements.</td></tr>')+'</tbody></table>'+
+ '<h3>Criteria cited against CARL\u2019s library</h3><div class="row" style="margin-top:0"><button id="bCite">Check citations against CARL\u2019s library</button><span class="small">'+(S.citecheck?'Checked '+esc(new Date(S.citecheck.at).toLocaleString([],{dateStyle:'medium',timeStyle:'short'}))+'. ':'')+'Finds every UFC, UFGS, EM 385-1-1 and 29 CFR reference in the SOW and confirms CARL\u2019s library holds it. No AI: a direct library search.</span></div>'+
+ (S.citecheck?'<table class="cov"><thead><tr><th>Cited</th><th>In CARL\u2019s library</th><th>Library document</th></tr></thead><tbody>'+(S.citecheck.rows.map(r=>'<tr><td>'+esc(r.cite)+'</td><td>'+(r.status==='in'?'<span class="pill ok">Yes</span>':r.status==='pointer'?'<span class="pill">Pointer only</span>':r.status==='gap'?'<span class="pill bad">Not found</span>':'<span class="pill">Not checked</span>')+'</td><td>'+esc(r.match||r.note||'')+'</td></tr>').join('')||'<tr><td colspan="3" class="empty">No criteria references found in the SOW.</td></tr>')+'</tbody></table>':'')+
  (untraced.length?'<h3>Untraced items</h3><table class="cov"><thead><tr><th>Item</th><th>Section</th><th>Text</th></tr></thead><tbody>'+untraced.map(u=>'<tr><td>'+u[0]+'</td><td>'+esc(u[1])+'</td><td>'+esc(u[2])+'</td></tr>').join('')+'</tbody></table>':'')+'</div>';
+ $('#bCite').onclick=checkCites;
  $('#bScott').onclick=()=>{try{localStorage.setItem('sophie_to_scott',JSON.stringify({at:Date.now(),title:S.p.title,text:plainSOW()}));log('Sent to SCOTT');save();location.href='scott.html';}catch(e){alert('This browser blocked local storage. Copy the text from the Outputs step instead.');}};}
+
+// Criteria references in the SOW, checked against CARL's library (a search, not a model).
+function citesIn(t){const out=new Map();const add=(k,q,n)=>{if(!out.has(k)) out.set(k,{cite:k,q,key:n});};
+ (t.match(/\bUFC\s*\d-\d{3}-\d{2}[A-Z]?\b/g)||[]).forEach(m=>{const c=m.replace(/\s+/,' ');add(c,c,c.replace(/\D/g,''));});
+ (t.match(/\b\d{2} \d{2} \d{2}(?:\.\d{2})?\b/g)||[]).forEach(m=>add('UFGS '+m,'UFGS '+m,m.replace(/\D/g,'')));
+ if(/\bEM\s*385-1-1\b/.test(t)) add('EM 385-1-1','EM 385-1-1 safety and health requirements','38511');
+ (t.match(/\b29\s*CFR\s*(?:Part\s*)?19(?:10|26)(?:\.\d+)?\b/gi)||[]).forEach(m=>{const n=m.match(/19(?:10|26)(?:\.\d+)?/)[0];add('29 CFR '+n,'29 CFR '+n,n.replace(/\D/g,''));});
+ (t.match(/\b(?:NFPA\s*\d+[A-Z]?|(?:IBC|IFC|IPC|IMC|IEBC)\b)/g)||[]).forEach(m=>add(m,'',null));
+ return [...out.values()];}
+async function checkCites(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to check citations against its library, then reload this page.');return;}
+ const list=citesIn(S.sections.map(s=>s.text).join('\n'));const b=$('#bCite');b.disabled=true;b.textContent='Checking '+list.length+'…';const rows=[];
+ for(const c of list){if(!c.key){rows.push({cite:c.cite,status:'pointer',note:'NFPA and ICC codes are kept as pointers, never full text, by design'});continue;}
+  try{const P=await CARLAI.library(c.q,5);const hit=P.find(p=>String(p.src+' '+(p.section||'')).replace(/\D/g,'').includes(c.key));rows.push(hit?{cite:c.cite,status:'in',match:hit.src}:{cite:c.cite,status:'gap',note:'Not in the library, or the search did not surface it. Confirm the number and edition.'});}
+  catch(err){rows.push({cite:c.cite,status:'error',note:err.message});}}
+ S.citecheck={at:new Date().toISOString(),rows};log('Citations checked against CARL library',rows.filter(r=>r.status==='in').length+' of '+rows.length+' found');save();vHarm();}
 
 // ---------- 5 outputs ----------
 function plainSOW(){return (S.p.title?S.p.title.toUpperCase()+'\n'+(S.p.installation||'')+'\n\n':'')+S.sections.map((s,i)=>(i+1)+'. '+s.title.toUpperCase()+'\n\n'+s.text.replace(/\s*\{[^}]*\}/g,'').trim()).join('\n\n');}
@@ -578,7 +596,7 @@ render();save();
  async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
  function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
-  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default';bar.appendChild(b);
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';

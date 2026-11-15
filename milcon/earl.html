@@ -334,7 +334,7 @@ function importNora(){const n=noraData();if(!n) return;
 function vAlts(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Alternatives</h2><p class="lead">List every reasonable way to meet the objective, including ones you expect to reject. Alternatives screened out stay in the analysis with the reason, as DoDI 7041.03 requires.</p>'+
  '<div class="mentor">Reviewers look for: status quo, renovation, conversion of an existing facility, new construction, lease, and use of another installation or joint use. Overseas, add host-nation funded construction where an agreement allows it.</div>'+
- '<table><thead><tr><th>Alternative</th><th>Type</th><th>Description</th><th>Screen</th><th></th></tr></thead><tbody id="ab"></tbody></table><div class="row"><button class="go" id="bAddA">Add alternative</button></div></div>'+
+ '<table><thead><tr><th>Alternative</th><th>Type</th><th>Description</th><th>Screen</th><th></th></tr></thead><tbody id="ab"></tbody></table><div class="row"><button class="go" id="bAddA">Add alternative</button><button id="bAIdesc">Write empty descriptions with AI</button></div></div>'+
  '<div class="panel"><h2>Screening</h2><p class="lead">Test each alternative against the Must-have requirements and hard constraints. One “Fails” removes an alternative from the cost comparison.</p>'+
  '<div id="mx"></div><div class="row"><input id="nq" placeholder="Add a screening criterion" style="width:380px"><button id="bAddQ">Add</button></div></div>';
  const tb=$('#ab');
@@ -343,6 +343,7 @@ function vAlts(){const v=$('#view');
   bindAll(tr,a,k=>{if(k==='screen'){log('Alternative screening changed',a.name+': '+(a.screen||'in'));vAlts();}renderSteps();});
   const d=tr.querySelector('[data-del]');if(d) d.onclick=()=>{if(!confirm('Remove '+(a.name||'this alternative')+' and its costs?')) return;E.alts=E.alts.filter(x=>x!==a);log('Alternative removed',a.name);save();vAlts();renderSteps();};
   tb.appendChild(tr);});
+ $('#bAIdesc').onclick=aiDescs;
  $('#bAddA').onclick=()=>{E.alts.push({id:uid(),name:'',type:'new',desc:'',screen:'',screen_reason:'',costs:[],residual:{on:true,life:40},scores:{}});save();vAlts();renderSteps();};
  $('#bAddQ').onclick=()=>{const t=$('#nq').value.trim();if(!t) return;E.reqs.push({id:uid(),src:'manual',text:t,must:true});save();vAlts();};
  const mx=$('#mx');if(!E.reqs.length){mx.innerHTML='<div class="empty">No screening criteria. Import Must-have requirements from NORA on step 1, or add criteria below.</div>';return;}
@@ -464,6 +465,38 @@ function renderPricer(a){const box=document.getElementById('pricer');if(!box) re
  box.querySelector('#pFill').onclick=()=>{const r=priceCalc(a);if(!r.lines.length) return;a.costs=a.costs.filter(c=>!c.auto).concat(r.lines.map(l=>({id:uid(),auto:true,...l})));
   if(r.first&&a.residual) a.residual.on=true;log('Priced from DoD tables',a.name+': '+r.lines.length+' lines');save();vCosts();renderSteps();};}
 
+// ---------- AI drafting through CARL ----------
+function aiReady(){if(window.CARLAI&&CARLAI.state().ok) return true;alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return false;}
+function earlSources(){const n=noraData(),L=[];L.push('PROJECT: '+[E.project.name,E.project.installation,E.project.service].filter(Boolean).join('; '));
+ if(E.objective) L.push('OBJECTIVE: '+E.objective);if(E.assumptions) L.push('ASSUMPTIONS: '+E.assumptions);
+ if(n){if(n.need_statement) L.push('NEED STATEMENT: '+n.need_statement);(n.requirements||[]).filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT {'+r.id+'} ('+(r.priority||'')+'): '+r.text));(n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+(c.text||c)));}
+ return L;}
+function numCheck(text,src){const S=String(src).replace(/,/g,'');const t=String(text).replace(/\{[A-Z]+-\d+\}/g,'').replace(/\b\d{4}\.\d{2}\b/g,'').replace(/\bDoDI \d{4}\.\d{2}\b/g,'');
+ return [...new Set((t.match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
+const DESC_SYS=`You write one-to-two sentence descriptions of alternatives for a DoD military construction economic analysis (DoDI 7041.03). Describe what each alternative physically and operationally involves, in neutral terms, so a reviewer understands it before seeing costs. Use ONLY facts in SOURCES and the alternative's name and type; do not state costs, durations or quantities that SOURCES do not give. No advocacy, no references to AI.
+Return ONLY JSON: {"descs":[{"id":"<alternative id>","desc":"..."}]}`;
+async function aiDescs(){if(!aiReady()) return;const todo=E.alts.filter(a=>!String(a.desc||'').trim()||a.desc==='Continue in the existing facilities with no new investment.');
+ if(!todo.length){alert('Every alternative already has a description. Clear one to have AI write it.');return;}
+ const src=earlSources().join('\n');const b=$('#bAIdesc');b.disabled=true;b.textContent='Writing…';
+ try{const j=await CARLAI.ask('claude',DESC_SYS,'SOURCES:\n'+src+'\n\nALTERNATIVES TO DESCRIBE:\n'+todo.map(a=>'id '+a.id+': '+(a.name||'(unnamed)')+' – type: '+ATYPES[a.type]).join('\n'));
+  let n=0;(j.descs||[]).forEach(d=>{const a=todo.find(x=>x.id===d.id);if(a&&d.desc){a.desc=String(d.desc).trim();n++;}});
+  log('Descriptions written with AI',n+' alternatives');save();vAlts();}
+ catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Write empty descriptions with AI';}}
+const RAT_SYS=`You write the recommendation rationale for a DoD military construction economic analysis memo (DoDI 7041.03). Two or three short paragraphs: which alternative is recommended and why, how it compares on net present value of cost with the next best, what the sensitivity results show about how robust the ranking is, and how the non-cost factors bear on it. If the recommended alternative is not the lowest cost, say plainly what the extra cost buys. Use ONLY facts and figures in SOURCES, written exactly as given. No references to AI.
+Return ONLY JSON: {"rationale":"the paragraphs, separated by a blank line"}`;
+async function aiRationale(){if(!aiReady()) return;const R=results();const rec=E.alts.find(a=>a.id===E.recommend.alt);
+ if(!rec){alert('Pick the recommended alternative first.');return;}
+ if(E.recommend.rationale&&!confirm('Replace the rationale with an AI draft?')) return;
+ const L=earlSources();L.push('BASIS: period of analysis '+period()+' years, '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+' discount rate, base FY'+E.base_fy);
+ R.rows.forEach(r=>L.push('ALTERNATIVE: '+r.a.name+' ('+ATYPES[r.a.type]+')'+(r.ok?' – rank '+r.rank+', NPV of cost '+$$(r.npv)+', non-cost score '+r.ws.toFixed(2):' – screened out'+(r.a.screen_reason?': '+r.a.screen_reason:''))+(r.a.desc?'; '+r.a.desc:'')));
+ L.push('RECOMMENDED: '+rec.name);if(R.lead&&R.second) L.push('DIFFERENCE BETWEEN RANK 1 AND RANK 2: '+$$(R.second.npv-R.lead.npv));
+ try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'%');}}catch(e){}
+ const src=L.join('\n');const b=$('#bAIr');b.disabled=true;b.textContent='Writing…';
+ try{const j=await CARLAI.ask('claude',RAT_SYS,'SOURCES:\n'+src);const t=String(j.rationale||'').trim();if(!t) throw new Error('Nothing returned');
+  const bad=numCheck(t,src);E.recommend.rationale=t;E.recommend.ai_check=bad.length?'Check these numbers, not found in the analysis: '+bad.join(', '):'';
+  log('Rationale written with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();vRec();}
+ catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Write rationale with AI';}}
+
 // ---------- 4 non-cost ----------
 function vBens(){const v=$('#view');const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0);
  v.innerHTML='<div class="panel"><h2>Non-cost factors</h2><p class="lead">Benefits that are hard to price still decide many projects. Weight what matters, score each alternative 1 (poor) to 5 (excellent), and write down why. DoDI 7041.03 bases the decision on both the numbers and these factors.</p>'+
@@ -514,7 +547,7 @@ function vRec(){const v=$('#view');const R=results();
  v.innerHTML='<div class="panel"><h2>Recommendation</h2><p class="lead">EARL ranks; you recommend. If you recommend something other than the lowest-cost alternative, the rationale must say what the extra cost buys.</p>'+
  '<div class="form"><div><label class="f">Recommended alternative</label><select id="ra">'+'<option value="">Select</option>'+R.ok.map(r=>'<option value="'+r.a.id+'" '+(r.a.id===E.recommend.alt?'selected':'')+'>'+esc(r.rank+'. '+r.a.name+' – '+$k(r.npv))+'</option>').join('')+'</select></div>'+
  '<div><label class="f">Prepared by</label><input id="pb"></div><div><label class="f">Decision authority</label><input id="da"></div>'+
- '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button></div>'+
+ '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button><button id="bAIr">Write rationale with AI</button></div>'+(E.recommend.ai_check?'<div class="mentor">'+esc(E.recommend.ai_check)+'</div>':'')+
  '<h3>Decision</h3><div class="form"><div><label class="f">Decision</label><select id="dd">'+opts({'':'Pending',approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'},E.recommend.decision||'')+'</select></div><div><label class="f">Date</label><input type="date" id="ddt"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">The memo supports the decision and the DD 1391; the tables and file are the record. The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p><div class="outs">'+
  out('memo','Economic analysis and recommendation memo','Objective, assumptions, alternatives, screening, costs, sensitivity, non-cost factors and recommendation. Opens in Word.','Download .doc')+
@@ -526,6 +559,7 @@ function vRec(){const v=$('#view');const R=results();
  ra.onchange=()=>{E.recommend.alt=ra.value;log('Recommended alternative set',(E.alts.find(a=>a.id===ra.value)||{}).name||'none');save();renderSteps();};
  rr.oninput=()=>{E.recommend.rationale=rr.value;save();};pb.oninput=()=>{E.recommend.by=pb.value;save();};da.oninput=()=>{E.recommend.authority=da.value;save();};
  dd.onchange=()=>{E.recommend.decision=dd.value;log('Decision recorded',dd.options[dd.selectedIndex].text);save();};ddt.onchange=()=>{E.recommend.date=ddt.value;save();};
+ $('#bAIr').onclick=aiRationale;
  $('#bDr').onclick=()=>{if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();save();vRec();};
  v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({memo:()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(memoHTML());w.document.close();setTimeout(()=>w.print(),400);},csv:()=>dl(fname('EA-Tables','csv'),csv(tables()),'text/csv'),json:()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();}})[b.dataset.out]());
  $('#lg').innerHTML=E.log.length?E.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
@@ -571,6 +605,81 @@ $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='earl-1') throw new Error('Not an EARL analysis file');E=Object.assign(BLANK(),j);log('Analysis file opened',f.name);save();STEP='basis';render();}catch(err){alert('Could not open: '+err.message);}});};
 if(!E.log.length) log('Analysis created');
 render();save();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+})();
 </script>
 </body>
 </html>

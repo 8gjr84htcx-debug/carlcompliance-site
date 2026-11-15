@@ -318,6 +318,36 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  let overall=parts.reduce((x,y)=>Math.max(x,y.l),-1);if(overall<0) overall=0;let ov=false;
  if(p.override&&p.override.level!==''){overall=N(p.override.level);ov=true;}
  return {overall,parts,stale,lastDate:lu?lu.date:'',override:ov};}
+// ---------- AI commentary through CARL ----------
+function aiOk(){if(window.CARLAI&&CARLAI.state().ok) return true;alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return false;}
+function numBad(t,src){const S=String(src).replace(/,/g,'');return [...new Set((String(t).match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
+function projFacts(p,h){const L=[];const b=base(p),e=est(p);const U=p.updates.slice().sort((a,c)=>a.date.localeCompare(c.date));const u=U[U.length-1];const ir=irmaFor(p),q=quinnFor(p);
+ L.push('PROJECT: '+[p.name,p.number,p.to&&('task order '+p.to),p.installation,p.service,'phase '+p.phase+' '+PHASES[p.phase],p.contractor&&('contractor '+p.contractor)].filter(Boolean).join('; '));
+ L.push('HEALTH: '+LEVEL[h.overall].n+(h.override?' (override: '+p.override.reason+')':''));h.parts.forEach(z=>L.push('  '+z.dim+': '+(z.l<0?'not assessed':LEVEL[z.l].n)+' – '+z.r));
+ L.push('MONEY: authorized '+M(b)+', current estimate '+M(e)+', award '+M(N(p.award))+', obligated '+M(N(p.obligated))+', expended '+M(N(p.expended)));
+ L.push('SCHEDULE: NTP '+(p.ntp||'–')+', baseline finish '+(p.baseline_finish||'–')+', forecast finish '+(p.forecast_finish||'–')+', '+(p.pct!==''?Math.round(N(p.pct))+'% complete':'percent complete not reported'));
+ if(u) L.push('LATEST UPDATE '+u.date+': done: '+(u.done||'')+' | next: '+(u.next||'')+' | concerns: '+(u.concerns||'none'));
+ p.risks.filter(r=>r.status!=='closed').forEach(r=>L.push('OPEN RISK (score '+N(r.l)*N(r.i)+'): '+r.text+(r.response?'; response: '+r.response:'')));
+ p.milestones.filter(m=>!m.actual).forEach(m=>L.push('MILESTONE: '+m.name+' baseline '+(m.baseline||'–')+' forecast '+(m.forecast||'–')));
+ if(ir) L.push('RFIS AND SUBMITTALS: '+ir.open+' open, '+ir.overdue+' past suspense');if(q) L.push('DEFICIENCIES: '+q.open+' open, '+q.aged+' open over 30 days');
+ if(p.decisions) L.push('DECISIONS NEEDED: '+p.decisions);return L;}
+const EXPLAIN_SYS=`You explain a DoD military construction project's status for a program manager's briefing. Two short paragraphs in plain language: what is driving the health rating, and what needs attention or a decision next. Use ONLY facts in SOURCES and state figures exactly as given. No speculation about causes the sources do not state. No references to AI.
+Return ONLY JSON: {"text":"the paragraphs, separated by a blank line"}`;
+async function aiExplain(p){if(!aiOk()) return;const h=health(p);const src=projFacts(p,h).join('\n');const b=$('#bAIx');b.disabled=true;b.textContent='Writing…';
+ try{const j=await CARLAI.ask('claude',EXPLAIN_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
+  p.ai_note={text:t,at:new Date().toISOString(),check:bad.length?'Check these numbers, not found in the project data: '+bad.join(', '):''};save();vOne();}
+ catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Explain with AI';}}
+const BRIEF_SYS=`You write the opening summary of a MILCON portfolio leadership brief. One paragraph of four to six sentences: overall portfolio health, the projects that most need leadership attention and why, and the decisions needed. Use ONLY facts in SOURCES and state figures exactly as given. No references to AI.
+Return ONLY JSON: {"text":"the paragraph"}`;
+function briefKey(){return [F.svc,F.ctry,F.phase,F.pm].join('|')+'|'+today();}
+async function aiBrief(){if(!aiOk()) return;const L=filtered();if(!L.length){alert('No projects in the current filter.');return;}
+ const H=L.map(p=>({p,h:health(p)}));const src=['PORTFOLIO: '+L.length+' projects, value '+M(L.reduce((s,p)=>s+value(p),0))+'; health '+[0,1,2].map(l=>LEVEL[l].n+' '+H.filter(x=>x.h.overall===l).length).join(', ')]
+  .concat(H.filter(x=>x.h.overall>0).sort((a,c)=>c.h.overall-a.h.overall||value(c.p)-value(a.p)).slice(0,8).map(x=>'ATTENTION: '+x.p.name+' ('+LEVEL[x.h.overall].n+', '+M(value(x.p))+'): '+x.h.parts.filter(z=>z.l===x.h.overall).map(z=>z.dim+' – '+z.r).join('; ')))
+  .concat(L.filter(p=>p.decisions).map(p=>'DECISION: '+p.name+': '+p.decisions)).join('\n');
+ const b=document.getElementById('bAIb');if(b){b.disabled=true;b.textContent='Writing…';}
+ try{const j=await CARLAI.ask('claude',BRIEF_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
+  P.ai_brief={key:briefKey(),text:t,check:bad.length?'Check these numbers, not found in the data: '+bad.join(', '):''};save();vRep();if(bad.length) alert(P.ai_brief.check);}
+ catch(err){alert('Failed: '+err.message);if(b){b.disabled=false;b.textContent='Write the summary with AI';}}}
 function chip(l,extra){const L=LEVEL[l];return '<span class="chip '+L.k+'">'+L.i+' '+L.n+(extra||'')+'</span>';}
 
 // ---------- filters ----------
@@ -462,7 +492,7 @@ function vOne(){const p=CUR;if(!p){VIEW='proj';return render();}const v=$('#view
  v.innerHTML='<div class="panel" style="padding-bottom:12px"><div class="row" style="margin-top:0;justify-content:space-between"><div><h2 style="margin:0">'+esc(p.name||'(untitled project)')+'</h2><div class="small">'+esc([p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.pm].filter(Boolean).join(' · '))+'</div></div><div>'+chip(h.overall,h.override?' (override)':'')+(h.stale?' <span class="chip n">No update in '+P.t.stale+' days</span>':'')+(window.MS&&MS.has(p.id)?'<div class="noprint" style="margin-top:6px;text-align:right"><span class="small">Open in </span>'+['nora','earl','piper','sophie'].map(t=>'<button class="sm" onclick="MS.openIn(\''+p.id+'\',\''+t+'\')">'+t.toUpperCase()+'</button>').join(' ')+'</div>':'')+'</div></div></div>'+
  '<div class="tabs2">'+[['ov','Overview'],['edit','Project data'],['ms','Milestones'],['risk','Risks'],['hist','Updates']].map(([k,t])=>'<button data-t="'+k+'" class="'+(PTAB===k?'on':'')+'">'+t+'</button>').join('')+'<button id="bUp" class="go" style="margin-left:auto">New status update</button></div><div id="pt"></div>';
  v.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{PTAB=b.dataset.t;vOne();});$('#bUp').onclick=()=>{VIEW='upd';UPD=p.id;render();};
- ({ov:pOv,edit:pEdit,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);}
+ ({ov:pOv,edit:pEdit,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);const bx=document.getElementById('bAIx');if(bx) bx.onclick=()=>aiExplain(p);}
 function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const sp=spi(p);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;const ir=irmaFor(p),q=quinnFor(p);
  const U=p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date));
  t.innerHTML='<div class="grid g-kpi"><div class="tile hero"><div class="lab">Current estimate</div><div class="val">'+M(e)+'</div><div class="sub">'+(b?((e-b)>=0?'+':'')+M(e-b)+' ('+pct((e-b)/b,1)+') against '+M(b)+' authorized':'No authorized amount')+'</div></div>'+
@@ -471,7 +501,9 @@ function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const 
  '<div class="tile"><div class="lab">Obligated / expended</div><div class="val" style="font-size:20px">'+(aw?pct(N(p.obligated)/aw)+' / '+pct(N(p.expended)/aw):'–')+'</div><div class="meter"><b style="width:'+(aw?Math.min(100,N(p.obligated)/aw*100):0)+'%;background:var(--seq250)"></b><b style="width:'+(aw?Math.min(100,N(p.expended)/aw*100):0)+'%"></b></div></div>'+
  '<div class="tile"><div class="lab">RFIs and submittals</div><div class="val">'+(ir?ir.overdue:'–')+'</div><div class="sub">'+(ir?'past suspense of '+ir.open+' open (IRMA)':'Set the task order to link IRMA')+'</div></div>'+
  '<div class="tile"><div class="lab">Deficiencies</div><div class="val">'+(q?q.open:'–')+'</div><div class="sub">'+(q?q.aged+' open over 30 days · last inspection '+(q.last||'–')+' (QUINN)':'Set the task order to link QUINN')+'</div></div></div>'+
- '<div class="card2" style="margin-top:14px"><h3>Why it is '+LEVEL[h.overall].n.toLowerCase()+'</h3><div class="parts" style="margin-top:8px">'+h.parts.map(z=>'<div>'+(z.l<0?'<span class="chip n">Not assessed</span>':chip(z.l))+' <b>'+esc(z.dim)+'</b><br>'+esc(z.r)+'</div>').join('')+(h.override?'<div>'+chip(h.overall)+' <b>Override</b><br>'+esc(p.override.reason)+'</div>':'')+'</div></div>'+
+ '<div class="card2" style="margin-top:14px"><h3>Why it is '+LEVEL[h.overall].n.toLowerCase()+'</h3><div class="parts" style="margin-top:8px">'+h.parts.map(z=>'<div>'+(z.l<0?'<span class="chip n">Not assessed</span>':chip(z.l))+' <b>'+esc(z.dim)+'</b><br>'+esc(z.r)+'</div>').join('')+(h.override?'<div>'+chip(h.overall)+' <b>Override</b><br>'+esc(p.override.reason)+'</div>':'')+'</div>'+
+ '<div class="row" style="margin-top:10px"><button class="sm" id="bAIx">Explain with AI</button><span class="small">'+(p.ai_note?'Written '+esc(p.ai_note.at.slice(0,10))+' from the data on this page.':'A short plain-language explanation for a briefing, from this project\u2019s data only, through CARL.')+'</span></div>'+
+ (p.ai_note?'<div style="margin-top:6px">'+p.ai_note.text.split(/\n\s*\n/).map(x=>'<p>'+esc(x)+'</p>').join('')+(p.ai_note.check?'<p class="small" style="color:var(--crit)">'+esc(p.ai_note.check)+'</p>':'')+'</div>':'')+'</div>'+
  '<div class="grid g-11" style="margin-top:14px"><div class="card2"><h3>Estimate over time</h3><p class="cap">Current working estimate at each status update, against the authorized amount.</p>'+(U.filter(u=>u.cwe!=='').length?lines(U.map(u=>u.date),[{n:'Estimate',c:'var(--s1)',v:U.map(u=>u.cwe===''?null:N(u.cwe))}],{xfmt:d=>mlab(d.slice(0,7)),ref:b?{n:'Authorized',v:b}:null}):'<div class="empty">No estimates in the updates yet.</div>')+'</div>'+
  '<div class="card2"><h3>Progress: plan against actual</h3><p class="cap">Percent complete. Plan is a straight line from notice to proceed to baseline completion.</p>'+progressChart(p,U)+'</div></div>'+
  '<div class="grid g-11" style="margin-top:14px"><div class="card2"><h3>Milestones: baseline against forecast</h3><p class="cap">Each line runs from the baseline date to the current forecast. Longer lines to the right mean slip.</p>'+dumbbell(p)+'</div>'+
@@ -533,11 +565,13 @@ function vUpd(){const v=$('#view');const ps=P.projects.slice().sort((a,b)=>(a.na
 // ---------- reports ----------
 function vRep(){const v=$('#view');
  v.innerHTML=filterRow()+'<div class="panel"><h2>Reports</h2><p class="lead">Every report uses the filters above, so the same buttons produce a portfolio brief, a Service brief or one PM’s projects.</p><div class="outs">'+
+ '<div class="card"><h4>Summary paragraph</h4><p>'+(P.ai_brief&&P.ai_brief.key===briefKey()?esc(P.ai_brief.text)+(P.ai_brief.check?'<br><b style="color:var(--crit)">'+esc(P.ai_brief.check)+'</b>':''):'Opens the leadership brief: health, who needs attention and why, decisions needed. Written from the filtered data only, through CARL.')+'</p><button class="sm" id="bAIb">Write the summary with AI</button></div>'+
  out('brief','Leadership brief','One to two pages: headline numbers, health, the projects that need attention and why, decisions needed, the next 30 days, top risks.','Open brief')+
  out('briefdoc','Leadership brief in Word','The same brief as a Word file.','Download .doc')+
  out('slides','Status slides','A 16:9 page for the portfolio and one for each project: health, progress, money, done, next, concerns. Print to PDF for the PMO deck.','Open slides')+
  out('csv','Data call export','Every field and the computed health for each project, ready for a spreadsheet or a data call.','Download .csv')+'</div></div>';
  bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({brief:()=>win(briefHTML()),briefdoc:()=>dl('PAULA_Leadership_Brief_'+today()+'.doc',briefHTML(),'application/msword'),slides:()=>win(slidesHTML()),csv:()=>dl('PAULA_Data_'+today()+'.csv',csv(dataRows()),'text/csv')})[b.dataset.out]());
+ $('#bAIb').onclick=aiBrief;
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 function win(html){const w=window.open('','_blank');w.document.write(html);w.document.close();}
 const docCSS='body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.3in}h1{font-size:18pt;margin:0}h2{font-size:13pt;margin:14pt 0 5pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt}td,th{border:1px solid #bbb;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#eef2f3}.k{display:inline-block;margin-right:18pt}.k b{display:block;font-size:16pt}.g{color:#006300}.w{color:#7a5600}.c{color:#9b2c2c}svg{max-width:100%}';
@@ -549,7 +583,7 @@ function briefHTML(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));cons
  const rk=[];L.forEach(p=>p.risks.filter(r=>r.status!=='closed').forEach(r=>rk.push([N(r.l)*N(r.i),p.name,r.text,r.response])));rk.sort((a,b)=>b[0]-a[0]);
  return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Leadership brief</title><style>'+docCSS+'</style></head><body><h1>MILCON Portfolio – Leadership Brief</h1><p>'+esc(scope)+' · as of '+today()+(P.me?' · '+esc(P.me):'')+'</p>'+
  '<div><span class="k">Portfolio value<b>'+M(tv)+'</b></span><span class="k">Projects<b>'+L.length+'</b></span><span class="k">Awarded<b>'+M(aw)+'</b></span><span class="k">Expended<b>'+(aw?pct(ex/aw):'–')+'</b></span><span class="k">Health<b><span class="g">'+cnt[0]+'</span> / <span class="w">'+cnt[1]+'</span> / <span class="c">'+cnt[2]+'</span></b></span></div>'+
- '<h2>Needs attention</h2>'+(att.length?'<table><tr><th>Health</th><th>Project</th><th>Value</th><th>Why</th></tr>'+att.map(x=>'<tr><td>'+hl(x.h.overall)+'</td><td>'+esc(x.p.name)+'<br><small>'+esc(x.p.installation)+' · Phase '+x.p.phase+'</small></td><td>'+M(value(x.p))+'</td><td>'+x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')+(x.h.override?'<br>Override: '+esc(x.p.override.reason):'')+'</td></tr>').join('')+'</table>':'<p>All projects on track.</p>')+
+ (P.ai_brief&&P.ai_brief.key===briefKey()?'<h2>Summary</h2><p>'+esc(P.ai_brief.text)+'</p>':'')+'<h2>Needs attention</h2>'+(att.length?'<table><tr><th>Health</th><th>Project</th><th>Value</th><th>Why</th></tr>'+att.map(x=>'<tr><td>'+hl(x.h.overall)+'</td><td>'+esc(x.p.name)+'<br><small>'+esc(x.p.installation)+' · Phase '+x.p.phase+'</small></td><td>'+M(value(x.p))+'</td><td>'+x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')+(x.h.override?'<br>Override: '+esc(x.p.override.reason):'')+'</td></tr>').join('')+'</table>':'<p>All projects on track.</p>')+
  '<h2>Decisions needed</h2>'+(dec.length?'<table><tr><th>Project</th><th>Decision</th></tr>'+dec.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.decisions)+'</td></tr>').join('')+'</table>':'<p>None.</p>')+
  '<h2>Next 30 days</h2>'+(ms.length?'<table><tr><th>Date</th><th>Project</th><th>Milestone</th></tr>'+ms.map(m=>'<tr><td>'+m[0]+'</td><td>'+esc(m[1])+'</td><td>'+esc(m[2])+(m[3]?' <span class="w">(forecast late)</span>':'')+'</td></tr>').join('')+'</table>':'<p>No milestones in the next 30 days.</p>')+
  '<h2>Top risks</h2>'+(rk.length?'<table><tr><th>Score</th><th>Project</th><th>Risk</th><th>Response</th></tr>'+rk.slice(0,8).map(r=>'<tr><td>'+r[0]+'</td><td>'+esc(r[1])+'</td><td>'+esc(r[2])+'</td><td>'+esc(r[3]||'')+'</td></tr>').join('')+'</table>':'<p>No open risks recorded.</p>')+
@@ -622,6 +656,81 @@ $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='paula-1') throw new Error('Not a PAULA file');P=Object.assign(BLANK(),j);P.t={...DEF_T,...j.t};CUR=null;VIEW='port';log('File opened',f.name);save();render();}catch(err){alert('Could not open: '+err.message);}});};
 if(window.MSfill) P.projects=P.projects.map(p=>MSfill(blankProj(),p));
 render();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+})();
 </script>
 </body>
 </html>
