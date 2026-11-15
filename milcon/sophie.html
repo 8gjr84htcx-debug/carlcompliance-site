@@ -538,5 +538,51 @@ $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) retu
 if(!S.log.length) log('Project created');
 render();save();
 </script>
+<script id="carl-ai">/* CARL shared AI: every AI call in this tool can go through CARL's server,
+   on CARL's keys, for anyone signed in to carl.carlcompliance.com. No key is
+   ever in this page. Signed out, the CARL engines simply stay off. */
+(function(){
+ if(typeof callAI!=='function'||typeof loadSettings!=='function') return;
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'};
+ var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+ try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+ function defaults(){return [
+  {provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},
+  {provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},
+  {provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];}
+ var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+ loadSettings=function(){var s=_load();
+  // Nobody has set up their own key: use CARL's.
+  if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=defaults().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+  s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});
+  return s;};
+ if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+ if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+ callAI=async function(slot,sys,user,images){
+  if(slot.provider!=='carl') return _call.apply(this,arguments);
+  var r=await fetch((slot.base||BASE).replace(/\/$/,'')+'/api/assist',{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},
+   body:JSON.stringify({engine:/gemini/i.test(slot.model||'')?'gemini':'claude',system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:window.MS_TOOL||document.title})});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  return j.result;};
+ var OBS=null;
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap';bar.appendChild(b);}
+  // The project bar redraws itself; put the badge back when it does.
+  if(!OBS&&window.MutationObserver&&bar!==document.body){OBS=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});OBS.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.msg;}
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok){ST={ok:true,user:j.user||'',msg:'Claude and Gemini through CARL. Engines: '+(j.engines||[]).join(', ')};}
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ window.CARLAI={state:function(){return ST;},base:BASE,defaults:defaults};
+})();
+</script>
 </body>
 </html>
