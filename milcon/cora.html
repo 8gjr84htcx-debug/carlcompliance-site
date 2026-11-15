@@ -155,7 +155,7 @@ function chip(text,on,cb){const l=document.createElement('label');l.className='c
 const NAMES={ufc:'UFC / FC / UFS',ufgs:'UFGS',clauses:'FAR / DFARS',safety:'EM 385-1-1 / OSHA'};
 const ST={ok:['Applies','b-ok'],sel:['Candidates — pick what fits the design','b-sel'],rev:['Needs a ruling','b-rev'],off:['Not triggered / removed (audit trail)','b-off']};
 let LAST=null;
-function update(){persist();LAST=run();renderResults();const h=document.getElementById('valHint');if(h){const v=Number(P.value);h.textContent=isNaN(v)?'':('$'+v.toLocaleString()+(v>D.thresholds.SAT?' — above SAT ($'+D.thresholds.SAT.toLocaleString()+')':' — at/below SAT'));}}
+function update(){persist();LAST=run();renderResults();try{localStorage.setItem('cora_selection',JSON.stringify({at:Date.now(),items:selected().map(({mod,x})=>({mod,reg:x.r.reg||x.r.type||'',number:x.r.number||'',title:x.r.title,status:x.st}))}));}catch(e){}const h=document.getElementById('valHint');if(h){const v=Number(P.value);h.textContent=isNaN(v)?'':('$'+v.toLocaleString()+(v>D.thresholds.SAT?' — above SAT ($'+D.thresholds.SAT.toLocaleString()+')':' — at/below SAT'));}}
 function renderResults(){
  const box=document.getElementById('results');box.innerHTML='';
  const tabs=document.createElement('div');tabs.className='tabs';

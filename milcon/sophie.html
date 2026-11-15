@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SOPHIE – Scope Of work Preparation, Harmonization, Integration, and Editing</title>
+<style>
+
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;letter-spacing:.01em}
+header .sp{flex:1}
+header .saved{font-size:12.5px;color:var(--shoal)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+button.sm{font-size:12.5px;padding:3px 9px}
+button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
+nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
+nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
+nav.steps button.on{background:#fff;border-color:var(--line);font-weight:600}
+nav.steps button.on .n{background:var(--depth);border-color:var(--depth);color:#fff}
+nav.steps button .c{margin-left:auto;font-size:12px;color:var(--mute);font-weight:400}
+nav.steps .gate{margin-top:10px;font-size:12.5px;color:var(--mute);padding:10px 12px;border-top:1px solid var(--line)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+h2{font:600 21px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+h3{font:600 16px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:18px 0 8px;color:var(--depth)}
+.lead{color:var(--mute);margin:0 0 14px;font-size:14px;max-width:78ch}
+.mentor{font-size:13.5px;background:#f3f8f7;border-left:3px solid var(--shoal);padding:9px 12px;border-radius:4px;margin:0 0 14px;max-width:90ch}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px}
+.form .wide{grid-column:1/-1}
+label.f{font-size:12.5px;color:var(--mute);display:block;margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+textarea.tall{min-height:200px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap}
+td input,td select,td textarea{font-size:13px;padding:4px 6px}
+td textarea{min-height:44px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}
+.pill.ok{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.warn{background:var(--warnbg);border-color:#ecd59a;color:var(--warn)}
+.pill.bad{background:var(--badbg);border-color:#e6bcbc;color:var(--bad)}
+.small{font-size:12.5px;color:var(--mute)}
+.empty{color:var(--mute);padding:22px 8px;text-align:center;font-size:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.card.withdrawn{opacity:.55}
+.card .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.card .id{font:600 14px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+@media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.flags{margin-top:6px}
+q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+.check li{margin:4px 0;list-style:none}
+.check{padding-left:0}
+.check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
+.check .n::before{content:"\25CB";color:var(--warn);margin-right:8px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.quad div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:70px;font-size:13px}
+.quad b{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:3px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1000px){.cols2{grid-template-columns:1fr}}
+.qbank li{margin:5px 0;font-size:13.5px}
+.engines{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eng{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c4cfcc}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h4{margin:0 0 8px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.score{font-weight:700;padding:1px 7px;border-radius:5px}
+.s-hi{background:var(--badbg);color:var(--bad)}.s-md{background:var(--warnbg);color:var(--warn)}.s-lo{background:var(--okbg);color:var(--ok)}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.outs .card h4{margin:0 0 4px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,nav.steps{display:none}.wrap{display:block}}
+
+.find{border-left:4px solid var(--line);padding:7px 11px;margin:6px 0;background:#fff;border-radius:4px;font-size:13px}
+.find.bad{border-color:var(--bad);background:var(--badbg)}.find.warn{border-color:var(--warn);background:var(--warnbg)}.find.ok{border-color:var(--ok);background:var(--okbg)}.find.info{border-color:var(--shoal);background:#f3f8f7}
+.find b{font-size:13px}
+.sec{border:1px solid var(--line);border-radius:10px;background:#fff;margin:12px 0}
+.sec>.hd{display:flex;gap:10px;align-items:center;padding:10px 14px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+.sec>.hd .t{font:600 16px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth);flex:1}
+.sec>.bd{padding:12px 14px}
+.cols{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.3fr);gap:14px}
+@media(max-width:1100px){.cols{grid-template-columns:1fr}}
+textarea.sow{min-height:220px;font:14px/1.55 Calibri,"Segoe UI",sans-serif}
+.reqpick{max-height:150px;overflow:auto;border:1px solid var(--line);border-radius:6px;padding:4px 8px;font-size:12.5px}
+.reqpick label{display:block;margin:2px 0}
+.reqpick input{width:auto;margin-right:6px}
+mark.u{background:#fde2e2;border-bottom:2px solid var(--bad)}
+.preview{font:11pt/1.5 Calibri,Arial,sans-serif;text-align:justify;background:#fff;border:1px solid var(--line);border-radius:8px;padding:18px 22px;max-height:600px;overflow:auto}
+.preview h4{margin:12px 0 4px;font-size:11pt}
+.cov td,.cov th{font-size:12.5px}
+.rule input{font-size:12.5px}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/milcon/">MILCON</a>
+ <h1>SOPHIE <span style="font-weight:400;font-size:15px;opacity:.75">Scope Of work Preparation, Harmonization, Integration, and Editing</span></h1>
+ <div class="sp"></div>
+ <span class="saved" id="saved"></span>
+ <button id="bNew">New SOW</button>
+ <button id="bOpen">Open…</button>
+ <input type="file" id="fOpen" accept=".json" hidden>
+ <button id="bSave">Save file</button>
+ <button id="bSettings">AI settings</button>
+</header>
+<div class="wrap">
+ <nav class="steps" id="steps" aria-label="SOPHIE steps"></nav>
+ <main id="view"></main>
+</div>
+<dialog id="dlg"><div class="dlg">
+ <h2>AI settings</h2>
+ <p class="lead">Shared with SCOTT and NORA. In SOPHIE the first reader drafts, the second reader reviews the draft against your rules and sources, and the arbiter settles the final text. With one AI, SOPHIE drafts and runs its own checks. Without AI, SOPHIE assembles sections from your requirements and notes.</p>
+ <div id="slots"></div>
+ <label class="small"><input type="checkbox" id="rememberKeys" style="width:auto"> Remember keys on this computer</label>
+ <div class="foot"><button class="go" id="bSaveSet">Save settings</button><button id="bCloseSet">Cancel</button></div>
+</div></dialog>
+<script>
+'use strict';
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toLocaleDateString('en-CA');
+
+// ---------- templates ----------
+const TEMPLATES={
+ house:{name:'House format – four sections (design-build outcome style)',per_bldg:true,secs:[
+  ['scope','Scope of Work','A short outcome statement: what the Government needs delivered, where, and why. State outcomes; the contractor owns means and methods.',false],
+  ['work','Work Description','Numbered items, each starting with a verb (Provide, Remove, Install, Repair, Test). One action per item.',true],
+  ['mm','Building-Specific Materials and Methods','For each building: required systems, materials and performance standards. Name the standard, not the product.',true],
+  ['iac','Building-Specific Inspection, Acceptance, and Control','For each building: hold points, tests, inspections, acceptance criteria and the records the contractor submits.',true]]},
+ full:{name:'Full statement of work',per_bldg:false,secs:[
+  ['bg','Background','Why the work is needed. Draw on NORA’s need statement and the 1391.',false],
+  ['obj','Objective','The outcome the Government is buying, in one paragraph.',false],
+  ['scope','Scope','What is included and what is not. Location, facilities, limits of work.',false],
+  ['docs','Applicable Documents','Criteria, specifications and standards that govern the work. Assembled from CORA.',false],
+  ['req','Requirements','Numbered requirements, verb-first, one per item, each traceable to a NORA requirement.',true],
+  ['sub','Submittals and Deliverables','What the contractor submits, when, and in what form.',true],
+  ['sched','Schedule and Period of Performance','Milestones, durations, work hours, phasing and outage constraints.',false],
+  ['qc','Quality Control and Acceptance','Contractor quality control, Government quality assurance, tests and acceptance criteria.',true],
+  ['safe','Safety','EM 385-1-1 and OSHA requirements, accident prevention plan and activity hazard analyses. Assembled from CORA.',true],
+  ['sec','Security and Access','Base access, badging, escort, CUI handling, restricted areas.',true],
+  ['env','Environmental','Hazardous materials, waste, storm water, historic and natural resource requirements.',true],
+  ['gfp','Government-Furnished Property and Information','What the Government provides, and when.',true]]},
+ custom:{name:'Custom headings',per_bldg:false,secs:[]}};
+const VERBS='provide|remove|install|repair|replace|furnish|test|inspect|submit|prepare|perform|clean|protect|demolish|construct|apply|verify|coordinate|maintain|restore|seal|patch|prime|paint|dispose|relocate|survey|document|commission|design|deliver|obtain|comply|ensure|repair|abate|excavate|backfill|compact|grade|pave|connect|disconnect|terminate|label|train|record|photograph|notify|schedule|schedule|measure|calibrate|flush|balance|start|adjust|secure|fasten|anchor|attach|embed|reinforce|cure|place|pour|form|strip|cut|core|drill|weld|bolt|tighten|caulk|flash|insulate|ventilate|drain|grout|sand|blast|strip|coat|seal|mark|stage|mobilize|demobilize|restore|return|turn|hand|transfer|identify|assess|evaluate|confirm|validate|design|develop|establish|implement|monitor|report|correct|reconnect|replace';
+const NOUN_START=/^(the|a|an|all|each|this|these|there|it|contractor|government|work|any|existing|new)\b/i;
+const ACRO_OK=new Set('UFC UFGS FC UFS ASTM ANSI ASCE ACI AISC AWS NFPA NEC OSHA EM FAR DFARS DOD DOW USA US DD AF USAF USACE NAVFAC AFCEC CO COR QC QA HVAC MEP PDF CAD BIM UL FM IBC IMC IPC ISO NIST CUI PPE AHA APP SSHO SDS GFP GFI LS SF SY LF CY EA HR VAC VDC AC DC LED IDS ESS SCIF SAPF ICD AT ATFP AT/FP UV TPO SPF EPDM BUR LPS RFI RFP SOW PWS IGE NTP BOD TBD ID NO OK CNMI JPMO RTM CSP ADA ABA EISA LEED IFS TSA AFB MCB NSA NAVBASE'.split(' '));
+const DEFAULT_RULES=[
+ {id:'r1',on:true,set:'House style',pat:'—',flags:'g',msg:'Em dash. House style uses en dashes only.',fix:'–',sev:'bad'},
+ {id:'r2',on:true,set:'House style',pat:'\\bContracting Officer\\b|\\bthe CO\\b',flags:'gi',msg:'No Contracting Officer references in deliverables.',fix:'',sev:'bad'},
+ {id:'r3',on:true,set:'House style',pat:'\\b(the )?contractor will\\b',flags:'gi',msg:'Contractor obligations take “shall”, not “will”.',fix:'',sev:'warn'},
+ {id:'r4',on:true,set:'Clarity',pat:'\\band/or\\b|\\betc\\.?|\\bTBD\\b|\\bas required\\b|\\bas necessary\\b|\\bif necessary\\b|\\bas needed\\b|\\bwhere practical\\b|\\bapproximately\\b',flags:'gi',msg:'Vague or open-ended wording. State the requirement.',fix:'',sev:'warn'},
+ {id:'r5',on:true,set:'Clarity',pat:'\\b(adequate|sufficient|appropriate|suitable|reasonable|good|proper|properly|high[- ]quality|state[- ]of[- ]the[- ]art|user[- ]friendly)\\b',flags:'gi',msg:'Subjective term. Replace with a measurable standard.',fix:'',sev:'warn'},
+ {id:'r6',on:true,set:'Clarity',pat:'\\bmust\\b',flags:'gi',msg:'Use “shall” consistently for requirements.',fix:'',sev:'info'},
+ {id:'r7',on:true,set:'Andersen roofing standards',pat:'\\b316(?!L)\\b',flags:'g',msg:'316L stainless steel only, never plain 316, in CX environments.',fix:'316L',sev:'bad'},
+ {id:'r8',on:true,set:'Andersen roofing standards',pat:'\\bgalvani[sz]\\w*',flags:'gi',msg:'Galvanized metal is not allowed on Andersen.',fix:'',sev:'bad'},
+ {id:'r9',on:true,set:'Andersen roofing standards',pat:'\\bTPO\\b',flags:'g',msg:'TPO is excluded by the Andersen Installation Facilities Standards (check if this is a repair to existing TPO).',fix:'',sev:'warn'},
+ {id:'r10',on:true,set:'Andersen roofing standards',pat:'\\bsealant\\b(?![^.]*C920)',flags:'gi',msg:'Sealants: specify ASTM C920 Class 50.',fix:'',sev:'info'}];
+const DB_PRESCRIPTIVE=/\b(by means of|shall use (a|an|the)|manufactured by|model (no\.|number)|brand|or approved equal|using (a|an|the) [a-z]+ (method|technique|machine|crane))\b/gi;
+
+// ---------- state ----------
+const BLANK=()=>({schema:'sophie-1',id:uid(),created:new Date().toISOString(),
+ p:{title:'',installation:'',delivery:'db',contract:'',buildings:'',prepared_by:''},template:'house',custom:'',
+ sections:[],reqs:[],criteria:[],rules:DEFAULT_RULES.map(r=>({...r})),versions:[],log:[]});
+let S=load()||BLANK();if(!S.sections.length) buildSections();let STEP='setup';
+function load(){try{return JSON.parse(localStorage.getItem('sophie_project')||'null');}catch(e){return null;}}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('sophie_project',JSON.stringify(S));
+ const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');const tm=traceMap();
+ rec.sophie={updated:new Date().toISOString(),title:S.p.title,template:S.template,sections:S.sections.map(s=>({title:s.title,status:s.status,words:wc(s.text)})),versions:S.versions.map(v=>({v:v.v,date:v.date,note:v.note}))};
+ if(Array.isArray(rec.rtm)){const h=rec.rtm[0];const ci=h.indexOf('SOW paragraph (SOPHIE)'),ri=h.indexOf('Req ID');if(ci>=0) rec.rtm.slice(1).forEach(r=>{const t=tm[r[ri]];r[ci]=t?t.join('; '):'';});}
+ localStorage.setItem('milcon_record',JSON.stringify(rec));
+ $('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){console.warn(e);$('#saved').textContent='Not saved – use Save file';}},300);}
+function log(w,d){S.log.push({at:new Date().toISOString(),what:w,detail:d||''});}
+const wc=t=>String(t||'').trim().split(/\s+/).filter(Boolean).length;
+function bldgs(){return S.p.buildings.split(/[,;\n]+/).map(x=>x.trim()).filter(Boolean);}
+function buildSections(){const T=TEMPLATES[S.template];const old=S.sections||[];const out=[];let n=0;
+ const keep=(key,title,guide,num)=>{const o=old.find(x=>x.key===key);out.push(o?{...o,title,guide,num}:{id:uid(),key,title,guide,num,notes:'',text:'',reqs:[],status:'empty',ai:null});};
+ if(S.template==='custom'){S.custom.split(/\n+/).map(x=>x.trim()).filter(Boolean).forEach((t,i)=>keep('c'+i+':'+t,t,'',/requirement|work|task|deliverable|submittal/i.test(t)));}
+ else T.secs.forEach(([k,t,g,num])=>{if(T.per_bldg&&(k==='mm'||k==='iac')&&bldgs().length) bldgs().forEach(b=>keep(k+':'+b,t+' – '+b,g,num));else keep(k,t,g,num);});
+ S.sections=out;}
+
+// ---------- shared data ----------
+function nora(){try{const j=JSON.parse(localStorage.getItem('nora_project')||'null');return j&&j.schema==='nora-1'?j:null;}catch(e){return null;}}
+function piper(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&j.schema==='piper-1'?j:null;}catch(e){return null;}}
+function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
+function coraSel(){try{return JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){return null;}}
+
+// ---------- steps ----------
+const STEPS=[['setup','Setup and sources',()=>S.p.title?'✓':''],['draft','Write sections',()=>{const d=S.sections.filter(s=>s.text.trim()).length;return d?d+'/'+S.sections.length:'';}],['style','Style and standards',()=>{const b=allFindings().filter(f=>f.sev==='bad').length;return b?b+'!':'';}],['harm','Harmonize and trace',()=>''],['out','Outputs',()=>'']];
+function renderSteps(){const nav=$('#steps');
+ if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
+ const W=S.sections.reduce((a,s)=>a+wc(s.text),0);nav.querySelector('.gate').innerHTML='<b>Phase 6:</b> acquisition package.<br>'+W.toLocaleString()+' words · '+S.sections.filter(s=>s.status==='final').length+' of '+S.sections.length+' sections final';}
+function render(){renderSteps();({setup:vSetup,draft:vDraft,style:vStyle,harm:vHarm,out:vOut})[STEP]();}
+function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.value;save();if(after) after(k,el);};});}
+const opts=(o,sel)=>Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(v)+'</option>').join('');
+
+// ---------- 1 setup ----------
+function vSetup(){const v=$('#view');const n=nora(),p=piper(),c=coraSel(),e=earl();
+ v.innerHTML='<div class="panel"><h2>Setup and sources</h2><p class="lead">Pick the format, then pull in what the earlier tools already know. SOPHIE writes from your requirements, criteria and notes, and every sentence it drafts must trace back to one of them.</p>'+
+ '<div class="form"><div class="wide"><label class="f">Project title</label><input data-k="title"></div><div><label class="f">Installation</label><input data-k="installation"></div>'+
+ '<div><label class="f">Delivery method</label><select data-k="delivery">'+opts({db:'Design-build (outcomes; contractor owns means and methods)',dbb:'Design-bid-build',to:'Task order / FSRM',other:'Other'},S.p.delivery)+'</select></div>'+
+ '<div><label class="f">Contract or task order number</label><input data-k="contract"></div><div><label class="f">Prepared by</label><input data-k="prepared_by"></div>'+
+ '<div class="wide"><label class="f">Buildings or facilities (comma separated; the house format repeats the building-specific sections for each)</label><input data-k="buildings" placeholder="B19017, B9034, B1622"></div></div>'+
+ '<h3>Format</h3><select id="tpl">'+opts(Object.fromEntries(Object.entries(TEMPLATES).map(([k,t])=>[k,t.name])),S.template)+'</select>'+
+ (S.template==='custom'?'<div style="margin-top:8px"><label class="f">Headings, one per line (in order). Headings with “requirement”, “work”, “task”, “deliverable” or “submittal” are numbered.</label><textarea id="cust" class="tall" style="min-height:140px"></textarea><button class="sm" id="bCust">Apply headings</button></div>':'')+
+ '<p class="small">'+S.sections.length+' sections: '+S.sections.map(s=>esc(s.title)).join(' · ')+'</p></div>'+
+ '<div class="panel"><h2>Sources</h2><div class="outs">'+
+ src('NORA',n?n.requirements.filter(r=>r.status!=='withdrawn').length+' requirements, need statement'+(n.need_statement?'':' (not written)'):'No NORA project in this browser','nora',!!n,S.reqs.length?S.reqs.length+' imported':'')+
+ src('CORA',c?c.items.length+' selected criteria, specifications, clauses and safety items':'Open CORA and make a selection; it is shared automatically','cora',!!c,S.criteria.length?S.criteria.length+' imported':'')+
+ src('PIPER',p?'1391 '+(p.b.title||'(untitled)')+', block 10 and 11 text':'No PIPER project in this browser','piper',!!p,'')+
+ src('EARL',e?'Recommended alternative: '+((e.alts.find(a=>a.id===e.recommend?.alt)||{}).name||'not selected'):'No EARL analysis in this browser','earl',!!e,'')+'</div></div>';
+ bindAll(v,S.p,k=>{if(k==='buildings'){buildSections();save();}renderSteps();});
+ $('#tpl').onchange=e=>{if(S.sections.some(s=>s.text.trim())&&!confirm('Change format? Sections with the same heading keep their text; others are set aside in the record.')) {e.target.value=S.template;return;}
+  const old=S.sections.filter(s=>s.text.trim());S.template=e.target.value;buildSections();const lost=old.filter(o=>!S.sections.some(s=>s.id===o.id));if(lost.length){S.parked=(S.parked||[]).concat(lost);log('Sections set aside on format change',lost.map(x=>x.title).join(', '));}
+  log('Format set',TEMPLATES[S.template].name);save();vSetup();renderSteps();};
+ if($('#cust')){$('#cust').value=S.custom;$('#bCust').onclick=()=>{S.custom=$('#cust').value;buildSections();log('Custom headings applied');save();vSetup();renderSteps();};}
+ v.querySelectorAll('[data-imp]').forEach(b=>b.onclick=()=>{({nora:impNora,cora:impCora,piper:impPiper,earl:impEarl})[b.dataset.imp]();save();vSetup();renderSteps();});
+ function src(t,d,k,ok,st){return '<div class="card"><h4>'+t+'</h4><p>'+esc(d)+'</p>'+(ok?'<button class="sm go" data-imp="'+k+'">Import</button> <span class="small">'+esc(st)+'</span>':'')+'</div>';}}
+function impNora(){const n=nora();if(!n) return;S.p.title=S.p.title||n.project.name;S.p.installation=S.p.installation||n.project.installation;
+ S.reqs=n.requirements.filter(r=>r.status!=='withdrawn').map(r=>({id:r.id,text:r.text,priority:r.priority,type:r.type,measure:r.measure||''}));
+ const bg=S.sections.find(s=>s.key==='bg');if(bg&&!bg.notes&&n.need_statement) bg.notes=n.need_statement;
+ log('Imported from NORA',S.reqs.length+' requirements');}
+function impCora(){const c=coraSel();if(!c) return;S.criteria=c.items;log('Imported from CORA',S.criteria.length+' items');}
+function impPiper(){const p=piper();if(!p) return;S.p.title=S.p.title||p.b.title;S.p.installation=S.p.installation||p.b.installation;
+ const sc=S.sections.find(s=>s.key==='scope');if(sc&&!sc.notes) sc.notes=[p.n.desc,p.n.project].filter(Boolean).join('\n');
+ const bg=S.sections.find(s=>s.key==='bg');if(bg) bg.notes=[bg.notes,p.n.requirement,p.n.current].filter(Boolean).join('\n');
+ log('Imported from PIPER','block 10 and 11 text');}
+function impEarl(){const e=earl();if(!e) return;const a=e.alts.find(x=>x.id===e.recommend?.alt);if(!a) return;const sc=S.sections.find(s=>s.key==='scope'||s.key==='obj');if(sc) sc.notes=[sc.notes,'Selected alternative: '+a.name+'. '+(a.desc||'')].filter(Boolean).join('\n');log('Imported from EARL',a.name);}
+
+// ---------- 2 draft ----------
+const ST={empty:'Empty',draft:'Draft',reviewed:'Reviewed',final:'Final'};
+function vDraft(){const v=$('#view');
+ v.innerHTML='<div class="panel"><h2>Write sections</h2><p class="lead">For each section, link the requirements it answers and add your notes: field conditions, decisions, quantities. Then assemble it from the sources, draft it with AI, or write it yourself. Text you edit is never overwritten without asking.</p>'+
+ '<div class="row" style="margin-top:0"><button class="go" id="bAll">Assemble all empty sections</button><span class="engines" id="eng"></span></div><div id="secs"></div></div>';
+ $('#bAll').onclick=()=>{let k=0;S.sections.forEach(s=>{if(!s.text.trim()){s.text=assemble(s);if(s.text.trim()){s.status='draft';k++;}}});log('Assembled empty sections',k+' sections');save();vDraft();renderSteps();};
+ const box=$('#secs');
+ S.sections.forEach((s,i)=>{const d=document.createElement('div');d.className='sec';
+  d.innerHTML='<div class="hd"><span class="t">'+(i+1)+'. '+esc(s.title)+'</span><select data-k="status" style="width:auto">'+opts(ST,s.status)+'</select><span class="small" data-w></span></div><div class="bd">'+(s.guide?'<p class="small" style="margin-top:0">'+esc(s.guide)+'</p>':'')+
+  '<div class="cols"><div><label class="f">Requirements this section answers</label><div class="reqpick">'+(S.reqs.length?S.reqs.map(r=>'<label><input type="checkbox" value="'+esc(r.id)+'" '+(s.reqs.includes(r.id)?'checked':'')+'><b>'+esc(r.id)+'</b> '+esc(r.text)+'</label>').join(''):'<span class="small">Import requirements from NORA on step 1.</span>')+'</div>'+
+  '<label class="f" style="margin-top:8px">Notes, facts and decisions for this section</label><textarea data-k="notes" style="min-height:120px"></textarea>'+
+  '<div class="row"><button class="sm" data-asm>Assemble from sources</button><button class="sm go" data-ai>Draft with AI</button><span class="engines" data-eng></span></div></div>'+
+  '<div><label class="f">Section text</label><textarea class="sow" data-k="text"></textarea><div data-fl></div></div></div></div>';
+  const w=()=>d.querySelector('[data-w]').textContent=wc(s.text)+' words';w();
+  const fl=()=>{const F=checkText(s.text,s).slice(0,6);d.querySelector('[data-fl]').innerHTML=F.map(f=>'<div class="find '+f.sev+'"><b>'+esc(f.msg)+'</b> '+(f.hit?'<q class="ev">'+esc(f.hit)+'</q>':'')+'</div>').join('')+(checkText(s.text,s).length>6?'<p class="small">More on the Style step.</p>':'');};
+  bindAll(d,s,k=>{if(k==='text'){w();if(s.status==='empty'&&s.text.trim()) s.status='draft';fl();}renderSteps();});fl();
+  d.querySelectorAll('.reqpick input').forEach(cb=>cb.onchange=()=>{s.reqs=[...d.querySelectorAll('.reqpick input:checked')].map(x=>x.value);save();});
+  d.querySelector('[data-asm]').onclick=()=>{const t=assemble(s);if(!t.trim()){alert('Nothing to assemble yet. Link requirements or add notes.');return;}if(s.text.trim()&&!confirm('Replace the current text with an assembled draft?')) return;s.text=t;s.status='draft';log('Section assembled',s.title);save();vDraft();renderSteps();};
+  d.querySelector('[data-ai]').onclick=()=>aiDraft(s,d);
+  box.appendChild(d);});}
+function lc(t){return /^[A-Z]{2}/.test(t)?t:t.replace(/^./,c=>c.toLowerCase());}
+function conj(v){v=v.toLowerCase();if(v==='be') return 'is';if(v==='have') return 'has';if(/(s|sh|ch|x|z|o)$/.test(v)) return v+'es';if(/[^aeiou]y$/.test(v)) return v.slice(0,-1)+'ies';return v+'s';}
+function toItem(t){let x=String(t).trim().replace(/\s+/g,' ').replace(/\.$/,'');let m;
+ if((m=x.match(/^(?:the )?contractor (?:shall|must|will|is required to|needs to) (.+)$/i))) x=m[1];
+ else if((m=x.match(/^(?:we|they|the users?|users?|the unit|the customer)\s+(?:need|needs|want|wants|require|requires)\s+(?:the |a |an )?(.+?)\s+(done|completed|performed|finished)\b\s*(.*)$/i))) x='Complete the '+m[1]+(m[3]?' '+m[3]:'');
+ else if((m=x.match(/^(?:we|they|the users?|users?|the unit|the customer)\s+(?:need|needs|want|wants|require|requires)\s+(.+)$/i))) x='Provide '+m[1];
+ else if((m=x.match(/^(?:there (?:shall|must|will) be)\s+(.+)$/i))) x='Provide '+m[1];
+ else if((m=x.match(/^((?:the|all|each|every|a|an)\s+)?([a-z0-9 ,\-\/]{2,60}?)\s+(?:shall|must|will)\s+be\s+(\w+ed|\w+en)\b\s*(.*)$/i))) x='Ensure '+(m[1]||'').toLowerCase()+lc(m[2])+(/[^s]s$/.test(m[2].trim())?' are ':' is ')+m[3]+(m[4]?' '+m[4]:'');
+ else if((m=x.match(/^((?:the|all|each|every|a|an)\s+)?([a-z0-9 ,\-\/]{2,60}?)\s+(?:shall|must|will)\s+(\w+)\s*(.*)$/i))) {const art=(m[1]||'').toLowerCase().trim();const pl=/[^s]s$/.test(m[2].trim());if(/^be$/i.test(m[3])) x='Ensure '+(art?art+' ':'the ')+lc(m[2])+(pl?' are ':' is ')+m[4];else x='Provide '+(art==='the'?(pl?'':'a '):art?art+' ':'')+lc(m[2])+' that '+(pl?m[3].toLowerCase():conj(m[3]))+(m[4]?' '+m[4]:'');}
+ if(!new RegExp('^('+VERBS+')\\b','i').test(x)&&!/^(ensure|complete)\b/i.test(x)) x='Provide '+x.replace(/^./,c=>c.toLowerCase());
+ x=x.replace(/^./,c=>c.toUpperCase()).replace(/\bProvide a ([aeiou])/,'Provide an $1');return x+'.';}
+function assemble(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const notes=(s.notes||'').trim();const k=s.key.split(':')[0];
+ if(k==='docs'){const c=S.criteria.filter(x=>x.mod!=='FAR / DFARS'&&!/EM 385|OSHA/i.test(x.mod));if(!c.length) return notes;
+  const g={};c.forEach(x=>{(g[x.mod]=g[x.mod]||[]).push(x);});return 'The work shall comply with the following documents, latest edition at the time of award unless a date is shown.\n\n'+Object.entries(g).map(([m,a])=>m+'\n'+a.map(x=>(x.number?x.number+' ':'')+x.title).join('\n')).join('\n\n')+(notes?'\n\n'+notes:'');}
+ if(k==='safe'){const c=S.criteria.filter(x=>/EM 385|OSHA/i.test(x.mod));const items=['Comply with USACE EM 385-1-1 and 29 CFR 1926.','Submit an Accident Prevention Plan and an Activity Hazard Analysis for each definable feature of work before starting that work.'].concat(c.map(x=>'Comply with '+(x.number?x.number+', ':'')+x.title+'.'));
+  return items.map((t,i)=>(i+1)+'. '+t).join('\n')+(notes?'\n\n'+notes:'');}
+ if(s.num){const lines=R.map(r=>toItem(r.text)+(r.measure?' Acceptance: '+r.measure.replace(/\.$/,'')+'.':'')+' {'+r.id+'}');
+  notes.split(/\n+/).map(x=>x.replace(/^[\s\-•*\d.)]+/,'').trim()).filter(x=>x.length>3).forEach(x=>lines.push(toItem(x)));
+  return lines.map((t,i)=>(i+1)+'. '+t).join('\n');}
+ const parts=[];if(notes) parts.push(notes.replace(/\n+/g,' ').trim());if(R.length) parts.push('The work shall meet these requirements: '+R.map(r=>r.text.replace(/\.$/,'')+' {'+r.id+'}').join('; ')+'.');
+ return parts.join('\n\n');}
+
+// ---------- AI ----------
+const PROVIDERS={anthropic:'Anthropic (Claude)',openai:'OpenAI-compatible (OpenAI, GenAI.mil if OpenAI-style, Ask Sage, Azure, local)',gemini:'Google Gemini',custom:'Custom endpoint (OpenAI request format)'};
+const SLOT_DEF={provider:'anthropic',label:'',role:'reader',base:'',model:'',key:'',header:'Authorization',prefix:'Bearer ',enabled:false};
+let SET=loadSettings();
+function loadSettings(){let s={slots:[{...SLOT_DEF,label:'Reader 1'},{...SLOT_DEF,label:'Reader 2',provider:'openai'},{...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'}],remember:false};
+ try{const j=JSON.parse(localStorage.getItem('pmt_ai')||'null');if(j){s=j;while(s.slots.length<3) s.slots.push({...SLOT_DEF,label:'Arbiter',role:'arbiter',provider:'openai'});s.slots.forEach(x=>x.role=x.role||'reader');}const k=JSON.parse(sessionStorage.getItem('pmt_ai_keys')||localStorage.getItem('pmt_ai_keys')||'null');if(k) s.slots.forEach((x,i)=>x.key=k[i]||'');}catch(e){}return s;}
+function saveSettings(){try{const keys=SET.slots.map(s=>s.key);const noKeys={...SET,slots:SET.slots.map(s=>({...s,key:''}))};localStorage.setItem('pmt_ai',JSON.stringify(noKeys));sessionStorage.setItem('pmt_ai_keys',JSON.stringify(keys));if(SET.remember) localStorage.setItem('pmt_ai_keys',JSON.stringify(keys));else localStorage.removeItem('pmt_ai_keys');}catch(e){}}
+async function callAI(slot,sys,user){const p=slot.provider;let url,headers={'Content-Type':'application/json'},body;
+ if(p==='anthropic'){url=(slot.base||'https://api.anthropic.com').replace(/\/$/,'')+'/v1/messages';headers['x-api-key']=slot.key;headers['anthropic-version']='2023-06-01';headers['anthropic-dangerous-direct-browser-access']='true';body={model:slot.model,max_tokens:6000,system:sys,messages:[{role:'user',content:user}]};}
+ else if(p==='gemini'){url=(slot.base||'https://generativelanguage.googleapis.com/v1beta').replace(/\/$/,'')+'/models/'+encodeURIComponent(slot.model)+':generateContent?key='+encodeURIComponent(slot.key);body={systemInstruction:{parts:[{text:sys}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{responseMimeType:'application/json'}};}
+ else{url=(slot.base||'https://api.openai.com/v1').replace(/\/$/,'')+'/chat/completions';if(slot.key) headers[slot.header||'Authorization']=(slot.prefix??'Bearer ')+slot.key;body={model:slot.model,messages:[{role:'system',content:sys},{role:'user',content:user}]};}
+ const r=await fetch(url,{method:'POST',headers,body:JSON.stringify(body)});const t=await r.text();if(!r.ok) throw new Error('HTTP '+r.status+': '+t.slice(0,200));const j=JSON.parse(t);
+ const txt=p==='anthropic'?(j.content||[]).map(c=>c.text||'').join(''):p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):(j.choices?.[0]?.message?.content||'');
+ const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<0) throw new Error('No JSON in reply');return JSON.parse(txt.slice(a,b+1));}
+function styleBrief(){return ['Write U.S. Government construction statement-of-work text.','Use "shall" for every contractor obligation. Never use em dashes; use en dashes.','Never refer to the Contracting Officer.',
+ S.p.delivery==='db'?'Design-build: state outcomes and performance standards; do not prescribe means and methods, products or brands.':'State requirements clearly and measurably.',
+ 'Numbered sections: one action per item, each item starts with an imperative verb (Provide, Remove, Install, Test, Submit).','No vague words (adequate, appropriate, as required, and/or, etc., TBD).','Define each acronym at first use.',
+ 'Locked standards that must be respected: '+S.rules.filter(r=>r.on&&r.set!=='House style'&&r.set!=='Clarity').map(r=>r.msg).join(' ')].join('\n');}
+function sourcesFor(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const c=S.criteria.slice(0,80).map(x=>(x.number?x.number+' ':'')+x.title).join('; ');
+ return 'PROJECT: '+S.p.title+' at '+S.p.installation+(bldgs().length?' (buildings: '+bldgs().join(', ')+')':'')+'\nSECTION: '+s.title+'\nSECTION PURPOSE: '+s.guide+(s.num?'\nFORMAT: numbered list':'\nFORMAT: paragraphs')+
+ '\nREQUIREMENTS (trace each item to these IDs):\n'+(R.map(r=>r.id+': '+r.text+(r.measure?' (verify by: '+r.measure+')':'')).join('\n')||'none linked')+'\nAUTHOR NOTES:\n'+(s.notes||'none')+(c?'\nAPPLICABLE CRITERIA (from CORA): '+c:'');}
+const DRAFT_SYS=()=>styleBrief()+'\n\nReturn ONLY JSON: {"text":"the section text. End each numbered item or paragraph with the requirement IDs it satisfies in braces, e.g. {R-003}. Use {NOTE} for text drawn only from author notes.","assumptions":["anything you had to assume"]}\nUse only facts, numbers and standards found in the sources. Do not invent quantities, dates, products or standards.';
+const REVIEW_SYS=()=>styleBrief()+'\n\nYou review a draft section against its sources and the style rules. Return ONLY JSON: {"issues":[{"quote":"exact text from the draft","problem":"what is wrong","fix":"replacement text"}],"missing":["requirement IDs not covered"],"revised":"your full corrected section text, keeping the {ID} trace tags"}';
+const ARB_SYS=()=>styleBrief()+'\n\nYou are the arbiter between a drafter and a reviewer. Produce the final section. Accept a reviewer fix only if it is supported by the sources and the style rules. Return ONLY JSON: {"text":"final section text with {ID} trace tags","rulings":["one line per reviewer issue: accepted or rejected and why"]}';
+function figuresUnverified(text,s){const src=[sourcesFor(s),S.p.title,S.p.installation,S.p.buildings,S.criteria.map(x=>x.number+' '+x.title).join(' ')].join(' ').toLowerCase();
+ const nums=(text.match(/\b\d[\d,.\/-]*\s*(%|percent|psi|psf|mph|inches|inch|in\.|feet|ft|sf|sy|lf|cy|mil|mils|years?|days?|hours?|gallons?|kw|kva|amps?|volts?|°f|degrees)?/gi)||[]).map(x=>x.trim()).filter(x=>!/^\d{1,2}\.$/.test(x)&&!/^\d{1,2}$/.test(x));
+ return [...new Set(nums)].filter(n=>!src.includes(n.toLowerCase().replace(/\s+/g,' '))&&!src.includes(n.replace(/[^\d.]/g,'')));}
+async function aiDraft(s,d){const eng=d.querySelector('[data-eng]');const rd=SET.slots.filter(x=>x.enabled&&x.model&&x.role!=='arbiter');const ar=SET.slots.find(x=>x.enabled&&x.model&&x.role==='arbiter');
+ if(!rd.length){alert('No AI is set up. Use AI settings, or Assemble from sources.');return;}
+ if(s.text.trim()&&!confirm('Replace the current text with an AI draft? The current text is kept in the record.')) return;
+ const pill=(n,st)=>'<span class="eng"><span class="dot '+st+'"></span>'+esc(n)+'</span>';const status={};const draw=()=>eng.innerHTML=Object.entries(status).map(([n,st])=>pill(n,st)).join('');
+ const src=sourcesFor(s);const prov={at:new Date().toISOString(),prev:s.text,steps:[]};
+ try{status['Drafter: '+(rd[0].label||'AI')]='run';draw();const dj=await callAI(rd[0],DRAFT_SYS(),src);status['Drafter: '+(rd[0].label||'AI')]='ok';draw();let text=String(dj.text||'');prov.steps.push({role:'drafter',model:rd[0].model,text,assumptions:dj.assumptions||[]});
+  if(rd[1]){status['Reviewer: '+(rd[1].label||'AI')]='run';draw();try{const rj=await callAI(rd[1],REVIEW_SYS(),src+'\n\nDRAFT:\n'+text);status['Reviewer: '+(rd[1].label||'AI')]='ok';draw();prov.steps.push({role:'reviewer',model:rd[1].model,issues:rj.issues||[],missing:rj.missing||[]});
+    if(ar){status['Arbiter: '+(ar.label||'AI')]='run';draw();try{const aj=await callAI(ar,ARB_SYS(),src+'\n\nDRAFT:\n'+text+'\n\nREVIEW:\n'+JSON.stringify({issues:rj.issues,missing:rj.missing,revised:rj.revised}));text=String(aj.text||text);prov.steps.push({role:'arbiter',model:ar.model,rulings:aj.rulings||[]});status['Arbiter: '+(ar.label||'AI')]='ok';}catch(e){status['Arbiter: '+(ar.label||'AI')]='err';}draw();}
+    else if(rj.revised) text=String(rj.revised);}catch(e){status['Reviewer: '+(rd[1].label||'AI')]='err';draw();}}
+  const un=figuresUnverified(text.replace(/\{[^}]*\}/g,''),s);prov.unverified=un;s.ai=prov;s.text=text;s.status=rd[1]?'reviewed':'draft';
+  log('AI section draft',s.title+' · '+prov.steps.map(x=>x.role+' '+x.model).join(', ')+(un.length?' · unverified figures: '+un.join(', '):''));save();vDraft();renderSteps();
+  if(un.length) setTimeout(()=>alert('Check these figures in '+s.title+'. They do not appear in your sources: '+un.join(', ')),50);
+ }catch(e){status['Drafter: '+(rd[0].label||'AI')]='err';draw();alert('AI draft failed: '+e.message);}}
+
+// ---------- 3 style ----------
+function checkText(t,s){const F=[];if(!t) return F;const plain=t.replace(/\{[^}]*\}/g,'');
+ S.rules.filter(r=>r.on).forEach(r=>{let re;try{re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');}catch(e){return;}const m=[...plain.matchAll(re)];if(m.length) F.push({sev:r.sev,msg:r.msg+(m.length>1?' ('+m.length+')':''),hit:ctx(plain,m[0].index,m[0][0].length),rule:r});});
+ if(s&&s.num) plain.split(/\n/).forEach(l=>{const m=l.match(/^\s*\d+[.)]\s+(.*)/);if(m&&(NOUN_START.test(m[1])||!new RegExp('^('+VERBS+')\\b','i').test(m[1]))) F.push({sev:'warn',msg:'Numbered item does not start with a verb.',hit:m[1].slice(0,80)});});
+ if(S.p.delivery==='db'){const m=[...plain.matchAll(DB_PRESCRIPTIVE)];if(m.length) F.push({sev:'warn',msg:'Prescribes means or products in a design-build scope.',hit:ctx(plain,m[0].index,m[0][0].length)});}
+ return F;}
+function ctx(t,i,n){const a=Math.max(0,i-35),b=Math.min(t.length,i+n+35);return (a?'…':'')+t.slice(a,b).replace(/\s+/g,' ')+(b<t.length?'…':'');}
+function acronyms(){const full=S.sections.map(s=>s.text.replace(/\{[^}]*\}/g,'')).join('\n');const defd=new Set([...full.matchAll(/\(([A-Z][A-Z0-9\/&]{1,7})\)/g)].map(m=>m[1]));const seen=new Set();const out=[];
+ for(const m of full.matchAll(/\b[A-Z][A-Z0-9&\/]{1,7}\b/g)){const a=m[0];if(seen.has(a)) continue;seen.add(a);if(ACRO_OK.has(a)||defd.has(a)||/^\d/.test(a)||/^[A-Z]\d/.test(a)||/^(I|II|III|IV|V|VI|A|B)$/.test(a)) continue;out.push(a);}return out;}
+function allFindings(){const F=[];S.sections.forEach(s=>checkText(s.text,s).forEach(f=>F.push({...f,sec:s})));acronyms().forEach(a=>F.push({sev:'info',msg:'Acronym not defined at first use: '+a,sec:null}));return F;}
+function vStyle(){const v=$('#view');const F=allFindings();
+ v.innerHTML='<div class="panel"><h2>Style and standards</h2><p class="lead">Every section is checked against house style, clarity rules and your locked standards. Rules you add here apply to every section and to the AI’s instructions.</p>'+
+ '<div class="row" style="margin-top:0"><button class="go" id="bFix">Apply automatic fixes</button><span class="small">Replaces em dashes with en dashes and any other rule that has a fix.</span></div>'+
+ (F.length?F.map(f=>'<div class="find '+f.sev+'"><b>'+(f.sec?esc(f.sec.title)+': ':'')+esc(f.msg)+'</b> '+(f.hit?'<q class="ev">'+esc(f.hit)+'</q>':'')+'</div>').join(''):'<div class="find ok"><b>No findings.</b></div>')+'</div>'+
+ '<div class="panel"><h2>Rules</h2><p class="lead">Pattern is a regular expression. Severity “bad” blocks the Final status check on the Outputs step. The Andersen roofing set holds your locked standards; switch it off for other work.</p>'+
+ '<table class="rule"><thead><tr><th>On</th><th>Set</th><th>Pattern</th><th>Message</th><th>Auto-fix</th><th>Severity</th><th></th></tr></thead><tbody id="rb"></tbody></table><div class="row"><button id="bAddR">Add rule</button><button id="bResetR">Restore default rules</button></div></div>';
+ $('#bFix').onclick=()=>{let k=0;S.sections.forEach(s=>S.rules.filter(r=>r.on&&r.fix).forEach(r=>{try{const re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');const n=(s.text.match(re)||[]).length;if(n){s.text=s.text.replace(re,r.fix);k+=n;}}catch(e){}}));log('Automatic fixes applied',k+' changes');save();vStyle();renderSteps();};
+ const tb=$('#rb');S.rules.forEach(r=>{const tr=document.createElement('tr');tr.innerHTML='<td><input type="checkbox" data-k="on" style="width:auto"></td><td><input data-k="set" style="width:150px"></td><td><input data-k="pat" style="width:200px;font-family:Consolas,monospace"></td><td><input data-k="msg"></td><td><input data-k="fix" style="width:70px"></td><td><select data-k="sev" style="width:auto">'+opts({bad:'Bad',warn:'Warn',info:'Info'},r.sev)+'</select></td><td><button class="sm" data-del>Remove</button></td>';
+  bindAll(tr,r,()=>renderSteps());tr.querySelector('[data-del]').onclick=()=>{S.rules=S.rules.filter(x=>x!==r);save();vStyle();renderSteps();};tb.appendChild(tr);});
+ $('#bAddR').onclick=()=>{S.rules.push({id:uid(),on:true,set:'Project',pat:'',flags:'gi',msg:'',fix:'',sev:'warn'});save();vStyle();};
+ $('#bResetR').onclick=()=>{if(!confirm('Restore the default rules? Your added rules are removed.')) return;S.rules=DEFAULT_RULES.map(r=>({...r}));save();vStyle();renderSteps();};}
+
+// ---------- 4 harmonize ----------
+function traceMap(){const m={};S.sections.forEach((s,i)=>{const lines=s.text.split(/\n/);lines.forEach(l=>{const tags=[...l.matchAll(/\{([^}]+)\}/g)].flatMap(x=>x[1].split(/[,;\s]+/)).filter(Boolean);const num=(l.match(/^\s*(\d+)[.)]/)||[])[1];tags.forEach(t=>{(m[t]=m[t]||[]).push((i+1)+(num?'.'+num:'')+' '+s.title);});});
+ s.reqs.forEach(id=>{if(!m[id]||!m[id].some(x=>x.startsWith((i+1)+''))) (m[id]=m[id]||[]).push((i+1)+' '+s.title+' (linked)');});});return m;}
+function vHarm(){const v=$('#view');const tm=traceMap();const p=piper();
+ const must=S.reqs.filter(r=>r.priority==='must');const uncovered=S.reqs.filter(r=>!tm[r.id]);
+ const untraced=[];S.sections.forEach((s,i)=>{if(!s.num) return;s.text.split(/\n/).forEach(l=>{const m=l.match(/^\s*(\d+)[.)]\s+(.*)/);if(m&&!/\{[^}]+\}/.test(l)) untraced.push([(i+1)+'.'+m[1],s.title,m[2]]);});});
+ const H=[];
+ if(!S.reqs.length) H.push(['warn','No requirements imported','Import from NORA on step 1 so SOPHIE can check coverage.']);
+ uncovered.forEach(r=>H.push([r.priority==='must'?'bad':'warn',r.id+' is not covered',r.text]));
+ if(untraced.length) H.push(['warn',untraced.length+' numbered items trace to no requirement','Untraced work is how scope creeps in. Tag the requirement in braces, e.g. {R-004}, or {NOTE} if it comes from a field decision.']);
+ const all=S.sections.map(s=>s.text).join('\n');
+ if(p&&p.pf&&Number(p.pf.qty)&&!all.includes(Number(p.pf.qty).toLocaleString())&&!all.includes(String(p.pf.qty))) H.push(['warn','1391 quantity not stated in the SOW','PIPER programs '+Number(p.pf.qty).toLocaleString()+' '+(p.pf.um||'')+'. State the same quantity or explain the difference.']);
+ if(/\bcontractor\b/.test(all)&&/\bContractor\b/.test(all)) H.push(['info','“Contractor” capitalized inconsistently','Pick one form and use it throughout.']);
+ if(/\bgovernment\b/.test(all)&&/\bGovernment\b/.test(all)) H.push(['info','“Government” capitalized inconsistently','']);
+ if(S.criteria.length&&!S.sections.some(s=>s.key==='docs')&&!/UFC|UFGS/.test(all)) H.push(['warn','No criteria cited','CORA selected '+S.criteria.length+' items; the SOW names none.']);
+ v.innerHTML='<div class="panel"><h2>Harmonize and trace</h2><p class="lead">Every requirement should land in the SOW, and every item in the SOW should trace to a requirement. SOPHIE also checks the SOW against the 1391 and the selected criteria, and can send the finished text to SCOTT to confirm the triggers CORA used still hold.</p>'+
+ '<div class="row" style="margin-top:0"><button class="go" id="bScott">Send the SOW to SCOTT</button><span class="small">Opens SCOTT with this text loaded. Parse it there, then send the triggers to CORA.</span></div>'+
+ (H.length?H.map(([s,t,d])=>'<div class="find '+s+'"><b>'+esc(t)+'</b> '+esc(d)+'</div>').join(''):'<div class="find ok"><b>Every requirement is covered and every item traces.</b></div>')+
+ '<h3>Traceability</h3><table class="cov"><thead><tr><th>Req ID</th><th>Requirement</th><th>Priority</th><th>Where in the SOW</th></tr></thead><tbody>'+(S.reqs.map(r=>'<tr><td>'+esc(r.id)+'</td><td>'+esc(r.text)+'</td><td>'+esc(r.priority||'')+'</td><td>'+(tm[r.id]?esc(tm[r.id].join('; ')):'<span class="pill bad">Not covered</span>')+'</td></tr>').join('')||'<tr><td colspan="4" class="empty">No requirements.</td></tr>')+'</tbody></table>'+
+ (untraced.length?'<h3>Untraced items</h3><table class="cov"><thead><tr><th>Item</th><th>Section</th><th>Text</th></tr></thead><tbody>'+untraced.map(u=>'<tr><td>'+u[0]+'</td><td>'+esc(u[1])+'</td><td>'+esc(u[2])+'</td></tr>').join('')+'</tbody></table>':'')+'</div>';
+ $('#bScott').onclick=()=>{try{localStorage.setItem('sophie_to_scott',JSON.stringify({at:Date.now(),title:S.p.title,text:plainSOW()}));log('Sent to SCOTT');save();location.href='scott.html';}catch(e){alert('This browser blocked local storage. Copy the text from the Outputs step instead.');}};}
+
+// ---------- 5 outputs ----------
+function plainSOW(){return (S.p.title?S.p.title.toUpperCase()+'\n'+(S.p.installation||'')+'\n\n':'')+S.sections.map((s,i)=>(i+1)+'. '+s.title.toUpperCase()+'\n\n'+s.text.replace(/\s*\{[^}]*\}/g,'').trim()).join('\n\n');}
+function vOut(){const v=$('#view');const bad=allFindings().filter(f=>f.sev==='bad').length;const notFinal=S.sections.filter(s=>s.status!=='final').length;
+ v.innerHTML='<div class="panel"><h2>Outputs</h2><p class="lead">Word output follows the house format: Calibri 11, justified, numbered items. Trace tags are removed from the document and kept in the matrix.</p>'+
+ (bad?'<div class="find bad"><b>'+bad+' must-fix style findings remain.</b> See the Style step.</div>':'')+(notFinal?'<div class="find warn"><b>'+notFinal+' sections are not marked Final.</b></div>':'<div class="find ok"><b>All sections are Final.</b></div>')+
+ '<div class="outs">'+out('doc','Statement of work','The full SOW in Word, house format.','Download .doc')+out('print','Print or save as PDF','The same, formatted for printing.','Open printable')+out('copy','Copy as plain text','Paste into an existing SOW or the contract writing system.','Copy')+
+ out('rtm','Traceability matrix','Requirement to SOW paragraph, for the contract file.','Download .csv')+out('json','Project file','Everything, including versions, AI provenance and the log.','Download .json')+'</div>'+
+ '<h3>Versions</h3><div class="row" style="margin-top:0"><input id="vn" placeholder="Why this version (e.g. issued for 65% review)" style="flex:1"><button class="go" id="bVer">Save version</button></div>'+
+ '<table style="margin-top:8px"><thead><tr><th>Version</th><th>Date</th><th>Reason</th><th>Words</th><th></th></tr></thead><tbody>'+(S.versions.slice().reverse().map(x=>'<tr><td>'+x.v+'</td><td>'+esc(x.date)+'</td><td>'+esc(x.note)+'</td><td>'+x.words.toLocaleString()+'</td><td><button class="sm" data-dv="'+x.v+'">Download</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No versions yet.</td></tr>')+'</tbody></table>'+
+ '<h3>Preview</h3><div class="preview" id="pv"></div></div><div class="panel"><h2>Record log</h2><div id="lg" class="small"></div></div>';
+ $('#pv').innerHTML=bodyHTML();
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('SOW','doc'),docHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(docHTML());w.document.close();setTimeout(()=>w.print(),400);},
+  copy:()=>{navigator.clipboard.writeText(plainSOW()).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy',1500);},()=>alert('Copy blocked by the browser.'));},rtm:()=>dl(fname('SOW-Traceability','csv'),csv(rtmRows()),'text/csv'),json:()=>{dl(fname('SOPHIE','json'),JSON.stringify(S,null,1),'application/json');log('Project file saved');save();}})[b.dataset.out]());
+ $('#bVer').onclick=()=>{const vv=(S.versions.at(-1)?.v||0)+1;S.versions.push({v:vv,date:today(),note:$('#vn').value||'',words:S.sections.reduce((a,s)=>a+wc(s.text),0),snap:S.sections.map(s=>({title:s.title,text:s.text}))});log('Version saved','v'+vv);save();vOut();};
+ v.querySelectorAll('[data-dv]').forEach(b=>b.onclick=()=>{const x=S.versions.find(z=>z.v==b.dataset.dv);dl(fname('SOW-v'+x.v,'txt'),x.snap.map((s,i)=>(i+1)+'. '+s.title.toUpperCase()+'\n\n'+s.text.replace(/\s*\{[^}]*\}/g,'')).join('\n\n'),'text/plain');});
+ $('#lg').innerHTML=S.log.length?S.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
+ function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
+function bodyHTML(){return '<div style="text-align:center;font-weight:bold">'+esc(S.p.title||'STATEMENT OF WORK').toUpperCase()+'</div>'+(S.p.installation?'<div style="text-align:center">'+esc(S.p.installation)+(S.p.contract?' – '+esc(S.p.contract):'')+'</div>':'')+
+ S.sections.map((s,i)=>'<h4>'+(i+1)+'. '+esc(s.title.toUpperCase())+'</h4>'+fmt(s.text.replace(/\s*\{[^}]*\}/g,''),i+1)).join('');}
+function fmt(t,n){const lines=t.split(/\n/);let html='',list=false;lines.forEach(l=>{const m=l.match(/^\s*(\d+)[.)]\s+(.*)/);
+ if(m){html+='<p style="margin:0 0 6pt 0.3in;text-indent:-0.3in">'+n+'.'+m[1]+'.&nbsp;&nbsp;'+esc(m[2])+'</p>';}else if(l.trim()) html+='<p style="margin:0 0 6pt">'+esc(l.trim())+'</p>';});return html;}
+function docHTML(){return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>'+esc(S.p.title||'SOW')+'</title><style>body{font:11pt Calibri,Arial,sans-serif;text-align:justify;max-width:6.5in;margin:0 auto}h4{font-size:11pt;margin:12pt 0 6pt}p{margin:0 0 6pt}</style></head><body>'+bodyHTML()+'</body></html>';}
+function rtmRows(){const tm=traceMap();return [['Req ID','Requirement','Priority','SOW location']].concat(S.reqs.map(r=>[r.id,r.text,r.priority||'',(tm[r.id]||['NOT COVERED']).join('; ')]));}
+const fname=(k,ext)=>((S.p.title||'SOPHIE').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+const csv=rows=>'\ufeff'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
+
+// ---------- settings + header ----------
+function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?'generativelanguage.googleapis.com':'api.openai.com';}
+function renderSlots(){const box=$('#slots');box.innerHTML='';SET.slots.forEach((s,i)=>{const d=document.createElement('div');d.className='slot';
+ d.innerHTML='<h4><label><input type="checkbox" data-f="enabled" style="width:auto" '+(s.enabled?'checked':'')+'> '+esc(s.label||('AI '+(i+1)))+'</label></h4><div class="grid2">'+
+ '<div><label>Display name</label><input data-f="label" value="'+esc(s.label)+'"></div><div><label>Role</label><select data-f="role"><option value="reader" '+(s.role!=='arbiter'?'selected':'')+'>Reader (drafter, then reviewer)</option><option value="arbiter" '+(s.role==='arbiter'?'selected':'')+'>Arbiter</option></select></div>'+
+ '<div><label>Provider</label><select data-f="provider">'+Object.entries(PROVIDERS).map(([k,v])=>'<option value="'+k+'" '+(s.provider===k?'selected':'')+'>'+esc(v)+'</option>').join('')+'</select></div><div><label>Model</label><input data-f="model" value="'+esc(s.model)+'"></div>'+
+ '<div><label>API key</label><input data-f="key" type="password" value="'+esc(s.key)+'" autocomplete="off"></div><div><label>Endpoint base URL (blank = default)</label><input data-f="base" value="'+esc(s.base)+'" placeholder="'+defaultBase(s.provider)+'"></div>'+
+ '<div><label>Auth header (custom)</label><input data-f="header" value="'+esc(s.header)+'"></div><div><label>Auth prefix</label><input data-f="prefix" value="'+esc(s.prefix)+'"></div>'+
+ '<div style="align-self:end"><button data-test="'+i+'">Test connection</button> <span class="small" id="t'+i+'"></span></div></div>';
+ d.querySelectorAll('[data-f]').forEach(el=>{el.oninput=el.onchange=()=>{s[el.dataset.f]=el.type==='checkbox'?el.checked:el.value;};});
+ d.querySelector('[data-test]').onclick=async ev=>{ev.preventDefault();const t=document.getElementById('t'+i);t.textContent='Testing…';try{const r=await callAI(s,'Reply with JSON only.','Return {"ok":true}');t.textContent=r.ok?'Connected':'Replied, unexpected output';}catch(err){t.textContent='Failed: '+String(err.message||err).slice(0,90);}};box.appendChild(d);});$('#rememberKeys').checked=!!SET.remember;}
+$('#bSettings').onclick=()=>{SET=loadSettings();renderSlots();$('#dlg').showModal();};
+$('#bCloseSet').onclick=()=>{$('#dlg').close();SET=loadSettings();};
+$('#bSaveSet').onclick=()=>{SET.remember=$('#rememberKeys').checked;saveSettings();$('#dlg').close();};
+$('#bSave').onclick=()=>{dl(fname('SOPHIE','json'),JSON.stringify(S,null,1),'application/json');log('Project file saved');save();};
+$('#bNew').onclick=()=>{if(!confirm('Start a new SOW? Save a file of the current one first if you need it.')) return;S=BLANK();buildSections();log('Project created');save();STEP='setup';render();};
+$('#bOpen').onclick=()=>$('#fOpen').click();
+$('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='sophie-1') throw new Error('Not a SOPHIE project file');S=Object.assign(BLANK(),j);log('Project file opened',f.name);save();STEP='setup';render();}catch(err){alert('Could not open: '+err.message);}});};
+if(!S.log.length) log('Project created');
+render();save();
+</script>
+</body>
+</html>
