@@ -279,14 +279,23 @@ const INST={'andersen':[13.58,144.93,'Guam'],'naval base guam':[13.44,144.65,'Gu
 function locate(inst){const t=String(inst||'').toLowerCase();const k=Object.keys(INST).sort((a,b)=>b.length-a.length).find(k=>t.includes(k));return k?INST[k]:null;}
 
 // ---------- state ----------
-const DEF_T={costWatch:5,costCrit:10,slipWatch:30,slipCrit:90,spiWatch:.9,spiCrit:.8,riskWatch:8,riskCrit:15,actWatch:1,actCrit:3,stale:30,umc:9000000};
+const DEF_T={costWatch:5,costCrit:10,slipWatch:30,slipCrit:90,spiWatch:.9,spiCrit:.8,riskWatch:8,riskCrit:15,actWatch:1,actCrit:3,stale:30,umc:9000000,fundsWatch:3};
+// Statutory figures the checks rely on, each with its source. Checked against the U.S. Code (Cornell LII) on 16 Nov 2026.
+const LAW={asof:'U.S. Code as published by Cornell LII, checked 16 Nov 2026',
+ umc:{v:9000000,cite:'10 U.S.C. 2805(a)(2)',what:'Unspecified minor construction ceiling'},
+ umcCap:{v:14000000,cite:'10 U.S.C. 2805(f)(1)',what:'Highest ceiling after the yearly area cost index adjustment by location'},
+ costPct:{v:25,cite:'10 U.S.C. 2853(a)',what:'Cost variation: 25% of authorized cost or 200% of the 2805(a) ceiling, whichever is less'},
+ scopeCut:{v:25,cite:'10 U.S.C. 2853(b)(1)',what:'Scope reduction without waiver; facility must stay complete and usable'},
+ scopeUp:{v:10,cite:'10 U.S.C. 2853(b)(2), (d)',what:'No scope increase without a waiver and 14-day notice; never more than 10%'},
+ report:{v:40000000,cite:'10 U.S.C. 2853(c)(1)(E)',what:'Projects over $40M with a cost increase of 25% or more: additional report under 2853(f)'},
+ bigCap:{v:500000000,cite:'10 U.S.C. 2853(c)(1)(D)',what:'No waiver above 50% on projects over $500M'}};
 const BLANK=()=>({schema:'paula-1',created:new Date().toISOString(),projects:[],t:{...DEF_T},me:'',log:[]});
 let P=load()||BLANK();let VIEW='port',CUR=null,PTAB='ov';let F={svc:'',ctry:'',phase:'',pm:'',health:'',q:''};
 function load(){try{const j=JSON.parse(localStorage.getItem('paula_project')||'null');if(j) j.t={...DEF_T,...j.t};return j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('paula_project',JSON.stringify(P));$('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},300);}
 function log(w,d){P.log.push({at:new Date().toISOString(),what:w,detail:d||''});}
-const blankProj=()=>({id:uid(),name:'',number:'',to:'',service:'',installation:'',country:'',lat:'',lon:'',phase:1,fy:'',pm:'',contractor:'',delivery:'',programmed:'',authorized:'',award:'',cwe:'',obligated:'',expended:'',ntp:'',baseline_finish:'',forecast_finish:'',pct:'',risks:[],milestones:[],updates:[],decisions:'',override:{level:'',reason:''},sample:false});
+const blankProj=()=>({id:uid(),name:'',number:'',to:'',service:'',installation:'',country:'',lat:'',lon:'',phase:1,fy:'',pm:'',contractor:'',delivery:'',programmed:'',authorized:'',award:'',cwe:'',obligated:'',expended:'',funded:'',scope_auth:'',scope_now:'',scope_unit:'',ntp:'',baseline_finish:'',forecast_finish:'',pct:'',risks:[],milestones:[],updates:[],decisions:'',override:{level:'',reason:''},sample:false});
 
 // ---------- live links to IRMA and QUINN ----------
 function irmaFor(p){try{const I=JSON.parse(localStorage.getItem('irma_project')||'null');if(!I||!p.to) return null;const sd=Number(I.settings?.sub_days||14),rd=Number(I.settings?.rfi_days||14);
@@ -302,10 +311,28 @@ const value=p=>N(p.cwe)||N(p.award)||N(p.authorized)||N(p.programmed);
 function lastUpd(p){return p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date)).pop();}
 function spi(p,asOf){if(!p.ntp||!p.baseline_finish||p.pct==='') return null;const tot=dd(p.ntp,p.baseline_finish);const el=dd(p.ntp,asOf||today());if(tot<=0||el<=0) return null;const tp=Math.min(1,el/tot);if(tp<.1) return null;return {spi:(N(p.pct)/100)/tp,tp};}
 function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(dim,l,r)=>parts.push({dim,l,r});
- const b=base(p),e=est(p);
- if(b&&(N(p.cwe)||N(p.award))){const g=(e-b)/b,lim=Math.min(.25*b,2*T.umc);
-  if(e-b>lim) add('Cost',2,'Up '+M(e-b)+' ('+pct(g,1)+') – beyond the 10 U.S.C. 2853 variation limit of '+M(lim));
-  else if(g*100>T.costCrit) add('Cost',2,'Up '+pct(g,1)+' on '+M(b));else if(g*100>T.costWatch) add('Cost',1,'Up '+pct(g,1)+' on '+M(b));else add('Cost',0,(g>=0?'Up ':'Down ')+pct(Math.abs(g),1));}
+ const b=base(p),e=est(p),hasE=!!(N(p.cwe)||N(p.award)),A=N(p.authorized);
+ // 1 Legal authority: the estimate against the amount Congress authorized (10 U.S.C. 2853).
+ if(A&&hasE){const d=e-A,g=d/A,lim=Math.min(LAW.costPct.v/100*A,2*T.umc);
+  if(d>lim) add('Legal authority',2,'Up '+M(d)+' ('+pct(g,1)+') – beyond the '+LAW.costPct.cite+' limit of '+M(lim)+'; needs a waiver and congressional notice before obligating');
+  else if(d>0) add('Legal authority',A>LAW.report.v&&g>=.25?1:0,'Up '+M(d)+', inside the '+M(lim)+' variation limit; the Secretary concerned must determine it is needed for unusual cost variations ('+LAW.costPct.cite+')'+(A>LAW.report.v&&g>=.25?' – also needs the 2853(f) report':''));
+  else add('Legal authority',0,'Within the authorized amount');}
+ else add('Legal authority',-1,A?'No current estimate yet':'No authorized amount recorded');
+ // 2 Funds available: can the money on hand cover the estimate?
+ const F=N(p.funded);if(F&&hasE){const h=(F-e)/F;
+  add('Funds',e>F?2:h*100<T.fundsWatch?1:0,e>F?'Estimate exceeds funds available by '+M(e-F):h*100<T.fundsWatch?'Only '+M(F-e)+' ('+pct(h,1)+') headroom left':M(F-e)+' headroom ('+pct(h,1)+')');}
+ else add('Funds',-1,F?'No current estimate yet':'Funds available not recorded');
+ // 3 Scope: against the 1391 justification data (10 U.S.C. 2853(b), (d)).
+ const sa=N(p.scope_auth),sn=N(p.scope_now),su=p.scope_unit||'';if(sa&&sn){const g=(sn-sa)/sa*100;
+  if(g<-LAW.scopeCut.v) add('Scope',2,'Cut '+Math.abs(g).toFixed(1)+'% – beyond the 25% limit of '+LAW.scopeCut.cite+'; needs a waiver and notice');
+  else if(g>LAW.scopeUp.v) add('Scope',2,'Up '+g.toFixed(1)+'% – no waiver can approve more than 10% ('+LAW.scopeUp.cite+')');
+  else if(g>0) add('Scope',1,'Up '+g.toFixed(1)+'% – needs a waiver and 14-day congressional notice ('+LAW.scopeUp.cite+')');
+  else if(g<0) add('Scope',0,'Cut '+Math.abs(g).toFixed(1)+'%, within 25% – facility must stay complete and usable');
+  else add('Scope',0,'As in the 1391: '+sn.toLocaleString()+' '+su);}
+ else add('Scope',-1,'Scope not recorded');
+ // 4 Cost performance: growth against the baseline, by your thresholds.
+ if(b&&hasE){const g=(e-b)/b;
+  if(g*100>T.costCrit) add('Cost',2,'Up '+pct(g,1)+' on '+M(b));else if(g*100>T.costWatch) add('Cost',1,'Up '+pct(g,1)+' on '+M(b));else add('Cost',0,(g>=0?'Up ':'Down ')+pct(Math.abs(g),1));}
  else add('Cost',-1,'No estimate against the authorized amount yet');
  if(N(p.phase)>=7&&p.baseline_finish&&p.forecast_finish){const s=dd(p.baseline_finish,p.forecast_finish);const sp=spi(p,now);let l=s>T.slipCrit?2:s>T.slipWatch?1:0;let r=s>0?s+' days late to baseline':'On or ahead of baseline';
   if(sp&&N(p.phase)===7){const l2=sp.spi<T.spiCrit?2:sp.spi<T.spiWatch?1:0;if(l2>l){l=l2;}r+='; '+Math.round(N(p.pct))+'% complete at '+pct(sp.tp)+' of time';}add('Schedule',l,r);}
@@ -522,7 +549,8 @@ function dumbbell(p){const ms=p.milestones.filter(m=>m.baseline||m.forecast||m.a
   s+='<g'+tipA(tip)+'>'+(b&&f?'<line x1="'+X(b)+'" x2="'+X(f)+'" y1="'+y+'" y2="'+y+'" stroke="#c3c2b7" stroke-width="2"/>':'')+(b?'<circle cx="'+X(b)+'" cy="'+y+'" r="4.5" fill="var(--seq250)" stroke="var(--surf)" stroke-width="2"/>':'')+(f?'<circle cx="'+X(f)+'" cy="'+y+'" r="4.5" fill="'+(m.actual?'var(--seq650)':'var(--s1)')+'" stroke="var(--surf)" stroke-width="2"/>':'')+'<rect x="0" y="'+(y-12)+'" width="'+W+'" height="24" fill="transparent"/></g>';});
  return s+'</svg>'+legend([['var(--seq250)','Baseline'],['var(--s1)','Forecast'],['var(--seq650)','Actual']]);}
 const FIELDS=[['name','Project title','wide'],['number','Project number'],['to','Task order / contract (links IRMA and QUINN)'],['service','Service','svc'],['installation','Installation'],['country','Country or state'],['lat','Latitude'],['lon','Longitude'],['phase','Lifecycle phase','phase'],['fy','Program fiscal year'],['pm','Project manager'],['contractor','Contractor'],['delivery','Delivery method'],
- ['programmed','Programmed amount (1391) $'],['authorized','Authorized / appropriated $'],['award','Contract award $'],['cwe','Current working estimate $'],['obligated','Obligated $'],['expended','Expended $'],['ntp','Notice to proceed','date'],['baseline_finish','Baseline completion (BOD)','date'],['forecast_finish','Forecast completion','date'],['pct','Physical percent complete']];
+ ['programmed','Programmed amount (1391) $'],['authorized','Authorized / appropriated $'],['award','Contract award $'],['cwe','Current working estimate $'],['obligated','Obligated $'],['expended','Expended $'],['ntp','Notice to proceed','date'],['baseline_finish','Baseline completion (BOD)','date'],['forecast_finish','Forecast completion','date'],['pct','Physical percent complete'],
+ ['funded','Funds available to the project $'],['scope_auth','Scope in the 1391 justification data (quantity)'],['scope_now','Scope now (same unit)'],['scope_unit','Scope unit (SF, LF, each…)']];
 function pEdit(p){const t=$('#pt');
  t.innerHTML='<div class="panel"><div class="form">'+FIELDS.map(([k,l,ty])=>'<div class="'+(ty==='wide'?'wide':'')+'"><label class="f">'+l+'</label>'+(ty==='svc'?'<select data-k="'+k+'"><option value="">—</option>'+SERVICES.map(s=>'<option '+(p[k]===s?'selected':'')+'>'+s+'</option>').join('')+'</select>':ty==='phase'?'<select data-k="'+k+'">'+[1,2,3,4,5,6,7,8].map(n=>'<option value="'+n+'" '+(N(p[k])===n?'selected':'')+'>'+n+'. '+PHASES[n]+'</option>').join('')+'</select>':'<input data-k="'+k+'" '+(ty==='date'?'type="date"':'')+'>')+'</div>').join('')+
  '<div class="wide"><label class="f">Decisions needed from leadership</label><textarea data-k="decisions"></textarea></div>'+
@@ -601,16 +629,16 @@ function dataRows(){const h=['Project','Number','Task order','Service','Installa
  return [h].concat(filtered().map(p=>{const H=health(p);return [p.name,p.number,p.to,p.service,p.installation,p.country,p.phase,p.fy,p.pm,p.contractor,p.programmed,p.authorized,p.award,p.cwe,p.obligated,p.expended,p.ntp,p.baseline_finish,p.forecast_finish,p.pct,LEVEL[H.overall].n,H.parts.map(z=>z.dim+': '+z.r).join(' | '),H.override?p.override.reason:'',H.lastDate];}));}
 
 // ---------- data + settings ----------
-const CSVCOLS=['name','number','to','service','installation','country','lat','lon','phase','fy','pm','contractor','delivery','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
+const CSVCOLS=['name','number','to','service','installation','country','lat','lon','phase','fy','pm','contractor','delivery','programmed','authorized','award','cwe','obligated','expended','funded','scope_auth','scope_now','scope_unit','ntp','baseline_finish','forecast_finish','pct'];
 function vData(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Data</h2><div class="outs">'+
  '<div class="card"><h4>Import projects</h4><p>From a spreadsheet saved as CSV, one row per project. Download the template for the columns. Rows matching an existing project number update it.</p><button class="sm" id="bTpl">Template</button> <button class="sm go" id="bImp">Import CSV</button><input type="file" id="fImp" accept=".csv" hidden></div>'+
  '<div class="card"><h4>Merge PM files</h4><p>Each PM keeps a copy and sends the saved file. Merge them here: projects match on project number or ID, and the most recent update wins.</p><button class="sm go" id="bMerge">Choose files</button><input type="file" id="fMerge" accept=".json" multiple hidden></div>'+
  '<div class="card"><h4>Link from the suite</h4><p>Bring in the 1391 amounts from PIPER and the project from NORA in this browser as a new or existing project.</p><button class="sm go" id="bLink">Link</button></div>'+
  '<div class="card"><h4>Sample portfolio</h4><p>Fictional projects at real Indo-Pacific installations, with a year of updates, to see how the dashboard reads.</p><button class="sm" id="bSample">'+(P.projects.some(p=>p.sample)?'Clear sample data':'Load sample data')+'</button></div></div><p class="small" id="dm"></p></div>'+
- '<div class="panel"><h2>Health thresholds</h2><p class="lead">The health engine takes the worst of cost, schedule, risk and actions. Change the thresholds to match JPMO’s rules; every chart and report follows.</p><div class="form">'+
- [['costWatch','Cost growth for watch (%)'],['costCrit','Cost growth for critical (%)'],['slipWatch','Schedule slip for watch (days)'],['slipCrit','Schedule slip for critical (days)'],['spiWatch','Progress ratio for watch (percent complete ÷ percent time)'],['spiCrit','Progress ratio for critical'],['riskWatch','Risk score for watch (likelihood × impact)'],['riskCrit','Risk score for critical'],['actWatch','Overdue actions for watch'],['actCrit','Overdue actions for critical'],['stale','Days before a project is flagged as not updated'],['umc','Minor construction ceiling, 10 U.S.C. 2805(a) ($)']].map(([k,l])=>'<div><label class="f">'+l+'</label><input type="number" step="any" data-t="'+k+'" value="'+P.t[k]+'"></div>').join('')+
- '<div><label class="f">Your name (on updates and reports)</label><input id="me" value="'+esc(P.me)+'"></div></div><div class="row"><button id="bResetT">Restore defaults</button></div></div>'+
+ '<div class="panel"><h2>Health thresholds</h2><p class="lead">The health engine takes the worst of legal authority, funds, scope, cost, schedule, risk and actions. Change the thresholds to match JPMO’s rules; every chart and report follows.</p><div class="form">'+
+ [['costWatch','Cost growth for watch (%)'],['costCrit','Cost growth for critical (%)'],['slipWatch','Schedule slip for watch (days)'],['slipCrit','Schedule slip for critical (days)'],['spiWatch','Progress ratio for watch (percent complete ÷ percent time)'],['spiCrit','Progress ratio for critical'],['riskWatch','Risk score for watch (likelihood × impact)'],['riskCrit','Risk score for critical'],['actWatch','Overdue actions for watch'],['actCrit','Overdue actions for critical'],['stale','Days before a project is flagged as not updated'],['fundsWatch','Funds headroom for watch (%)'],['umc','Minor construction ceiling used for 2853 ($): $9M by statute; up to $14M where the location-adjusted figure applies']].map(([k,l])=>'<div><label class="f">'+l+'</label><input type="number" step="any" data-t="'+k+'" value="'+P.t[k]+'"></div>').join('')+
+ '<div class="wide small">Statutory figures ('+esc(LAW.asof)+'): '+['umc','umcCap','costPct','scopeCut','scopeUp','report','bigCap'].map(k=>LAW[k].what+' – '+LAW[k].cite).join('; ')+'. PAULA flags; the Service and its counsel decide.</div><div><label class="f">Your name (on updates and reports)</label><input id="me" value="'+esc(P.me)+'"></div></div><div class="row"><button id="bResetT">Restore defaults</button></div></div>'+
  '<div class="panel"><h2>Log</h2><div class="small">'+(P.log.slice().reverse().slice(0,150).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
  v.querySelectorAll('[data-t]').forEach(i=>i.onchange=()=>{P.t[i.dataset.t]=Number(i.value);log('Threshold changed',i.dataset.t+' = '+i.value);save();});$('#me').oninput=e=>{P.me=e.target.value;save();};
  $('#bResetT').onclick=()=>{P.t={...DEF_T};save();vData();};
@@ -634,6 +662,7 @@ function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483
  const defs=[['Aircraft Maintenance Hangar','Andersen AFB, Guam','Air Force',7,182e6],['Munitions Storage Igloos','Andersen AFB, Guam','Air Force',7,64e6],['Typhoon Recovery Roofing, Phase 1','Andersen AFB, Guam','Air Force',7,26e6],['Bachelor Enlisted Quarters','Camp Blaz, Guam','Marine Corps',7,141e6],['Live-Fire Training Range Complex','Camp Blaz, Guam','Marine Corps',8,96e6],['Wharf Improvements','Naval Base Guam','Navy',6,212e6],['Divert Airfield Fuel Storage','Tinian, CNMI','Air Force',7,73e6],['Parking Apron Expansion','Kadena AB, Okinawa','Air Force',7,118e6],['Fitness Center','Camp Hansen, Okinawa','Marine Corps',5,38e6],['Pier Replacement','Yokosuka, Japan','Navy',4,265e6],['Fighter Squadron Operations','Misawa AB, Japan','Air Force',7,54e6],['Hardened Aircraft Shelters','Osan AB, Korea','Air Force',6,88e6],['Unaccompanied Housing','Camp Humphreys, Korea','Army',7,156e6],['Water Treatment Plant','Kunsan AB, Korea','Air Force',3,47e6],['Dry Dock Modernization','Pearl Harbor, Hawaii','Navy',7,621e6],['Barracks Renovation','Schofield Barracks, Hawaii','Army',7,82e6],['Aircraft Maintenance Hangar','Kaneohe, Hawaii','Marine Corps',5,129e6],['Range Instrumentation Facility','PMRF Barking Sands, Hawaii','Navy',2,31e6],['Airfield Pavement Repair','Wake Island','Air Force',6,44e6],['Space Surveillance Facility','Kwajalein, Marshall Islands','Space Force',4,58e6],['Bulk Fuel Storage','Darwin, Australia','Defense-Wide',3,112e6],['Expeditionary Airfield Upgrades','Basa AB, Philippines','Air Force',5,36e6],['Dormitory','Eielson AFB, Alaska','Air Force',7,92e6],['Composite Medical Facility','JBER, Alaska','DHA',1,165e6]];
  const pms=['R. G. Bishop','J. Santos','M. Tanaka','K. Leon Guerrero','D. Park'];const ctrs=['InfraTech International','Black Construction','Hensel Phelps','Kiewit','Core Tech'];
  defs.forEach(([nm,inst,svc,ph,val],i)=>{const g=locate(inst);const p=Object.assign(blankProj(),{name:nm,number:'P'+(100+i*7),to:'F'+String(140+i).padStart(4,'0'),service:svc,installation:inst,country:g?g[2]:'',phase:ph,fy:String(2024+(i%5)),pm:pick(pms),contractor:ph>=7?pick(ctrs):'',delivery:pick(['Design-build','Design-bid-build']),programmed:Math.round(val),authorized:ph>=4?Math.round(val*(.98+rnd()*.06)):'',sample:true});
+  if(ph>=4){p.funded=Math.round(N(p.authorized)*(rnd()<.15?.97:1));p.scope_auth=Math.round(val/700/10)*10;p.scope_now=rnd()<.15?Math.round(p.scope_auth*(rnd()<.5?.9:1.04)):p.scope_auth;p.scope_unit='SF';}
   if(ph>=7){const ntp=addD(today(),-Math.round(200+rnd()*600));const dur=Math.round(600+rnd()*500);const bf=addD(ntp,dur);const tp=Math.min(1,dd(ntp,today())/dur);
    const award=Math.round(N(p.authorized)*(.86+rnd()*.1));const growth=rnd()<.2?(.06+rnd()*.16):rnd()*.05;const slip=rnd()<.3?Math.round(30+rnd()*160):Math.round(rnd()*25-10);
    const pctNow=ph===8?100:Math.round(Math.max(3,Math.min(97,tp*100*(slip>60?.78:.98+rnd()*.06))));Object.assign(p,{ntp,baseline_finish:bf,forecast_finish:addD(bf,slip),award,cwe:Math.round(award*(1+growth)),obligated:Math.round(award*(1+growth*.6)),expended:Math.round(award*pctNow/100*.95),pct:pctNow});

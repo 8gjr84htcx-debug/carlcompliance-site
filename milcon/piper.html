@@ -257,7 +257,8 @@ const TU={none:['Not in Table 2-4',1],rdte:['300 Research, development, test and
 const DC={low:['Low – site-adapted, repetitive standard design, routine technology',1.05],medium:['Medium – unique design, complex technology',1.10],high:['High – unique design, highly complex technology',1.20],ultra:['Ultra-high – extremely complex or innovative technology',1.30]};
 const ROUND=[[1e6,1e4],[5e6,5e4],[1e7,1e5],[1.5e7,2e5],[2e7,5e5],[Infinity,1e6]];
 const SIOH={conus:['CONUS',6.5],oconus:['OCONUS (incl. Hawaii, Alaska, territories)',7.3],remote:['Remote OCONUS (justification required)',9.0]};
-const LAW={umc:9000000,asof:'10 U.S.C. 2805(a) and 2853 as in the U.S. Code through mid-2026'};
+// Statutory figures, each with its source. Checked against the U.S. Code (Cornell LII) on 16 Nov 2026.
+const LAW={umc:9000000,umcCap:14000000,asof:'10 U.S.C. 2805 and 2853, U.S. Code as published by Cornell LII, checked 16 Nov 2026'};
 const COMPONENTS=['Army','Navy','Marine Corps','Air Force','Space Force','Defense-Wide','Defense Health Agency','Army Reserve','Army National Guard','Navy Reserve','Air Force Reserve','Air National Guard'];
 const APPROP=['OPN','OPA','OPAF','O&M','RDT&E','DHP','Other'];
 function sizeFactor(r){let best=SIZE[0];for(const s of SIZE) if(s[0]<=r+1e-9) best=s;return best;}
@@ -274,7 +275,7 @@ const BLANK=()=>({schema:'piper-1',id:uid(),created:new Date().toISOString(),mod
  prim:[],sup:[],cont:5,sioh_override:'',db:0,eq:[],
  n:{desc:'',um:'SF',req:'',adqt:'',substd:'',project:'',requirement:'',current:'',impact:'',additional:'',joint:''},
  s12:{acq:'',ds:'',pct:'',asof:'',d35:'',dc:'',dcost:'',energy:'',std:'',award:'',start:'',complete:'',fci:''},
- versions:[],qa:[],ex:{auth:'',approp:'',cwe:'',ige:'',scope_auth:'',scope_now:''},review:{ext:false,ext_total:'',ext_qty:'',ext_prim:'',ext_sup:'',ext_cont:'',ext_sioh:''},log:[]});
+ versions:[],qa:[],ex:{auth:'',approp:'',cwe:'',ige:'',scope_auth:'',scope_now:'',umc:'',umc_src:''},review:{ext:false,ext_total:'',ext_qty:'',ext_prim:'',ext_sup:'',ext_cont:'',ext_sioh:''},log:[]});
 let P=load()||BLANK();let STEP='blocks';
 function load(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
@@ -547,19 +548,21 @@ function vDef(){const v=$('#view');
 // ---------- 8 execution checks ----------
 function vEx(){const v=$('#view');const x=P.ex;
  v.innerHTML='<div class="panel"><h2>Cost and scope checks</h2><p class="lead">Once the project is authorized, every estimate is measured against the amount Congress approved. Use this before award (Government estimate against the 1391) and during construction (current working estimate against the authorization).</p>'+
- '<div class="form"><div><label class="f">Authorized / appropriated cost ($)</label><input data-k="auth" placeholder="'+(calc().rounded||'')+'"></div><div><label class="f">Independent Government estimate ($)</label><input data-k="ige"></div><div><label class="f">Current working estimate ($)</label><input data-k="cwe"></div><div><label class="f">Scope in justification data</label><input data-k="scope_auth" placeholder="'+(calc().qty||'')+'"></div><div><label class="f">Scope now</label><input data-k="scope_now"></div></div><div id="exo"></div>'+
- '<p class="small">Limits from '+esc(LAW.asof)+': cost variation up to the lesser of 25% of authorized cost or 200% of the $'+(LAW.umc/1e6)+'M minor construction ceiling; scope reduction up to 25%; scope increase no more than 10%; an added report for projects over $40M with a cost increase of 25% or more. PIPER flags; the Service and its lawyers decide. Confirm the current statute before acting.</p></div>';
+ '<div class="form"><div><label class="f">Authorized / appropriated cost ($)</label><input data-k="auth" placeholder="'+(calc().rounded||'')+'"></div><div><label class="f">Independent Government estimate ($)</label><input data-k="ige"></div><div><label class="f">Current working estimate ($)</label><input data-k="cwe"></div><div><label class="f">Scope in justification data</label><input data-k="scope_auth" placeholder="'+(calc().qty||'')+'"></div><div><label class="f">Scope now</label><input data-k="scope_now"></div><div><label class="f">Minor construction ceiling for 2853 ($)</label><input data-k="umc" placeholder="9000000"></div><div class="wide"><label class="f">Source if not $9,000,000 (location-adjusted under 2805(f), up to $14,000,000)</label><input data-k="umc_src" placeholder="e.g. Service guidance, FY27 area cost index"></div></div><div id="exo"></div>'+
+ '<p class="small">Limits from '+esc(LAW.asof)+': cost variation up to the lesser of 25% of authorized cost or 200% of the minor construction ceiling in 2805(a) ($9M by statute; the yearly location adjustment under 2805(f) can raise it to no more than $14M, and PIPER uses $9M unless you enter the adjusted figure and its source); scope reduction up to 25% (2853(b)(1)); no scope increase without a waiver and 14-day congressional notice, and never more than 10% (2853(b)(2), (d)); an added report for projects over $40M with a cost increase of 25% or more (2853(c)(1)(E)); no waiver above 50% on projects over $500M (2853(c)(1)(D)). PIPER flags; the Service and its lawyers decide. Confirm the current statute before acting.</p></div>';
  bindAll(v,x,()=>out());
- function out(){const auth=N(x.auth)||calc().rounded;const lim=Math.min(.25*auth,2*LAW.umc);const rows=[];
+ function out(){const auth=N(x.auth)||calc().rounded;const umc=Math.min(N(x.umc)||LAW.umc,LAW.umcCap);const lim=Math.min(.25*auth,2*umc);const rows=[];
+  if(N(x.umc)>LAW.umcCap) rows.push(['bad','Ceiling entered: '+usd(N(x.umc)),'2805(f)(1) caps any adjusted ceiling at '+usd(LAW.umcCap)+'; PIPER uses '+usd(LAW.umcCap)+'.']);
+  if(N(x.umc)&&N(x.umc)!==LAW.umc&&!String(x.umc_src||'').trim()) rows.push(['warn','Ceiling '+usd(N(x.umc))+' has no source','Record where the location-adjusted figure comes from.']);
   const chk=(lbl,val)=>{if(!val) return;const d=val-auth;const p=d/auth*100;let s='ok',m='Within the 1391 amount.';
-   if(d>lim) {s='bad';m='Increase of '+usd(d)+' exceeds the '+usd(lim)+' limit. Requires Secretary approval and congressional notification under 10 U.S.C. 2853(c) before obligating.';}
-   else if(d>0) {s='warn';m='Increase of '+usd(d)+' ('+p.toFixed(1)+'%) is inside the '+usd(lim)+' variation limit.';}
-   else if(-d>lim) {s='warn';m='Decrease of '+usd(-d)+' is beyond the variation limit; check whether scope has been cut.';}
+   if(d>lim) {s='bad';m='Increase of '+usd(d)+' exceeds the '+usd(lim)+' limit. Requires a Secretary waiver and congressional notice, then a 14-day wait, before obligating (10 U.S.C. 2853(c)(1)).';}
+   else if(d>0) {s='warn';m='Increase of '+usd(d)+' ('+p.toFixed(1)+'%) is inside the '+usd(lim)+' variation limit; the Secretary concerned must determine it is needed for unusual cost variations (2853(a)).';}
+   else if(-d>lim) {s='warn';m='Decrease of '+usd(-d)+' is beyond the variation limit: a waiver with notice no later than 14 days after obligation under 2853(c)(2). Check whether scope has been cut.';}
    if(auth>40e6&&p>=25) m+=' Also triggers the additional report under 2853(f) (project over $40M, increase of 25% or more).';
    if(auth>500e6&&p>50) m+=' Over 50% on a project above $500M: a waiver is required.';
    rows.push([s,lbl+': '+usd(val)+' ('+(p>=0?'+':'')+p.toFixed(1)+'%)',m]);};
   chk('Government estimate',N(x.ige));chk('Current working estimate',N(x.cwe));
-  const sa=N(x.scope_auth)||calc().qty,sn=N(x.scope_now);if(sa&&sn){const p=(sn-sa)/sa*100;rows.push([p<-25||p>10?'bad':Math.abs(p)>0?'warn':'ok','Scope '+sn.toLocaleString()+' vs '+sa.toLocaleString()+' ('+(p>=0?'+':'')+p.toFixed(1)+'%)',p<-25?'Reduction over 25% requires notification under 2853(b); the facility must remain complete and usable.':p>10?'Scope increase over 10% is not allowed under 2853(d).':p<0?'Reduction within 25%; the facility must still be complete and usable and meet the requirement.':p>0?'Increase within 10%; requires notification.':'No change.']);}
+  const sa=N(x.scope_auth)||calc().qty,sn=N(x.scope_now);if(sa&&sn){const p=(sn-sa)/sa*100;rows.push([p<-25||p>10?'bad':Math.abs(p)>0?'warn':'ok','Scope '+sn.toLocaleString()+' vs '+sa.toLocaleString()+' ('+(p>=0?'+':'')+p.toFixed(1)+'%)',p<-25?'Reduction over 25% requires notification under 2853(b); the facility must remain complete and usable.':p>10?'No waiver can approve a scope increase over 10% (2853(d)(4)).':p<0?'Reduction within 25%; the facility must still be complete and usable and meet the requirement.':p>0?'Any scope increase needs a Secretary waiver and 14-day congressional notice (2853(b)(2), (d)); 10% is the most a waiver can approve.':'No change.']);}
   $('#exo').innerHTML='<div style="margin-top:12px">'+(rows.length?rows.map(([s,t,m])=>'<div class="find '+s+'"><b>'+esc(t)+'</b><span>'+esc(m)+'</span></div>').join(''):'<p class="small">Enter an estimate or scope to check.</p>')+'</div>';}
  out();}
 
