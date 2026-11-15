@@ -4,6 +4,118 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIPER – Programming, Investment, and Project Estimate Reviewer</title>
+<script id="ms-core">window.MS_TOOL='piper';
+/* MILCON suite shared project record. Inlined into each tool; runs before the tool's own script. */
+(function(){
+'use strict';
+const TOOL=window.MS_TOOL||'';
+const PKEY={nora:'nora_project',earl:'earl_project',piper:'piper_project',sophie:'sophie_project',record:'milcon_record',paula:'paula_project'};
+const PER=['nora','earl','piper','sophie','record'];
+const ls=window.localStorage;const orig=Storage.prototype.setItem;
+const today=()=>new Date().toLocaleDateString('en-CA');
+const uid=()=>Math.random().toString(36).slice(2,10);
+function get(k){try{return JSON.parse(ls.getItem(k)||'null');}catch(e){return null;}}
+function raw(k,v){orig.call(ls,k,v);}
+function loadStore(){const s=get('milcon_store');return s&&s.projects?s:{schema:'milcon-store-1',active:'',projects:{}};}
+let full=false;
+function saveStore(s){try{raw('milcon_store',JSON.stringify(s));full=false;}catch(e){full=true;note('Browser storage is full. Use “Export all” to keep a copy, then delete old projects.');}}
+function fill(base,obj){if(obj==null) return obj;for(const k of Object.keys(base)){if(obj[k]===undefined) obj[k]=base[k];else if(base[k]&&typeof base[k]==='object'&&!Array.isArray(base[k])&&obj[k]&&typeof obj[k]==='object'&&!Array.isArray(obj[k])) fill(base[k],obj[k]);}return obj;}
+window.MSfill=fill;
+
+// ---- field maps: what each tool shares with the record ----
+const SVC={army:'Army',navy:'Navy',usmc:'Marine Corps',af:'Air Force',ussf:'Space Force',dha:'DHA',def_agency:'Defense-Wide',joint:'Joint'};
+const LOC={us_hawaii:'Hawaii',us_alaska:'Alaska',guam:'Guam',cnmi:'CNMI',american_samoa:'American Samoa',wake:'Wake Island',japan:'Japan',korea:'Korea',australia:'Australia',philippines:'Philippines',palau:'Palau',fsm:'FSM',marshall_islands:'Marshall Islands',papua_new_guinea:'Papua New Guinea',singapore:'Singapore'};
+const inv=o=>Object.fromEntries(Object.entries(o).map(([k,v])=>[v,k]));
+const PIPER_SVC={'DHA':'Defense Health Agency','Defense Health Agency':'Defense Health Agency'};
+const has=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
+const set=(o,k,v)=>{if(has(v)) o[k]=v;};
+const MAP={
+ nora:{skel:()=>({schema:'nora-1',project:{}}),
+  get:s=>({name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service],country:LOC[s.project?.location],need_date:s.project?.need_date,_ev:{'Requirement validated':s.validation?.service_date||s.validation?.installation_date||''}}),
+  put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);if(inv(SVC)[c.service]) s.project.service=inv(SVC)[c.service];if(inv(LOC)[c.country]) s.project.location=inv(LOC)[c.country];set(s.project,'need_date',c.need_date);}},
+ earl:{skel:()=>({schema:'earl-1',project:{}}),
+  get:s=>({name:s.project?.name,installation:s.project?.installation,service:s.project?.service,_ev:{'Economic analysis approved':s.recommend?.decision==='approved'?(s.recommend.date||today()):''}}),
+  put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);set(s.project,'service',c.service);}},
+ piper:{skel:()=>({schema:'piper-1',b:{},ex:{}}),
+  get:s=>({name:s.b?.title,installation:s.b?.installation,number:s.b?.project_no,fy:s.b?.fy,catcode:s.b?.catcode,service:s.b?.component==='Defense Health Agency'?'DHA':s.b?.component,authorized:s.ex?.auth,cwe:s.ex?.cwe,_ev:{'1391 validated':(s.versions||[]).length?'':''}}),
+  put:(s,c)=>{s.b=s.b||{};s.ex=s.ex||{};set(s.b,'title',c.name);set(s.b,'installation',c.installation);set(s.b,'project_no',c.number);set(s.b,'fy',c.fy);set(s.b,'catcode',c.catcode);if(has(c.service)) s.b.component=PIPER_SVC[c.service]||c.service;set(s.ex,'auth',c.authorized);set(s.ex,'cwe',c.cwe);}},
+ sophie:{skel:()=>({schema:'sophie-1',p:{}}),
+  get:s=>({name:s.p?.title,installation:s.p?.installation,to:s.p?.contract,buildings:s.p?.buildings,_ev:{'SOW final':(s.sections||[]).length&&s.sections.every(x=>x.status==='final')?'@today':''}}),
+  put:(s,c)=>{s.p=s.p||{};set(s.p,'title',c.name);set(s.p,'installation',c.installation);set(s.p,'contract',c.to);set(s.p,'buildings',c.buildings);}},
+ record:{skel:()=>null,get:r=>({programmed:r?.piper?.rounded||undefined}),put:()=>{}}};
+const PAULA_F=['name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
+function mergeCore(core,o){if(!o) return false;let ch=false;for(const [k,v] of Object.entries(o)){if(k==='_ev') continue;if(has(v)&&String(core[k]??'')!==String(v)){core[k]=v;ch=true;}}
+ core.events=core.events||{};for(const [k,v] of Object.entries(o._ev||{})){if(v==='@today'){if(!core.events[k]){core.events[k]=today();ch=true;}}else if(has(v)&&core.events[k]!==v){core.events[k]=v;ch=true;}}return ch;}
+
+// ---- startup: put the active project's state where the tool expects it ----
+let S=loadStore();
+if(!Object.keys(S.projects).length&&PER.some(t=>ls.getItem(PKEY[t]))){const id=uid();const p={id,core:{},tools:{},created:today()};PER.forEach(t=>{const v=get(PKEY[t]);if(v){p.tools[t]=v;mergeCore(p.core,MAP[t].get(v));}});p.core.name=p.core.name||'Project 1';S.projects[id]=p;S.active=id;saveStore(S);}
+if(PER.includes(TOOL)){
+ if(!S.active||!S.projects[S.active]){const first=Object.keys(S.projects)[0];if(first) S.active=first;else{const id=uid();S.projects[id]={id,core:{name:'New project'},tools:{},created:today()};S.active=id;}saveStore(S);}
+ const P=S.projects[S.active];
+ PER.forEach(t=>{let v=P.tools[t];if(!v&&t===TOOL) v=MAP[t].skel();if(v){if(t!=='record') MAP[t].put(v,P.core);raw(PKEY[t],JSON.stringify(v));}else ls.removeItem(PKEY[t]);});
+}
+if(TOOL==='paula') paulaIn();
+
+// ---- every save flows back into the record ----
+Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('MILCON record',e);}};
+function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) return;const St=loadStore();
+ if(t==='paula'){paulaOut(St,JSON.parse(v));return;}
+ if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val));P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
+
+// ---- PAULA: one PAULA project per record project, same id ----
+function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',created:new Date().toISOString(),projects:[],t:{},me:'',log:[]};let ch=false;
+ for(const [id,p] of Object.entries(S.projects)){let pp=pa.projects.find(x=>x.id===id);if(!pp){pp={id,phase:1,risks:[],milestones:[],updates:[],override:{level:'',reason:''}};pa.projects.push(pp);ch=true;}
+  PAULA_F.forEach(f=>{if(has(p.core[f])&&String(pp[f]??'')!==String(p.core[f])){pp[f]=p.core[f];ch=true;}});
+  const ph={'Requirement validated':2,'Economic analysis approved':3,'1391 validated':4,'SOW final':6};
+  for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]){pp.phase=ph[n];ch=true;}}}
+ if(ch) raw('paula_project',JSON.stringify(pa));}
+function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sample) return;let p=St.projects[pp.id];if(!p){if(!has(pp.name)) return;p=St.projects[pp.id]={id:pp.id,core:{},tools:{},created:today()};ch=true;}
+  const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o)) ch=true;});if(ch) saveStore(St);}
+
+// ---- public helpers ----
+window.MS={store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],
+ openIn:(id,tool)=>{const s=loadStore();if(!s.projects[id]) return;flush(s);s.active=id;saveStore(s);location.href=tool+'.html';},
+ tos:()=>[...new Set(Object.values(loadStore().projects).map(p=>p.core.to).filter(has))].sort()};
+function flush(s){const P=s.projects[s.active];if(!P||!PER.includes(TOOL)) return;PER.forEach(t=>{const v=get(PKEY[t]);if(v){P.tools[t]=v;mergeCore(P.core,MAP[t].get(v));}});}
+function sw(id){const s=loadStore();flush(s);s.active=id;saveStore(s);location.reload();}
+function dl(name,data){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+function note(t){const n=document.getElementById('msnote');if(n) n.textContent=t;}
+
+// ---- project bar ----
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+function bar(){if(!PER.includes(TOOL)) return;const h=document.querySelector('header');if(!h) return;const d=document.createElement('div');d.id='msbar';
+ d.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 28px;background:#1F5566;color:#fff;font:13px "Segoe UI",system-ui,sans-serif';h.after(d);refresh();}
+function refresh(){const d=document.getElementById('msbar');if(!d) return;const s=loadStore();const P=s.projects[s.active];const c=P?P.core:{};
+ const ids=Object.keys(s.projects).sort((a,b)=>(s.projects[a].core.name||'').localeCompare(s.projects[b].core.name||''));
+ d.innerHTML='<span style="opacity:.8">Project<\/span><select id="mssel" style="width:auto;max-width:340px;font-size:13px;padding:3px 6px;border-radius:5px">'+ids.map(id=>'<option value="'+id+'" '+(id===s.active?'selected':'')+'>'+esc(s.projects[id].core.name||'(untitled)')+'<\/option>').join('')+'<\/select>'+
+ '<button id="msnew" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">New project<\/button>'+
+ '<span style="opacity:.85;flex:1;min-width:200px">'+esc([c.number,c.to,c.installation,c.service,c.fy?'FY'+c.fy:''].filter(has).join(' · ')||'Shared record: title, installation, task order and amounts are entered once and used by every tool')+'<\/span>'+
+ '<span id="msnote" style="color:#F2B632"><\/span>'+
+ '<button id="msmore" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">Projects…<\/button>';
+ d.querySelector('#mssel').onchange=e=>sw(e.target.value);
+ d.querySelector('#msnew').onclick=()=>{const n=prompt('Name of the new project');if(!n) return;const s2=loadStore();flush(s2);const id=uid();s2.projects[id]={id,core:{name:n.trim()},tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
+ d.querySelector('#msmore').onclick=manage;}
+function manage(){const s=loadStore();const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:0;max-width:760px;width:94vw';
+ const rows=Object.values(s.projects).sort((a,b)=>(a.core.name||'').localeCompare(b.core.name||''));
+ dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Projects<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">Every project lives in this browser’s shared record. Each tool keeps its own work for each project. Export everything to move to another computer or to keep a backup.<\/p>'+
+ '<table style="width:100%;border-collapse:collapse;font-size:13px"><tr><th style="text-align:left;padding:6px">Project<\/th><th style="text-align:left">Task order<\/th><th style="text-align:left">Tools used<\/th><th><\/th><\/tr>'+rows.map(p=>'<tr style="border-top:1px solid #c9d6d3"><td style="padding:6px">'+esc(p.core.name||'(untitled)')+(p.id===s.active?' <b>(open)<\/b>':'')+'<\/td><td>'+esc(p.core.to||'')+'<\/td><td>'+esc(Object.keys(p.tools).filter(t=>t!=='record').map(t=>t.toUpperCase()).join(', ')||'–')+'<\/td><td style="white-space:nowrap"><button data-ren="'+p.id+'">Rename<\/button> '+(p.id!==s.active?'<button data-del="'+p.id+'">Delete<\/button>':'')+'<\/td><\/tr>').join('')+'<\/table>'+
+ '<div style="display:flex;gap:10px;margin-top:16px;flex-wrap:wrap"><button id="msexp">Export all<\/button><button id="msimp">Import…<\/button><input type="file" id="msf" accept=".json" hidden><span style="flex:1"><\/span><button id="mscl">Close<\/button><\/div><\/div>';
+ document.body.appendChild(dlg);dlg.showModal();const close=()=>{dlg.close();dlg.remove();};
+ dlg.querySelector('#mscl').onclick=close;
+ dlg.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const s2=loadStore();flush(s2);const p=s2.projects[b.dataset.ren];const n=prompt('Project name',p.core.name||'');if(!n) return;p.core.name=n.trim();saveStore(s2);location.reload();});
+ dlg.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const s2=loadStore();const p=s2.projects[b.dataset.del];if(!confirm('Delete “'+(p.core.name||'project')+'” and everything every tool holds for it? This cannot be undone. Export first if you need a copy.')) return;delete s2.projects[p.id];saveStore(s2);close();manage();});
+ dlg.querySelector('#msexp').onclick=()=>{const s2=loadStore();flush(s2);saveStore(s2);const all={schema:'milcon-backup-1',exported:new Date().toISOString(),store:s2,irma:get('irma_project'),quinn:get('quinn_project'),paula:get('paula_project')};dl('MILCON_all_projects_'+today()+'.json',JSON.stringify(all));};
+ dlg.querySelector('#msimp').onclick=()=>dlg.querySelector('#msf').click();
+ dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a MILCON backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
+
+// ---- task order suggestions in IRMA and QUINN ----
+function toList(){if(TOOL!=='irma'&&TOOL!=='quinn') return;const dl2=document.createElement('datalist');dl2.id='ms-to';dl2.innerHTML=window.MS.tos().map(t=>'<option value="'+esc(t)+'">').join('');document.body.appendChild(dl2);
+ const tag=()=>document.querySelectorAll('input[data-k="to"]:not([list])').forEach(i=>i.setAttribute('list','ms-to'));new MutationObserver(tag).observe(document.body,{childList:true,subtree:true});tag();}
+document.addEventListener('DOMContentLoaded',()=>{bar();toList();});
+})();
+</script>
+
 <style>
 
 :root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
@@ -164,7 +276,7 @@ const BLANK=()=>({schema:'piper-1',id:uid(),created:new Date().toISOString(),mod
  s12:{acq:'',ds:'',pct:'',asof:'',d35:'',dc:'',dcost:'',energy:'',std:'',award:'',start:'',complete:'',fci:''},
  versions:[],qa:[],ex:{auth:'',approp:'',cwe:'',ige:'',scope_auth:'',scope_now:''},review:{ext:false,ext_total:'',ext_qty:'',ext_prim:'',ext_sup:'',ext_cont:'',ext_sioh:''},log:[]});
 let P=load()||BLANK();let STEP='blocks';
-function load(){try{return JSON.parse(localStorage.getItem('piper_project')||'null');}catch(e){return null;}}
+function load(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('piper_project',JSON.stringify(P));const C=calc();
  const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');rec.project=Object.assign(rec.project||{},{name:P.b.title||rec.project?.name,installation:P.b.installation||rec.project?.installation});
