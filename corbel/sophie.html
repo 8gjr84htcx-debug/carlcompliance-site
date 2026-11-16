@@ -295,7 +295,7 @@ const DB_PRESCRIPTIVE=/\b(by means of|shall use (a|an|the)|manufactured by|model
 const BLANK=()=>({schema:'sophie-1',id:uid(),created:new Date().toISOString(),
  p:{title:'',installation:'',delivery:'db',contract:'',buildings:'',prepared_by:''},template:'house',custom:'',
  sections:[],reqs:[],criteria:[],rules:DEFAULT_RULES.map(r=>({...r})),versions:[],log:[]});
-let S=load()||BLANK();if(!S.sections.length) buildSections();let STEP='setup';
+let S=load()||BLANK();if(!S.sections.length) buildSections();let STEP=(S.built||S.review||S.sections.some(x=>x.text.trim()))?'done':'build';
 function load(){try{const j=JSON.parse(localStorage.getItem('sophie_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('sophie_project',JSON.stringify(S));
@@ -319,14 +319,157 @@ function piper(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'
 function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
 function coraSel(){try{return JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){return null;}}
 
+// ---------- Reading documents (shared with NORA) ----------
+let PDFJS=null;
+async function pdfLib(){if(PDFJS) return PDFJS;
+ // The PDF reader ships inside IRMA on the same site; NORA borrows it rather than carrying a second copy.
+ const r=await fetch('irma.html',{cache:'force-cache'});if(!r.ok) throw new Error('The PDF reader could not be loaded');const h=await r.text();
+ const grab=id=>{const m=h.match(new RegExp('<script id="'+id+'" type="text/plain">([\\s\\S]*?)<\/script>'));if(!m) throw new Error('The PDF reader could not be loaded');return Uint8Array.from(atob(m[1].trim()),c=>c.charCodeAt(0));};
+ const u=URL.createObjectURL(new Blob([grab('pdfjs')],{type:'text/javascript'}));const w=URL.createObjectURL(new Blob([grab('pdfw')],{type:'text/javascript'}));
+ PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
+async function readPdf(file,st){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const pages=[],scans=[];
+ for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i);const tc=await p.getTextContent();let last=null,t='';
+  tc.items.forEach(it=>{if(last!==null&&Math.abs(it.transform[5]-last)>2) t+='\n';else if(t&&!t.endsWith(' ')) t+=' ';t+=it.str;last=it.transform[5];});
+  t=t.replace(/[ \t]+/g,' ').trim();pages.push(t);
+  if(t.length<40&&scans.length<12){const vp=p.getViewport({scale:1.4});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;scans.push({page:i,data:c.toDataURL('image/jpeg',.75).split(',')[1]});}}
+ if(scans.length&&window.CARLAI&&CARLAI.state().ok){for(const sc of scans){if(st) st('Reading scanned page '+sc.page+' of '+file.name+'…');
+   try{const j=await CARLAI.ask('fast','Transcribe the page exactly. Return ONLY JSON {"text":"..."}. Keep line breaks. Do not summarize or correct.','Transcribe this page.',[sc.data]);pages[sc.page-1]=String(j.text||'');}catch(e){console.warn(e);}}}
+ const left=scans.filter(sc=>!(pages[sc.page-1]||'').trim()).length;
+ return {text:pages.map((t,i)=>doc.numPages>1?'[Page '+(i+1)+']\n'+t:t).join('\n\n'),note:left?left+' scanned page'+(left>1?'s':'')+' could not be read':scans.length?scans.length+' scanned page'+(scans.length>1?'s':'')+' read by AI':''};}
+async function unzip(buf,want){const u=new Uint8Array(buf),dv=new DataView(buf);let e=-1;for(let i=u.length-22;i>=Math.max(0,u.length-65557);i--) if(dv.getUint32(i,true)===0x06054b50){e=i;break;}
+ if(e<0) throw new Error('Not a Word file');const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const td=new TextDecoder();
+ for(let k=0;k<n;k++){const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),fl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);const name=td.decode(u.subarray(p+46,p+46+fl));
+  if(name===want){const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);const data=u.subarray(ds,ds+cs);
+   if(m===0) return td.decode(data);const out=new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return await new Response(out).text();}
+  p+=46+fl+xl+cl;}
+ throw new Error('No text found in the Word file');}
+function xmlText(x){return x.replace(/<w:tab\/>/g,'\t').replace(/<w:br[^>]*\/>/g,'\n').replace(/<\/w:p>/g,'\n').replace(/<\/w:tc>/g,' | ').replace(/<[^>]+>/g,'')
+ .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
+function qp(s){return s.replace(/=\r?\n/g,'').replace(/=([0-9A-F]{2})/gi,(m,h)=>String.fromCharCode(parseInt(h,16)));}
+function emlText(raw){const hdr=raw.split(/\r?\n\r?\n/)[0];const keep=(hdr.match(/^(From|To|Cc|Date|Subject):.*$/gim)||[]).join('\n');
+ const parts=[];const walk=(chunk)=>{const h=chunk.split(/\r?\n\r?\n/)[0],body=chunk.slice(h.length).trim();const b=(h.match(/boundary="?([^";\r\n]+)"?/i)||[])[1];
+  if(b){body.split('--'+b).slice(1).forEach(p=>{if(!p.startsWith('--')) walk(p.replace(/^\r?\n/,''));});return;}
+  if(/content-type:\s*text\/(plain|html)/i.test(h)||!/content-type:/i.test(h)){let t=body;if(/base64/i.test(h)){try{t=new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\s/g,'')),c=>c.charCodeAt(0)));}catch(e){}}else if(/quoted-printable/i.test(h)) t=qp(t);
+   if(/text\/html/i.test(h)) t=t.replace(/<br\s*\/?>|<\/p>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ');parts.push({html:/text\/html/i.test(h),t});}};
+ walk(raw);const plain=parts.find(p=>!p.html)||parts[0];return (keep?keep+'\n\n':'')+(plain?plain.t.trim():'');}
+async function readAny(f,st){const n=f.name.toLowerCase();
+ if(n.endsWith('.pdf')) return await readPdf(f,st);
+ if(n.endsWith('.docx')) return {text:xmlText(await unzip(await f.arrayBuffer(),'word/document.xml'))};
+ if(n.endsWith('.eml')) return {text:emlText(await f.text())};
+ if(n.endsWith('.html')||n.endsWith('.htm')) return {text:(await f.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,'').replace(/<br\s*\/?>|<\/(p|div|li|tr|h\d)>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n').trim()};
+ if(n.endsWith('.doc')||n.endsWith('.msg')||n.endsWith('.xlsx')||n.endsWith('.pptx')) throw new Error('save it as PDF, .docx or .txt first');
+ return {text:await f.text()};}
+
+// ---------- Build my SOW ----------
+function aiOnS(){return !!(window.CARLAI&&CARLAI.state().ok);}
+function sigS(){const n=nora(),c=coraSel(),p=piper();const t=JSON.stringify([n&&(n.requirements||[]).filter(r=>r.status!=='withdrawn').map(r=>[r.id,r.text,r.priority,r.measure]),c&&(c.items||[]).map(x=>x.number),p&&[p.n&&p.n.desc,p.pf&&p.pf.qty]]);let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);}
+function ctxText(){const n=nora(),p=piper(),e=earl(),L=[];if(n&&n.need_statement) L.push('NEED STATEMENT: '+n.need_statement);
+ if(n) (n.gaps||[]).forEach(g=>L.push('GAP: '+[g.area,g.current&&('today: '+g.current),g.required&&('needed: '+g.required),g.qty_need!==''&&g.qty_need!=null&&(g.qty_have+' of '+g.qty_need+' '+(g.unit||''))].filter(Boolean).join('; ')));
+ if(n) (n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+c.text));
+ if(p&&p.n&&p.n.desc) L.push('1391 BLOCK 10: '+p.n.desc);if(p&&p.pf&&Number(p.pf.qty)) L.push('1391 PRIMARY FACILITY: '+(p.pf.guc_name||'')+' '+Number(p.pf.qty).toLocaleString()+' '+(p.pf.um||''));
+ const a=e&&e.alts.find(x=>x.id===e.recommend?.alt);if(a) L.push('SELECTED ALTERNATIVE (EARL): '+a.name+(a.desc?' – '+a.desc:''));return L.join('\n');}
+const MAP_SYS=`You plan a U.S. Government construction statement of work. Assign every requirement to the section or sections whose text must answer it, using each section's purpose. A must-have requirement must land in at least one section. Return ONLY JSON: {"map":[{"section":"section key","reqs":["R-001"]}],"buildings":["building numbers named in CONTEXT, if any"]}`;
+async function pipeS(s){const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT (facts you may use):\n'+S.ctx:'');const prov={at:new Date().toISOString(),prev:s.text,steps:[]};
+ const dj=await CARLAI.ask('reader-a',DRAFT_SYS(),src);let text=String(dj.text||'');prov.steps.push({role:'drafter',text,assumptions:dj.assumptions||[]});
+ try{const rj=await CARLAI.ask('reader-b',REVIEW_SYS(),src+'\n\nDRAFT:\n'+text);prov.steps.push({role:'reviewer',issues:rj.issues||[],missing:rj.missing||[]});
+  try{const aj=await CARLAI.ask('reviewer',ARB_SYS(),src+'\n\nDRAFT:\n'+text+'\n\nREVIEW:\n'+JSON.stringify({issues:rj.issues,missing:rj.missing,revised:rj.revised}));text=String(aj.text||text);prov.steps.push({role:'arbiter',rulings:aj.rulings||[]});}
+  catch(e){if(rj.revised) text=String(rj.revised);}}catch(e){}
+ const un=figuresUnverified(text.replace(/\{[^}]*\}/g,''),s);prov.unverified=un;s.ai=prov;s.text=text;s.status='reviewed';return un;}
+async function buildSOW(){const st=$('#sStat');const say=t=>{if(st) st.textContent=t;};const b=$('#sB');if(b) b.disabled=true;const made=[];
+ if(nora()){impNora();made.push(S.reqs.length+' requirements');}if(coraSel()){impCora();made.push(S.criteria.length+' criteria');}if(piper()) impPiper();if(earl()) impEarl();
+ S.ctx=ctxText();
+ if(aiOnS()&&S.reqs.length){try{say('Matching requirements to sections…');const j=await CARLAI.ask('reviewer',MAP_SYS,'SECTIONS:\n'+S.sections.map(s=>s.key+' | '+s.title+' | '+s.guide).join('\n')+'\n\nREQUIREMENTS:\n'+S.reqs.map(r=>r.id+' ('+(r.priority||'')+'): '+r.text).join('\n')+'\n\nCONTEXT:\n'+S.ctx,null,{fresh:true});
+   if(!S.p.buildings&&(j.buildings||[]).length){const B=j.buildings.map(String).filter(x=>S.ctx.includes(x));if(B.length){S.p.buildings=B.join(', ');buildSections();made.push('buildings '+S.p.buildings+' (from your record)');}}
+   (j.map||[]).forEach(m=>{const ids=(m.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));S.sections.filter(s=>s.key===m.section||s.key.split(':')[0]===m.section).forEach(s=>{ids.forEach(id=>{if(!s.reqs.includes(id)) s.reqs.push(id);});});});
+   made.push('requirements matched to sections');}catch(e){made.push('matching failed: '+e.message);}}
+ const todo=S.sections.filter(s=>!s.text.trim());let n=0;const unv=[];
+ for(const s of todo){const k=s.key.split(':')[0];if(k==='docs'||k==='safe'||!aiOnS()){s.text=assemble(s);if(s.text.trim()){s.status='draft';n++;}continue;}
+  say('Drafting '+s.title+' ('+(++n)+' of '+todo.length+')…');try{const u=await pipeS(s);if(u.length) unv.push(s.title+': '+u.join(', '));}catch(e){s.text=assemble(s);if(s.text.trim()) s.status='draft';}}
+ made.push(n+' sections written');
+ let fx=0;S.sections.forEach(s=>S.rules.filter(r=>ruleOn(r)&&r.fix).forEach(r=>{try{const re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');const c=(s.text.match(re)||[]).length;if(c){s.text=s.text.replace(re,r.fix);fx+=c;}}catch(e){}}));if(fx) made.push(fx+' automatic style fixes');
+ if(aiOnS()){say('Running the AI review…');await aiReviewS(true);}
+ S.built={at:new Date().toISOString(),sig:sigS(),made,unv};log('Build my SOW',made.join('; '));save();say('');STEP='done';render();window.scrollTo(0,0);}
+
+// ---------- Review a SOW someone else wrote ----------
+const SPLIT_SYS=`You split a construction statement of work into its sections exactly as written. Return ONLY JSON: {"title":"project title on the document","sections":[{"title":"heading as written","numbered":true,"text":"the section body copied exactly, keeping item numbers and line breaks"}]}. Copy text exactly; do not fix, summarize or reorder anything.`;
+const TRACE_SYS=`You trace a statement of work to the project's requirements. For each numbered item or paragraph in SECTION, list the requirement IDs it satisfies, or none. Return ONLY JSON: {"items":[{"start":"the first 8 words of the item exactly","reqs":["R-001"]}]}`;
+let XS=null;
+async function readSOW(f){if(!aiOnS()){alert('Sign in to CARL to review a statement of work.');return;}const st=$('#rStatS');const say=t=>{if(st) st.textContent=t;};
+ try{say('Reading '+f.name+'…');const r=await readAny(f,say);const text=r.text;if((text.match(/\S+/g)||[]).length<40) throw new Error('Too little text found');
+  say('Finding the sections…');const j=await CARLAI.ask('reviewer',SPLIT_SYS,'SOW:\n'+text.slice(0,120000),null,{fresh:true});
+  const nt=nz3(text);const secs=(j.sections||[]).filter(x=>x&&x.title&&x.text).map(x=>({...x,ok:nt.includes(nz3(String(x.text).slice(0,120)))}));
+  XS={file:f.name,text,title:j.title||'',secs};log('SOW read for review',f.name+': '+secs.length+' sections');say('');}
+ catch(e){say('');alert('Could not read the statement of work: '+e.message);}vBuildS();}
+function nz3(s){return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+async function applySOW(){const X=XS;S.template='custom';S.custom=X.secs.map(x=>x.title).join('\n');S.sections=X.secs.map((x,i)=>({id:uid(),key:'c'+i+':'+x.title,title:x.title,guide:'',num:!!x.numbered,notes:'',text:String(x.text),reqs:[],status:'draft',ai:null,review:true}));
+ if(!S.p.title&&X.title) S.p.title=X.title;S.review={file:X.file,at:new Date().toISOString()};XS=null;
+ if(nora()) impNora();if(coraSel()) impCora();
+ const st=$('#rStatS');const say=t=>{if(st) st.textContent=t;};
+ if(aiOnS()&&S.reqs.length){for(const s of S.sections){say('Tracing '+s.title+'…');try{const j=await CARLAI.ask('reviewer',TRACE_SYS,'REQUIREMENTS:\n'+S.reqs.map(r=>r.id+': '+r.text).join('\n')+'\n\nSECTION:\n'+s.text,null,{fresh:true});
+   const lines=s.text.split('\n');(j.items||[]).forEach(it=>{const ids=(it.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));if(!ids.length) return;const k=lines.findIndex(l=>nz3(l).startsWith(nz3(it.start).slice(0,30))&&nz3(it.start).length>5);if(k>=0&&!/\{[^}]+\}\s*$/.test(lines[k])) lines[k]=lines[k].replace(/\s*$/,' {'+ids.join(', ')+'}');});s.text=lines.join('\n');}catch(e){}}}
+ log('SOW applied for review',S.review.file);save();if(aiOnS()) await aiReviewS(true);STEP='done';render();window.scrollTo(0,0);}
+const REVS_SYS=`You are a contracting officer's technical reviewer reading a construction statement of work against the project RECORD (requirements, criteria, 1391). Find what would cause a protest, a claim or a bad award: requirements not covered; scope with no requirement behind it; criteria the record selects that the SOW never invokes; quantities that contradict the 1391; vague or unmeasurable obligations; design-build text that prescribes means and methods. Return ONLY JSON: {"findings":[{"severity":"bad|warn","title":"short","detail":"what to fix","quote":"exact words from the SOW, or empty"}]} – at most 10, most important first.`;
+async function aiReviewS(q){if(!aiOnS()){if(!q) alert('Sign in to CARL to run the AI review.');return;}const b=$('#bRevS');if(b){b.disabled=true;b.textContent='Reviewing…';}
+ try{const sow=S.sections.map(s=>s.title+'\n'+s.text).join('\n\n');const rec='REQUIREMENTS:\n'+S.reqs.map(r=>r.id+' ('+(r.priority||'')+'): '+r.text).join('\n')+'\nCRITERIA: '+S.criteria.slice(0,80).map(x=>(x.number?x.number+' ':'')+x.title).join('; ')+'\n'+(S.ctx||ctxText());
+  const j=await CARLAI.ask('reviewer',REVS_SYS,'SOW:\n'+sow.slice(0,100000)+'\n\nRECORD:\n'+rec.slice(0,40000),null,{fresh:true});const plain=nz3(sow);
+  S.ai_rev=(j.findings||[]).filter(x=>x&&x.title).map(x=>({sev:x.severity==='bad'?'bad':'warn',msg:'AI review: '+x.title+(x.detail?' – '+x.detail:''),hit:x.quote&&plain.includes(nz3(x.quote))?x.quote:''}));S.ai_rev_at=new Date().toISOString();log('AI review of the SOW',S.ai_rev.length+' findings');save();}
+ catch(e){if(!q) alert('AI review failed: '+e.message);}if(!q) render();}
+
+// ---------- Fix a finding with AI ----------
+const FIXS_SYS=()=>styleBrief()+'\n\nYou fix one finding in one section of a statement of work. Change only what the finding needs; keep every other sentence and every {ID} trace tag. Use only facts in SOURCES. Return ONLY JSON: {"text":"the complete corrected section","note":"one line on what changed"}';
+let FXS=null;
+function findingsAll(){const F=allFindings().filter(f=>f.sev!=='info').map(f=>({...f}));harmList().filter(h=>h[0]!=='info').forEach(([s,t,d])=>F.push({sev:s,msg:t+(d?' – '+d:''),hit:'',sec:null,harm:true}));(S.ai_rev||[]).forEach(x=>F.push({...x,sec:null,ai:true}));return F;}
+function secFor(f){if(f.sec) return f.sec;const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id){const s=S.sections.find(x=>x.reqs.includes(id))||S.sections.find(x=>x.num);if(s) return s;}
+ if(f.hit){const s=S.sections.find(x=>nz3(x.text).includes(nz3(f.hit)));if(s) return s;}return S.sections.find(x=>x.num)||S.sections[0];}
+async function aiFixS(i){if(!aiOnS()){alert('Sign in to CARL to fix findings with AI.');return;}const f=findingsAll()[i];if(!f) return;const s=secFor(f);const b=document.querySelector('[data-fxs="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
+ try{const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id&&!s.reqs.includes(id)) s.reqs.push(id);
+  const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT:\n'+S.ctx:'');const j=await CARLAI.ask('reviewer',FIXS_SYS(),src+'\n\nSECTION ('+s.title+'):\n'+s.text+'\n\nFINDING: '+f.msg+(f.hit?' (“'+f.hit+'”)':''),null,{fresh:true});
+  FXS={i,msg:f.msg,sid:s.id,title:s.title,text:String(j.text||'').trim(),note:String(j.note||''),un:figuresUnverified(String(j.text||'').replace(/\{[^}]*\}/g,''),s)};}
+ catch(e){alert('Could not fix: '+e.message);}vDoneS();}
+function fixHTMLS(){if(!FXS) return '';return '<div class="card" style="margin:10px 0;padding:12px 14px"><b>Proposed fix in '+esc(FXS.title)+'</b><div class="small" style="margin:4px 0">'+esc(FXS.msg)+(FXS.note?' – '+esc(FXS.note):'')+'</div><textarea id="fxsT" class="sow" style="min-height:180px">'+esc(FXS.text)+'</textarea>'+(FXS.un.length?'<div class="find warn">Check these figures, not in your sources: '+esc(FXS.un.join(', '))+'</div>':'')+'<div class="row"><button class="go" id="fxsA">Apply</button><button id="fxsX">Discard</button></div></div>';}
+
+// ---------- Screens ----------
+function vBuildS(){const v=$('#view');const n=nora(),c=coraSel(),p=piper(),e=earl();const a=e&&e.alts.find(x=>x.id===e.recommend?.alt);const signed=aiOnS();
+ const have=[['NORA',n?(n.requirements||[]).filter(r=>r.status!=='withdrawn').length+' requirements':'none'],['CORA',c?(c.items||[]).length+' criteria and clauses':'none'],['PIPER',p?(p.b.title||'1391')+(p.n&&p.n.desc?', block 10':''):'none'],['EARL',a?a.name:'none']];
+ v.innerHTML='<div class="panel"><h2>Build my SOW</h2><p class="lead">SOPHIE writes the statement of work from what the earlier tools hold. It imports the requirements and criteria, matches each requirement to the sections that must answer it, and writes every section through three steps: one reader drafts, a second reviews, and a reviewer rules on each change. Every item traces to a requirement, and the style rules are applied.</p>'+
+  '<table style="max-width:640px"><tbody>'+have.map(([x,y])=>'<tr><td>'+x+'</td><td>'+esc(y)+'</td></tr>').join('')+'</tbody></table>'+
+  '<div class="form" style="margin-top:10px"><div><label class="f">Format</label><select id="tplB">'+opts(Object.fromEntries(Object.entries(TEMPLATES).filter(([k])=>k!=='custom').map(([k,t])=>[k,t.name])),S.template)+'</select></div><div><label class="f">Delivery method</label><select id="dlvB">'+opts({db:'Design-build',dbb:'Design-bid-build',to:'Task order / FSRM',other:'Other'},S.p.delivery)+'</select></div><div><label class="f">Buildings (optional)</label><input id="bldB" value="'+esc(S.p.buildings)+'" placeholder="found in your record if left blank"></div></div>'+
+  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> Without it SOPHIE assembles each section from the sources.')+'</div>'+
+  '<div class="row"><button class="go" id="sB">'+(S.built?'Build again (fills only empty sections)':'Build my SOW')+'</button><span class="small" id="sStat"></span></div></div>'+
+  '<div class="panel"><h2>Review a statement of work someone else wrote</h2><p class="lead">Drop in the SOW (PDF or Word). SOPHIE splits it into its sections as written, traces each item to your requirements, and checks coverage, criteria, the 1391 quantity and style.</p>'+
+  '<label id="sdrop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer"><b>Drop the SOW here or click to choose</b><br><span class="small">PDF or Word (.docx)</span><input type="file" id="sFile" accept=".pdf,.docx,.txt" hidden></label><div class="small" id="rStatS"></div>'+
+  (XS?'<h3>Read from '+esc(XS.file)+': '+XS.secs.length+' sections</h3><ul class="small">'+XS.secs.map(x=>'<li>'+esc(x.title)+' – '+wc(x.text)+' words'+(x.ok?'':' <b>(text not matched to the document; check it)</b>')+'</li>').join('')+'</ul><div class="row"><button class="go" id="sApply">Apply and review</button><button id="sX">Discard</button><span class="small">Replaces the sections in SOPHIE. Save a version first if you need it.</span></div>':'')+'</div>';
+ $('#tplB').onchange=ev=>{S.template=ev.target.value;buildSections();save();renderSteps();};$('#dlvB').onchange=ev=>{S.p.delivery=ev.target.value;save();};$('#bldB').onchange=ev=>{S.p.buildings=ev.target.value;buildSections();save();renderSteps();};
+ $('#sB').onclick=buildSOW;const fi=$('#sFile'),dr=$('#sdrop');fi.onchange=()=>{const f=fi.files[0];fi.value='';if(f) readSOW(f);};
+ dr.ondragover=ev=>{ev.preventDefault();dr.style.background='#f1f6f7';};dr.ondragleave=()=>dr.style.background='';dr.ondrop=ev=>{ev.preventDefault();dr.style.background='';const f=ev.dataTransfer.files[0];if(f) readSOW(f);};
+ if($('#sApply')) $('#sApply').onclick=()=>{$('#sApply').disabled=true;applySOW();};if($('#sX')) $('#sX').onclick=()=>{XS=null;vBuildS();};}
+function vDoneS(){const v=$('#view');const F=findingsAll();const bad=F.filter(f=>f.sev==='bad').length,warn=F.filter(f=>f.sev==='warn').length;const tm=traceMap();
+ const cov=S.reqs.filter(r=>tm[r.id]).length;const words=S.sections.reduce((a,s)=>a+wc(s.text),0);const written=S.sections.filter(s=>s.text.trim()).length;
+ const stale=S.built&&S.built.sig&&sigS()!==S.built.sig;const unv=S.sections.filter(s=>s.ai&&s.ai.unverified&&s.ai.unverified.length);const asm=S.sections.flatMap(s=>((s.ai&&s.ai.steps&&s.ai.steps[0]&&s.ai.steps[0].assumptions)||[]).map(a=>[s.title,a]));
+ v.innerHTML=(stale?'<div class="panel"><div class="find warn"><b>NORA, CORA or PIPER changed since this SOW was built.</b> Requirements, criteria or the 1391 were edited. Rebuild the affected sections, or keep it as is.</div><div class="row"><button class="go" id="sRe">Rebuild sections</button><button id="sKeep">Keep as is</button></div></div>':'')+
+  '<div class="panel"><h2>'+esc(S.p.title||'Your SOW')+'</h2><p class="lead">'+esc([S.p.installation,{db:'Design-build',dbb:'Design-bid-build',to:'Task order / FSRM',other:''}[S.p.delivery],S.p.buildings].filter(Boolean).join(' · '))+(S.review?' · <b>Review of '+esc(S.review.file)+'</b>':'')+'</p>'+
+  '<div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Sections written',written+' of '+S.sections.length],['Words',words.toLocaleString()],['Requirements covered',cov+' of '+S.reqs.length],['Must fix',bad],['Check',warn]].map(([l,n])=>'<div style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
+  '<div class="row"><button class="go" data-o="doc">Download SOW (.doc)</button><button data-o="print">Print or PDF</button><button data-o="copy">Copy as text</button><button data-o="rtm">Traceability matrix</button></div></div>'+
+  ((unv.length||asm.length)?'<div class="panel"><h2>Confirm before you send it</h2><ul>'+unv.map(s=>'<li><b>'+esc(s.title)+':</b> figures not in your sources: '+esc(s.ai.unverified.join(', '))+'</li>').join('')+asm.slice(0,8).map(([t,a])=>'<li><b>'+esc(t)+':</b> assumed '+esc(a)+'</li>').join('')+'</ul><p class="small">Edit the text under Adjust details → Write sections.</p></div>':'')+
+  '<div class="panel"><h2>Findings</h2>'+fixHTMLS()+(F.length?F.map((f,i)=>'<div class="find '+f.sev+'" style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><b>'+(f.sec?esc(f.sec.title)+': ':'')+esc(f.msg)+'</b> '+(f.hit?'<q class="ev">'+esc(f.hit)+'</q>':'')+'</div>'+(aiOnS()?'<button class="sm" data-fxs="'+i+'">Fix with AI</button>':'')+'</div>').join(''):'<div class="find ok"><b>No findings.</b> Every requirement is covered and every item traces.</div>')+
+  '<div class="row"><button id="bRevS">'+(S.ai_rev_at?'Run the AI review again':'Run the AI review')+'</button><span class="small">Style and trace checks run as you type; the AI reviewer reads the SOW against the requirements, the criteria and the 1391.</span></div></div>';
+ v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('SOW','doc'),docHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(docHTML());w.document.close();setTimeout(()=>w.print(),400);},copy:()=>{navigator.clipboard.writeText(plainSOW()).then(()=>{b.textContent='Copied';setTimeout(()=>b.textContent='Copy as text',1500);},()=>alert('Copy blocked by the browser.'));},rtm:()=>dl(fname('SOW-Traceability','csv'),csv(rtmRows()),'text/csv')})[b.dataset.o]());
+ $('#bRevS').onclick=()=>aiReviewS(false);v.querySelectorAll('[data-fxs]').forEach(b=>b.onclick=()=>aiFixS(Number(b.dataset.fxs)));
+ if($('#fxsA')) $('#fxsA').onclick=()=>{const s=S.sections.find(x=>x.id===FXS.sid);if(s){s.prior=s.text;s.text=$('#fxsT').value;if(s.status==='final') s.status='reviewed';log('Finding fixed with AI',s.title+': '+FXS.msg.slice(0,80));}FXS=null;save();vDoneS();renderSteps();};
+ if($('#fxsX')) $('#fxsX').onclick=()=>{FXS=null;vDoneS();};
+ if(stale){$('#sKeep').onclick=()=>{S.built.sig=sigS();log('Kept SOW after upstream changes');save();vDoneS();};
+  $('#sRe').onclick=async()=>{if(!confirm('Rewrite every section that is not marked Final from the updated sources? Your current text is kept in each section’s record.')) return;S.sections.forEach(s=>{if(s.status!=='final'){s.prior=s.text;s.text='';s.status='empty';}});buildSOW();};}}
+
 // ---------- steps ----------
-const STEPS=[['setup','Setup and sources',()=>S.p.title?'✓':''],['draft','Write sections',()=>{const d=S.sections.filter(s=>s.text.trim()).length;return d?d+'/'+S.sections.length:'';}],['style','Style and standards',()=>{const b=allFindings().filter(f=>f.sev==='bad').length;return b?b+'!':'';}],['harm','Harmonize and trace',()=>''],['out','Outputs',()=>'']];
+const STEPS=[['build','Build my SOW',()=>S.built||S.review?'✓':''],['done','Your SOW',()=>{const b=findingsAll().filter(f=>f.sev==='bad').length;return b?b+'!':(S.sections.some(x=>x.text.trim())?'✓':'');}],['setup','Setup and sources',()=>S.p.title?'✓':''],['draft','Write sections',()=>{const d=S.sections.filter(s=>s.text.trim()).length;return d?d+'/'+S.sections.length:'';}],['style','Style and standards',()=>{const b=allFindings().filter(f=>f.sev==='bad').length;return b?b+'!':'';}],['harm','Harmonize and trace',()=>''],['out','Outputs',()=>'']];
 function renderSteps(){const nav=$('#steps');
- if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+ if(!nav.dataset.built){const btn=(s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>';
+  nav.innerHTML=STEPS.slice(0,2).map(btn).join('')+'<details id="adj"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">Adjust details</summary>'+STEPS.slice(2).map(btn).join('')+'</details><div class="gate"></div>';
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ const adj=nav.querySelector('#adj');if(nav.dataset.last!==STEP){adj.open=!['build','done'].includes(STEP);nav.dataset.last=STEP;}
  STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
  const W=S.sections.reduce((a,s)=>a+wc(s.text),0);nav.querySelector('.gate').innerHTML='<b>Phase 6:</b> acquisition package.<br>'+W.toLocaleString()+' words · '+S.sections.filter(s=>s.status==='final').length+' of '+S.sections.length+' sections final';}
-function render(){renderSteps();({setup:vSetup,draft:vDraft,style:vStyle,harm:vHarm,out:vOut})[STEP]();}
+function render(){renderSteps();({build:vBuildS,done:vDoneS,setup:vSetup,draft:vDraft,style:vStyle,harm:vHarm,out:vOut})[STEP]();}
 function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.value;save();if(after) after(k,el);};});}
 const opts=(o,sel)=>Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(v)+'</option>').join('');
 
@@ -429,7 +572,7 @@ function sourcesFor(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const c=S
 const DRAFT_SYS=()=>styleBrief()+'\n\nReturn ONLY JSON: {"text":"the section text. End each numbered item or paragraph with the requirement IDs it satisfies in braces, e.g. {R-003}. Use {NOTE} for text drawn only from author notes.","assumptions":["anything you had to assume"]}\nUse only facts, numbers and standards found in the sources. Do not invent quantities, dates, products or standards.';
 const REVIEW_SYS=()=>styleBrief()+'\n\nYou review a draft section against its sources and the style rules. Return ONLY JSON: {"issues":[{"quote":"exact text from the draft","problem":"what is wrong","fix":"replacement text"}],"missing":["requirement IDs not covered"],"revised":"your full corrected section text, keeping the {ID} trace tags"}';
 const ARB_SYS=()=>styleBrief()+'\n\nYou are the arbiter between a drafter and a reviewer. Produce the final section. Accept a reviewer fix only if it is supported by the sources and the style rules. Return ONLY JSON: {"text":"final section text with {ID} trace tags","rulings":["one line per reviewer issue: accepted or rejected and why"]}';
-function figuresUnverified(text,s){const src=[sourcesFor(s),S.p.title,S.p.installation,S.p.buildings,S.criteria.map(x=>x.number+' '+x.title).join(' ')].join(' ').toLowerCase();
+function figuresUnverified(text,s){const src=[sourcesFor(s),S.ctx||'',S.reqs.map(r=>r.text+' '+(r.measure||'')).join(' '),S.p.title,S.p.installation,S.p.buildings,S.criteria.map(x=>x.number+' '+x.title).join(' ')].join(' ').toLowerCase();
  const nums=(text.match(/\b\d[\d,.\/-]*\s*(%|percent|psi|psf|mph|inches|inch|in\.|feet|ft|sf|sy|lf|cy|mil|mils|years?|days?|hours?|gallons?|kw|kva|amps?|volts?|°f|degrees)?/gi)||[]).map(x=>x.trim()).filter(x=>!/^\d{1,2}\.$/.test(x)&&!/^\d{1,2}$/.test(x));
  return [...new Set(nums)].filter(n=>!src.includes(n.toLowerCase().replace(/\s+/g,' '))&&!src.includes(n.replace(/[^\d.]/g,'')));}
 async function aiDraft(s,d){const eng=d.querySelector('[data-eng]');const rd=SET.slots.filter(x=>x.enabled&&x.model&&x.role!=='arbiter');const ar=SET.slots.find(x=>x.enabled&&x.model&&x.role==='arbiter');
@@ -477,6 +620,19 @@ function vStyle(){const v=$('#view');const F=allFindings();
 // ---------- 4 harmonize ----------
 function traceMap(){const m={};S.sections.forEach((s,i)=>{const lines=s.text.split(/\n/);lines.forEach(l=>{const tags=[...l.matchAll(/\{([^}]+)\}/g)].flatMap(x=>x[1].split(/[,;\s]+/)).filter(Boolean);const num=(l.match(/^\s*(\d+)[.)]/)||[])[1];tags.forEach(t=>{(m[t]=m[t]||[]).push((i+1)+(num?'.'+num:'')+' '+s.title);});});
  s.reqs.forEach(id=>{if(!m[id]||!m[id].some(x=>x.startsWith((i+1)+''))) (m[id]=m[id]||[]).push((i+1)+' '+s.title+' (linked)');});});return m;}
+function harmList(){const tm=traceMap();const p=piper();
+ const must=S.reqs.filter(r=>r.priority==='must');const uncovered=S.reqs.filter(r=>!tm[r.id]);
+ const untraced=[];S.sections.forEach((s,i)=>{if(!s.num) return;s.text.split(/\n/).forEach(l=>{const m=l.match(/^\s*(\d+)[.)]\s+(.*)/);if(m&&!/\{[^}]+\}/.test(l)) untraced.push([(i+1)+'.'+m[1],s.title,m[2]]);});});
+ const H=[];
+ if(!S.reqs.length) H.push(['warn','No requirements imported','Import from NORA on step 1 so SOPHIE can check coverage.']);
+ uncovered.forEach(r=>H.push([r.priority==='must'?'bad':'warn',r.id+' is not covered',r.text]));
+ if(untraced.length) H.push(['warn',untraced.length+' numbered items trace to no requirement','Untraced work is how scope creeps in. Tag the requirement in braces, e.g. {R-004}, or {NOTE} if it comes from a field decision.']);
+ const all=S.sections.map(s=>s.text).join('\n');
+ if(p&&p.pf&&Number(p.pf.qty)&&!all.includes(Number(p.pf.qty).toLocaleString())&&!all.includes(String(p.pf.qty))) H.push(['warn','1391 quantity not stated in the SOW','PIPER programs '+Number(p.pf.qty).toLocaleString()+' '+(p.pf.um||'')+'. State the same quantity or explain the difference.']);
+ if(/\bcontractor\b/.test(all)&&/\bContractor\b/.test(all)) H.push(['info','“Contractor” capitalized inconsistently','Pick one form and use it throughout.']);
+ if(/\bgovernment\b/.test(all)&&/\bGovernment\b/.test(all)) H.push(['info','“Government” capitalized inconsistently','']);
+ if(S.criteria.length&&!S.sections.some(s=>s.key==='docs')&&!/UFC|UFGS/.test(all)) H.push(['warn','No criteria cited','CORA selected '+S.criteria.length+' items; the SOW names none.']);
+ return H;}
 function vHarm(){const v=$('#view');const tm=traceMap();const p=piper();
  const must=S.reqs.filter(r=>r.priority==='must');const uncovered=S.reqs.filter(r=>!tm[r.id]);
  const untraced=[];S.sections.forEach((s,i)=>{if(!s.num) return;s.text.split(/\n/).forEach(l=>{const m=l.match(/^\s*(\d+)[.)]\s+(.*)/);if(m&&!/\{[^}]+\}/.test(l)) untraced.push([(i+1)+'.'+m[1],s.title,m[2]]);});});
