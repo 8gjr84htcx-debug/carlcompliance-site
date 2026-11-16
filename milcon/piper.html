@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIPER – Programming, Investment, and Project Estimate Reviewer</title>
 <script id="ms-core">window.MS_TOOL='piper';
-/* MILCON suite shared project record. Inlined into each tool; runs before the tool's own script. */
+/* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
 const TOOL=window.MS_TOOL||'';
@@ -58,7 +58,7 @@ if(PER.includes(TOOL)){
 if(TOOL==='paula') paulaIn();
 
 // ---- every save flows back into the record ----
-Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('MILCON record',e);}};
+Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('Corbel record',e);}};
 function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) return;const St=loadStore();
  if(t==='paula'){paulaOut(St,JSON.parse(v));return;}
  if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val));P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
@@ -105,9 +105,9 @@ function manage(){const s=loadStore();const dlg=document.createElement('dialog')
  dlg.querySelector('#mscl').onclick=close;
  dlg.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const s2=loadStore();flush(s2);const p=s2.projects[b.dataset.ren];const n=prompt('Project name',p.core.name||'');if(!n) return;p.core.name=n.trim();saveStore(s2);location.reload();});
  dlg.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const s2=loadStore();const p=s2.projects[b.dataset.del];if(!confirm('Delete “'+(p.core.name||'project')+'” and everything every tool holds for it? This cannot be undone. Export first if you need a copy.')) return;delete s2.projects[p.id];saveStore(s2);close();manage();});
- dlg.querySelector('#msexp').onclick=()=>{const s2=loadStore();flush(s2);saveStore(s2);const all={schema:'milcon-backup-1',exported:new Date().toISOString(),store:s2,irma:get('irma_project'),quinn:get('quinn_project'),paula:get('paula_project')};dl('MILCON_all_projects_'+today()+'.json',JSON.stringify(all));};
+ dlg.querySelector('#msexp').onclick=()=>{const s2=loadStore();flush(s2);saveStore(s2);const all={schema:'milcon-backup-1',exported:new Date().toISOString(),store:s2,irma:get('irma_project'),quinn:get('quinn_project'),paula:get('paula_project')};dl('Corbel_all_projects_'+today()+'.json',JSON.stringify(all));};
  dlg.querySelector('#msimp').onclick=()=>dlg.querySelector('#msf').click();
- dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a MILCON backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
+ dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a Corbel backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
 
 // ---- task order suggestions in IRMA and QUINN ----
 function toList(){if(TOOL!=='irma'&&TOOL!=='quinn') return;const dl2=document.createElement('datalist');dl2.id='ms-to';dl2.innerHTML=window.MS.tos().map(t=>'<option value="'+esc(t)+'">').join('');document.body.appendChild(dl2);
@@ -224,7 +224,7 @@ td.num input{text-align:right}
 </head>
 <body>
 <header>
- <a class="home" href="/milcon/">MILCON</a>
+ <a class="home" href="/milcon/">Corbel</a>
  <h1>PIPER <span style="font-weight:400;font-size:15px;opacity:.75">Programming, Investment, and Project Estimate Reviewer</span></h1>
  <div class="sp"></div>
  <span class="saved" id="saved"></span>
@@ -498,25 +498,60 @@ function vBuild(){const v=$('#view');const n=nora(),e=earl();const r=e&&e.alts.f
  $('#bB').onclick=build1391;const fi=$('#rFile'),dr=$('#rdrop');fi.onchange=()=>{const f=fi.files[0];fi.value='';if(f) read1391(f);};
  dr.ondragover=ev=>{ev.preventDefault();dr.style.background='#f1f6f7';};dr.ondragleave=()=>dr.style.background='';dr.ondrop=ev=>{ev.preventDefault();dr.style.background='';const f=ev.dataTransfer.files[0];if(f) read1391(f);};
  if($('#rApply')) $('#rApply').onclick=apply1391;if($('#rX')) $('#rX').onclick=()=>{XR=null;vBuild();};}
-function vDone(){const v=$('#view');const C=calc();const F=findings();const bad=F.filter(x=>x.s==='bad'),warn=F.filter(x=>x.s==='warn');const A=P.auto||{};const s12a=A.s12||{};
- const todo=[];if(A.catcode&&P.b.catcode) todo.push('Category code '+P.b.catcode+' was proposed by AI ('+A.catcode+'). Confirm it under Adjust details → Project data.');
- if(A.loc) todo.push('Location '+P.loc.name+' was matched from the installation name. Check it under Adjust details → Project data.');
- const est=P.sup.filter(x=>/estimated|needed/i.test(x.auto||''));if(est.length) todo.push(est.length+' supporting line'+(est.length>1?'s have':' has')+' an estimated or missing quantity: '+est.map(x=>x.item).slice(0,5).join(', ')+(est.length>5?'…':'')+'. Confirm under Adjust details → Cost estimate.');
- const nounit=P.sup.filter(x=>!N(x.unit));if(nounit.length) todo.push(nounit.length+' supporting line'+(nounit.length>1?'s have':' has')+' no unit cost: '+nounit.map(x=>x.item).slice(0,4).join(', ')+'.');
- const sk=Object.keys(s12a);if(sk.length) todo.push('Block 12 '+(sk.includes('ds')?'dates are estimates from program year '+P.b.fy:'entries')+(sk.includes('acq')?'; acquisition strategy proposed':'')+'. Replace them with the design schedule.');
- (A.questions||[]).forEach(q=>todo.push(q));
- if(P.n.ai_check) todo.push('Block 11: '+P.n.ai_check+'.');if(P.n.ai_check10) todo.push('Block 10: '+P.n.ai_check10+'.');
+function vDone(){const v=$('#view');const C=calc();const F=findings();const bad=F.filter(x=>x.s==='bad'),warn=F.filter(x=>x.s==='warn');
  const stale=P.ai_rev_sig&&P.ai_rev_sig!==sig1391();
  v.innerHTML='<div class="panel"><h2>'+esc(P.b.title||'Your 1391')+'</h2><p class="lead">'+esc([P.b.installation,P.b.component,P.b.fy&&'FY'+P.b.fy,P.b.catcode&&'category code '+P.b.catcode].filter(Boolean).join(' · '))+(P.mode==='review'?' · <b>Review of '+esc(P.review.src?.file||'a submitted 1391')+'</b>':'')+'</p>'+
   '<div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Block 8 ($000)',C.rounded?k$(C.rounded):'—'],['Primary facility',C.qty?C.qty.toLocaleString()+' '+(P.pf.um||'SF'):'—'],['Supporting lines',P.sup.length],['Must fix',bad.length],['Check',warn.length]].map(([l,n])=>'<div style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
   (P.mode==='review'&&P.review.ext_total?'<p class="small">Submitted block 8: $'+N(P.review.ext_total).toLocaleString()+'K. PIPER’s rebuild: $'+k$(C.rounded)+'K.</p>':'')+
   '<div class="row"><button class="go" data-o="doc">Download 1391 (.doc)</button><button data-o="print">Print or PDF</button><button data-o="backup">Estimate backup</button><button data-o="jb">Justification text</button></div></div>'+
-  (todo.length?'<div class="panel"><h2>Confirm before you submit</h2><ul>'+todo.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'')+
+  confirmHTML()+
   '<div class="panel"><h2>Red team</h2>'+(stale?'<div class="find warn"><b>The 1391 changed since the AI review.</b> Run it again.</div>':'')+
-  (F.length?F.map(x=>'<div class="find '+x.s+'"><b>'+esc(x.t)+'</b> <span>'+esc(x.d)+'</span></div>').join(''):'<div class="small">No findings.</div>')+
+  fixHTML()+(F.length?F.map((x,i)=>'<div class="find '+x.s+'" style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><b>'+esc(x.t)+'</b> <span>'+esc(x.d)+'</span></div>'+(aiOn()?'<button class="sm" data-fix="'+i+'">Fix with AI</button>':'')+'</div>').join(''):'<div class="small">No findings.</div>')+
   '<div class="row"><button id="bRev">'+(P.ai_rev_at?'Run the AI review again':'Run the AI review')+'</button><span class="small">Rule checks run as you type; the AI reviewer reads the narrative against block 9, NORA and EARL.</span></div></div>';
  v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>dl(fname('Estimate-Backup','csv'),csv(backup()),'text/csv'),jb:()=>dl(fname('Justification','txt'),jb(),'text/plain')})[b.dataset.o]());
- $('#bRev').onclick=()=>aiReview(false);}
+ $('#bRev').onclick=()=>aiReview(false);v.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>aiFix(Number(b.dataset.fix)));bindFix();bindConfirm();}
+
+// ---------- Fix a finding with AI ----------
+const FIXF={desc:'Block 10 description',project:'Block 11 Project',requirement:'Block 11 Requirement',current:'Block 11 Current situation',impact:'Block 11 Impact if not provided',additional:'Block 11 Additional',joint:'Joint use certification',notes:'Primary facility basis notes',acq:'Block 12 acquisition strategy'};
+const FIX_SYS=`You fix one red-team finding on a DD Form 1391. Given the FINDING, THE 1391 and RECORD, rewrite the ONE field that resolves it, keeping everything that is already right in that field. Use ONLY facts in THE 1391 and RECORD; where a fact is missing write [NEEDED: what]. A certification or statement only the installation can make (for example joint use) is written in standard wording ending with [NEEDED: confirm with the installation].
+Fields: desc (block 10), project, requirement, current, impact, additional (block 11), joint (joint use certification), notes (primary facility basis notes), acq (block 12 acquisition strategy). If no text change fixes it (a number, a factor or a missing input), return field "" and say in "note" what the user must change and where.
+Return ONLY JSON: {"field":"","text":"the complete new field text","note":"one line on what changed"}`;
+let FIX=null;
+function fieldGet(f){return f==='notes'?P.pf.notes:f==='acq'?P.s12.acq:P.n[f];}
+function fieldSet(f,t){if(f==='notes') P.pf.notes=t;else if(f==='acq') P.s12.acq=t;else P.n[f]=t;}
+async function aiFix(i){if(!aiOn()){alert('Sign in to CARL to fix findings with AI.');return;}const x=findings()[i];if(!x) return;const b=document.querySelector('[data-fix="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
+ try{const src='THE 1391:\n'+the1391()+'\nBasis notes: '+(P.pf.notes||'')+'\nJoint use: '+(P.n.joint||'')+'\n\nRECORD:\n'+recordText().slice(0,40000)+'\n\n'+srcText10();
+  const j=await CARLAI.ask('claude',FIX_SYS,src+'\n\nFINDING: '+x.t+' – '+x.d,null,{fresh:true});
+  const f=String(j.field||'');FIX={i,t:x.t,field:FIXF[f]?f:'',text:String(j.text||'').trim(),note:String(j.note||''),bad:FIXF[f]?numsNotIn(j.text,src):[]};}
+ catch(e){alert('Could not fix: '+e.message);}vDone();}
+function fixHTML(){if(!FIX) return '';return '<div class="card" id="fixP" style="margin:10px 0;padding:12px 14px;border-color:var(--shoal)"><b>Proposed fix: '+esc(FIX.t)+'</b>'+
+ (FIX.field?'<div class="small" style="margin:4px 0">'+esc(FIXF[FIX.field])+(FIX.note?' – '+esc(FIX.note):'')+'</div><textarea id="fixT" class="tall" style="min-height:120px">'+esc(FIX.text)+'</textarea>'+(FIX.bad.length?'<div class="find warn">Check these numbers, not found in the 1391 or the record: '+esc(FIX.bad.join(', '))+'</div>':'')+
+  '<div class="row"><button class="go" id="fixA">Apply</button><button id="fixX">Discard</button></div>':'<p>'+esc(FIX.note||'No text change fixes this one.')+'</p><div class="row"><button id="fixX">Close</button></div>')+'</div>';}
+function bindFix(){const a=$('#fixA');if(a) a.onclick=()=>{const t=$('#fixT').value.trim();P.prior=P.prior||{};P.prior[FIX.field]=fieldGet(FIX.field);fieldSet(FIX.field,t);log('Finding fixed with AI',FIX.t+' → '+FIXF[FIX.field]);FIX=null;save();vDone();renderSteps();};
+ const x=$('#fixX');if(x) x.onclick=()=>{FIX=null;vDone();};}
+
+// ---------- Confirm in place ----------
+function confirmHTML(){const A=P.auto||{};const s12a=A.s12||{};const rows=[];
+ if(A.catcode) rows.push('<div class="card" style="margin:6px 0;padding:8px 12px"><b>Category code</b> <span class="small">proposed: '+esc(A.catcode)+'</span><div class="row" style="margin-top:4px"><input data-cb="catcode" value="'+esc(P.b.catcode)+'" style="width:160px"><button class="sm go" data-ok="catcode">Confirm</button></div></div>');
+ if(A.loc) rows.push('<div class="card" style="margin:6px 0;padding:8px 12px"><b>Location</b> '+esc(P.loc.name)+' (area cost factor '+esc(P.loc.acf)+') <span class="small">'+esc(A.loc)+'</span><div class="row" style="margin-top:4px"><button class="sm go" data-ok="loc">Correct</button><button class="sm" data-go="blocks">Change it</button></div></div>');
+ const est=P.sup.filter(x=>x.auto&&!/^Confirmed/.test(x.auto)||!N(x.unit));
+ if(est.length) rows.push('<div class="card" style="margin:6px 0;padding:8px 12px"><b>Supporting facilities to confirm</b><table style="margin-top:6px"><thead><tr><th>Item</th><th class="num">Quantity</th><th>Unit</th><th class="num">Unit cost ($)</th><th></th></tr></thead><tbody>'+est.map(x=>'<tr><td>'+esc(x.item)+(x.auto?'<div class="small">'+esc(x.auto)+'</div>':'')+'</td><td class="num"><input data-sq="'+x.id+'" value="'+esc(x.qty)+'" style="width:100px"></td><td>'+esc(x.um||'')+'</td><td class="num"><input data-su="'+x.id+'" value="'+esc(x.unit)+'" style="width:110px"></td><td><button class="sm go" data-sok="'+x.id+'">Confirm</button> <button class="sm" data-sdel="'+x.id+'">Remove</button></td></tr>').join('')+'</tbody></table><p class="small">Unit costs from Table 6 are national averages; PIPER applies the area cost factor and escalation.</p></div>');
+ const DK=[['ds','Design started'],['d35','35% design'],['dc','Design complete'],['award','Contract award'],['start','Construction start'],['complete','Construction complete']].filter(([k])=>s12a[k]);
+ if(DK.length||s12a.acq) rows.push('<div class="card" style="margin:6px 0;padding:8px 12px"><b>Block 12</b> <span class="small">estimated from program year '+esc(P.b.fy)+'; replace with the design schedule</span><div class="form" style="margin-top:6px">'+(s12a.acq?'<div class="wide"><label class="f">Acquisition strategy (proposed)</label><input data-s12="acq" value="'+esc(P.s12.acq)+'"></div>':'')+DK.map(([k,l])=>'<div><label class="f">'+l+'</label><input type="month" data-s12="'+k+'" value="'+esc(P.s12[k])+'"></div>').join('')+'</div><div class="row"><button class="sm go" data-ok="s12">Confirm block 12</button></div></div>');
+ (A.questions||[]).forEach((q,i)=>rows.push('<div class="card" style="margin:6px 0;padding:8px 12px">'+esc(q)+' <button class="sm" data-qx="'+i+'">Done</button></div>'));
+ if(P.n.ai_check) rows.push('<div class="find warn">Block 11: '+esc(P.n.ai_check)+'</div>');if(P.n.ai_check10) rows.push('<div class="find warn">Block 10: '+esc(P.n.ai_check10)+'</div>');
+ return rows.length?'<div class="panel"><h2>Confirm before you submit</h2><p class="lead">What PIPER proposed or estimated. Edit it here and confirm; everything else is under Adjust details.</p>'+rows.join('')+'</div>':'';}
+function bindConfirm(){const A=P.auto=P.auto||{};const v=$('#view');const again=()=>{save();vDone();renderSteps();};
+ v.querySelectorAll('[data-cb]').forEach(el=>el.oninput=()=>{P.b[el.dataset.cb]=el.value;save();});
+ v.querySelectorAll('[data-ok]').forEach(b=>b.onclick=()=>{const k=b.dataset.ok;if(k==='catcode'){delete A.catcode;log('Category code confirmed',P.b.catcode);}if(k==='loc'){delete A.loc;log('Location confirmed',P.loc.name);}
+  if(k==='s12'){const old=A.s12||{};const moved=old.start||old.complete;A.s12={};log('Block 12 confirmed');if(moved&&A.mid&&P.s12.start&&P.s12.complete){const a=new Date(P.s12.start+'-01'),c=new Date(P.s12.complete+'-01');const m=new Date((a.getTime()+c.getTime())/2);P.pf.mid_y=m.getFullYear();P.pf.mid_m=m.getMonth()+1;log('Midpoint set from schedule',P.pf.mid_y+'-'+P.pf.mid_m);}}again();});
+ v.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{STEP=b.dataset.go;render();window.scrollTo(0,0);});
+ v.querySelectorAll('[data-s12]').forEach(el=>el.oninput=el.onchange=()=>{P.s12[el.dataset.s12]=el.value;save();});
+ v.querySelectorAll('[data-sq]').forEach(el=>el.oninput=()=>{const x=P.sup.find(y=>y.id===el.dataset.sq);x.qty=el.value;save();});
+ v.querySelectorAll('[data-su]').forEach(el=>el.oninput=()=>{const x=P.sup.find(y=>y.id===el.dataset.su);x.unit=el.value;if(!x.src) x.adj=false;save();});
+ v.querySelectorAll('[data-sok]').forEach(b=>b.onclick=()=>{const x=P.sup.find(y=>y.id===b.dataset.sok);if(!N(x.qty)||!N(x.unit)){alert('Enter a quantity and a unit cost first.');return;}x.auto='Confirmed by you';log('Supporting line confirmed',x.item);again();});
+ v.querySelectorAll('[data-sdel]').forEach(b=>b.onclick=()=>{const x=P.sup.find(y=>y.id===b.dataset.sdel);P.sup=P.sup.filter(y=>y!==x);log('Supporting line removed',x.item);again();});
+ v.querySelectorAll('[data-qx]').forEach(b=>b.onclick=()=>{A.questions.splice(Number(b.dataset.qx),1);again();});}
 
 // ---------- 1 blocks ----------
 function vBlocks(){const v=$('#view');const n=nora(),e=earl();
@@ -647,9 +682,14 @@ function srcText10(){const C=calc(),L=[];let cs=null;try{cs=JSON.parse(localStor
  C.prim.forEach(x=>L.push('PRIMARY ITEM: '+[x.item,x.qty&&(x.qty+' '+(x.um||''))].filter(Boolean).join(', ')));
  C.sup.forEach(x=>L.push('SUPPORTING ITEM: '+[x.item,x.qty&&(x.qty+' '+(x.um||''))].filter(Boolean).join(', ')));
  if(cs&&cs.items) cs.items.slice(0,40).forEach(it=>L.push('SELECTED CRITERION: '+[it.number,it.title].filter(Boolean).join(' ')));
+ // The DoD-wide baseline every 1391 states, whether or not CORA has run.
+ const has=re=>cs&&cs.items&&cs.items.some(it=>re.test(it.number||''));
+ if(!has(/1-200-01/)) L.push('SELECTED CRITERION: UFC 1-200-01 DoD Building Code (baseline for all DoD construction)');
+ if(!has(/4-010-01/)) L.push('SELECTED CRITERION: UFC 4-010-01 DoD Minimum Antiterrorism Standards for Buildings (baseline for inhabited buildings)');
+ if(/guam|marian|okinawa|japan|philippin|hawaii|korea|wake|kwajalein|saipan|tinian/i.test((P.loc.country||'')+' '+(P.loc.name||'')+' '+(P.b.installation||''))) L.push('SITE CONDITIONS: typhoon and high-wind region with seismic exposure; the design addresses wind and seismic loads under UFC 1-200-01');
  const n=nora();if(n) (n.requirements||[]).filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT {'+r.id+'}: '+r.text));
  if(P.n.desc) L.push('AUTHOR DRAFT: '+P.n.desc);return L.join('\n');}
-const DRAFT10_SYS=`You draft block 10 (Description of Proposed Construction) of a DD Form 1391. One paragraph: what is constructed, its size, the primary and supporting facilities, and the governing criteria it will meet. Name only criteria listed in SOURCES as SELECTED CRITERION; if none are listed, write [NEEDED: criteria list from CORA]. Use ONLY facts in SOURCES. No references to AI.
+const DRAFT10_SYS=`You draft block 10 (Description of Proposed Construction) of a DD Form 1391. One paragraph: what is constructed, its size, the primary and supporting facilities, and the governing criteria it will meet. Name only criteria listed in SOURCES as SELECTED CRITERION, always including the DoD Building Code and antiterrorism baseline when listed. If SITE CONDITIONS are listed, state how the design addresses them. Use ONLY facts in SOURCES. No references to AI.
 Return ONLY JSON: {"desc":"the paragraph"}`;
 async function draft10(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
  if(!q&&P.n.desc&&!confirm('Replace block 10 with an AI draft? Your text is sent along as a source.')) return;
@@ -717,8 +757,11 @@ function findings(){const F=[];const C=calc();const n=P.n;const add=(s,t,d)=>F.p
  const s=P.s12;if(!s.acq) add('warn','Acquisition strategy blank','Block 12A(1).');if(!s.pct) add('warn','Percent design complete blank','Block 12A(2)(b).');
  if(s.award&&N(P.b.fy)){const a=new Date(s.award+'-01');const fyEnd=new Date(N(P.b.fy)+'-09-30');if(a>fyEnd) add('warn','Award after the end of the program year','Award '+s.award+' falls after FY'+P.b.fy+'. Reviewers move projects that cannot award in their year.');}
  const R=rec();if(R.earl?.recommended&&!new RegExp(R.earl.recommended.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(n.additional+n.desc+n.project)) add('warn','EARL recommendation not mentioned','EARL recommended “'+R.earl.recommended.name+'”. Make sure the 1391 describes the same alternative.');
- if(ext){const et=N(P.review.ext_total);if(et&&Math.abs(et*1000-C.rounded)>1) add('bad','Submitted block 8 does not match PIPER’s rebuild','Submitted $'+et.toLocaleString()+'K; rebuilt $'+k$(C.rounded)+'K ('+(((C.rounded/1000)/et-1)*100).toFixed(1)+'%).');
+ if(ext){const et=N(P.review.ext_total);if(et&&Math.abs(et*1000-C.rounded)>1){const d=(C.rounded/1000)/et-1;const g=D.guc[P.pf.guc_i];const band=Math.min(g&&g.sd?g.sd:.15,.25);const msg='Submitted $'+et.toLocaleString()+'K; PIPER\u2019s UFS rebuild $'+k$(C.rounded)+'K ('+(d*100).toFixed(1)+'%). ';
+  if(Math.abs(d)>2*band) add('bad','Submitted block 8 far from the UFS rebuild',msg+'More than twice the '+(g&&g.sd?'published spread for this facility type':'15% planning band')+' ('+(band*100).toFixed(0)+'%). Ask for the Service\u2019s estimate backup.');
+  else if(Math.abs(d)>band) add('warn','Submitted block 8 differs from the UFS rebuild',msg+'Outside the '+(g&&g.sd?'published spread for this facility type':'15% planning band')+' ('+(band*100).toFixed(0)+'%). Check the unit cost and factors.');}
   const ec=N(P.review.ext_cont),es=N(P.review.ext_sioh);if(P.review.ext_cont!==''&&ec!==N(P.cont)) add('warn','Submitted contingency differs',ec+'% submitted.');if(P.review.ext_sioh!==''&&Math.abs(es-SIOH[sClass()][1])>.01) add('warn','Submitted SIOH differs from the fixed rate',es+'% submitted; '+SIOH[sClass()][1]+'% expected for this location.');}
+ const ph=Object.entries({desc:'block 10',project:'Project',requirement:'Requirement',current:'Current situation',impact:'Impact',additional:'Additional',joint:'Joint use'}).filter(([k])=>/\[NEEDED/i.test(n[k]||'')).map(([k,l])=>l);if(ph.length) add('warn','[NEEDED] placeholders left','Fill them in: '+ph.join(', ')+'.');
  (P.ai_rev||[]).forEach(x=>F.push(x));
  return F;}
 function vRev(){const v=$('#view');const F=findings();const b=F.filter(x=>x.s==='bad'),w=F.filter(x=>x.s==='warn');

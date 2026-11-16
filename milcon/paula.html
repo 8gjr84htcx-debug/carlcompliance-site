@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PAULA – Portfolio Analytics, Updates, and Leadership Advisor</title>
 <script id="ms-core">window.MS_TOOL='paula';
-/* MILCON suite shared project record. Inlined into each tool; runs before the tool's own script. */
+/* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
 const TOOL=window.MS_TOOL||'';
@@ -58,7 +58,7 @@ if(PER.includes(TOOL)){
 if(TOOL==='paula') paulaIn();
 
 // ---- every save flows back into the record ----
-Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('MILCON record',e);}};
+Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('Corbel record',e);}};
 function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) return;const St=loadStore();
  if(t==='paula'){paulaOut(St,JSON.parse(v));return;}
  if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val));P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
@@ -105,9 +105,9 @@ function manage(){const s=loadStore();const dlg=document.createElement('dialog')
  dlg.querySelector('#mscl').onclick=close;
  dlg.querySelectorAll('[data-ren]').forEach(b=>b.onclick=()=>{const s2=loadStore();flush(s2);const p=s2.projects[b.dataset.ren];const n=prompt('Project name',p.core.name||'');if(!n) return;p.core.name=n.trim();saveStore(s2);location.reload();});
  dlg.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{const s2=loadStore();const p=s2.projects[b.dataset.del];if(!confirm('Delete “'+(p.core.name||'project')+'” and everything every tool holds for it? This cannot be undone. Export first if you need a copy.')) return;delete s2.projects[p.id];saveStore(s2);close();manage();});
- dlg.querySelector('#msexp').onclick=()=>{const s2=loadStore();flush(s2);saveStore(s2);const all={schema:'milcon-backup-1',exported:new Date().toISOString(),store:s2,irma:get('irma_project'),quinn:get('quinn_project'),paula:get('paula_project')};dl('MILCON_all_projects_'+today()+'.json',JSON.stringify(all));};
+ dlg.querySelector('#msexp').onclick=()=>{const s2=loadStore();flush(s2);saveStore(s2);const all={schema:'milcon-backup-1',exported:new Date().toISOString(),store:s2,irma:get('irma_project'),quinn:get('quinn_project'),paula:get('paula_project')};dl('Corbel_all_projects_'+today()+'.json',JSON.stringify(all));};
  dlg.querySelector('#msimp').onclick=()=>dlg.querySelector('#msf').click();
- dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a MILCON backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
+ dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a Corbel backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
 
 // ---- task order suggestions in IRMA and QUINN ----
 function toList(){if(TOOL!=='irma'&&TOOL!=='quinn') return;const dl2=document.createElement('datalist');dl2.id='ms-to';dl2.innerHTML=window.MS.tos().map(t=>'<option value="'+esc(t)+'">').join('');document.body.appendChild(dl2);
@@ -247,7 +247,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
 </head>
 <body>
 <header>
- <a class="home" href="/milcon/">MILCON</a>
+ <a class="home" href="/milcon/">Corbel</a>
  <h1>PAULA <span style="font-weight:400;font-size:15px;opacity:.75">Portfolio Analytics, Updates, and Leadership Advisor</span></h1>
  <div class="sp"></div>
  <span class="saved" id="saved"></span>
