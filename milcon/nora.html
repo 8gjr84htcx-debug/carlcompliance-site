@@ -172,7 +172,7 @@ td textarea{min-height:44px}
 .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
 @media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .flags{margin-top:6px}
-q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+q.ev{cursor:pointer;background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
 .check li{margin:4px 0;list-style:none}
 .check{padding-left:0}
 .check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
@@ -512,7 +512,7 @@ const EXTRACT_SYS=()=>`You are a requirements analyst for U.S. DoD military cons
 Return ONLY JSON:
 {"project":[{"field":"name|installation|service|location|unit|driver|driver_detail|mission|need_date","value":"...","quote":"...","src":"S1"}],
 "stakeholders":[{"name":"person's name as written","title":"","org":"","role":"<one of ROLES>","authority":"decides|approves|validates|consulted|informed","influence":"H|L","interest":"H|L","quote":"...","src":"S1"}],
-"requirements":[{"statement":"The facility shall … (one need, measurable where the source gives a number)","type":"<type id>","priority":"must|should|could|wont","measure":"how it will be verified","measure_basis":"stated|proposed","evidence":"...","src":"S1"}],
+"requirements":[{"statement":"The facility shall … (one need, measurable where the source gives a number)","type":"<type id>","priority":"must|should|could|wont","measure":"how it will be verified","measure_basis":"stated|proposed","speaker":"who said or wrote it, as the source shows (interviewee, email sender, workshop speaker); empty if not shown","evidence":"...","src":"S1"}],
 "gaps":[{"area":"capability","current":"what exists today","required":"what is needed","qty_have":"number only or empty","qty_need":"number only or empty","unit":"SF, bays, beds, kW…","impact":"what happens to the mission without it","quote":"...","src":"S1"}],
 "constraints":[{"text":"","basis":"","quote":"","src":""}],
 "assumptions":[{"text":"","owner":"who should confirm it","quote":"","src":""}],
@@ -533,28 +533,32 @@ function srcText(){return P.sessions.filter(s=>(s.notes||'').trim()).map((s,i)=>
 function srcSession(q){const n=norm(q);return P.sessions.find(s=>n.length>=6&&norm(s.notes).includes(n));}
 function numsOk(item,all){const S=String(all).replace(/,/g,'');['qty_have','qty_need'].forEach(f=>{const v=String(item[f]??'').replace(/,/g,'').trim();if(v&&!S.includes(v)){item[f]='';item.numsCleared=true;}});}
 async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) so NORA can use AI, then reload this page.');return;}
- const all=srcText();if(all.length<40){alert('Add at least one document or some notes first.');return;}
- const b=$('#bBuild'),st=$('#bStat');b.disabled=true;const say=t=>st.textContent=t;
- say('Two readers are reading your documents on their own…');
- const [A,B]=await Promise.all([CARLAI.ask('claude',EXTRACT_SYS(),'SOURCES:\n'+all).catch(e=>({err:e.message})),CARLAI.ask('gemini',EXTRACT_SYS(),'SOURCES:\n'+all).catch(e=>({err:e.message}))]);
- const runs=[[A,'Claude'],[B,'Gemini']].filter(([j])=>j&&!j.err);
- if(!runs.length){b.disabled=false;say('');alert('AI did not answer: '+(A.err||B.err));return;}
+ const all=allText();if(all.trim().length<40){alert('Add at least one document or some notes first.');return;}
+ let CH=srcChunks();const skipped=Math.max(0,CH.length-MAXCH);CH=CH.slice(0,MAXCH);
+ const b=$('#bBuild'),st=$('#bStat');b.disabled=true;const say=t=>st.textContent=t;const runs=[];let err='';
+ for(let c=0;c<CH.length;c++){say(CH.length>1?'Two readers are reading part '+(c+1)+' of '+CH.length+'…':'Two readers are reading your documents on their own…');
+  const [A,B]=await Promise.all([CARLAI.ask('claude',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message})),CARLAI.ask('gemini',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message}))]);
+  [[A,'Claude'],[B,'Gemini']].forEach(([j,w])=>{if(j&&!j.err) runs.push([j,w,c]);else err=err||(j&&j.err);});}
+ const readers=[...new Set(runs.map(r=>r[1]))];
+ if(!runs.length){b.disabled=false;say('');alert('AI did not answer: '+err);return;}
  const out={};let rejected=0;
  Object.keys(KEYF).forEach(cat=>{const pool=[];const kf=KEYF[cat],qf=QUOTEF(cat);
-  runs.forEach(([j,who])=>(Array.isArray(j[cat])?j[cat]:[]).forEach(raw=>{if(!raw||!String(raw[kf]||'').trim()) return;const it={...raw};
+  runs.forEach(([j,who,ch])=>(Array.isArray(j[cat])?j[cat]:[]).forEach(raw=>{if(!raw||!String(raw[kf]||'').trim()) return;const it={...raw};
    it.ok=verified(all,it[qf]);
    if(!it.ok){const soft=['assumptions','risks','measures'].includes(cat)&&!String(it[qf]||'').trim();if(!soft){rejected++;log('AI item rejected (quote not in your documents)',who+' · '+cat+': '+String(it[kf]).slice(0,80));return;}it[qf]='';}
    if(cat==='gaps') numsOk(it,all);
-   const m=pool.find(p=>(cat==='project'?p.field===it.field:cat==='stakeholders'?norm(p.name)===norm(it.name):sim(p[kf],it[kf])>=.6)&&!p.by.includes(who));
-   if(m){m.by.push(who);if(!m.ok&&it.ok) Object.assign(m,it,{by:m.by});}else pool.push({...it,id:uid(),by:[who],keep:true});}));
-  pool.forEach(p=>p.status=!p.ok?'suggestion':runs.length<2?'single':p.by.length>=2?'agreed':'single');
+   const m=pool.find(p=>cat==='project'?p.field===it.field:cat==='stakeholders'?norm(p.name)===norm(it.name):sim(p[kf],it[kf])>=.6);
+   if(m){if(!m.by.includes(who)) m.by.push(who);if(!m.ok&&it.ok) Object.assign(m,it,{by:m.by,id:m.id,keep:m.keep});else Object.keys(it).forEach(f=>{if((m[f]===''||m[f]==null)&&it[f]) m[f]=it[f];});}
+   else pool.push({...it,id:uid(),by:[who],ch,keep:true});}));
+  pool.forEach(p=>p.status=!p.ok?'suggestion':readers.length<2?'single':p.by.length>=2?'agreed':'single');
   out[cat]=pool;});
  // A requirement only one reader found goes to the arbiter.
- const disputed=runs.length>=2?out.requirements.filter(p=>p.status==='single'):[];
+ const disputed=readers.length>=2?out.requirements.filter(p=>p.status==='single'):[];
  if(disputed.length){say('The arbiter is ruling on '+disputed.length+' requirement'+(disputed.length>1?'s':'')+' only one reader found…');
-  try{const j=await CARLAI.ask('claude',ARB_SYS,'NOTES:\n'+all.slice(0,60000)+'\n\nDISPUTED CANDIDATES:\n'+disputed.map((p,i)=>(i+1)+'. '+p.statement).join('\n'));
-   (j.rulings||[]).forEach(rl=>{const p=disputed[(rl.n|0)-1];if(!p) return;if(rl.keep&&verified(all,rl.evidence)){p.status='upheld';p.evidence=rl.evidence;}else{p.status='dropped';log('Arbiter dropped candidate',p.statement.slice(0,90)+' – '+(rl.reason||''));}});}
-  catch(e){console.warn(e);}
+  for(const c of [...new Set(disputed.map(p=>p.ch||0))]){const D=disputed.filter(p=>(p.ch||0)===c);
+  try{const j=await CARLAI.ask('claude',ARB_SYS,'NOTES:\n'+CH[c]+'\n\nDISPUTED CANDIDATES:\n'+D.map((p,i)=>(i+1)+'. '+p.statement).join('\n'));
+   (j.rulings||[]).forEach(rl=>{const p=D[(rl.n|0)-1];if(!p) return;if(rl.keep&&verified(all,rl.evidence)){p.status='upheld';p.evidence=rl.evidence;}else{p.status='dropped';log('Arbiter dropped candidate',p.statement.slice(0,90)+' – '+(rl.reason||''));}});}
+  catch(e){console.warn(e);}}
   out.requirements=out.requirements.filter(p=>p.status!=='dropped');}
  // Leave out what the record already holds.
  out.requirements=out.requirements.filter(k=>!P.requirements.some(r=>sim(r.text,k.statement)>=.85));
@@ -562,8 +566,8 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
  out.project=out.project.filter(k=>k.field in BLANK().project&&String(k.value||'').trim()&&pBlank(k.field));
  out.project.forEach(k=>{if(k.field==='service'&&!SERVICES[k.value]) k.keep=false;if(k.field==='location'&&!LOCS[k.value]) k.keep=false;if(k.field==='driver'&&!DRIVERS[k.value]) k.keep=false;});
  ['gaps','constraints','assumptions','risks','measures'].forEach(c=>out[c]=out[c].filter(k=>!P[c].some(x=>sim(x.text||x.area||'',k[KEYF[c]])>=.85)));
- P.build={at:new Date().toISOString(),items:out,ans:{},engines:runs.map(r=>r[1]),rejected,applied:false};
- log('Build my requirement: read',all.length+' characters from '+P.sessions.length+' sources; '+Object.entries(out).map(([k,v])=>v.length+' '+k).join(', ')+(rejected?'; '+rejected+' rejected for quotes not found':''));
+ P.build={at:new Date().toISOString(),items:out,ans:{},engines:readers,rejected,parts:CH.length,skipped,applied:false};
+ log('Build my requirement: read',all.length+' characters from '+P.sessions.length+' sources'+(CH.length>1?' in '+CH.length+' parts':'')+(skipped?' ('+skipped+' more parts not read: too long)':'')+'; '+Object.entries(out).map(([k,v])=>v.length+' '+k).join(', ')+(rejected?'; '+rejected+' rejected for quotes not found':''));
  save();b.disabled=false;say('');vBuild();renderSteps();}
 
 // What the documents did not answer, asked as plain questions.
@@ -586,7 +590,7 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
  const PF={name:'Title',installation:'Installation',service:'Service',location:'Location',unit:'Requiring unit',driver:'Mission driver',driver_detail:'Why now',mission:'Mission',need_date:'Needed by'};
  const show=(c,x)=>c==='project'?'<b>'+esc(PF[x.field]||x.field)+':</b> '+esc(x.field==='service'?SERVICES[x.value]||x.value:x.field==='location'?LOCS[x.value]||x.value:x.field==='driver'?(DRIVERS[x.value]||{}).t||x.value:x.value)
   :c==='stakeholders'?'<b>'+esc(x.name)+'</b>'+(x.title?', '+esc(x.title):'')+(x.org?', '+esc(x.org):'')+' <span class="small">'+esc(x.role||'')+(x.authority?' · '+esc(AUTH[x.authority]||x.authority):'')+'</span>'
-  :c==='requirements'?'<textarea data-c="requirements" data-id="'+x.id+'" data-f="statement" style="min-height:40px">'+esc(x.statement)+'</textarea><div class="row" style="margin-top:4px"><select data-c="requirements" data-id="'+x.id+'" data-f="type" style="width:auto">'+opts(RTYPES,RTYPES[x.type]?x.type:'functional')+'</select><select data-c="requirements" data-id="'+x.id+'" data-f="priority" style="width:auto">'+opts(PRIOR,PRIOR[x.priority]?x.priority:'should')+'</select></div>'+(x.measure?'<div class="small">Verified by: '+esc(x.measure)+(x.measure_basis==='proposed'?' <span class="pill warn">proposed</span>':'')+'</div>':'')
+  :c==='requirements'?'<textarea data-c="requirements" data-id="'+x.id+'" data-f="statement" style="min-height:40px">'+esc(x.statement)+'</textarea><div class="row" style="margin-top:4px"><select data-c="requirements" data-id="'+x.id+'" data-f="type" style="width:auto">'+opts(RTYPES,RTYPES[x.type]?x.type:'functional')+'</select><select data-c="requirements" data-id="'+x.id+'" data-f="priority" style="width:auto">'+opts(PRIOR,PRIOR[x.priority]?x.priority:'should')+'</select></div>'+(x.speaker?'<div class="small">Said by: '+esc(x.speaker)+'</div>':'')+(x.measure?'<div class="small">Verified by: '+esc(x.measure)+(x.measure_basis==='proposed'?' <span class="pill warn">proposed</span>':'')+'</div>':'')
   :c==='gaps'?'<b>'+esc(x.area)+'</b> – today '+esc(x.current||'?')+'; needed '+esc(x.required||'?')+((x.qty_have||x.qty_need)?' <span class="small">('+esc(x.qty_have||'?')+' of '+esc(x.qty_need||'?')+' '+esc(x.unit||'')+')</span>':'')+(x.impact?'<div class="small">Impact: '+esc(x.impact)+'</div>':'')+(x.numsCleared?'<div class="small">A number not found in your documents was removed.</div>':'')
   :c==='risks'?esc(x.text)+' <span class="small">(likelihood '+esc(x.l||3)+', impact '+esc(x.i||3)+')</span>':esc(x.text)+(x.target?' <span class="small">– target '+esc(x.target)+'</span>':'')+(x.basis?' <span class="small">– '+esc(x.basis)+'</span>':'')+(x.owner?' <span class="small">– confirm with '+esc(x.owner)+'</span>':'');
  v.innerHTML='<div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two AI readers (Claude and Gemini) read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
@@ -595,8 +599,9 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
   '<details><summary class="small" style="cursor:pointer">Or paste text</summary><input id="pTitle" placeholder="What it is (e.g. Interview with the squadron commander, 12 Nov)" style="margin:6px 0"><textarea id="pText" class="tall" placeholder="Paste notes, an email or a document"></textarea><div class="row"><button id="bPaste">Add</button></div></details>'+
   '<div id="dStat" class="small"></div>'+
   (docs.length?'<h3>Sources ('+docs.length+')</h3><ul class="small">'+docs.map(s=>'<li>'+esc(s.title||SESSION_TYPES[s.type])+' – '+((s.notes.match(/\S+/g)||[]).length).toLocaleString()+' words'+(s.file&&s.file.note?' · '+esc(s.file.note):'')+' <a href="#" data-rm="'+s.id+'">remove</a></li>').join('')+'</ul>':'')+
+  (function(){const ch=srcChunks().length,w=(allText().match(/\S+/g)||[]).length;return ch>1?'<p class="small">'+w.toLocaleString()+' words. NORA reads '+(ch>MAXCH?'the first '+MAXCH+' of '+ch+' parts (about 120,000 words); remove or split the longest documents to read the rest.':'them in '+ch+' parts; this takes a few minutes.')+'</p>':'';})()+
   '<div class="row"><button class="go" id="bBuild" '+(signed&&docs.length?'':'disabled')+'>'+(B?'Build again':'Build my requirement')+'</button><span class="small" id="bStat"></span></div></div>'+
-  (B&&!B.applied?'<div class="panel"><h2>Review what NORA found</h2><p class="lead">Untick anything wrong. Labels show who found it: both readers, one reader, the arbiter, or a planner’s suggestion with no source (assumptions, risks and measures only).'+(B.rejected?' '+B.rejected+' item'+(B.rejected>1?'s were':' was')+' thrown out because the quote was not in your documents.':'')+'</p>'+
+  (B&&!B.applied?'<div class="panel"><h2>Review what NORA found</h2><p class="lead">Untick anything wrong. Labels show who found it: both readers, one reader, the arbiter, or a planner’s suggestion with no source (assumptions, risks and measures only).'+(B.rejected?' '+B.rejected+' item'+(B.rejected>1?'s were':' was')+' thrown out because the quote was not in your documents.':'')+(B.skipped?' <b>'+B.skipped+' part'+(B.skipped>1?'s':'')+' of your documents were too long to read.</b>':'')+' Click any quote to see it in its source.</p>'+
    Object.keys(LBL).map(c=>B.items[c].length?'<h3>'+LBL[c]+' ('+B.items[c].filter(x=>x.keep).length+' of '+B.items[c].length+')</h3>'+B.items[c].map(x=>'<div class="card" style="margin:6px 0;padding:8px 12px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-k2="'+c+'" data-id="'+x.id+'" '+(x.keep?'checked':'')+' style="width:auto;margin-top:4px"><span style="flex:1">'+show(c,x)+'<div class="flags">'+pill(x)+(x[QUOTEF(c)]?' <q class="ev">'+esc(x[QUOTEF(c)])+'</q>':'')+'</div></span></label></div>').join(''):'').join('')+
    (function(){const Q=buildQs();return Q.length?'<h3>Only you can answer these</h3><p class="small">Your documents did not say. Leave blank if you do not know yet.</p><div class="form">'+Q.map(([k,l,t])=>'<div class="wide"><label class="f">'+esc(l)+'</label>'+(t==='svc'?'<select data-a="'+k+'">'+opts(SERVICES,B.ans[k]||'','Select')+'</select>':t==='drv'?'<select data-a="'+k+'">'+opts(Object.fromEntries(Object.entries(DRIVERS).map(([a,x])=>[a,x.t])),B.ans[k]||'','Select')+'</select>':'<input data-a="'+k+'" type="'+(t==='date'?'date':'text')+'" value="'+esc(B.ans[k]||'')+'">')+'</div>').join('')+'</div>':'';})()+
    '<div class="row"><button class="go" id="bApply">Apply and write the need statement</button><span class="small">Requirements go in as Draft until their source confirms them.</span></div></div>':'')+
@@ -617,7 +622,7 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
   P.stakeholders.push({id:uid(),name:name.trim(),title:t.join(',').trim(),org:'',role,authority:k==='decider'?'decides':'consulted',influence:k==='decider'?'H':'',interest:'H',contact:'',origin:'Your answer'});n.stakeholders=(n.stakeholders||0)+1;});
  const byName={};kept('stakeholders').forEach(x=>{const s={id:uid(),name:x.name,title:x.title||'',org:x.org||'',role:ROLES.includes(x.role)?x.role:'Other',authority:AUTH[x.authority]?x.authority:'',influence:x.influence==='H'?'H':x.influence==='L'?'L':'',interest:x.interest==='H'?'H':x.interest==='L'?'L':'',contact:'',origin:'From '+(srcSession(x.quote)?.title||'your documents')};P.stakeholders.push(s);byName[norm(x.name)]=s.id;n.stakeholders=(n.stakeholders||0)+1;
   const ss=srcSession(x.quote);if(ss&&!ss.participants.includes(s.id)) ss.participants.push(s.id);});
- kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
+ kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);const who=personFor(x.speaker,ss,x.evidence);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
  kept('gaps').forEach(x=>{P.gaps.push({id:uid(),area:x.area,current:x.current||'',required:x.required||'',qty_have:String(x.qty_have??''),qty_need:String(x.qty_need??''),unit:x.unit||'',impact:x.impact||'',reqs:[],origin:x.ok?'From your documents':'Suggestion'});n.gaps=(n.gaps||0)+1;});
  kept('constraints').forEach(x=>{P.constraints.push({id:uid(),text:x.text,basis:x.basis||(x.ok?'“'+x.quote+'”':'')});n.constraints=(n.constraints||0)+1;});
  kept('assumptions').forEach(x=>{P.assumptions.push({id:uid(),text:x.text,owner:x.owner||'',confirmed:'no'});n.assumptions=(n.assumptions||0)+1;});
@@ -644,6 +649,62 @@ async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in t
   log('Need statement written with AI',P.need_check);save();}
  catch(e){alert('Could not write the need statement: '+e.message);}
  if(STEP==='out') vOut();renderSteps();}
+
+// ---------- Long documents: read in parts ----------
+const CHUNK=120000,MAXCH=6;
+function srcBlocks(){const B=[];P.sessions.filter(s=>(s.notes||'').trim()).forEach((s,i)=>{const hd='[S'+(i+1)+'] '+(s.title||SESSION_TYPES[s.type]||'Source')+' ('+(SESSION_TYPES[s.type]||s.type)+', '+(s.date||'')+')';const t=s.notes.trim();
+  if(t.length<=CHUNK-500){B.push(hd+'\n'+t);return;}
+  let part='',k=1;t.split(/\n{2,}/).forEach(pp=>{while(pp.length>CHUNK-500){if(part){B.push(hd+' part '+(k++)+'\n'+part);part='';}B.push(hd+' part '+(k++)+'\n'+pp.slice(0,CHUNK-500));pp=pp.slice(CHUNK-500);}
+   if((part+pp).length>CHUNK-500){B.push(hd+' part '+(k++)+'\n'+part);part='';}part+=(part?'\n\n':'')+pp;});if(part) B.push(hd+' part '+k+'\n'+part);});return B;}
+function srcChunks(){const C=[];let cur='';srcBlocks().forEach(b=>{if(cur&&(cur+b).length>CHUNK){C.push(cur);cur='';}cur+=(cur?'\n\n':'')+b;});if(cur) C.push(cur);return C;}
+function allText(){return P.sessions.map(s=>s.notes||'').join('\n\n');}
+
+// ---------- Who said it ----------
+function lastTok(n){const t=String(n||'').replace(/\b(col|lt|ltc|maj|capt|cpt|gen|cmsgt|smsgt|msgt|tsgt|ssgt|sgt|mr|mrs|ms|dr|cdr|lcdr|capt|cmdr)\b\.?/gi,'').match(/[A-Za-z][A-Za-z'\-]{2,}/g);return t?t[t.length-1].toLowerCase():'';}
+function personFor(speaker,ss,ev){const L=lastTok(speaker);
+ if(L){const m=P.stakeholders.find(s=>norm(s.name)===norm(speaker))||P.stakeholders.find(s=>lastTok(s.name)===L);if(m) return m.id;
+  if(norm(allText()).includes(norm(speaker))){const s={id:uid(),name:String(speaker).trim(),title:'',org:'',role:'Other',authority:'consulted',influence:'',interest:'',contact:'',origin:'Named in '+(ss?.title||'your documents')};P.stakeholders.push(s);return s.id;}}
+ if(!ss||!ev) return '';const notes=ss.notes||'';const at=norm(notes).indexOf(norm(ev));if(at<0) return '';
+ const win=norm(notes).slice(Math.max(0,at-700),at+norm(ev).length+80);let best='',pos=-1;
+ P.stakeholders.forEach(s=>{const l=lastTok(s.name);if(!l) return;const k=win.lastIndexOf(l);if(k>pos){pos=k;best=s.id;}});return best;}
+
+// ---------- See a quote in its source ----------
+function findIn(text,q){const w=String(q||'').match(/[A-Za-z0-9]+/g);if(!w||!w.length) return null;const re=new RegExp(w.map(x=>x.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')).join('[^A-Za-z0-9]+'),'i');const m=re.exec(text);return m?{i:m.index,n:m[0].length}:null;}
+function showQuote(q){let s=null,f=null;for(const x of P.sessions){const r=findIn(x.notes||'',q);if(r){s=x;f=r;break;}}
+ const o=document.createElement('div');o.style.cssText='position:fixed;inset:0;background:rgba(10,30,40,.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+ const t=s?s.notes:'';o.innerHTML='<div style="background:#fff;border-radius:10px;max-width:820px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.3)"><div style="display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line)"><b>'+esc(s?(s.title||SESSION_TYPES[s.type]):'Not found')+'</b><button id="qx">Close</button></div>'+
+  '<div id="qb" style="padding:16px;overflow:auto;white-space:pre-wrap;font-size:13.5px;line-height:1.5">'+(s?esc(t.slice(0,f.i))+'<mark id="qm" style="background:#ffe28a">'+esc(t.slice(f.i,f.i+f.n))+'</mark>'+esc(t.slice(f.i+f.n)):'These words are no longer in any source on the record.')+'</div></div>';
+ document.body.appendChild(o);const close=()=>o.remove();o.onmousedown=e=>{if(e.target===o) close();};o.querySelector('#qx').onclick=close;document.addEventListener('keydown',function k(e){if(e.key==='Escape'){close();document.removeEventListener('keydown',k);}});
+ const m=o.querySelector('#qm');if(m) m.scrollIntoView({block:'center'});}
+// mousedown, not click: editing a field and then clicking a quote can redraw the list between press and release.
+document.addEventListener('mousedown',e=>{if(e.button!==0) return;const t=e.target.closest&&e.target.closest('q.ev');if(t){e.preventDefault();showQuote(t.textContent);}},true);
+
+// ---------- Confirm with your sources ----------
+const HOW={person:'In person',email:'Email',phone:'Phone',workshop:'Workshop',sheet:'Signed sheet'};
+function confGroups(){const G={};P.requirements.filter(r=>r.status==='draft').forEach(r=>{const k=(r.sources||[]).find(id=>P.stakeholders.some(s=>s.id===id))||'';(G[k]=G[k]||[]).push(r);});
+ return Object.entries(G).map(([k,rs])=>({k,who:P.stakeholders.find(s=>s.id===k),rs})).sort((a,b)=>(!a.k)-(!b.k)||b.rs.length-a.rs.length);}
+function sheetHTML(groups){const p=P.project;
+ return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Confirmation sheet</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:16pt;margin:0 0 4pt}table{border-collapse:collapse;width:100%;font-size:10pt;margin:8pt 0}th,td{border:1px solid #999;padding:4pt 6pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.pb{page-break-before:always}</style></head><body>'+
+ groups.map((g,i)=>(i?'<br clear="all" style="page-break-before:always">':'')+'<div><h1>Please confirm: '+esc(p.name||'requirement')+'</h1><div class="m">'+esc([p.installation,SERVICES[p.service]].filter(Boolean).join(' · '))+'<br>For: <b>'+esc(g.who?g.who.name+(g.who.title?', '+g.who.title:''):'(name)')+'</b></div>'+
+  '<p>These are the requirements we recorded from your input. Please mark each one. If anything is wrong or missing, write the change in the box; your wording is what we will use.</p>'+
+  '<table><tr><th style="width:9%">ID</th><th style="width:38%">Requirement</th><th style="width:25%">Your words</th><th style="width:28%">Correct? / change</th></tr>'+
+  g.rs.map(r=>'<tr><td>'+esc(r.id)+'</td><td>'+esc(r.text)+(r.measure?'<br><i>Verified by: '+esc(r.measure)+'</i>':'')+'</td><td>'+(r.evidence?'“'+esc(r.evidence)+'”':'')+'</td><td>☐ Correct<br>☐ Change:<br><br></td></tr>').join('')+'</table>'+
+  '<p>Anything missing?</p><p>______________________________________________________________</p><p>Name __________________________ Signature __________________ Date __________</p></div>').join('')+'</body></html>';}
+function confPanel(){const G=confGroups();const n=G.reduce((a,g)=>a+g.rs.length,0);
+ if(!n) return P.requirements.some(r=>r.status==='confirmed')?'<div class="panel"><h2>Confirm with your sources</h2><p class="lead">Every requirement is confirmed by its source.</p></div>':'';
+ return '<div class="panel"><h2>Confirm with your sources</h2><p class="lead">'+n+' requirement'+(n>1?'s are':' is')+' still Draft. Send each person their sheet or walk through it with them, then record what they confirmed. Untick anything they changed and fix it under Adjust details → Requirements.</p>'+
+  '<div class="row"><button id="cAll">Download all sheets</button></div>'+
+  G.map((g,i)=>'<div class="card" style="margin:8px 0;padding:10px 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="flex:1">'+esc(g.who?g.who.name+(g.who.title?', '+g.who.title:''):'No named source')+'</b><span class="small">'+g.rs.length+' draft</span><button data-sh="'+i+'">Sheet</button><button class="go" data-cf="'+i+'">Record confirmation</button></div>'+
+   '<div data-cform="'+i+'" hidden style="margin-top:8px">'+g.rs.map(r=>'<label style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><input type="checkbox" data-r="'+r.id+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(r.id)+'</b> '+esc(r.text)+'</span></label>').join('')+
+   '<div class="form" style="margin-top:6px"><div><label class="f">Confirmed by</label><input data-by value="'+esc(g.who?g.who.name:'')+'" placeholder="Name"></div><div><label class="f">Date</label><input data-dt type="date" value="'+today()+'"></div><div><label class="f">How</label><select data-hw>'+opts(HOW,'person')+'</select></div></div>'+
+   '<div class="row"><button class="go" data-save="'+i+'">Mark ticked ones Confirmed</button></div></div></div>').join('')+'</div>';}
+function bindConf(root,again){const G=confGroups();
+ const a=root.querySelector('#cAll');if(a) a.onclick=()=>{dl(fname('Confirmation-Sheets','doc'),sheetHTML(G),'application/msword');log('Confirmation sheets downloaded',G.length+' people');save();};
+ root.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>{const g=G[b.dataset.sh];dl(fname('Confirm-'+(g.who?g.who.name:'unnamed').replace(/\W+/g,'-'),'doc'),sheetHTML([g]),'application/msword');});
+ root.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.cf+'"]');f.hidden=!f.hidden;});
+ root.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.save+'"]');const by=f.querySelector('[data-by]').value.trim();if(!by){alert('Enter who confirmed them.');return;}
+  const dt=f.querySelector('[data-dt]').value||today(),hw=f.querySelector('[data-hw]').value;const ids=[...f.querySelectorAll('[data-r]:checked')].map(x=>x.dataset.r);if(!ids.length) return;
+  ids.forEach(id=>{const r=P.requirements.find(x=>x.id===id);if(r){r.status='confirmed';r.confirmed={by,date:dt,how:hw};}});log('Requirements confirmed by source',ids.join(', ')+' – '+by+', '+dt+' ('+HOW[hw]+')');save();again();renderSteps();});}
 
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
@@ -679,7 +740,7 @@ function vReqs(){const v=$('#view');
    '<div class="grid4" style="margin-top:8px"><div><label class="f">How it will be verified</label><input data-k="measure" placeholder="Measure, test, or acceptance criterion"></div><div><label class="f">Rationale</label><input data-k="rationale" placeholder="Why it is needed"></div>'+
    '<div><label class="f">Source stakeholders</label><select data-src multiple size="2">'+P.stakeholders.map(x=>'<option value="'+x.id+'" '+((r.sources||[]).includes(x.id)?'selected':'')+'>'+esc(x.name||'(unnamed)')+'</option>').join('')+'</select>'+((r.source_names||[]).length?'<div class="small">Former: '+esc(r.source_names.join(', '))+'</div>':'')+'</div>'+
    '<div><label class="f">Source session</label><select data-sess>'+'<option value="">—</option>'+P.sessions.map(x=>'<option value="'+x.id+'" '+(x.id===r.session?'selected':'')+'>'+esc((SESSION_TYPES[x.type]||'')+' '+x.date+' '+(x.title||''))+'</option>').join('')+'</select></div></div>'+
-   (r.evidence?'<div class="small" style="margin-top:6px">Source words: <q class="ev">'+esc(r.evidence)+'</q></div>':'')+
+   (r.evidence?'<div class="small" style="margin-top:6px">Source words: <q class="ev" title="Show in source">'+esc(r.evidence)+'</q></div>':'')+(r.confirmed&&r.status!=='draft'?'<div class="small">Confirmed by '+esc(r.confirmed.by)+', '+esc(r.confirmed.date)+' ('+esc(HOW[r.confirmed.how]||r.confirmed.how)+')</div>':'')+
    (r.status==='withdrawn'?'<div style="margin-top:6px"><label class="f">Reason withdrawn</label><input data-k="withdrawn_reason"></div>':'');
    const fl=()=>d.querySelector('[data-fl]').innerHTML=quality(r).map(([c,t])=>'<span class="pill '+c+'">'+esc(t)+'</span>').join('');
    bindAll(d,r,k=>{fl();if(k==='status'){log('Requirement status changed',r.id+' → '+RSTAT[r.status]);vReqs();renderSteps();}});
@@ -753,7 +814,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks',P.risks.length],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
  '<p class="small">Change anything under Adjust details. Requirements stay Draft until their source confirms them; mark each one Confirmed on the Requirements step after you check it with that person.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
- '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+
+ '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+confPanel()+
  '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
  '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package for validation; keep the rest for the record. The RTM and the requirements also pass to EARL, PIPER and SOPHIE through the shared project record in this browser.</p><div class="outs">'+
@@ -766,7 +827,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  '<div class="panel"><h2>Record log</h2><p class="lead">Append-only history of what was added, accepted, rejected and changed.</p><div id="lg" class="small"></div></div>';
  const n=$('#need');n.value=P.need_statement||'';const wc=()=>$('#nwc').textContent=(n.value.trim().split(/\s+/).filter(Boolean).length||0)+' words';wc();
  n.oninput=()=>{P.need_statement=n.value;P.need_check='';save();wc();renderSteps();};
- $('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
+ bindConf(v,vOut);$('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
  $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();P.need_check='';log('Need statement drafted from record');save();vOut();renderSteps();};
  v.querySelectorAll('[data-v]').forEach(el=>{el.value=P.validation[el.dataset.v]||'';el.onchange=()=>{P.validation[el.dataset.v]=el.value;log('Validation recorded',el.dataset.v+': '+el.value);save();};});
  v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>dl(fname('Requirement-Package','doc'),wordWrap(pkgHTML()),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(pkgHTML(true));w.document.close();setTimeout(()=>w.print(),400);},
@@ -783,7 +844,6 @@ function regRows(){return [['Name','Title / office','Organization','Role','Autho
 function wordWrap(body){return body.replace('<html>','<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">');}
 function pkgHTML(print){const p=P.project;const act=P.requirements.filter(r=>r.status!=='withdrawn');const tb=(h,rows)=>'<table><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(p.name||'Requirement package')+'</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:13pt;margin:16pt 0 6pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4pt 0}th,td{border:1px solid #999;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.cui{text-align:center;font-weight:bold;font-size:10pt}</style></head><body>'+
- '<div class="cui">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN – MARK PER DoDI 5200.48 AS REQUIRED</div>'+
  '<h1>Requirement Package: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(p.prepared_by||'—')+', '+today()+'. Prepared with NORA; recommendations only. Validation authority rests with the installation and the Service.</div>'+
  '<h2>1. Need statement</h2><p>'+esc(P.need_statement||'(not yet written)')+'</p>'+
  '<h2>2. Mission and driver</h2><p><b>Mission:</b> '+esc(p.mission||'—')+'</p><p><b>Driver:</b> '+esc(DRIVERS[p.driver]?.t||'—')+'. '+esc(p.driver_detail||'')+'</p>'+(p.need_date?'<p><b>Capability needed by:</b> '+esc(p.need_date)+'</p>':'')+
@@ -796,7 +856,7 @@ function pkgHTML(print){const p=P.project;const act=P.requirements.filter(r=>r.s
  '<h2>9. Success measures</h2>'+tb(['Measure','Target','How measured'],P.measures.map(c=>[c.text,c.target,c.how]))+
  '<h2>10. Readiness and validation</h2>'+tb(['Check','Status'],gateItems().map(([t,ok])=>[t,ok?'Met':'Open']))+
  tb(['Validating office','Name','Date'],[['Installation',P.validation.installation||'',P.validation.installation_date||''],['Service',P.validation.service||'',P.validation.service_date||'']])+
- '<div class="cui" style="margin-top:14pt">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN</div></body></html>';}
+ '</body></html>';}
 function saveFile(){dl(fname('NORA','json'),JSON.stringify(P,null,1),'application/json');log('Project file saved');save();}
 
 // header actions
