@@ -202,6 +202,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
 .outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 @media print{header,nav.steps{display:none}.wrap{display:block}}
+.find.warn{background:var(--warnbg);border:1px solid #ecd59a;border-left:3px solid var(--warn);color:var(--ink,#1b2b33);padding:9px 12px;border-radius:4px;margin:0 0 12px;font-size:13.5px}
 </style>
 </head>
 <body>
@@ -644,7 +645,7 @@ function numCheck(text,src){const S=String(src).replace(/,/g,'');return [...new 
 async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return;}
  const b=$('#bAINeed');if(b){b.disabled=true;b.textContent='Writing…';}const rec=needRecord();
  try{const j=await CARLAI.ask('claude',NEED_SYS,'RECORD:\n'+rec,null,{fresh:true});const t=String(j.need||'').trim();if(!t) throw new Error('Nothing returned');
-  P.need_statement=t;const bad=numCheck(t,rec+'\n'+P.sessions.map(s=>s.notes).join('\n'));const gaps=(t.match(/\[NEEDED:[^\]]*\]/g)||[]).length;
+  P.need_statement=t;P.need_sig=needSig();const bad=numCheck(t,rec+'\n'+P.sessions.map(s=>s.notes).join('\n'));const gaps=(t.match(/\[NEEDED:[^\]]*\]/g)||[]).length;
   P.need_check=(bad.length?'Check these numbers; they are not in the record: '+bad.join(', ')+'. ':'Every number traces to the record. ')+(gaps?gaps+' [NEEDED] gap'+(gaps>1?'s':'')+' to fill.':'');
   log('Need statement written with AI',P.need_check);save();}
  catch(e){alert('Could not write the need statement: '+e.message);}
@@ -756,6 +757,10 @@ function bindRet(root){if(!RET) return;root.querySelectorAll('[data-ra]').forEac
   if(RET.missing&&RET.addMissing){const r=newReq({text:RET.missing,session:ss.id,sources:who?[who.id]:[],evidence:RET.missing,origin:'Returned sheet – '+by});done.push(r.id+' added');}
   log('Returned sheet applied',by+', '+dt+': '+(done.join(', ')||'nothing'));RET=null;save();vOut();renderSteps();};}
 
+// ---------- Is the need statement still current? ----------
+function needSig(){const t=needRecord();let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);}
+function needStale(){return !!(String(P.need_statement||'').trim()&&P.need_sig&&P.need_sig!==needSig());}
+
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
 function quality(r){const f=[];const t=r.text||'';const lt=' '+t.toLowerCase()+' ';
@@ -864,7 +869,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks',P.risks.length],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
  '<p class="small">Change anything under Adjust details. Requirements stay Draft until their source confirms them; mark each one Confirmed on the Requirements step after you check it with that person.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
- '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
+ '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(needStale()?'<div class="find warn"><b>The record has changed since this was written.</b> Requirements, gaps or the project details were edited. Rewrite it so it matches.</div>':'')+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
  '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
  '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package for validation; keep the rest for the record. The RTM and the requirements also pass to EARL, PIPER and SOPHIE through the shared project record in this browser.</p><div class="outs">'+
@@ -876,9 +881,9 @@ function vOut(){const v=$('#view');const gi=gateItems();
  '</div></div>'+
  '<div class="panel"><h2>Record log</h2><p class="lead">Append-only history of what was added, accepted, rejected and changed.</p><div id="lg" class="small"></div></div>';
  const n=$('#need');n.value=P.need_statement||'';const wc=()=>$('#nwc').textContent=(n.value.trim().split(/\s+/).filter(Boolean).length||0)+' words';wc();
- n.oninput=()=>{P.need_statement=n.value;P.need_check='';save();wc();renderSteps();};
+ n.oninput=()=>{P.need_statement=n.value;P.need_check='';P.need_sig=needSig();save();wc();renderSteps();};
  bindConf(v,vOut);$('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
- $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();P.need_check='';log('Need statement drafted from record');save();vOut();renderSteps();};
+ $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();P.need_check='';P.need_sig=needSig();log('Need statement drafted from record');save();vOut();renderSteps();};
  v.querySelectorAll('[data-v]').forEach(el=>{el.value=P.validation[el.dataset.v]||'';el.onchange=()=>{P.validation[el.dataset.v]=el.value;log('Validation recorded',el.dataset.v+': '+el.value);save();};});
  v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>dl(fname('Requirement-Package','doc'),wordWrap(pkgHTML()),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(pkgHTML(true));w.document.close();setTimeout(()=>w.print(),400);},
   rtm:()=>dl(fname('RTM','csv'),csv(rtmRows()),'text/csv'),reg:()=>dl(fname('Stakeholder-Register','csv'),csv(regRows()),'text/csv'),json:()=>saveFile()})[b.dataset.out]());
