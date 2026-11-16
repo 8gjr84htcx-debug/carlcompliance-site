@@ -630,7 +630,7 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
  kept('measures').forEach(x=>{P.measures.push({id:uid(),text:x.text,target:x.target||'',how:x.how||''});n.measures=(n.measures||0)+1;});
  B.applied=true;B.summary='Added '+(Object.entries(n).map(([k,v])=>v+' '+(k==='project'?'project fields':k)).join(', ')||'nothing new')+'.';
  log('Build my requirement: applied',B.summary);save();STEP='out';render();window.scrollTo(0,0);
- if(window.CARLAI&&CARLAI.state().ok&&!(P.need_statement||'').trim()) aiNeed();}
+ if(window.CARLAI&&CARLAI.state().ok){(async()=>{if(!(P.need_statement||'').trim()) await aiNeed();await aiMeasures(true);})();}}
 
 // The need statement, written from the record, with every number checked.
 const NEED_SYS=`You write the need statement for a DoD military construction requirement: one paragraph of 120 to 200 words a busy reviewer can read in a minute. Say who needs what capability, why now, and what happens to the mission without it. State the need, not a solution (say "covered maintenance space for two aircraft", not "a new hangar"). Use ONLY facts in RECORD; where a fact the paragraph needs is missing, write [NEEDED: what]. Plain words, active voice, no acronyms without spelling them out once, no references to AI or to this record.
@@ -690,21 +690,71 @@ function sheetHTML(groups){const p=P.project;
   '<table><tr><th style="width:9%">ID</th><th style="width:38%">Requirement</th><th style="width:25%">Your words</th><th style="width:28%">Correct? / change</th></tr>'+
   g.rs.map(r=>'<tr><td>'+esc(r.id)+'</td><td>'+esc(r.text)+(r.measure?'<br><i>Verified by: '+esc(r.measure)+'</i>':'')+'</td><td>'+(r.evidence?'“'+esc(r.evidence)+'”':'')+'</td><td>☐ Correct<br>☐ Change:<br><br></td></tr>').join('')+'</table>'+
   '<p>Anything missing?</p><p>______________________________________________________________</p><p>Name __________________________ Signature __________________ Date __________</p></div>').join('')+'</body></html>';}
+function measPanel(){const m=P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must'&&!String(r.measure||'').trim());return m.length?'<div class="panel"><h2>Verification measures</h2><p class="lead">'+m.length+' must-have requirement'+(m.length>1?'s have':' has')+' no measure yet ('+m.map(r=>r.id).join(', ')+'). Gate 1 needs one for each.</p><div class="row"><button class="go" id="bMeas">Propose measures with AI</button><span class="small">Review them under Adjust details \u2192 Requirements.</span></div></div>':'';}
 function confPanel(){const G=confGroups();const n=G.reduce((a,g)=>a+g.rs.length,0);
  if(!n) return P.requirements.some(r=>r.status==='confirmed')?'<div class="panel"><h2>Confirm with your sources</h2><p class="lead">Every requirement is confirmed by its source.</p></div>':'';
  return '<div class="panel"><h2>Confirm with your sources</h2><p class="lead">'+n+' requirement'+(n>1?'s are':' is')+' still Draft. Send each person their sheet or walk through it with them, then record what they confirmed. Untick anything they changed and fix it under Adjust details → Requirements.</p>'+
-  '<div class="row"><button id="cAll">Download all sheets</button></div>'+
+  '<div class="row"><button id="cAll">Download all sheets</button><label class="btn" style="cursor:pointer"><input type="file" id="retF" accept=".pdf,.docx,.txt,.eml,image/*" hidden><span style="border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-block">Read a returned sheet</span></label><span class="small" id="retStat">PDF, Word, or a photo of the marked-up sheet</span></div>'+
   G.map((g,i)=>'<div class="card" style="margin:8px 0;padding:10px 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="flex:1">'+esc(g.who?g.who.name+(g.who.title?', '+g.who.title:''):'No named source')+'</b><span class="small">'+g.rs.length+' draft</span><button data-sh="'+i+'">Sheet</button><button class="go" data-cf="'+i+'">Record confirmation</button></div>'+
    '<div data-cform="'+i+'" hidden style="margin-top:8px">'+g.rs.map(r=>'<label style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><input type="checkbox" data-r="'+r.id+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(r.id)+'</b> '+esc(r.text)+'</span></label>').join('')+
    '<div class="form" style="margin-top:6px"><div><label class="f">Confirmed by</label><input data-by value="'+esc(g.who?g.who.name:'')+'" placeholder="Name"></div><div><label class="f">Date</label><input data-dt type="date" value="'+today()+'"></div><div><label class="f">How</label><select data-hw>'+opts(HOW,'person')+'</select></div></div>'+
    '<div class="row"><button class="go" data-save="'+i+'">Mark ticked ones Confirmed</button></div></div></div>').join('')+'</div>';}
-function bindConf(root,again){const G=confGroups();
+function bindConf(root,again){const G=confGroups();const rf=root.querySelector('#retF');if(rf) rf.onchange=()=>{const f=rf.files[0];rf.value='';if(f) readSheet(f);};const bm=root.querySelector('#bMeas');if(bm) bm.onclick=()=>aiMeasures(false);bindRet(root);
  const a=root.querySelector('#cAll');if(a) a.onclick=()=>{dl(fname('Confirmation-Sheets','doc'),sheetHTML(G),'application/msword');log('Confirmation sheets downloaded',G.length+' people');save();};
  root.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>{const g=G[b.dataset.sh];dl(fname('Confirm-'+(g.who?g.who.name:'unnamed').replace(/\W+/g,'-'),'doc'),sheetHTML([g]),'application/msword');});
  root.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.cf+'"]');f.hidden=!f.hidden;});
  root.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.save+'"]');const by=f.querySelector('[data-by]').value.trim();if(!by){alert('Enter who confirmed them.');return;}
   const dt=f.querySelector('[data-dt]').value||today(),hw=f.querySelector('[data-hw]').value;const ids=[...f.querySelectorAll('[data-r]:checked')].map(x=>x.dataset.r);if(!ids.length) return;
   ids.forEach(id=>{const r=P.requirements.find(x=>x.id===id);if(r){r.status='confirmed';r.confirmed={by,date:dt,how:hw};}});log('Requirements confirmed by source',ids.join(', ')+' – '+by+', '+dt+' ('+HOW[hw]+')');save();again();renderSteps();});}
+
+// ---------- Verification measures for every must-have ----------
+const MEAS_SYS=`For each DoD facility requirement below, propose how a reviewer would verify it was met: one short, objective acceptance criterion (inspection of as-built drawings, test, measurement, commissioning report, survey). Use the numbers in the requirement; never invent new ones. If it cannot be made objective, say what document would show it.
+Return ONLY JSON: {"measures":[{"id":"R-001","measure":"..."}]}`;
+async function aiMeasures(quiet){const need=P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must'&&!String(r.measure||'').trim());if(!need.length) return 0;
+ if(!(window.CARLAI&&CARLAI.state().ok)){if(!quiet) alert('Sign in to CARL to propose measures with AI.');return 0;}
+ const b=$('#bMeas');if(b){b.disabled=true;b.textContent='Proposing…';}let n=0;
+ try{const j=await CARLAI.ask('claude',MEAS_SYS,need.map(r=>r.id+': '+r.text).join('\n'),null,{fresh:true});
+  (j.measures||[]).forEach(m=>{const r=need.find(x=>x.id===m.id);const t=String(m.measure||'').trim();if(r&&t){r.measure=t;r.origin=(r.origin||'')+'; measure proposed by AI';n++;}});
+  log('Verification measures proposed with AI',n+' must-have requirement'+(n===1?'':'s'));save();}
+ catch(e){if(!quiet) alert('Could not propose measures: '+e.message);}
+ if(STEP==='out') vOut();renderSteps();return n;}
+
+// ---------- Read a returned confirmation sheet ----------
+let RET=null;
+async function pdfImages(file,max){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const out=[];
+ for(let i=1;i<=Math.min(doc.numPages,max);i++){const p=await doc.getPage(i);const vp=p.getViewport({scale:1.6});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;out.push(c.toDataURL('image/jpeg',.8).split(',')[1]);}return out;}
+function imgB64(file){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1]);};im.onerror=()=>no(new Error('Could not open the image'));im.src=URL.createObjectURL(file);});}
+const RET_SYS=`You read a confirmation sheet a stakeholder returned for a DoD facility requirement. It may be typed, marked up or handwritten, and may be a photo or scan. For each requirement ID on the sheet, report what the person marked.
+Return ONLY JSON: {"signer":"name as written or empty","date":"YYYY-MM-DD or empty","items":[{"id":"R-001","verdict":"correct|change|unclear","change":"their new wording, exactly as written, if they changed it","note":"anything else they wrote beside it"}],"missing":"what they wrote under Anything missing, exactly as written, or empty"}
+Rules: "correct" only if the Correct box is clearly marked and nothing contradicts it. "change" if they marked Change or wrote new wording. "unclear" if you cannot tell. Never guess wording you cannot read; write [illegible] for it. Only report IDs from the LIST.`;
+async function readSheet(f){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL to read a returned sheet.');return;}
+ const st=$('#retStat');const say=t=>{if(st) st.textContent=t;};say('Reading '+f.name+'…');
+ try{const n=f.name.toLowerCase();let images=null,text='';
+  if(n.endsWith('.pdf')) images=await pdfImages(f,6);else if(/\.(jpe?g|png|gif|webp|heic)$/.test(n)||f.type.startsWith('image/')) images=[await imgB64(f)];else text=(await readAny(f)).text;
+  const list=P.requirements.filter(r=>r.status!=='withdrawn').map(r=>r.id+': '+r.text).join('\n');
+  const j=await CARLAI.ask('claude',RET_SYS,'LIST:\n'+list+(text?'\n\nSHEET:\n'+text:'\n\nThe sheet is in the image(s).'),images,{fresh:true});
+  const items=(j.items||[]).filter(x=>P.requirements.some(r=>r.id===x.id)).map(x=>({...x,apply:x.verdict!=='unclear'}));
+  RET={file:f.name,text,signer:String(j.signer||''),date:/^\d{4}-\d\d-\d\d$/.test(j.date||'')?j.date:today(),items,missing:String(j.missing||'').trim(),addMissing:!!String(j.missing||'').trim()};
+  log('Returned sheet read with AI',f.name+': '+items.length+' requirement'+(items.length===1?'':'s'));say('');}
+ catch(e){say('');alert('Could not read the sheet: '+e.message);}
+ vOut();}
+function retPanel(){if(!RET) return '';const V={correct:'<span class="pill ok">Correct</span>',change:'<span class="pill warn">Change</span>',unclear:'<span class="pill bad">Unclear</span>'};
+ return '<div class="panel" id="retP"><h2>Returned sheet: '+esc(RET.file)+'</h2><p class="lead">Check what NORA read against the sheet. Ticked lines are applied: Correct marks the requirement Confirmed; Change replaces the wording with theirs and marks it Confirmed. Unclear ones stay Draft.</p>'+
+  '<div class="form"><div><label class="f">Signed by</label><input id="rtBy" value="'+esc(RET.signer)+'"></div><div><label class="f">Date</label><input id="rtDt" type="date" value="'+esc(RET.date)+'"></div></div>'+
+  RET.items.map((x,i)=>{const r=P.requirements.find(y=>y.id===x.id);return '<div class="card" style="margin:6px 0;padding:8px 12px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-ra="'+i+'" '+(x.apply?'checked':'')+' style="width:auto;margin-top:4px"><span style="flex:1"><b>'+esc(x.id)+'</b> '+(V[x.verdict]||'')+'<div class="small">'+esc(r?r.text:'')+'</div>'+
+   (x.verdict==='change'?'<label class="f" style="margin-top:4px">Their wording</label><textarea data-rc="'+i+'" style="min-height:40px">'+esc(x.change||'')+'</textarea>':'')+(x.note?'<div class="small">Note: '+esc(x.note)+'</div>':'')+'</span></label></div>';}).join('')+
+  (RET.missing?'<div class="card" style="margin:6px 0;padding:8px 12px"><label style="display:flex;gap:8px"><input type="checkbox" id="rtMiss" '+(RET.addMissing?'checked':'')+' style="width:auto"><span><b>Anything missing:</b> '+esc(RET.missing)+'<div class="small">Added as a new Draft requirement for you to word.</div></span></label></div>':'')+
+  '<div class="row"><button class="go" id="rtApply">Apply</button><button id="rtX">Discard</button></div></div>';}
+function bindRet(root){if(!RET) return;root.querySelectorAll('[data-ra]').forEach(c=>c.onchange=()=>RET.items[c.dataset.ra].apply=c.checked);root.querySelectorAll('[data-rc]').forEach(t=>t.oninput=()=>RET.items[t.dataset.rc].change=t.value);
+ const m=root.querySelector('#rtMiss');if(m) m.onchange=()=>RET.addMissing=m.checked;root.querySelector('#rtX').onclick=()=>{RET=null;vOut();};
+ root.querySelector('#rtApply').onclick=()=>{const by=root.querySelector('#rtBy').value.trim(),dt=root.querySelector('#rtDt').value||today();if(!by){alert('Enter who signed the sheet.');return;}
+  const ss={id:uid(),type:'document',date:dt,title:'Returned sheet – '+by,participants:[],notes:(RET.text||RET.items.map(x=>x.id+': '+x.verdict+(x.change?' – '+x.change:'')+(x.note?' ('+x.note+')':'')).join('\n'))+(RET.missing?'\nAnything missing: '+RET.missing:''),candidates:[]};
+  const who=P.stakeholders.find(s=>norm(s.name)===norm(by))||P.stakeholders.find(s=>lastTok(s.name)&&lastTok(s.name)===lastTok(by));if(who) ss.participants.push(who.id);P.sessions.unshift(ss);const done=[];
+  RET.items.filter(x=>x.apply).forEach(x=>{const r=P.requirements.find(y=>y.id===x.id);if(!r) return;
+   if(x.verdict==='change'){const t=String(x.change||'').trim();if(!t||/\[illegible\]/i.test(t)) return;r.prior_text=r.text;r.text=t;r.evidence=t;r.session=ss.id;}
+   if(x.verdict==='correct'||x.verdict==='change'){r.status='confirmed';r.confirmed={by,date:dt,how:'sheet'};done.push(r.id+(x.verdict==='change'?' (reworded)':''));}});
+  if(RET.missing&&RET.addMissing){const r=newReq({text:RET.missing,session:ss.id,sources:who?[who.id]:[],evidence:RET.missing,origin:'Returned sheet – '+by});done.push(r.id+' added');}
+  log('Returned sheet applied',by+', '+dt+': '+(done.join(', ')||'nothing'));RET=null;save();vOut();renderSteps();};}
 
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
@@ -814,7 +864,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks',P.risks.length],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
  '<p class="small">Change anything under Adjust details. Requirements stay Draft until their source confirms them; mark each one Confirmed on the Requirements step after you check it with that person.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
- '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+confPanel()+
+ '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
  '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
  '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package for validation; keep the rest for the record. The RTM and the requirements also pass to EARL, PIPER and SOPHIE through the shared project record in this browser.</p><div class="outs">'+
