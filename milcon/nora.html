@@ -539,7 +539,7 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
  const b=$('#bBuild'),st=$('#bStat');b.disabled=true;const say=t=>st.textContent=t;const runs=[];let err='';
  for(let c=0;c<CH.length;c++){say(CH.length>1?'Two readers are reading part '+(c+1)+' of '+CH.length+'…':'Two readers are reading your documents on their own…');
   const [A,B]=await Promise.all([CARLAI.ask('claude',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message})),CARLAI.ask('gemini',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message}))]);
-  [[A,'Claude'],[B,'Gemini']].forEach(([j,w])=>{if(j&&!j.err) runs.push([j,w,c]);else err=err||(j&&j.err);});}
+  [[A,'Reader A'],[B,'Reader B']].forEach(([j,w])=>{if(j&&!j.err) runs.push([j,w,c]);else err=err||(j&&j.err);});}
  const readers=[...new Set(runs.map(r=>r[1]))];
  if(!runs.length){b.disabled=false;say('');alert('AI did not answer: '+err);return;}
  const out={};let rejected=0;
@@ -594,7 +594,7 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
   :c==='requirements'?'<textarea data-c="requirements" data-id="'+x.id+'" data-f="statement" style="min-height:40px">'+esc(x.statement)+'</textarea><div class="row" style="margin-top:4px"><select data-c="requirements" data-id="'+x.id+'" data-f="type" style="width:auto">'+opts(RTYPES,RTYPES[x.type]?x.type:'functional')+'</select><select data-c="requirements" data-id="'+x.id+'" data-f="priority" style="width:auto">'+opts(PRIOR,PRIOR[x.priority]?x.priority:'should')+'</select></div>'+(x.speaker?'<div class="small">Said by: '+esc(x.speaker)+'</div>':'')+(x.measure?'<div class="small">Verified by: '+esc(x.measure)+(x.measure_basis==='proposed'?' <span class="pill warn">proposed</span>':'')+'</div>':'')
   :c==='gaps'?'<b>'+esc(x.area)+'</b> – today '+esc(x.current||'?')+'; needed '+esc(x.required||'?')+((x.qty_have||x.qty_need)?' <span class="small">('+esc(x.qty_have||'?')+' of '+esc(x.qty_need||'?')+' '+esc(x.unit||'')+')</span>':'')+(x.impact?'<div class="small">Impact: '+esc(x.impact)+'</div>':'')+(x.numsCleared?'<div class="small">A number not found in your documents was removed.</div>':'')
   :c==='risks'?esc(x.text)+' <span class="small">(likelihood '+esc(x.l||3)+', impact '+esc(x.i||3)+')</span>':esc(x.text)+(x.target?' <span class="small">– target '+esc(x.target)+'</span>':'')+(x.basis?' <span class="small">– '+esc(x.basis)+'</span>':'')+(x.owner?' <span class="small">– confirm with '+esc(x.owner)+'</span>':'');
- v.innerHTML='<div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two AI readers (Claude and Gemini) read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
+ v.innerHTML=needsPanel()+'<div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: returned interview kits, interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two independent AI readers read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
   '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> You can still add documents now.')+'</div>'+
   '<label id="drop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;margin:10px 0"><b>Drop files here or click to choose</b><br><span class="small">PDF, Word (.docx), email (.eml), text. Scanned PDF pages are read by AI.</span><input type="file" id="dFiles" multiple accept=".pdf,.docx,.eml,.txt,.md,.csv,.htm,.html" hidden></label>'+
   '<details><summary class="small" style="cursor:pointer">Or paste text</summary><input id="pTitle" placeholder="What it is (e.g. Interview with the squadron commander, 12 Nov)" style="margin:6px 0"><textarea id="pText" class="tall" placeholder="Paste notes, an email or a document"></textarea><div class="row"><button id="bPaste">Add</button></div></details>'+
@@ -607,7 +607,7 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
    (function(){const Q=buildQs();return Q.length?'<h3>Only you can answer these</h3><p class="small">Your documents did not say. Leave blank if you do not know yet.</p><div class="form">'+Q.map(([k,l,t])=>'<div class="wide"><label class="f">'+esc(l)+'</label>'+(t==='svc'?'<select data-a="'+k+'">'+opts(SERVICES,B.ans[k]||'','Select')+'</select>':t==='drv'?'<select data-a="'+k+'">'+opts(Object.fromEntries(Object.entries(DRIVERS).map(([a,x])=>[a,x.t])),B.ans[k]||'','Select')+'</select>':'<input data-a="'+k+'" type="'+(t==='date'?'date':'text')+'" value="'+esc(B.ans[k]||'')+'">')+'</div>').join('')+'</div>':'';})()+
    '<div class="row"><button class="go" id="bApply">Apply and write the need statement</button><span class="small">Requirements go in as Draft until their source confirms them.</span></div></div>':'')+
   (B&&B.applied?'<div class="panel"><h2>Applied</h2><p class="lead">'+esc(B.summary||'')+'</p><div class="row"><button class="go" id="bGoOut">See your requirement</button></div><p class="small">Add more documents and build again; NORA leaves out what the record already holds.</p></div>':'');
- const fi=$('#dFiles'),dr=$('#drop');fi.onchange=()=>{const f=[...fi.files];fi.value='';if(f.length) addDocs(f);};
+ bindNeeds(v);const fi=$('#dFiles'),dr=$('#drop');fi.onchange=()=>{const f=[...fi.files];fi.value='';if(f.length) addDocs(f);};
  dr.ondragover=e=>{e.preventDefault();dr.style.background='#f1f6f7';};dr.ondragleave=()=>dr.style.background='';dr.ondrop=e=>{e.preventDefault();dr.style.background='';addDocs([...e.dataTransfer.files]);};
  $('#bPaste').onclick=()=>{const t=$('#pText').value.trim();if(t.length<20) return;P.sessions.unshift({id:uid(),type:'document',date:today(),title:$('#pTitle').value.trim()||'Pasted text',participants:[],notes:t,candidates:[]});log('Text added',$('#pTitle').value.trim()||'Pasted text');save();vBuild();renderSteps();};
  v.querySelectorAll('[data-rm]').forEach(a=>a.onclick=e=>{e.preventDefault();const s=P.sessions.find(x=>x.id===a.dataset.rm);if(!s) return;if(P.requirements.some(r=>r.session===s.id)&&!confirm('Requirements trace to this source. Remove it anyway? Their quotes are kept.')) return;P.sessions=P.sessions.filter(x=>x!==s);log('Source removed',s.title||'');save();vBuild();renderSteps();});
@@ -760,6 +760,71 @@ function bindRet(root){if(!RET) return;root.querySelectorAll('[data-ra]').forEac
 // ---------- Is the need statement still current? ----------
 function needSig(){const t=needRecord();let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);}
 function needStale(){return !!(String(P.need_statement||'').trim()&&P.need_sig&&P.need_sig!==needSig());}
+
+// ---------- What NORA needs: coverage, interview kits, reading kits back ----------
+const KR={cmd:'Commander or decision authority',user:'End user / operator',pw:'Installation public works (DPW, BCE, PWD)',pm:'Sponsor / requirement owner'};
+const KRL={cmd:'Commander / decision authority',user:'End user / operator',pw:'Installation public works',pm:'Project lead (you)'};
+function covData(){const B=P.build&&!P.build.applied?P.build.items:null;const k=c=>B?B[c].filter(x=>x.keep):[];const pj=f=>!pBlank(f)?'rec':k('project').some(x=>x.field===f)?'new':'';
+ const sh=P.stakeholders.concat(k('stakeholders'));const role=r=>sh.some(s=>s.role===r);
+ const gaps=P.gaps.concat(k('gaps'));const reqs=P.requirements.filter(r=>r.status!=='withdrawn').length+k('requirements').length;
+ const st=(rec,nw)=>rec?'rec':nw?'new':'';
+ return [
+  ['title','Project title, installation and Service','pm',st(!pBlank('name')&&!pBlank('installation')&&!pBlank('service'),pj('name')&&pj('installation')&&pj('service'))],
+  ['mission','Mission and requiring unit','cmd',st(!pBlank('mission')&&!pBlank('unit'),pj('mission')&&pj('unit'))],
+  ['driver','What is driving the need, and why now','cmd',st(!pBlank('driver')&&String(P.project.driver_detail||'').length>20,pj('driver'))],
+  ['date','When the capability is needed','cmd',pj('need_date')],
+  ['decide','Who has decision authority','cmd',st(P.stakeholders.some(s=>s.authority==='decides'),k('stakeholders').some(s=>s.authority==='decides'))],
+  ['user','The end user, consulted','user',st(P.stakeholders.some(s=>s.role===KR.user),role(KR.user))],
+  ['pw','Installation public works, consulted','pw',st(P.stakeholders.some(s=>/public works/.test(s.role||'')),sh.some(s=>/public works/.test(s.role||'')))],
+  ['reqs','Requirements: what the facility must let people do (at least 3)','user',st(P.requirements.filter(r=>r.status!=='withdrawn').length>=3,reqs>=3)],
+  ['gap','The gap in numbers: what exists today and what is needed','user',st(P.gaps.some(g=>g.qty_need!==''&&g.qty_need!=null),gaps.some(g=>g.qty_need!==''&&g.qty_need!=null))],
+  ['impact','Impact on the mission if nothing is done','cmd',st(P.gaps.some(g=>g.impact),gaps.some(g=>g.impact))],
+  ['site','Site and utility constraints','pw',st(P.constraints.length>0,k('constraints').length>0)],
+  ['measure','How success will be measured','cmd',st(P.measures.length>0,k('measures').length>0)],
+  ['risk','Assumptions and risks','pm',st(P.assumptions.length&&P.risks.length,(P.assumptions.length||k('assumptions').length)&&(P.risks.length||k('risks').length))]];}
+const KQ={
+ pm:[['title','Working project title, installation and Service.'],['risk','What are we assuming that could turn out wrong (funding, site, schedule, mission)?'],['risk','What could stop or delay this project, and how likely is it?']],
+ cmd:[['mission','What mission does the facility support, and which unit owns the requirement?'],['driver','What is driving this need now? Name the directive, basing decision, failure or change.'],['date','By when must the capability exist, and what sets that date?'],['impact','If this is not funded, what happens to the mission, to whom, and by when? Give numbers.'],['decide','Who decides on this requirement? Name and title.'],['measure','How will you know the project succeeded? Give a measurable target.'],['reqs','Which needs are must-haves, and which could wait?']],
+ user:[['reqs','List what the facility must let you do, one item per line.'],['gap','What do you have today (size, count, condition), and what do you need? Give numbers.'],['reqs','How many people use the space, by shift, today and in five years?'],['reqs','What equipment, vehicles or aircraft must it hold? Sizes and weights.'],['impact','What work cannot be done at all today because of the facility?'],['reqs','What must be next to what? What must be kept apart?']],
+ pw:[['gap','What existing facilities serve this mission today? Size and condition (real property records, condition index).'],['site','What limits the likely sites: land, utilities, environment, historic, airfield clearances, standoff?'],['site','What utility capacity is available at the likely sites (power, water, sewer, communications)?'],['risk','What can the installation actually operate and maintain afterward?']]};
+function kitHTML(roles){const p=P.project;const C=Object.fromEntries(covData().map(x=>[x[0],x]));
+ const known=[['Project title',p.name&&!pBlank('name')?p.name:''],['Installation',p.installation],['Service',SERVICES[p.service]],['Requiring unit',p.unit],['Mission',p.mission],['Driver',(DRIVERS[p.driver]||{}).t],['Why now',p.driver_detail],['Needed by',p.need_date]].filter(x=>x[1]);
+ return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Interview kit</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:16pt;margin:0 0 4pt}h2{font-size:12pt;margin:14pt 0 4pt}table{border-collapse:collapse;width:100%;font-size:10pt;margin:6pt 0}th,td{border:1px solid #999;padding:5pt 6pt;text-align:left;vertical-align:top}th{background:#e8eef0}.a{height:60pt}.m{color:#444;font-size:10pt}.c{color:#777;font-size:8pt}</style></head><body>'+
+ roles.map((r,i)=>{const qs=(KQ[r]||[]).slice();if(r==='cmd'&&DRIVERS[p.driver]) DRIVERS[p.driver].q.forEach(q=>qs.splice(2,0,['driver',q]));
+  const open=qs.filter(([c])=>!C[c]||C[c][3]!=='rec');const asked=open.length?open:qs.slice(0,3);
+  return (i?'<br clear="all" style="page-break-before:always">':'')+'<h1>Interview kit: '+esc(p.name&&!pBlank('name')?p.name:'new requirement')+'</h1><div class="m">'+esc([p.installation,SERVICES[p.service]].filter(Boolean).join(' · '))+'<br><b>Role: '+esc(KR[r])+'</b></div>'+
+  '<table border="1" cellpadding="6" cellspacing="0" width="100%"><tr><td style="width:33%">Name</td><td style="width:33%">Title / office</td><td>Date</td></tr><tr><td style="height:24pt">&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr></table>'+
+  '<p>We are documenting the requirement for this project. Please answer in your own words and give numbers wherever you can. Your answers are recorded with your name and become the basis of the requirement.</p>'+
+  (known.length?'<h2>What we have so far</h2><table border="1" cellpadding="6" cellspacing="0" width="100%"><tr><th style="width:28%">Item</th><th>Recorded</th><th style="width:28%">Correct? / change</th></tr>'+known.map(([a,b])=>'<tr><td>'+esc(a)+'</td><td>'+esc(b)+'</td><td>☐ Correct<br>☐ Change:</td></tr>').join('')+'</table>':'')+
+  '<h2>Questions</h2><table border="1" cellpadding="6" cellspacing="0" width="100%"><tr><th width="40%">Question</th><th width="60%">Your answer</th></tr>'+asked.map(([c,q])=>'<tr><td width="40%">'+esc(q)+' <span class="c">['+c+']</span></td><td class="a" height="80"></td></tr>').join('')+'</table>'+
+  '<p>Anything else we should know?</p><p>______________________________________________________________</p>';}).join('')+'</body></html>';}
+const KIT_SYS=`You read a returned NORA interview kit for a DoD construction requirement. It may be typed, handwritten, marked up, scanned or photographed. Transcribe every answer exactly as written; write [illegible] where you cannot read it. Never fill in an answer that is not there.
+Return ONLY JSON: {"respondent":{"name":"","title":"","org":""},"role":"the role printed on the kit","date":"YYYY-MM-DD or empty","corrections":[{"item":"","correction":"exactly as written"}],"answers":[{"code":"the code in brackets beside the question","question":"","answer":"exactly as written"}],"other":"anything written under Anything else"}`;
+async function readKits(files){if(!aiOn2()){alert('Sign in to CARL to read returned kits.');return;}const st=$('#kStat');const say=t=>{if(st) st.textContent=t;};let n=0;
+ for(const f of files){try{say('Reading '+f.name+'…');const nm=f.name.toLowerCase();let images=null,text='';
+   if(nm.endsWith('.pdf')){const r=await readPdf(f,say);if((r.text.match(/\S+/g)||[]).length>40&&!r.note) text=r.text;else images=await pdfImagesN(f,6);}
+   else if(/\.(jpe?g|png|gif|webp|heic)$/.test(nm)||f.type.startsWith('image/')) images=[await imgB64N(f)];else text=(await readAny(f)).text;
+   const j=await CARLAI.ask('claude',KIT_SYS,text?'KIT:\n'+text.slice(0,60000):'The kit is in the image(s).',images,{fresh:true});
+   const who=j.respondent||{};const role=Object.values(KR).find(r=>nz2(j.role).includes(nz2(r).split(' ')[0]))||'Other';
+   const body=text||(['Transcribed by AI from '+f.name].concat((j.corrections||[]).map(c=>'Correction to '+c.item+': '+c.correction),(j.answers||[]).filter(a=>String(a.answer||'').trim()).map(a=>'Q ['+a.code+']: '+a.question+'\nA: '+a.answer),j.other?['Anything else: '+j.other]:[]).join('\n\n'));
+   let s=P.stakeholders.find(x=>who.name&&lastTok(x.name)&&lastTok(x.name)===lastTok(who.name));
+   if(!s&&who.name){s={id:uid(),name:String(who.name).trim(),title:who.title||'',org:who.org||'',role:ROLES.includes(role)?role:'Other',authority:role===KR.cmd?'decides':'consulted',influence:role===KR.cmd?'H':'',interest:'H',contact:'',origin:'Interview kit'};P.stakeholders.push(s);}
+   P.sessions.unshift({id:uid(),type:'interview',date:/^\d{4}-\d\d-\d\d$/.test(j.date||'')?j.date:today(),title:'Interview kit – '+(who.name||f.name)+(role!=='Other'?' ('+role+')':''),participants:s?[s.id]:[],notes:body,candidates:[],file:{name:f.name,words:(body.match(/\S+/g)||[]).length,note:text?'':'transcribed by AI'}});
+   log('Interview kit read',(who.name||f.name)+', '+role);n++;}
+  catch(e){alert('Could not read '+f.name+': '+e.message);}}
+ save();say('');vBuild();renderSteps();if(n&&aiOn2()) buildReq();}
+function aiOn2(){return !!(window.CARLAI&&CARLAI.state().ok);}
+function nz2(s){return String(s||'').toLowerCase();}
+async function pdfImagesN(file,max){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const out=[];for(let i=1;i<=Math.min(doc.numPages,max);i++){const p=await doc.getPage(i);const vp=p.getViewport({scale:1.6});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;out.push(c.toDataURL('image/jpeg',.8).split(',')[1]);}return out;}
+function imgB64N(file){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1]);};im.onerror=()=>no(new Error('Could not open the image'));im.src=URL.createObjectURL(file);});}
+function needsPanel(){const C=covData();const done=C.filter(x=>x[3]).length;const miss=C.filter(x=>!x[3]);const byRole={};miss.forEach(x=>(byRole[x[2]]=byRole[x[2]]||[]).push(x[1]));
+ return '<div class="panel"><h2>What NORA needs</h2><p class="lead">Everything the requirement package and Gate 1 call for, and who usually knows it. '+done+' of '+C.length+' covered'+(P.build&&!P.build.applied?' (counting what is waiting for your review below)':'')+'.</p>'+
+  '<table><tbody>'+C.map(([k,l,r,s])=>'<tr><td style="width:28px;color:'+(s==='rec'?'var(--ok)':s==='new'?'var(--warn)':'var(--mute)')+'">'+(s==='rec'?'✓':s==='new'?'◐':'○')+'</td><td>'+esc(l)+'</td><td class="small">'+(s==='rec'?'On record':s==='new'?'Found, waiting for your review':'Ask: '+esc(KRL[r]))+'</td></tr>').join('')+'</tbody></table>'+
+  '<h3>Interview kits</h3><p class="small">One sheet per person. Each asks only what is still missing, shows what is already on record for them to confirm, and leaves room to answer. Send it, or take it to the meeting.</p>'+
+  '<div class="row">'+Object.keys(KR).map(r=>'<button data-kit="'+r+'">'+esc(KRL[r])+(byRole[r]?' ('+byRole[r].length+' open)':'')+'</button>').join('')+'<button class="go" data-kit="all">All four</button></div>'+
+  '<div class="row"><label style="cursor:pointer"><input type="file" id="kFiles" multiple accept=".pdf,.docx,.txt,image/*" hidden><span style="border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-block">Read returned kits</span></label><span class="small" id="kStat">Typed, handwritten or photographed. NORA adds each as an interview with the person’s name, then builds again.</span></div></div>';}
+function bindNeeds(v){v.querySelectorAll('[data-kit]').forEach(b=>b.onclick=()=>{const r=b.dataset.kit;const roles=r==='all'?Object.keys(KR):[r];dl(fname('Interview-Kit'+(r==='all'?'':'-'+KRL[r].replace(/\W+/g,'-')),'doc'),wordWrap(kitHTML(roles)),'application/msword');log('Interview kit downloaded',roles.map(x=>KRL[x]).join(', '));save();});
+ const kf=v.querySelector('#kFiles');if(kf) kf.onchange=()=>{const f=[...kf.files];kf.value='';if(f.length) readKits(f);};}
 
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
@@ -962,14 +1027,16 @@ render();save();
   var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
  // ---- one notice per browser session before anything leaves the page
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
-  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
  async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
   if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
- async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+ // Engines are named for their job on screen; which service runs each stays here.
+ var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
   var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
   if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
   if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
@@ -992,10 +1059,11 @@ render();save();
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
   var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
-  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
   loadSettings=function(){var s=_load();
    if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'){if(x.role==='arbiter'){x.model='reviewer';x.label='Reviewer';}else if(/gemini|reader-b/i.test(x.model)){x.model='reader-b';x.label='Reader B';}else{x.model='reader-a';x.label='Reader A';}}});
    s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
   if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
   if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
@@ -1013,6 +1081,9 @@ render();save();
    if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
    if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ // Connecting other AI services (the .mil build's GenAI.mil, for one) is an administrator task.
+ function gate(){var adm=false;try{adm=localStorage.getItem('carl_ai_admin')==='1';}catch(e){}var b=document.getElementById('bSettings');if(b&&!adm) b.style.display='none';}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',gate);else gate();
 })();
 </script>
 </body>

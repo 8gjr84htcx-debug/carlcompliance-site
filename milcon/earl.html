@@ -636,7 +636,7 @@ function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>
 function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const signed=window.CARLAI&&CARLAI.state().ok;
  const badge=c=>c.basis==='notes'?'<span class="pill ok">From your notes</span>':c.basis==='standard'?'<span class="pill">Standard alternative</span>':'<span class="pill warn">AI suggestion</span>';
  const reqs=E.reqs.filter(q=>q.must);
- v.innerHTML='<div class="panel"><h2>Build my AoA</h2><p class="lead">EARL reads NORA\u2019s requirements, gaps and notes, has two AI planners (Claude and Gemini) propose every reasonable course of action on their own, merges them, screens each against the must-have requirements, scores the non-cost factors and prices what the DoD tables cover. You review, answer what only you know, and EARL writes the analysis of alternatives.</p>'+
+ v.innerHTML='<div class="panel"><h2>Build my AoA</h2><p class="lead">EARL reads NORA\u2019s requirements, gaps and notes, has two independent AI planners propose every reasonable course of action on their own, merges them, screens each against the must-have requirements, scores the non-cost factors and prices what the DoD tables cover. You review, answer what only you know, and EARL writes the analysis of alternatives.</p>'+
   '<div class="mentor">'+(n?'NORA: <b>'+esc(n.project.name||'(untitled)')+'</b> \u2013 '+(n.requirements||[]).filter(r=>r.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gap'+((n.gaps||[]).length===1?'':'s')+', '+(n.sessions||[]).length+' session'+((n.sessions||[]).length===1?'':'s')+'.':'No NORA project in this browser; EARL will work from the objective on step 1.')+' Location: '+(E.price&&E.price.loc?esc(E.price.loc.label):(guessLoc_()?esc(siteLabel_(guessLoc_())):'<b>not found</b> \u2013 set it on step 3'))+'. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use this.</b>')+'</div>'+
   '<div class="row"><button class="go" id="bBuild" '+(signed?'':'disabled')+'>'+(B?'Build again':'Build my AoA')+'</button><span class="small" id="bStat"></span></div></div>'+
   (B?'<div class="panel"><h2>Review the courses of action</h2><p class="lead">Keep or drop each one, fix the facility type or size where EARL guessed, then apply. Labels show where each came from: your own notes (with the words it rests on), the standard DoD list, or an AI suggestion to consider.</p>'+
@@ -823,14 +823,16 @@ render();save();
   var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
  // ---- one notice per browser session before anything leaves the page
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
-  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
  async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
   if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
- async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+ // Engines are named for their job on screen; which service runs each stays here.
+ var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
   var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
   if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
   if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
@@ -853,10 +855,11 @@ render();save();
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
   var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
-  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
   loadSettings=function(){var s=_load();
    if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'){if(x.role==='arbiter'){x.model='reviewer';x.label='Reviewer';}else if(/gemini|reader-b/i.test(x.model)){x.model='reader-b';x.label='Reader B';}else{x.model='reader-a';x.label='Reader A';}}});
    s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
   if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
   if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
@@ -874,6 +877,9 @@ render();save();
    if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
    if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ // Connecting other AI services (the .mil build's GenAI.mil, for one) is an administrator task.
+ function gate(){var adm=false;try{adm=localStorage.getItem('carl_ai_admin')==='1';}catch(e){}var b=document.getElementById('bSettings');if(b&&!adm) b.style.display='none';}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',gate);else gate();
 })();
 </script>
 </body>

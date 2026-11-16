@@ -782,7 +782,7 @@ function arbiter(){const i=SET.slots.findIndex(s=>s.enabled&&s.model&&s.role==='
 function renderEngines(status={}){const box=$('#engines');box.innerHTML='';
  [...engineList(),...(arbiter()?[{...arbiter(),name:arbiter().name+' (arbiter)'}]:[])].forEach(e=>{const st=status[e.id]||{};const d=document.createElement('div');d.className='eng';
   d.innerHTML='<span class="dot '+(st.state||'')+'"></span><span class="nm">'+esc(e.name)+'</span><span class="st">'+esc(st.msg||e.desc)+'</span>';box.appendChild(d);});
- if(SET.slots.every(s=>!s.enabled)) box.insertAdjacentHTML('beforeend','<div class="small">No AI configured. In AI settings, add up to two readers and an arbiter; the readers parse the scope and the arbiter settles any disagreement.</div>');
+ if(SET.slots.every(s=>!s.enabled)) box.insertAdjacentHTML('beforeend','<div class="small">AI is off. Sign in to CARL (carl.carlcompliance.com) to use it.</div>');
  const ai=[...engineList().filter(e=>e.slot),...(arbiter()?[arbiter()]:[])];const w=$('#dataWarn');
  if(ai.length){w.hidden=false;w.innerHTML='Parsing will send the scope text to: <b>'+ai.map(e=>esc(e.name)+' ('+esc(e.slot.base||defaultBase(e.slot.provider))+')').join(', ')+'</b>. Send CUI only to an AI approved for CUI.';}else w.hidden=true;}
 function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?'generativelanguage.googleapis.com':'api.openai.com';}
@@ -914,14 +914,16 @@ try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.
   var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
  // ---- one notice per browser session before anything leaves the page
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
-  var ok=confirm('This sends the text to Claude or Gemini through CARL (commercial AI).\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
  async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
   if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
- async function ask(engine,sys,user,images,opt){opt=opt||{};engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+ // Engines are named for their job on screen; which service runs each stays here.
+ var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
   var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
   if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
   if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
@@ -944,10 +946,11 @@ try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
   var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
-  var DEF=function(){return [{provider:'carl',label:'Claude (CARL)',role:'reader',model:'claude',enabled:true},{provider:'carl',label:'Gemini (CARL)',role:'reader',model:'gemini',enabled:true},{provider:'carl',label:'Arbiter (CARL)',role:'arbiter',model:'claude',enabled:true}];};
+  var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
   loadSettings=function(){var s=_load();
    if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'){if(x.role==='arbiter'){x.model='reviewer';x.label='Reviewer';}else if(/gemini|reader-b/i.test(x.model)){x.model='reader-b';x.label='Reader B';}else{x.model='reader-a';x.label='Reader A';}}});
    s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
   if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
   if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
@@ -965,6 +968,9 @@ try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.
    if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
    if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ // Connecting other AI services (the .mil build's GenAI.mil, for one) is an administrator task.
+ function gate(){var adm=false;try{adm=localStorage.getItem('carl_ai_admin')==='1';}catch(e){}var b=document.getElementById('bSettings');if(b&&!adm) b.style.display='none';}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',gate);else gate();
 })();
 </script>
 </body>
