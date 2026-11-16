@@ -319,6 +319,43 @@ function piper(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'
 function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
 function coraSel(){try{return JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){return null;}}
 
+
+// ---------- Corbel Word forms: one look for every printed sheet ----------
+// Word reads this HTML as a document. Georgia stands in for the site's serif; colors are the site's.
+// Styles are written inline so Word and other word processors render them the same way.
+const CD={navy:'#1B2F4E',deep:'#0F1E36',gold:'#E8D5A8',taupe:'#8B6F3D',taupe2:'#5C4A33',rule:'#C9B998',ink:'#1A1410',tint:'#F6F1E7',tint2:'#FBF8F2',mute:'#7A7065'};
+const CDF='font-family:Georgia,\'Times New Roman\',serif;';
+const CDK=CDF+'font-size:7.5pt;letter-spacing:2pt;text-transform:uppercase;color:'+CD.taupe+';';
+function cdDoc(title,pages,landscape){const sz=landscape?'11.0in 8.5in;mso-page-orientation:landscape':'8.5in 11.0in';
+ return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+ '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+ '<style>@page Section1{size:'+sz+';margin:0.6in 0.7in 0.6in 0.7in}div.Section1{page:Section1}body{'+CDF+'font-size:10.5pt;color:'+CD.ink+'}p{margin:0 0 6pt}table{border-collapse:collapse}td{vertical-align:top}</style></head>'+
+ '<body style="'+CDF+'font-size:10.5pt;color:'+CD.ink+'"><div class="Section1">'+pages.join('<br clear="all" style="page-break-before:always;mso-break-type:page-break">')+'</div></body></html>';}
+function cdP(t,st){return '<p style="'+CDF+'margin:0 0 6pt;'+(st||'')+'">'+t+'</p>';}
+// Writing lines: a small table of underlined rows works in every word processor.
+function cdLines(n,bg){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+Array(n).fill('<tr><td height="24" style="height:18pt;border-bottom:0.75pt solid '+CD.rule+(bg?';background:'+bg:'')+'"'+(bg?' bgcolor="'+bg+'"':'')+'>&nbsp;</td></tr>').join('')+'</table>';}
+// The navy band at the top of each page.
+function cdBand(kind,title,sub,chip){return '<table width="100%" cellpadding="14" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.navy+'" style="background:'+CD.navy+';padding:14pt 16pt">'+
+ cdP('CORBEL &nbsp;&middot;&nbsp; '+esc(kind).toUpperCase(),'margin:0 0 6pt;font-size:7.5pt;letter-spacing:2.5pt;color:'+CD.gold)+
+ cdP(esc(title),'margin:0;font-size:20pt;line-height:120%;color:#FFFFFF')+(sub?cdP(esc(sub),'margin:5pt 0 0;font-size:9.5pt;font-style:italic;color:'+CD.gold):'')+'</td></tr></table>'+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td height="4" bgcolor="'+CD.gold+'" style="height:3pt;background:'+CD.gold+';font-size:2pt;line-height:2pt">&nbsp;</td></tr></table>'+
+ (chip?'<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-top:8pt"><tr><td bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:3pt 8pt">'+cdP(esc(chip).toUpperCase(),'margin:0;font-size:8pt;letter-spacing:1.5pt;color:'+CD.navy)+'</td></tr></table>':'');}
+// Name / title / date boxes.
+function cdWho(fields){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:10pt"><tr>'+fields.map((f,i)=>'<td width="'+Math.floor(100/fields.length)+'%" style="padding:0 '+(i<fields.length-1?'14pt':'0')+' 0 0">'+cdP(esc(f).toUpperCase(),CDK+'margin:0 0 4pt')+cdLines(1)+'</td>').join('')+'</tr></table>';}
+function cdLead(t){return cdP(t,'margin:12pt 0 4pt;font-style:italic;color:'+CD.taupe2);}
+function cdH(t){return cdP(esc(t),'margin:16pt 0 2pt;font-size:13pt;color:'+CD.navy)+'<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:8pt"><tr><td height="2" style="height:1pt;border-top:0.75pt solid '+CD.gold+';font-size:1pt">&nbsp;</td></tr></table>';}
+// "What we have so far": tinted rows with tick boxes.
+function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows.map(([a,b],i)=>{const bg=i%2?CD.tint2:CD.tint;const td=(w,c)=>'<td'+(w?' width="'+w+'"':'')+' bgcolor="'+bg+'" style="background:'+bg+';padding:6pt 8pt;border-bottom:0.5pt solid '+CD.rule+'">'+c+'</td>';
+  return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
+// One question: number and question, then a ruled answer box with a gold edge.
+function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q)+(code?' <span style="font-size:7pt;color:'+CD.mute+';letter-spacing:1pt">['+esc(code)+']</span>':''),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
+// A data table with a navy header row and tinted stripes.
+function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
+ '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
+ rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
+function cdFoot(t){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 // ---------- Reading documents (shared with NORA) ----------
 let PDFJS=null;
 async function pdfLib(){if(PDFJS) return PDFJS;
@@ -471,12 +508,12 @@ function lineDiff(doc,txt){const D=nz3(doc);return String(txt).split(/\n+|(?<=[.
 function fixSplit(X){let at=0;X.secs.forEach(x=>{const sl=exactSlice(X.text,x.text,at);if(sl){x.text=sl.t.replace(/\r/g,'').trim();x.exact=true;x.diff=[];at=sl.i+sl.t.length;}else{x.exact=false;x.diff=lineDiff(X.text,x.text);}x.ok=x.exact||!x.diff.length;});}
 
 // ---------- Review comments for the author ----------
-function commentsHTML(){const F=findingsAll();const P2=S.proposals||{};
- return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Review comments</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:9.5in;margin:0 auto;padding:.4in}h1{font-size:16pt;margin:0 0 4pt}table{border-collapse:collapse;width:100%;font-size:9.5pt}th,td{border:1px solid #999;padding:4pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}</style></head><body>'+
- '<h1>Review comments: '+esc(S.p.title||S.review?.file||'statement of work')+'</h1><div class="m">'+esc(S.review?('Document reviewed: '+S.review.file+'. '):'')+'Reviewed '+today()+'. Requirements checked: '+S.reqs.length+'; criteria checked: '+S.criteria.length+'.</div>'+
- '<table border="1" cellpadding="5" cellspacing="0" width="100%" style="margin-top:10pt"><tr><th width="4%">#</th><th width="16%">Section</th><th width="22%">Text</th><th width="28%">Comment</th><th width="30%">Suggested wording</th></tr>'+
- F.map((f,i)=>{const s=f.sec||(f.hit?S.sections.find(x=>nz3(x.text).includes(nz3(f.hit))):null);const pr=P2[f.msg];return '<tr><td>'+(i+1)+'</td><td>'+esc(s?s.title:'General')+'</td><td>'+(f.hit?'“'+esc(f.hit)+'”':'')+'</td><td>'+esc(f.msg.replace(/^AI review: /,''))+'</td><td>'+(pr?esc(pr).replace(/\n/g,'<br>'):'')+'</td></tr>';}).join('')+'</table></body></html>';}
-
+function commentsHTML(){const F=findingsAll();const P2=S.proposals||{};const bad=F.filter(f=>f.sev==='bad').length;
+ const rows=F.map((f,i)=>{const s=f.sec||(f.hit?S.sections.find(x=>nz3(x.text).includes(nz3(f.hit))):null);const pr=P2[f.msg];
+  return ['<span style="color:'+CD.taupe+'">'+(i+1)+'</span>',esc(s?s.title:'General'),f.hit?'<i style="color:'+CD.taupe2+'">“'+esc(f.hit)+'”</i>':'',(f.sev==='bad'?'<b style="color:#8A2B1E">Must fix.</b> ':'')+esc(f.msg.replace(/^AI review: /,'')),pr?esc(pr).replace(/\n/g,'<br>'):''];});
+ return cdDoc('Review comments',[cdBand('Statement of work review',S.p.title||S.review?.file||'Statement of work',(S.review?'Document reviewed: '+S.review.file+'  ·  ':'')+'Reviewed '+today(),'')+
+  cdLead(F.length+' comment'+(F.length===1?'':'s')+(bad?', '+bad+' must fix':'')+'. Checked against '+S.reqs.length+' requirement'+(S.reqs.length===1?'':'s')+(S.criteria.length?' and '+S.criteria.length+' selected criteria':'')+'. Suggested wording is offered where a fix was drafted; the decision stays with the author.')+
+  cdTable(['#','Section','Text','Comment','Suggested wording'],rows,['4%','15%','24%','27%','30%'])+cdFoot('Prepared with Corbel  ·  '+esc(S.p.title||''))],true);}
 // ---------- Confirm in place ----------
 function confirmHTMLS(){const rows=[];
  S.sections.forEach(s=>{const k=s.key.split(':')[0];const noReq=!s.reqs.length&&!['docs','safe'].includes(k)&&S.reqs.length&&!s.review&&!(s.ai&&s.ai.linkedOk);const un=(s.ai&&!s.ai.confirmed&&s.ai.unverified)||[];const asm=(s.ai&&!s.ai.confirmed&&s.ai.steps&&s.ai.steps[0]&&s.ai.steps[0].assumptions)||[];
