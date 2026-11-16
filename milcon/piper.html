@@ -276,7 +276,7 @@ const BLANK=()=>({schema:'piper-1',id:uid(),created:new Date().toISOString(),mod
  n:{desc:'',um:'SF',req:'',adqt:'',substd:'',project:'',requirement:'',current:'',impact:'',additional:'',joint:''},
  s12:{acq:'',ds:'',pct:'',asof:'',d35:'',dc:'',dcost:'',energy:'',std:'',award:'',start:'',complete:'',fci:''},
  versions:[],qa:[],ex:{auth:'',approp:'',cwe:'',ige:'',scope_auth:'',scope_now:'',umc:'',umc_src:''},review:{ext:false,ext_total:'',ext_qty:'',ext_prim:'',ext_sup:'',ext_cont:'',ext_sioh:''},log:[]});
-let P=load()||BLANK();let STEP='blocks';
+let P=load()||BLANK();let STEP=(P.built||(P.review&&P.review.src))?'done':(!N(P.pf.qty)&&!P.sup.length)?'build':'done';
 function load(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('piper_project',JSON.stringify(P));const C=calc();
@@ -305,19 +305,218 @@ function calc(){const f=P.pf;const acf=N(P.loc.acf)||1;const y=N(f.mid_y)||N(P.b
 function sClass(){if(P.loc.remote) return 'remote';return P.loc.conus?'conus':P.loc.country?'oconus':'conus';}
 
 // ---------- steps ----------
-const STEPS=[['blocks','Project data (blocks 1–8)',()=>P.b.title?'✓':''],['pf','Primary facility',()=>N(P.pf.qty)?'✓':''],['b9','Cost estimate (block 9)',()=>P.sup.length||''],['narr','Narrative (blocks 10–11)',()=>P.n.requirement?'✓':''],['b12','Supplemental (block 12)',()=>P.s12.acq?'✓':''],['rev','Red-team review',()=>{const f=findings();const b=f.filter(x=>x.s==='bad').length;return b?b+'!':'';}],['def','Versions and defense',()=>P.versions.length||''],['ex','Cost and scope checks',()=>''],['out','Outputs',()=>'']];
+const STEPS=[['build','Build my 1391',()=>P.built||P.review.src?'✓':''],['done','Your 1391',()=>{const f=findings();const b=f.filter(x=>x.s==='bad').length;return b?b+'!':(calc().rounded?'✓':'');}],['blocks','Project data (blocks 1–8)',()=>P.b.title?'✓':''],['pf','Primary facility',()=>N(P.pf.qty)?'✓':''],['b9','Cost estimate (block 9)',()=>P.sup.length||''],['narr','Narrative (blocks 10–11)',()=>P.n.requirement?'✓':''],['b12','Supplemental (block 12)',()=>P.s12.acq?'✓':''],['rev','Red-team review',()=>{const f=findings();const b=f.filter(x=>x.s==='bad').length;return b?b+'!':'';}],['def','Versions and defense',()=>P.versions.length||''],['ex','Cost and scope checks',()=>''],['out','Outputs',()=>'']];
 function renderSteps(){const nav=$('#steps');
- if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+ if(!nav.dataset.built){const btn=(s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>';
+  nav.innerHTML=STEPS.slice(0,2).map(btn).join('')+'<details id="adj"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">Adjust details</summary>'+STEPS.slice(2).map(btn).join('')+'</details><div class="gate"></div>';
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ const adj=nav.querySelector('#adj');if(nav.dataset.last!==STEP){adj.open=!['build','done'].includes(STEP);nav.dataset.last=STEP;}
  STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
  const C=calc();nav.querySelector('.gate').innerHTML='<b>Block 8:</b> '+(C.rounded?k$(C.rounded)+' ($000)':'—')+'<br><b>Gate 3:</b> 1391 validated and ranked.';}
-function render(){renderSteps();({blocks:vBlocks,pf:vPF,b9:vB9,narr:vNarr,b12:vB12,rev:vRev,def:vDef,ex:vEx,out:vOut})[STEP]();}
+function render(){renderSteps();({build:vBuild,done:vDone,blocks:vBlocks,pf:vPF,b9:vB9,narr:vNarr,b12:vB12,rev:vRev,def:vDef,ex:vEx,out:vOut})[STEP]();}
 function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.value;save();if(after) after(k,el);};});}
 const opts=(o,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(String(k)===String(sel)?'selected':'')+'>'+esc(Array.isArray(v)?v[0]:v)+'</option>').join('');
 const optsArr=(a,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+a.map(v=>'<option '+(v===sel?'selected':'')+'>'+esc(v)+'</option>').join('');
 function rec(){try{return JSON.parse(localStorage.getItem('milcon_record')||'{}');}catch(e){return {};}}
 function nora(){try{const j=JSON.parse(localStorage.getItem('nora_project')||'null');return j&&j.schema==='nora-1'?j:null;}catch(e){return null;}}
 function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
+
+// ---------- Reading documents (shared with NORA) ----------
+let PDFJS=null;
+async function pdfLib(){if(PDFJS) return PDFJS;
+ // The PDF reader ships inside IRMA on the same site; NORA borrows it rather than carrying a second copy.
+ const r=await fetch('irma.html',{cache:'force-cache'});if(!r.ok) throw new Error('The PDF reader could not be loaded');const h=await r.text();
+ const grab=id=>{const m=h.match(new RegExp('<script id="'+id+'" type="text/plain">([\\s\\S]*?)<\/script>'));if(!m) throw new Error('The PDF reader could not be loaded');return Uint8Array.from(atob(m[1].trim()),c=>c.charCodeAt(0));};
+ const u=URL.createObjectURL(new Blob([grab('pdfjs')],{type:'text/javascript'}));const w=URL.createObjectURL(new Blob([grab('pdfw')],{type:'text/javascript'}));
+ PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
+async function readPdf(file,st){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const pages=[],scans=[];
+ for(let i=1;i<=doc.numPages;i++){const p=await doc.getPage(i);const tc=await p.getTextContent();let last=null,t='';
+  tc.items.forEach(it=>{if(last!==null&&Math.abs(it.transform[5]-last)>2) t+='\n';else if(t&&!t.endsWith(' ')) t+=' ';t+=it.str;last=it.transform[5];});
+  t=t.replace(/[ \t]+/g,' ').trim();pages.push(t);
+  if(t.length<40&&scans.length<12){const vp=p.getViewport({scale:1.4});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;scans.push({page:i,data:c.toDataURL('image/jpeg',.75).split(',')[1]});}}
+ if(scans.length&&window.CARLAI&&CARLAI.state().ok){for(const sc of scans){if(st) st('Reading scanned page '+sc.page+' of '+file.name+'…');
+   try{const j=await CARLAI.ask('fast','Transcribe the page exactly. Return ONLY JSON {"text":"..."}. Keep line breaks. Do not summarize or correct.','Transcribe this page.',[sc.data]);pages[sc.page-1]=String(j.text||'');}catch(e){console.warn(e);}}}
+ const left=scans.filter(sc=>!(pages[sc.page-1]||'').trim()).length;
+ return {text:pages.map((t,i)=>doc.numPages>1?'[Page '+(i+1)+']\n'+t:t).join('\n\n'),note:left?left+' scanned page'+(left>1?'s':'')+' could not be read':scans.length?scans.length+' scanned page'+(scans.length>1?'s':'')+' read by AI':''};}
+async function unzip(buf,want){const u=new Uint8Array(buf),dv=new DataView(buf);let e=-1;for(let i=u.length-22;i>=Math.max(0,u.length-65557);i--) if(dv.getUint32(i,true)===0x06054b50){e=i;break;}
+ if(e<0) throw new Error('Not a Word file');const n=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const td=new TextDecoder();
+ for(let k=0;k<n;k++){const m=dv.getUint16(p+10,true),cs=dv.getUint32(p+20,true),fl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),lo=dv.getUint32(p+42,true);const name=td.decode(u.subarray(p+46,p+46+fl));
+  if(name===want){const ds=lo+30+dv.getUint16(lo+26,true)+dv.getUint16(lo+28,true);const data=u.subarray(ds,ds+cs);
+   if(m===0) return td.decode(data);const out=new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'));return await new Response(out).text();}
+  p+=46+fl+xl+cl;}
+ throw new Error('No text found in the Word file');}
+function xmlText(x){return x.replace(/<w:tab\/>/g,'\t').replace(/<w:br[^>]*\/>/g,'\n').replace(/<\/w:p>/g,'\n').replace(/<\/w:tc>/g,' | ').replace(/<[^>]+>/g,'')
+ .replace(/&lt;/g,'<').replace(/&gt;/g,'>').replace(/&quot;/g,'"').replace(/&apos;/g,"'").replace(/&amp;/g,'&').replace(/[ \t]+\n/g,'\n').replace(/\n{3,}/g,'\n\n').trim();}
+function qp(s){return s.replace(/=\r?\n/g,'').replace(/=([0-9A-F]{2})/gi,(m,h)=>String.fromCharCode(parseInt(h,16)));}
+function emlText(raw){const hdr=raw.split(/\r?\n\r?\n/)[0];const keep=(hdr.match(/^(From|To|Cc|Date|Subject):.*$/gim)||[]).join('\n');
+ const parts=[];const walk=(chunk)=>{const h=chunk.split(/\r?\n\r?\n/)[0],body=chunk.slice(h.length).trim();const b=(h.match(/boundary="?([^";\r\n]+)"?/i)||[])[1];
+  if(b){body.split('--'+b).slice(1).forEach(p=>{if(!p.startsWith('--')) walk(p.replace(/^\r?\n/,''));});return;}
+  if(/content-type:\s*text\/(plain|html)/i.test(h)||!/content-type:/i.test(h)){let t=body;if(/base64/i.test(h)){try{t=new TextDecoder().decode(Uint8Array.from(atob(t.replace(/\s/g,'')),c=>c.charCodeAt(0)));}catch(e){}}else if(/quoted-printable/i.test(h)) t=qp(t);
+   if(/text\/html/i.test(h)) t=t.replace(/<br\s*\/?>|<\/p>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ');parts.push({html:/text\/html/i.test(h),t});}};
+ walk(raw);const plain=parts.find(p=>!p.html)||parts[0];return (keep?keep+'\n\n':'')+(plain?plain.t.trim():'');}
+async function readAny(f,st){const n=f.name.toLowerCase();
+ if(n.endsWith('.pdf')) return await readPdf(f,st);
+ if(n.endsWith('.docx')) return {text:xmlText(await unzip(await f.arrayBuffer(),'word/document.xml'))};
+ if(n.endsWith('.eml')) return {text:emlText(await f.text())};
+ if(n.endsWith('.html')||n.endsWith('.htm')) return {text:(await f.text()).replace(/<script[\s\S]*?<\/script>|<style[\s\S]*?<\/style>/gi,'').replace(/<br\s*\/?>|<\/(p|div|li|tr|h\d)>/gi,'\n').replace(/<[^>]+>/g,'').replace(/&nbsp;/g,' ').replace(/&amp;/g,'&').replace(/\n{3,}/g,'\n\n').trim()};
+ if(n.endsWith('.doc')||n.endsWith('.msg')||n.endsWith('.xlsx')||n.endsWith('.pptx')) throw new Error('save it as PDF, .docx or .txt first');
+ return {text:await f.text()};}
+
+// ---------- Build my 1391 ----------
+const nz=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
+const inSrc=(src,q)=>{const n=nz(q);return n.length>=6&&nz(src).includes(n);};
+function numsNotIn(text,src){const S=String(src).replace(/[,$]/g,'');return [...new Set((String(text||'').replace(/\{[A-Z]+-\d+\}/g,'').replace(/\[NEEDED:[^\]]*\]/g,'').replace(/\b\d{1,2}-\d{3}-\d{2}\b/g,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/[,$]/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
+const SVC2COMP={army:'Army',navy:'Navy',usmc:'Marine Corps',af:'Air Force',ussf:'Space Force',dha:'Defense Health Agency',def_agency:'Defense-Wide',joint:'Defense-Wide'};
+function aiOn(){return !!(window.CARLAI&&CARLAI.state().ok);}
+function ym(y,m){return y+'-'+String(m).padStart(2,'0');}
+function addMonths(s,n){const [y,m]=s.split('-').map(Number);const t=y*12+(m-1)+n;return ym(Math.floor(t/12),t%12+1);}
+// Find the closest area cost factor row for an installation name.
+function locFind(name){const w=nz(name).replace(/[^a-z0-9 ]/g,' ').split(' ').filter(x=>x.length>2&&!['air','force','base','naval','station','army','camp','joint','the'].includes(x));if(!w.length) return null;
+ let best=null,sc=0;D.acf.forEach(a=>{const t=nz(a[0]+' '+a[3]);const k=w.filter(x=>t.includes(x)).length;if(k>sc){sc=k;best=a;}});return sc?best:null;}
+function setLoc(a,src){P.loc.name=a[0]+(a[3]&&a[3]!==a[0]?' – '+a[3]:'');P.loc.acf=a[2];P.loc.country=a[1];P.loc.conus=a[4]===1&&!['Hawaii','Alaska'].includes(a[1]);P.loc.src=src;}
+function setGuc(i,qty,dc){const g=D.guc[i];if(!g||g.na) return false;const f=P.pf;f.guc_i=String(i);f.guc_name=g.n;f.guc=g.usd;f.ref=g.ref||'';f.um=g.per?'VF':'SF';
+ if(qty) f.qty=String(qty);if(dc&&DC[dc]) f.dc=dc;f.size_kind=/BARRACKS|DORMITOR|UNACCOMPANIED/i.test(g.n)?'barracks':/FAMILY HOUSING/i.test(g.n)?'mfh':'std';return true;}
+// What the earlier tools already know, copied in without AI.
+function importAll(){const n=nora(),e=earl(),k=[];P.auto=P.auto||{};
+ if(n){const p=n.project||{};if(!P.b.title&&p.name&&!/^new project$/i.test(p.name)){P.b.title=p.name;k.push('title');}if(!P.b.installation&&p.installation){P.b.installation=p.installation;k.push('installation');}
+  if(!P.b.component&&SVC2COMP[p.service]){P.b.component=SVC2COMP[p.service];k.push('component');}}
+ if(e){if(!P.b.fy&&e.base_fy){P.b.fy=String(e.base_fy);P.auto.fy='EARL base year';k.push('program year');}
+  const L=e.price&&e.price.loc;if(!N(P.loc.acf)&&L&&L.acf){const a=D.acf.find(x=>Math.abs(x[2]-L.acf)<1e-6&&nz(L.label).includes(nz(x[0]).split(' ')[0]))||null;
+   if(a) setLoc(a,'EARL');else{P.loc.name=L.label;P.loc.acf=L.acf;P.loc.country=L.country||'';P.loc.conus=!!L.us;P.loc.src='EARL';}P.loc.remote=!!L.remote;k.push('location and area cost factor');}
+  const r=e.alts.find(a=>a.id===e.recommend?.alt);
+  if(r&&r.price&&r.price.guc!==''&&r.price.guc!=null&&!N(P.pf.qty)&&['new','addition','other','host_nation'].includes(r.type)){if(setGuc(Number(r.price.guc),r.price.qty,r.price.dc)){P.auto.pf='EARL recommended alternative: '+r.name;k.push('primary facility ('+r.name+')');}}}
+ if(!N(P.loc.acf)&&P.b.installation){const a=locFind(P.b.installation);if(a){setLoc(a,'matched from installation name');P.auto.loc='Matched from the installation name; check it';k.push('location (matched by name)');}}
+ if(typeof importPrior==='function') importPrior();
+ log('Built from NORA and EARL',k.join(', ')||'nothing new');save();return k;}
+
+// AI: the parts of the 1391 the earlier tools do not hold.
+const PLAN_SYS=()=>`You prepare a DD Form 1391 (Military Construction Project Data) for a U.S. DoD program. From RECORD (requirements, gaps, constraints, notes and the recommended alternative), propose what the record does not already hold.
+Return ONLY JSON:
+{"catcode":{"value":"the Service's facility category code for the primary facility, or empty","basis":"why"},
+"pe":{"value":"program element number, only if RECORD states it, else empty","quote":""},
+"supporting":[{"item":"plain name, e.g. 'Asphalt parking'","t6":"the code from TABLE 6 that prices it best, e.g. 85110-1-3, or empty if none fits","um":"unit","qty":"number or empty","qty_basis":"stated|estimate","quote":"words from RECORD that state the quantity, if stated","why":"one line"}],
+"acq":{"value":"Design-Bid-Build, Design-Build, or other","basis":"stated|proposed","quote":""},
+"energy":"Yes|No|","std":"Yes|No|",
+"questions":["up to 4 things the 1391 needs that only the user can answer"]}
+Rules: supporting facilities are what a typical project of this kind needs outside the five-foot line (utilities, paving and parking, site preparation, storm drainage, antiterrorism measures, demolition, communications, landscaping) plus anything RECORD mentions. Never invent a stated quantity; estimate only where a planner would, and mark it "estimate". A "quote" must be copied exactly from RECORD. Category codes vary by Service; give your best match and say so in "basis". Use the TABLE 6 unit of measure for the quantity when you give a code.`;
+function recordText(){const n=nora(),e=earl(),L=[];const C=calc();
+ L.push('PROJECT: '+[P.b.title,P.b.installation,P.b.component,P.b.fy&&('program FY'+P.b.fy)].filter(Boolean).join('; '));
+ if(C.qty) L.push('PRIMARY FACILITY: '+(P.pf.guc_name||'')+', '+C.qty.toLocaleString()+' '+(P.pf.um||'SF'));
+ if(n){(n.requirements||[]).filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT '+r.id+': '+r.text));(n.gaps||[]).forEach(g=>L.push('GAP: '+[g.area,g.current,g.required,g.qty_have!==''&&('have '+g.qty_have),g.qty_need!==''&&('need '+g.qty_need),g.unit].filter(Boolean).join('; ')));
+  (n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+c.text));if(n.need_statement) L.push('NEED STATEMENT: '+n.need_statement);
+  L.push('\nSOURCE NOTES:\n'+(n.sessions||[]).map(s=>s.notes||'').join('\n\n').slice(0,60000));}
+ if(e){const r=e.alts.find(a=>a.id===e.recommend?.alt);if(r) L.push('RECOMMENDED ALTERNATIVE: '+r.name+' – '+(r.desc||''));}
+ return L.join('\n');}
+function supMatch(q){const t=nz(q).split(' ').filter(w=>w.length>2);if(!t.length) return null;let best=null,sc=0;D.sup.forEach(r=>{const s=(r[0]+' '+r[2]).toLowerCase();const k=t.filter(w=>s.includes(w)).length;if(k>sc||(k===sc&&best&&r[2].length<best[2].length)){sc=k;best=r;}});return sc>=Math.min(2,t.length)?best:null;}
+function s12Defaults(){const fy=N(P.b.fy);if(!fy) return null;const C=calc();const tot=C.rounded||0;const dur=tot<2e7?18:tot<6e7?24:30;
+ const award=ym(fy,3),start=ym(fy,5);return {ds:ym(fy-3,10),d35:ym(fy-2,8),dc:ym(fy-1,9),award,start,complete:addMonths(start,dur),dur};}
+async function build1391(){const st=$('#bStat');const say=t=>{if(st) st.textContent=t;};const b=$('#bB');if(b) b.disabled=true;
+ const k=importAll();P.auto=P.auto||{};const made=[...k];
+ // Block 12 dates from the program year, as estimates
+ const d=s12Defaults();if(d){['ds','d35','dc','award','start','complete'].forEach(f=>{if(!P.s12[f]){P.s12[f]=d[f];(P.auto.s12=P.auto.s12||{})[f]=1;}});if(!P.pf.mid_y){const a=new Date(d.start+'-01'),c=new Date(d.complete+'-01');const m=new Date((a.getTime()+c.getTime())/2);P.pf.mid_y=m.getFullYear();P.pf.mid_m=m.getMonth()+1;P.auto.mid=1;}made.push('block 12 schedule (estimated)');}
+ if(aiOn()){try{say('Proposing category code, supporting facilities and acquisition strategy…');const src=recordText();const t6=D.sup.map(r=>r[1]+' | '+r[2].slice(0,70)+' | '+r[3]).join('\n');const j=await CARLAI.ask('claude',PLAN_SYS(),'RECORD:\n'+src+'\n\nTABLE 6 (code | item | unit):\n'+t6,null,{fresh:true});
+   if(!P.b.catcode&&j.catcode&&String(j.catcode.value||'').trim()){P.b.catcode=String(j.catcode.value).trim();P.auto.catcode=String(j.catcode.basis||'proposed by AI');made.push('category code (proposed)');}
+   if(!P.b.pe&&j.pe&&j.pe.value&&inSrc(src,j.pe.quote)){P.b.pe=String(j.pe.value).trim();made.push('program element');}
+   if(!P.s12.acq&&j.acq&&j.acq.value){P.s12.acq=String(j.acq.value).trim();if(!(j.acq.basis==='stated'&&inSrc(src,j.acq.quote))) (P.auto.s12=P.auto.s12||{}).acq=1;}
+   ['energy','std'].forEach(f=>{if(!P.s12[f]&&['Yes','No'].includes(j[f])){P.s12[f]=j[f];(P.auto.s12=P.auto.s12||{})[f]=1;}});
+   if(!P.sup.length){(j.supporting||[]).forEach(x=>{const r=D.sup.find(t=>t[1]===String(x.t6||'').trim())||null;let qty=String(x.qty||'').replace(/[,]/g,'');const stated=x.qty_basis==='stated'&&inSrc(src,x.quote)&&qty&&String(x.quote).replace(/,/g,'').includes(qty);
+     P.sup.push({id:uid(),item:String(x.item||'').slice(0,90)+(r?' – '+r[2].slice(0,60).replace(/[,;\s]+$/,''):''),um:r?r[3]:(x.um||'LS'),qty:qty||'',unit:r?r[4]:'',adj:!!r,src:r?'UFS 3-701-01 Table 6 '+r[1]:'',auto:stated?'Quantity from your documents':qty?'Quantity estimated by AI; confirm':'Quantity needed',why:x.why||''});});
+    if(P.sup.length) made.push(P.sup.length+' supporting facility lines');}
+   P.auto.questions=(j.questions||[]).slice(0,4);}
+  catch(e){console.warn(e);made.push('AI step failed: '+e.message);}
+  say('Drafting blocks 10 and 11…');if(!P.n.desc) await draft10(true);if(!['project','requirement','current','impact'].some(f=>P.n[f])||!P.n.requirement||P.n.requirement===(nora()||{}).need_statement) await draft11(true);
+  say('Running the red team…');await aiReview(true);}
+ P.built={at:new Date().toISOString(),made};log('Build my 1391',made.join('; '));save();say('');STEP='done';render();window.scrollTo(0,0);}
+
+// ---------- Review mode: read the Service's 1391 ----------
+const X1391_SYS=()=>`You read a DD Form 1391 (Military Construction Project Data) and return its content exactly as written.
+Return ONLY JSON:
+{"component":"","date":"","installation":"","title":"","pe":"","catcode":"","project_no":"","fy":"program fiscal year, 4 digits","block8":"total in $000 as a number",
+"primary":{"facility":"the closest of these Table 2 facility types, copied exactly: ${D.guc.filter(g=>!g.na).map(g=>g.n).join(' | ')}","qty":"","um":""},
+"lines":[{"group":"primary|supporting|markup","item":"","um":"","qty":"","unit_cost":"","cost":"cost in $000 as a number"}],
+"cont":"contingency percent","sioh":"SIOH percent","design":"design-build design percent, or empty",
+"desc":"block 10 text","project":"block 11 Project","requirement":"block 11 Requirement","current":"block 11 Current situation","impact":"block 11 Impact if not provided","additional":"block 11 Additional","req":"","adqt":"","substd":"",
+"s12":{"acq":"","ds":"YYYY-MM","pct":"","asof":"YYYY-MM","d35":"YYYY-MM","dc":"YYYY-MM","dcost":"$000","energy":"Yes|No|","std":"Yes|No|","award":"YYYY-MM","start":"YYYY-MM","complete":"YYYY-MM","fci":""}}
+Copy text and numbers exactly; leave anything not on the form empty. Contingency, SIOH and design go in "markup" lines and in cont, sioh, design.`;
+let XR=null;
+async function read1391(f){if(!aiOn()){alert('Sign in to CARL to read a 1391.');return;}const st=$('#rStat');const say=t=>{if(st) st.textContent=t;};
+ try{say('Reading '+f.name+'…');const r=await readAny(f,say);const text=r.text;if((text.match(/\S+/g)||[]).length<30) throw new Error('Too little text found');
+  say('Extracting the blocks…');const j=await CARLAI.ask('claude',X1391_SYS(),'1391:\n'+text.slice(0,120000),null,{fresh:true});
+  const bad=[];const chk=(v,lbl)=>{const x=String(v??'').replace(/[,$]/g,'').trim();if(x&&/\d/.test(x)&&!String(text).replace(/[,$]/g,'').includes(x.replace(/\.0+$/,''))) bad.push(lbl+' '+v);};
+  chk(j.block8,'Block 8');chk(j.cont,'Contingency');chk(j.sioh,'SIOH');(j.lines||[]).forEach(l=>{chk(l.qty,l.item+' quantity');chk(l.cost,l.item+' cost');});
+  XR={file:f.name,text,j,bad};log('1391 read with AI',f.name+(bad.length?'; '+bad.length+' numbers not found on the form':''));say('');}
+ catch(e){say('');alert('Could not read the 1391: '+e.message);}
+ vBuild();}
+function apply1391(){const j=XR.j;P.mode='review';P.auto={};P.ai_rev=[];['component','date','installation','title','pe','catcode','project_no','fy'].forEach(k=>{if(j[k]) P.b[k]=String(j[k]);});
+ ['desc','project','requirement','current','impact','additional','req','adqt','substd'].forEach(k=>{if(j[k]) P.n[k]=String(j[k]);});
+ Object.entries(j.s12||{}).forEach(([k,v])=>{if(v&&k in P.s12) P.s12[k]=String(v);});
+ const gi=D.guc.findIndex(g=>g.n===String(j.primary?.facility||''));if(gi>=0) setGuc(gi,String(j.primary.qty||'').replace(/,/g,''),'');
+ P.prim=[];P.sup=[];(j.lines||[]).forEach(l=>{if(l.group==='markup') return;const it={id:uid(),item:String(l.item||'').slice(0,90),um:l.um||'LS',qty:String(l.qty||'').replace(/,/g,''),unit:String(l.unit_cost||'').replace(/[,$]/g,'')||(N(l.cost)&&N(l.qty)?(N(l.cost)*1000/N(l.qty)).toFixed(2):N(l.cost)?String(N(l.cost)*1000):''),adj:false,src:'As submitted'};if(it.um==='LS'&&!it.qty) it.qty='1';
+  if(l.group==='primary'&&P.pf.guc_i!==''&&nz(l.item).includes(nz(P.pf.guc_name).split(' ')[0])) return;(l.group==='primary'?P.prim:P.sup).push(it);});
+ if(P.b.installation){const a=locFind(P.b.installation);if(a){setLoc(a,'matched from installation name');P.auto.loc='Matched from the installation on the form; check it';}}
+ P.review.ext=true;P.review.ext_total=String(j.block8||'').replace(/[,$]/g,'');P.review.ext_cont=String(j.cont||'').replace('%','');P.review.ext_sioh=String(j.sioh||'').replace('%','');if(N(j.design)) P.db=String(N(j.design));
+ const ss={file:XR.file,read:new Date().toISOString(),bad:XR.bad};P.review.src=ss;P.review.text=XR.text.slice(0,200000);log('1391 applied for review',XR.file);XR=null;save();
+ (async()=>{if(aiOn()) await aiReview(true);STEP='done';render();window.scrollTo(0,0);})();}
+
+// ---------- AI red team ----------
+const REV_SYS=`You are a skeptical OSD and congressional staff reviewer of a DD Form 1391. Read THE 1391 against RECORD (the project's requirements, gaps and economic analysis) and find what a reviewer would challenge. Look for: block 11 numbers that contradict block 9 or RECORD; scope in block 10 or 9 with no requirement behind it; requirements with no scope; a solution stated as the requirement; a vague or missing impact; claims with no number; inconsistent dates or quantities; supporting costs that look high or low for the scope.
+Return ONLY JSON: {"findings":[{"severity":"bad|warn","title":"short","detail":"what to fix, one or two sentences","quote":"exact words from THE 1391 the finding is about, or empty"}]}
+Only real issues, most important first, at most 10. Never restate rule checks about missing blocks.`;
+function the1391(){const C=calc(),n=P.n,L=[];L.push('Blocks 1-8: '+[P.b.component,P.b.installation,P.b.title,P.b.catcode&&'catcode '+P.b.catcode,'FY'+P.b.fy,'block 8 $'+k$(C.rounded)+'K'].filter(Boolean).join('; '));
+ L.push('Block 9: primary facility '+(P.pf.guc_name||'')+' '+(C.qty||'')+' '+(P.pf.um||''));(C.prim||[]).forEach(x=>L.push('  primary item: '+x.item+' '+(x.qty||'')+' '+(x.um||'')));(C.sup||[]).forEach(x=>L.push('  supporting: '+x.item+' '+(x.qty||'')+' '+(x.um||'')+(x.cost?' $'+Math.round(x.cost).toLocaleString():'')));
+ L.push('Block 10: '+(n.desc||''));L.push('Block 11 Project: '+(n.project||''));L.push('Requirement: '+(n.requirement||''));L.push('Current situation: '+(n.current||''));L.push('Impact if not provided: '+(n.impact||''));L.push('Additional: '+(n.additional||''));
+ L.push('Block 12: '+Object.entries(P.s12).filter(([k,v])=>v).map(([k,v])=>k+' '+v).join('; '));return L.join('\n');}
+async function aiReview(q){if(!aiOn()){if(!q) alert('Sign in to CARL to run the AI review.');return;}const b=$('#bRev');if(b){b.disabled=true;b.textContent='Reviewing…';}
+ try{const t=the1391();const j=await CARLAI.ask('claude',REV_SYS,'THE 1391:\n'+t+'\n\nRECORD:\n'+recordText().slice(0,40000),null,{fresh:true});
+  P.ai_rev=(j.findings||[]).filter(x=>x&&x.title).map(x=>({s:x.severity==='bad'?'bad':'warn',t:'AI review: '+String(x.title),d:String(x.detail||'')+(x.quote&&inSrc(t,x.quote)?' (“'+x.quote+'”)':''),}));P.ai_rev_at=new Date().toISOString();P.ai_rev_sig=sig1391();
+  log('AI red-team review',P.ai_rev.length+' findings');save();}
+ catch(e){if(!q) alert('AI review failed: '+e.message);}
+ if(b){b.disabled=false;b.textContent='Run the AI review again';}if(!q) render();}
+function sig1391(){const t=the1391();let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);}
+
+// ---------- Reviewer questions ----------
+const ANS_SYS=`You draft the answer to a reviewer's question about a DoD military construction project (DD Form 1391). Answer directly in the first sentence, then support it with facts. Use ONLY facts in THE 1391 and RECORD; where a fact is missing write [NEEDED: what]. Plain, factual, under 150 words, no references to AI.
+Return ONLY JSON: {"answer":"..."}`;
+async function aiAnswer(it){if(!aiOn()){alert('Sign in to CARL to draft answers with AI.');return;}if(!String(it.q||'').trim()){alert('Type the question first.');return;}
+ if(String(it.a||'').trim()&&!confirm('Replace the current answer?')) return;
+ try{const src='THE 1391:\n'+the1391()+'\n\nRECORD:\n'+recordText().slice(0,40000);const j=await CARLAI.ask('claude',ANS_SYS,src+'\n\nQUESTION: '+it.q,null,{fresh:true});const a=String(j.answer||'').trim();if(!a) throw new Error('Nothing returned');
+  it.a=a;const bad=numsNotIn(a,src+'\n'+it.q);it.check=bad.length?'Check these numbers, not found in the 1391 or the record: '+bad.join(', '):'Every number traces to the 1391 or the record.';it.status=it.status==='open'?'answered':it.status;log('Answer drafted with AI',String(it.q).slice(0,60));save();}
+ catch(e){alert('Could not draft the answer: '+e.message);}vDef();}
+
+// ---------- Screens ----------
+function vBuild(){const v=$('#view');const n=nora(),e=earl();const r=e&&e.alts.find(a=>a.id===e.recommend?.alt);const signed=aiOn();
+ const have=[['NORA requirements',n?((n.requirements||[]).filter(x=>x.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gaps'+(n.need_statement?', need statement':'')):'none'],['EARL recommendation',r?r.name+(r.price&&r.price.guc!==''?' (priced)':''):'none'],['Location',e&&e.price&&e.price.loc?e.price.loc.label:n&&n.project&&n.project.installation||'none']];
+ v.innerHTML='<div class="panel"><h2>Build my 1391</h2><p class="lead">PIPER fills the DD Form 1391 from what NORA and EARL already hold: header, location and area cost factor, the priced primary facility, blocks 10 and 11. AI proposes the category code, the supporting facilities priced from UFS 3-701-01 Table 6, the acquisition strategy, and a block 12 schedule from the program year, each labelled for you to confirm. Then a red-team reviewer reads it the way OSD and congressional staff will.</p>'+
+  '<table style="max-width:640px"><tbody>'+have.map(([a,b])=>'<tr><td>'+a+'</td><td>'+esc(b)+'</td></tr>').join('')+'</tbody></table>'+
+  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> Without it PIPER still copies everything NORA and EARL hold.')+'</div>'+
+  '<div class="row"><button class="go" id="bB">'+(P.built?'Build again (fills only what is empty)':'Build my 1391')+'</button><span class="small" id="bStat"></span></div></div>'+
+  '<div class="panel"><h2>Review a 1391 someone else prepared</h2><p class="lead">Drop in the Service’s 1391 (PDF or Word). AI reads blocks 1 to 12 and the block 9 lines; PIPER checks every number against the form, rebuilds the estimate from UFS 3-730-01 and runs the red team against it.</p>'+
+  '<label id="rdrop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer"><b>Drop the 1391 here or click to choose</b><br><span class="small">PDF or Word (.docx); scanned pages are read by AI</span><input type="file" id="rFile" accept=".pdf,.docx,.txt" hidden></label><div class="small" id="rStat"></div>'+
+  (XR?'<h3>Read from '+esc(XR.file)+'</h3>'+(XR.bad.length?'<div class="find warn"><b>Not found on the form:</b> '+esc(XR.bad.join('; '))+'. Check these before applying.</div>':'<p class="small">Every number checked against the form.</p>')+
+   '<table><tbody>'+[['Title',XR.j.title],['Installation',XR.j.installation],['Program year',XR.j.fy],['Category code',XR.j.catcode],['Block 8 ($000)',XR.j.block8],['Primary facility',(XR.j.primary||{}).facility+' '+((XR.j.primary||{}).qty||'')+' '+((XR.j.primary||{}).um||'')],['Block 9 lines',(XR.j.lines||[]).length],['Contingency / SIOH',(XR.j.cont||'?')+'% / '+(XR.j.sioh||'?')+'%']].map(([a,b])=>'<tr><td>'+a+'</td><td>'+esc(b??'')+'</td></tr>').join('')+'</tbody></table>'+
+   '<div class="row"><button class="go" id="rApply">Apply and review</button><button id="rX">Discard</button><span class="small">Replaces the current 1391 in PIPER. Save a version first if you need it.</span></div>':'')+'</div>';
+ $('#bB').onclick=build1391;const fi=$('#rFile'),dr=$('#rdrop');fi.onchange=()=>{const f=fi.files[0];fi.value='';if(f) read1391(f);};
+ dr.ondragover=ev=>{ev.preventDefault();dr.style.background='#f1f6f7';};dr.ondragleave=()=>dr.style.background='';dr.ondrop=ev=>{ev.preventDefault();dr.style.background='';const f=ev.dataTransfer.files[0];if(f) read1391(f);};
+ if($('#rApply')) $('#rApply').onclick=apply1391;if($('#rX')) $('#rX').onclick=()=>{XR=null;vBuild();};}
+function vDone(){const v=$('#view');const C=calc();const F=findings();const bad=F.filter(x=>x.s==='bad'),warn=F.filter(x=>x.s==='warn');const A=P.auto||{};const s12a=A.s12||{};
+ const todo=[];if(A.catcode&&P.b.catcode) todo.push('Category code '+P.b.catcode+' was proposed by AI ('+A.catcode+'). Confirm it under Adjust details → Project data.');
+ if(A.loc) todo.push('Location '+P.loc.name+' was matched from the installation name. Check it under Adjust details → Project data.');
+ const est=P.sup.filter(x=>/estimated|needed/i.test(x.auto||''));if(est.length) todo.push(est.length+' supporting line'+(est.length>1?'s have':' has')+' an estimated or missing quantity: '+est.map(x=>x.item).slice(0,5).join(', ')+(est.length>5?'…':'')+'. Confirm under Adjust details → Cost estimate.');
+ const nounit=P.sup.filter(x=>!N(x.unit));if(nounit.length) todo.push(nounit.length+' supporting line'+(nounit.length>1?'s have':' has')+' no unit cost: '+nounit.map(x=>x.item).slice(0,4).join(', ')+'.');
+ const sk=Object.keys(s12a);if(sk.length) todo.push('Block 12 '+(sk.includes('ds')?'dates are estimates from program year '+P.b.fy:'entries')+(sk.includes('acq')?'; acquisition strategy proposed':'')+'. Replace them with the design schedule.');
+ (A.questions||[]).forEach(q=>todo.push(q));
+ if(P.n.ai_check) todo.push('Block 11: '+P.n.ai_check+'.');if(P.n.ai_check10) todo.push('Block 10: '+P.n.ai_check10+'.');
+ const stale=P.ai_rev_sig&&P.ai_rev_sig!==sig1391();
+ v.innerHTML='<div class="panel"><h2>'+esc(P.b.title||'Your 1391')+'</h2><p class="lead">'+esc([P.b.installation,P.b.component,P.b.fy&&'FY'+P.b.fy,P.b.catcode&&'category code '+P.b.catcode].filter(Boolean).join(' · '))+(P.mode==='review'?' · <b>Review of '+esc(P.review.src?.file||'a submitted 1391')+'</b>':'')+'</p>'+
+  '<div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Block 8 ($000)',C.rounded?k$(C.rounded):'—'],['Primary facility',C.qty?C.qty.toLocaleString()+' '+(P.pf.um||'SF'):'—'],['Supporting lines',P.sup.length],['Must fix',bad.length],['Check',warn.length]].map(([l,n])=>'<div style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
+  (P.mode==='review'&&P.review.ext_total?'<p class="small">Submitted block 8: $'+N(P.review.ext_total).toLocaleString()+'K. PIPER’s rebuild: $'+k$(C.rounded)+'K.</p>':'')+
+  '<div class="row"><button class="go" data-o="doc">Download 1391 (.doc)</button><button data-o="print">Print or PDF</button><button data-o="backup">Estimate backup</button><button data-o="jb">Justification text</button></div></div>'+
+  (todo.length?'<div class="panel"><h2>Confirm before you submit</h2><ul>'+todo.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'')+
+  '<div class="panel"><h2>Red team</h2>'+(stale?'<div class="find warn"><b>The 1391 changed since the AI review.</b> Run it again.</div>':'')+
+  (F.length?F.map(x=>'<div class="find '+x.s+'"><b>'+esc(x.t)+'</b> <span>'+esc(x.d)+'</span></div>').join(''):'<div class="small">No findings.</div>')+
+  '<div class="row"><button id="bRev">'+(P.ai_rev_at?'Run the AI review again':'Run the AI review')+'</button><span class="small">Rule checks run as you type; the AI reviewer reads the narrative against block 9, NORA and EARL.</span></div></div>';
+ v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>dl(fname('Estimate-Backup','csv'),csv(backup()),'text/csv'),jb:()=>dl(fname('Justification','txt'),jb(),'text/plain')})[b.dataset.o]());
+ $('#bRev').onclick=()=>aiReview(false);}
 
 // ---------- 1 blocks ----------
 function vBlocks(){const v=$('#view');const n=nora(),e=earl();
@@ -452,27 +651,27 @@ function srcText10(){const C=calc(),L=[];let cs=null;try{cs=JSON.parse(localStor
  if(P.n.desc) L.push('AUTHOR DRAFT: '+P.n.desc);return L.join('\n');}
 const DRAFT10_SYS=`You draft block 10 (Description of Proposed Construction) of a DD Form 1391. One paragraph: what is constructed, its size, the primary and supporting facilities, and the governing criteria it will meet. Name only criteria listed in SOURCES as SELECTED CRITERION; if none are listed, write [NEEDED: criteria list from CORA]. Use ONLY facts in SOURCES. No references to AI.
 Return ONLY JSON: {"desc":"the paragraph"}`;
-async function draft10(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
- if(P.n.desc&&!confirm('Replace block 10 with an AI draft? Your text is sent along as a source.')) return;
- const src=srcText10();const b=$('#bAI10');b.disabled=true;b.textContent='Drafting…';
+async function draft10(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+ if(!q&&P.n.desc&&!confirm('Replace block 10 with an AI draft? Your text is sent along as a source.')) return;
+ const src=srcText10();const b=$('#bAI10');if(b){b.disabled=true;b.textContent='Drafting…';}
  try{const j=await CARLAI.ask('claude',DRAFT10_SYS,'SOURCES:\n'+src);const t=String(j.desc||'').trim();if(!t) throw new Error('Nothing returned');
   const S=src.replace(/[,$]/g,'');const bad=[...new Set((t.replace(/\b\d{1,2}-\d{3}-\d{2}\b/g,'').replace(/\b\d{2} \d{2} \d{2}\b/g,'').replace(/\b1391\b/g,'').replace(/\[NEEDED:[^\]]*\]/g,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/[,$]/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];
-  P.n.desc=t;P.n.ai_check10=bad.length?'Check these numbers, not found in the sources: '+bad.join(', '):'';log('Block 10 drafted with AI');save();vNarr();}
- catch(err){alert('Draft failed: '+err.message);b.disabled=false;b.textContent='Draft block 10 with AI';}}
+  P.n.desc=t;P.n.ai_check10=bad.length?'Check these numbers, not found in the sources: '+bad.join(', '):'';log('Block 10 drafted with AI');save();if(STEP==='narr') vNarr();}
+ catch(err){if(!q) alert('Draft failed: '+err.message);if(b){b.disabled=false;b.textContent='Draft block 10 with AI';}}}
 const DRAFT11_SYS=`You draft block 11 of a DD Form 1391 (Military Construction Project Data) for a U.S. DoD reviewer. Write in plain, factual budget-justification style: mission terms, the gap in numbers, and what happens if the project is not funded. Use ONLY facts in SOURCES. Where a fact the block needs is missing, write [NEEDED: what is missing] instead of inventing it. End each sentence that rests on a stated requirement with its ID in braces, e.g. {R-003}. No marketing language, no references to AI.
 Return ONLY JSON: {"project":"one sentence","requirement":"paragraph","current":"paragraph","impact":"paragraph","additional":"paragraph covering the economic analysis and criteria, only from SOURCES","req":"quantity required or empty","adqt":"adequate quantity or empty","substd":"substandard quantity or empty"}`;
-async function draft11(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
- const src=srcText11();if(!nora()){if(!confirm('There is no NORA requirements record for this project, so the draft will have many [NEEDED] gaps. Draft anyway?')) return;}
- const filled=['project','requirement','current','impact','additional'].filter(k=>P.n[k]);if(filled.length&&!confirm('Replace the text already in '+filled.join(', ')+' with a draft? Your text is sent along as a source.')) return;
- const b=$('#bAI11');b.disabled=true;b.textContent='Drafting…';
+async function draft11(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+ const src=srcText11();if(!q&&!nora()){if(!confirm('There is no NORA requirements record for this project, so the draft will have many [NEEDED] gaps. Draft anyway?')) return;}
+ const filled=['project','requirement','current','impact','additional'].filter(k=>P.n[k]);if(!q&&filled.length&&!confirm('Replace the text already in '+filled.join(', ')+' with a draft? Your text is sent along as a source.')) return;
+ const b=$('#bAI11');if(b){b.disabled=true;b.textContent='Drafting…';}
  try{const j=await CARLAI.ask('claude',DRAFT11_SYS,'SOURCES:\n'+src);
   const norm=x=>String(x||'').replace(/[,$]/g,'');const S=norm(src);const bad=[];
   ['project','requirement','current','impact','additional','req','adqt','substd'].forEach(k=>{if(typeof j[k]!=='string') return;P.n[k]=j[k];
    (j[k].replace(/\{[A-Z]+-\d+\}/g,'').replace(/\b\d{1,2}-\d{3}-\d{2}\b/g,'').replace(/\b\d{2} \d{2} \d{2}\b/g,'').replace(/\b1391\b/g,'').replace(/\[NEEDED:[^\]]*\]/g,'').match(/\d[\d,.]*/g)||[]).forEach(nm=>{const v=norm(nm).replace(/\.$/,'');if(v.length>1&&!S.includes(v)) bad.push(nm+' ('+k+')');});});
   P.n.ai_check=bad.length?'Check these numbers, not found in the sources: '+[...new Set(bad)].join(', '):'';
-  log('Block 11 drafted with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();vNarr();
-  if(bad.length) alert(P.n.ai_check);}
- catch(err){alert('Draft failed: '+err.message);b.disabled=false;b.textContent='Draft block 11 with AI';}}
+  log('Block 11 drafted with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();if(STEP==='narr') vNarr();
+  if(bad.length&&!q) alert(P.n.ai_check);}
+ catch(err){if(!q) alert('Draft failed: '+err.message);if(b){b.disabled=false;b.textContent='Draft block 11 with AI';}}}
 
 // ---------- 5 block 12 ----------
 function vB12(){const v=$('#view');
@@ -520,6 +719,7 @@ function findings(){const F=[];const C=calc();const n=P.n;const add=(s,t,d)=>F.p
  const R=rec();if(R.earl?.recommended&&!new RegExp(R.earl.recommended.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'),'i').test(n.additional+n.desc+n.project)) add('warn','EARL recommendation not mentioned','EARL recommended “'+R.earl.recommended.name+'”. Make sure the 1391 describes the same alternative.');
  if(ext){const et=N(P.review.ext_total);if(et&&Math.abs(et*1000-C.rounded)>1) add('bad','Submitted block 8 does not match PIPER’s rebuild','Submitted $'+et.toLocaleString()+'K; rebuilt $'+k$(C.rounded)+'K ('+(((C.rounded/1000)/et-1)*100).toFixed(1)+'%).');
   const ec=N(P.review.ext_cont),es=N(P.review.ext_sioh);if(P.review.ext_cont!==''&&ec!==N(P.cont)) add('warn','Submitted contingency differs',ec+'% submitted.');if(P.review.ext_sioh!==''&&Math.abs(es-SIOH[sClass()][1])>.01) add('warn','Submitted SIOH differs from the fixed rate',es+'% submitted; '+SIOH[sClass()][1]+'% expected for this location.');}
+ (P.ai_rev||[]).forEach(x=>F.push(x));
  return F;}
 function vRev(){const v=$('#view');const F=findings();const b=F.filter(x=>x.s==='bad'),w=F.filter(x=>x.s==='warn');
  v.innerHTML='<div class="panel"><h2>Red-team review</h2><p class="lead">The questions a Service programmer, OSD analyst or committee staffer will ask, checked against this 1391. Fix the red items before submission; answer or accept the amber ones.</p>'+
@@ -542,7 +742,7 @@ function vDef(){const v=$('#view');
  '<table><thead><tr><th>Date</th><th>From</th><th>Question</th><th>Answer</th><th>Status</th><th></th></tr></thead><tbody id="qab"></tbody></table><div class="row"><button class="go" id="bQ">Add question</button></div></div>';
  $('#bVer').onclick=()=>{const s=snapshot();const prev=P.versions[P.versions.length-1];const vv=(prev?prev.v:0)+1;P.versions.push({v:vv,date:today(),note:$('#vn').value||'',rounded:s.rounded,changes:diff(prev?.snap,s),snap:s});log('Version saved','v'+vv+' '+k$(s.rounded)+'K');save();vDef();renderSteps();};
  v.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>{const x=P.versions.find(z=>z.v==b.dataset.rs);if(!x||!confirm('Restore version '+x.v+'? The current working copy is replaced; save a version first if you need it.')) return;const s=x.snap;Object.assign(P,{b:{...s.b},pf:{...s.pf},loc:{...s.loc},prim:s.prim.map(z=>({...z})),sup:s.sup.map(z=>({...z})),cont:s.cont,db:s.db,n:{...s.n}});log('Version restored','v'+x.v);save();render();});
- const tb=$('#qab');P.qa.forEach(it=>{const tr=document.createElement('tr');tr.innerHTML='<td><input type="date" data-k="date" style="width:140px"></td><td><input data-k="from" style="width:130px"></td><td><textarea data-k="q"></textarea></td><td><textarea data-k="a"></textarea></td><td><select data-k="status" style="width:auto">'+opts({open:'Open',answered:'Answered',closed:'Closed'},it.status)+'</select></td><td><button class="sm" data-del>Remove</button></td>';bindAll(tr,it);tr.querySelector('[data-del]').onclick=()=>{P.qa=P.qa.filter(x=>x!==it);save();vDef();};tb.appendChild(tr);});
+ const tb=$('#qab');P.qa.forEach(it=>{const tr=document.createElement('tr');tr.innerHTML='<td><input type="date" data-k="date" style="width:140px"></td><td><input data-k="from" style="width:130px"></td><td><textarea data-k="q"></textarea></td><td><textarea data-k="a"></textarea>'+(it.check?'<div class="small">'+esc(it.check)+'</div>':'')+'</td><td><select data-k="status" style="width:auto">'+opts({open:'Open',answered:'Answered',closed:'Closed'},it.status)+'</select></td><td><button class="sm go" data-ai>Draft with AI</button> <button class="sm" data-del>Remove</button></td>';bindAll(tr,it,k=>{if(k==='a') it.check='';});tr.querySelector('[data-ai]').onclick=()=>aiAnswer(it);tr.querySelector('[data-del]').onclick=()=>{P.qa=P.qa.filter(x=>x!==it);save();vDef();};tb.appendChild(tr);});
  $('#bQ').onclick=()=>{P.qa.push({id:uid(),date:today(),from:'',q:'',a:'',status:'open'});save();vDef();};}
 
 // ---------- 8 execution checks ----------
