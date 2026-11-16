@@ -260,7 +260,7 @@ const BLANK=()=>({schema:'earl-1',id:uid(),created:new Date().toISOString(),
  project:{name:'',installation:'',service:''},objective:'',assumptions:'',base_fy:new Date().getFullYear()+1,lead:3,life:25,dollars:'real',rate_override:'',convention:'mixed',
  alts:[{id:uid(),name:'Status quo',type:'status_quo',desc:'Continue in the existing facilities with no new investment.',screen:'',screen_reason:'',costs:[],residual:{on:false,life:40},scores:{}}],
  reqs:[],cells:{},criteria:DEF_CRIT.map(([n,w])=>({id:uid(),name:n,weight:w})),recommend:{alt:'',rationale:''},log:[]});
-let E=load()||BLANK();let STEP=(E.alts.length<=1&&!E.build)?'build':'basis';
+let E=load()||BLANK();let STEP=(E.build&&E.build.applied)?'done':(E.alts.length<=1&&!E.build)?'build':'basis';
 function load(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('earl_project',JSON.stringify(E));
@@ -275,12 +275,12 @@ function log(what,detail){E.log.push({at:new Date().toISOString(),what,detail:de
 const period=()=>Math.max(1,(Number(E.lead)||0)+(Number(E.life)||1));
 function rate(p){if(E.rate_override!==''&&!isNaN(Number(E.rate_override))) return Number(E.rate_override);return appcRate(p||period(),E.dollars==='nominal'?'nominal':'real');}
 function factor(n,i,mid){return 1/Math.pow(1+i/100,mid?n-0.5:n);}
-function invBasis(a){return a.costs.filter(c=>INVEST.includes(c.cat)&&c.cat!=='land'&&c.cat!=='demolition'&&c.cat!=='relocation').reduce((s,c)=>s+(Number(c.amount)||0)*Math.max(1,(Number(c.end)||Number(c.start)||1)-(Number(c.start)||1)+1),0);}
-function residual(a,N){if(!a.residual?.on) return 0;const L=Number(a.residual.life)||40;const inSvc=(Number(E.lead)||0)+1;const used=Math.max(0,N-inSvc+1);return invBasis(a)*Math.max(0,(L-used)/L);}
+function invBasis(a,cf){return a.costs.filter(c=>INVEST.includes(c.cat)&&c.cat!=='land'&&c.cat!=='demolition'&&c.cat!=='relocation').reduce((s,c)=>s+(Number(c.amount)||0)*(cf?cf(c):1)*Math.max(1,(Number(c.end)||Number(c.start)||1)-(Number(c.start)||1)+1),0);}
+function residual(a,N,cf){if(!a.residual?.on) return 0;const L=Number(a.residual.life)||40;const inSvc=(Number(E.lead)||0)+1;const used=Math.max(0,N-inSvc+1);return invBasis(a,cf)*Math.max(0,(L-used)/L);}
 function stream(a,opt={}){const N=opt.N||period();const y=new Array(N+1).fill(0);const yr=new Array(N+1).fill(0);const m=opt.mult||{};
- a.costs.forEach(c=>{const s=Math.max(1,Number(c.start)||1),e=Math.min(N,Number(CATS[c.cat]?.[1]?(c.end||N):(c.end||c.start))||s);const amt=(Number(c.amount)||0)*(m[c.cat]??1)*(m._all??1)*(INVEST.includes(c.cat)?(m._inv??1):1);
+ a.costs.forEach(c=>{const s=Math.max(1,Number(c.start)||1),e=Math.min(N,Number(CATS[c.cat]?.[1]?(c.end||N):(c.end||c.start))||s);const amt=(Number(c.amount)||0)*(opt.cf?opt.cf(c):1)*(m[c.cat]??1)*(m._all??1)*(INVEST.includes(c.cat)?(m._inv??1):1);
   for(let t=s;t<=e;t++){if(CATS[c.cat]?.[1]) yr[t]+=amt;else y[t]+=amt;}});
- return {one:y,rec:yr,res:residual(a,N)*(m._inv??1)*(m._all??1),N};}
+ return {one:y,rec:yr,res:residual(a,N,opt.cf)*(m._inv??1)*(m._all??1),N};}
 function npv(a,opt={}){const i=opt.rate??rate(opt.N);const st=stream(a,opt);let pv=0,und=0;const cum=[0];
  for(let t=1;t<=st.N;t++){const conv=E.convention;const f1=factor(t,i,conv==='mid');const f2=factor(t,i,conv!=='end');
   const v=st.one[t]*f1+st.rec[t]*f2;pv+=v;und+=st.one[t]+st.rec[t];cum.push(pv);}
@@ -289,17 +289,57 @@ function npv(a,opt={}){const i=opt.rate??rate(opt.N);const st=stream(a,opt);let 
 function feasible(a){if(a.screen==='out') return false;return !E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail');}
 function failReasons(a){const r=[];if(a.screen==='out') r.push(a.screen_reason||'Screened out');E.reqs.filter(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail').forEach(q=>r.push('Fails: '+q.text));return r;}
 function wscore(a){const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0)||1;return E.criteria.reduce((s,c)=>s+(Number(c.weight)||0)*(Number(a.scores[c.id])||0),0)/W;}
-function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);return {a,ok:feasible(a),npv:n.pv,und:n.und,rv:n.rv,cum:n.cum,ws:wscore(a)};});
+function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);const unpriced=feasible(a)&&!a.costs.some(c=>Number(c.amount)>0);return {a,unpriced,ok:feasible(a)&&!unpriced,npv:n.pv,und:n.und,rv:n.rv,cum:n.cum,ws:wscore(a)};});
  const ok=rows.filter(r=>r.ok).sort((x,y)=>x.npv-y.npv);ok.forEach((r,i)=>r.rank=i+1);return {rows,ok,lead:ok[0],second:ok[1]};}
 
+// ---------- uncertainty ranges ----------
+// EARL's planning ranges for inputs it estimated; costs you enter by hand are taken as given.
+const RANGE={inv:[0.85,1.30,'Construction and design priced from the DoD tables'],sus:[0.90,1.20,'Sustainment priced from the DoD tables'],ask:[0.80,1.20,'Lease, joint-use or host-nation figures from your answers'],est:[0.50,1.50,'Status quo costs EARL estimated']};
+function rClass(c){if(c.sqAuto) return (c.est??/estimate confirmed/.test(c.label||''))?'est':null;if(!c.auto) return null;if(c.src==='ask') return 'ask';return CATS[c.cat]?.[1]?'sus':'inv';}
+function cfOf(side){return c=>{const k=rClass(c);return k?RANGE[k][side]:1;};}
+function npvRange(a){return {lo:npv(a,{cf:cfOf(0)}).pv,hi:npv(a,{cf:cfOf(1)}).pv};}
+function rangeInfo(){const R=results();const rg={};R.ok.forEach(r=>rg[r.a.id]=npvRange(r.a));let holds=null,beat=[];
+ if(R.lead&&R.second){beat=R.ok.slice(1).filter(r=>rg[r.a.id].lo<=rg[R.lead.a.id].hi);holds=!beat.length;}
+ // the estimated lines that move the leader's answer most
+ const drv=[];if(R.lead){const a=R.lead.a;a.costs.forEach(c=>{const k=rClass(c);if(!k) return;const one={...a,costs:[c]};const sw=npv(one,{cf:cfOf(1)}).pv-npv(one,{cf:cfOf(0)}).pv;if(sw>0) drv.push({c,k,sw});});drv.sort((x,y)=>y.sw-x.sw);}
+ return {R,rg,holds,beat,drv:drv.slice(0,3)};}
+const $r=(g)=>g?$k(g.lo)+' – '+$k(g.hi):'—';
+
+function rangeText(RI){const R=RI.R;if(!R.lead) return 'No alternative is costed yet.';if(RI.holds===null) return 'Only one alternative is costed, so there is nothing to compare it with.';
+ if(RI.holds) return 'The ranking holds: even at the high end of its range, '+R.lead.a.name+' costs less than every other alternative at the low end of its range.';
+ return 'The ranking depends on estimates: '+RI.beat.map(r=>r.a.name).join(', ')+' could cost less than '+R.lead.a.name+' if the estimates move within their ranges.';}
+function vDone(){const v=$('#view');const RI=rangeInfo();const R=RI.R;const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const rr=rec&&R.rows.find(x=>x.a===rec);
+ const org=a=>a.type==='status_quo'?'<span class="pill">Baseline</span>':a.origin==='notes'?'<span class="pill ok">Your notes</span>':a.origin==='standard'?'<span class="pill">Standard</span>':a.origin?'<span class="pill warn">AI suggestion</span>':'<span class="pill">You</span>';
+ const todo=[];const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) todo.push(est.length+' status quo cost estimate'+(est.length>1?'s':'')+' (confirmed when you applied; reconfirm with CE or finance)');
+ const un=R.rows.filter(r=>r.unpriced);if(un.length) todo.push('Not costed, so not ranked: '+un.map(r=>r.a.name).join(', ')+'. Add their costs under Adjust details → Life-cycle costs.');
+ const ai=Object.keys(E.cellWhy||{}).length;if(ai) todo.push(ai+' screening calls proposed by AI. Review them under Adjust details → Alternatives and screening.');
+ if(RI.drv.length&&RI.holds===false) todo.push('Firm up first: '+RI.drv.map(d=>(d.c.label||'').split(/ – |: /)[0]+' ('+$k(d.sw)+' swing)').join('; ')+'.');
+ const gp=(noraData()?.gaps||[]).find(g=>Number(g.qty_have)>=0&&Number(g.qty_need)>Number(g.qty_have)&&g.qty_have!=='');if(R.lead&&R.lead.a.type==='status_quo'&&gp) todo.unshift('The status quo ranks first, but NORA shows a gap ('+gp.qty_have+' of '+gp.qty_need+' '+(gp.unit||'')+' for '+(gp.area||'the requirement')+'). If it cannot meet a must-have, screen it out under Adjust details → Alternatives and screening.');
+ if(!E.recommend.rationale) todo.push('No rationale yet. Write it with AI below or by hand under Adjust details → Recommendation.');
+ v.innerHTML='<div class="panel"><h2>Your analysis of alternatives</h2>'+
+  (rec&&rr&&rr.ok?'<div class="kpis"><div class="card"><span class="small">Recommended</span><span class="big">'+esc(rec.name)+'</span><span class="small">'+esc(ATYPES[rec.type])+'</span></div><div class="card"><span class="small">NPV of cost, '+period()+' years</span><span class="big">'+$k(rr.npv)+'</span><span class="small">Likely '+$r(RI.rg[rec.id])+'</span></div><div class="card"><span class="small">Ranking</span><span class="big">'+(RI.holds===null?'—':RI.holds?'Holds':'Close')+'</span><span class="small">'+(RI.holds===false?'depends on estimates':'across estimate ranges')+'</span></div></div>'+
+   '<div class="mentor">'+esc(rangeText(RI))+'</div>':'<div class="find warn">No alternative is costed and feasible yet. Use Adjust details to add costs, or build again.</div>')+
+  '<div class="row"><button class="go" id="dAoA">Download AoA</button><button id="dMemo">Download memo</button><button id="dAI">'+(E.recommend.rationale?'Rewrite rationale with AI':'Write rationale with AI')+'</button></div>'+
+  '<p class="small">The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p></div>'+
+  '<div class="panel"><h2>Ranking</h2><table><thead><tr><th>Rank</th><th>Alternative</th><th>From</th><th class="num">NPV of cost</th><th class="num">Likely range</th><th class="num">Non-cost score</th></tr></thead><tbody>'+
+  R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>'<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+(r.rank||'—')+'</td><td>'+esc(r.a.name)+(r.ok?'':'<br><span class="small">'+esc(r.unpriced?'Not costed':'Screened out: '+failReasons(r.a).join('; '))+'</span>')+'</td><td>'+org(r.a)+'</td><td class="num">'+(r.ok?$k(r.npv):'—')+'</td><td class="num">'+(r.ok?$r(RI.rg[r.a.id]):'—')+'</td><td class="num">'+r.ws.toFixed(2)+'</td></tr>').join('')+'</tbody></table>'+
+  '<p class="small">Likely range: '+Object.values(RANGE).map(x=>x[2]+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs you entered are taken as given.</p></div>'+
+  (todo.length?'<div class="panel"><h2>Check before you send it</h2><ul>'+todo.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'')+
+  (E.recommend.rationale?'<div class="panel"><h2>Rationale</h2><p>'+esc(E.recommend.rationale).replace(/\n/g,'<br>')+'</p>'+(E.recommend.ai_check?'<div class="mentor">'+esc(E.recommend.ai_check)+'</div>':'')+'</div>':'');
+ $('#dAoA').onclick=()=>{dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');save();};
+ $('#dMemo').onclick=()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword');
+ $('#dAI').onclick=()=>{if(!E.recommend.alt&&rec) E.recommend.alt=rec.id;aiRationale();};}
+
 // ---------- steps ----------
-const STEPS=[['build','Build my AoA',()=>E.build&&E.build.applied?'✓':''],['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
+const STEPS=[['build','Build my AoA',()=>E.build&&E.build.applied?'✓':''],['done','Your AoA',()=>E.recommend.alt?'✓':''],['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
 function renderSteps(){const nav=$('#steps');
- if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
+ if(!nav.dataset.built){const btn=(s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>';
+  nav.innerHTML=STEPS.slice(0,2).map(btn).join('')+'<details id="adj"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">Adjust details</summary>'+STEPS.slice(2).map((s,i)=>btn(s,i)).join('')+'</details><div class="gate"></div>';
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
+ const adj=nav.querySelector('#adj');if(nav.dataset.last!==STEP){adj.open=!(['build','done'].includes(STEP)&&E.build&&E.build.applied);nav.dataset.last=STEP;}
  STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
  const R=results();nav.querySelector('.gate').innerHTML='<b>Gate 2:</b> preferred alternative approved.<br>'+(R.lead?'Lowest life-cycle cost: <b>'+esc(R.lead.a.name)+'</b> '+$k(R.lead.npv):'No feasible alternative costed yet.');}
-function render(){renderSteps();({build:vBuild,basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
+function render(){renderSteps();({build:vBuild,done:vDone,basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
 function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.type==='number'?(el.value===''?'':Number(el.value)):el.value;save();if(after) after(k,el);};});}
 const opts=(o,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(Array.isArray(v)?v[0]:v)+'</option>').join('');
 
@@ -385,7 +425,7 @@ function vCosts(){const v=$('#view');if(!CA||!E.alts.find(a=>a.id===CA)) CA=E.al
 const PD_=JSON.parse(document.getElementById('edata').textContent);
 const SIZE_=[[.05,1.275],[.1,1.269],[.15,1.232],[.2,1.202],[.25,1.175],[.3,1.152],[.35,1.132],[.4,1.114],[.45,1.098],[.5,1.084],[.55,1.072],[.6,1.06],[.65,1.05],[.7,1.041],[.75,1.033],[.8,1.025],[.85,1.018],[.9,1.011],[.95,1.005],[1,1],[1.05,.995],[1.1,.99],[1.15,.986],[1.2,.982],[1.25,.978],[1.3,.974],[1.35,.971],[1.4,.968],[1.45,.965],[1.5,.962],[1.55,.96],[1.6,.957],[1.65,.955],[1.7,.953],[1.75,.951],[1.8,.949],[1.85,.947],[1.9,.945],[1.95,.943],[2,.942],[2.05,.94],[2.1,.939],[2.15,.937],[2.2,.936],[2.25,.935],[2.3,.933],[2.35,.932],[2.4,.931],[2.45,.93],[2.5,.929],[2.55,.928],[2.6,.927],[2.65,.926],[2.7,.925],[2.75,.924],[2.8,.924],[2.85,.923],[2.9,.922],[2.95,.921],[3,.921],[3.05,.92]];
 const DC_={low:['Low – site-adapted or repetitive design',1.05],medium:['Medium – unique design, complex technology',1.10],high:['High – highly complex technology',1.20],ultra:['Ultra-high – extremely complex or innovative',1.30]};
-const PMODE={new:'build',addition:'build',renovate:'renew',convert:'renew',status_quo:'keep',lease:'none',joint:'none',host_nation:'none',other:'build'};
+const PMODE={new:'build',addition:'build',renovate:'renew',convert:'renew',status_quo:'keep',lease:'lease',joint:'joint',host_nation:'host',other:'build'};
 function sizeF_(r){let b=SIZE_[0];for(const s of SIZE_) if(s[0]<=r+1e-9) b=s;return b;}
 function escF_(y,m){const T=PD_.esc.map(([yy,mm,f])=>[yy+(mm-1)/12,f]);const t=y+(m-1)/12;if(t<=T[0][0]) return T[0][1];
  for(let i=0;i<T.length-1;i++) if(t>=T[i][0]&&t<=T[i+1][0]) return T[i][1]+(T[i+1][1]-T[i][1])*(t-T[i][0])/(T[i+1][0]-T[i][0]);const L=T[T.length-1];return L[1]*Math.pow(1.02,t-L[0]);}
@@ -403,7 +443,17 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
  if(!L){out.notes.push('Pick the location first.');return out;}
  const [by,bm]=baseMid_();const lead=Number(E.lead)||0,occ=lead+1,N=period();
  const conYrs=lead>=2?[2,lead]:[1,1];const nCon=conYrs[1]-conYrs[0]+1;
- const mode=PMODE[a.type]||'none';const siohPct=sioh_(L);
+ let mode=PMODE[a.type]||'none';const siohPct=sioh_(L);const host=mode==='host';if(host) mode='build';
+ if(mode==='lease'){const r=Number(p.rent)||0,q=Number(p.qty)||0,f=Number(p.fit)||0;
+  if(!r||!q) out.notes.push('Enter the rent per square foot per year and the space needed.');
+  else{out.lines.push({cat:'lease',src:'ask',label:'Lease rent from your answer: '+$$(r,2)+'/SF/yr × '+q.toLocaleString()+' SF',amount:Math.round(r*q),start:occ,end:''});
+   if(f) out.lines.push({cat:'relocation',src:'ask',label:'Fit-out and move-in from your answer: '+$$(f,2)+'/SF × '+q.toLocaleString()+' SF',amount:Math.round(f*q),start:lead||1,end:''});
+   out.sr=r*q;out.first=f*q;out.ok=true;out.notes.push('Confirm rent and terms with the real estate office; a lease needs its own authority and approvals.');}}
+ if(mode==='joint'){const ch=Number(p.charge)||0,o=Number(p.once)||0;
+  if(!ch&&!o) out.notes.push('Enter the host unit’s yearly charge and any one-time cost to move in.');
+  else{if(ch) out.lines.push({cat:'otherR',src:'ask',label:'Joint-use charge from your answer (support agreement)',amount:Math.round(ch),start:occ,end:''});
+   if(o) out.lines.push({cat:'relocation',src:'ask',label:'One-time move and fit-up from your answer',amount:Math.round(o),start:lead||1,end:''});
+   out.sr=ch;out.first=o;out.ok=true;out.notes.push('Confirm the charge in the support agreement with the host installation.');}}
  const fac=p.fac!=null&&p.fac!==''?PD_.fac[Number(p.fac)]:null;
  if(mode==='build'){const g=p.guc!=null&&p.guc!==''?PD_.guc[Number(p.guc)]:null;const q=Number(p.qty)||0;
   if(!g||!q){out.notes.push('Pick the facility type and enter its size.');}
@@ -428,26 +478,32 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
    out.lines.push({cat:'contingency',label:'Contingency 5%',amount:Math.round(cont/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
    out.lines.push({cat:'sioh',label:'SIOH '+siohPct+'%',amount:Math.round(sioh/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
    out.first=base+cont+sioh+des;out.ok=true;}}
- if(mode!=='none'){const q=Number(p.sqty||p.qty)||0;
+ if(host&&out.ok){const us=p.us===''||p.us==null?null:Number(p.us);
+  if(us==null){out.lines=[];out.ok=false;out.first=0;out.notes.push('Enter the US share of the construction cost (%) from the host-nation agreement.');}
+  else{out.lines.forEach(l=>{l.amount=Math.round(l.amount*us/100);l.label+=' × US share '+us+'% (your answer)';l.src='ask';});out.first=(out.first||0)*us/100;}}
+ if(['build','renew','keep'].includes(mode)){const q=Number(p.sqty||p.qty)||0;
   if(fac&&q&&fac[4]){const om=omF_(Number(E.base_fy))/omF_(2026);const sr=q*fac[4]*(L.sacf||L.acf)*om;
    out.lines.push({cat:'srm',label:'Sustainment, UFS 3-701-01 Eq 3-2: FAC '+fac[0]+' '+$$(fac[4],2)+'/'+fac[2]+' × SACF '+(L.sacf||L.acf)+' × O&M escalation '+om.toFixed(3)+' × '+q.toLocaleString(),amount:Math.round(sr),start:mode==='keep'?1:occ,end:''});out.sr=sr;out.ok=true;}
   else if(fac&&!fac[4]) out.notes.push('No sustainment unit cost for FAC '+fac[0]+'.');
   else if(mode==='keep'||mode==='renew'||(mode==='build'&&out.ok)) out.notes.push('For yearly sustainment, pick the FAC'+(mode==='build'?' of the new facility':'')+' and its size.');}
- if(mode==='none') out.notes.push(ATYPES[a.type]+' has no published unit costs. Enter lease rent, shared-use charges or host-nation contributions by hand from the real estate office or the agreement.');
+ if(mode==='none') out.notes.push(ATYPES[a.type]+' has no published unit costs. Enter its costs by hand.');
  out.notes.push('Utilities, personnel and mission costs are not in the pricing guide. Add them from installation data.');
  return out;}
 function renderPricer(a){const box=document.getElementById('pricer');if(!box) return;
  E.price=E.price||{};if(!E.price.loc){const g=guessLoc_();if(g){E.price.loc=locObj_(g);save();}}
- a.price=a.price||{};const p=a.price;const L=E.price.loc;const mode=PMODE[a.type]||'none';
+ a.price=a.price||{};const p=a.price;const L=E.price.loc;const mode0=PMODE[a.type]||'none';const mode=mode0==='host'?'build':mode0;
  if(E.dollars==='nominal'){box.innerHTML='<div class="mentor">Pricing from the DoD tables works in constant base-year dollars. Switch the dollar basis to constant dollars in step 1 to use it.</div>';return;}
  const gOpts='<option value="">Facility type (UFS 3-701-01 Table 2)</option>'+PD_.guc.map((g,i)=>g.usd?'<option value="'+i+'" '+(String(p.guc)===String(i)?'selected':'')+'>'+esc(g.c+' – '+g.n)+'</option>':'').join('');
  const fOpts='<option value="">FAC (UFS 3-701-01 Table 3)</option>'+PD_.fac.map((f,i)=>'<option value="'+i+'" '+(String(p.fac)===String(i)?'selected':'')+'>'+esc(f[0]+' '+f[1]+' ('+f[2]+')')+'</option>').join('');
- box.innerHTML='<details class="panel" style="margin:12px 0;background:#f6fafb" '+(a.costs.length?'':'open')+'><summary style="cursor:pointer;font-weight:600">Price this alternative from the DoD pricing tables</summary>'+
+ box.innerHTML='<details class="panel" style="margin:12px 0;background:#f6fafb" '+(a.costs.length?'':'open')+'><summary style="cursor:pointer;font-weight:600">'+(mode==='lease'||mode==='joint'?'Price this alternative from your answers':'Price this alternative from the DoD pricing tables')+'</summary>'+
   '<p class="small">Uses UFS 3-701-01 (July 2026 data tables) and UFS 3-730-01, in constant FY'+esc(E.base_fy)+' dollars. Lines it adds are marked and can be edited; filling again replaces only those lines.</p>'+
   '<div class="form"><div class="wide"><label class="f">Location (all alternatives)</label><input id="pLoc" list="pLocs" placeholder="Start typing an installation or country" value="'+esc(L?.label||'')+'"><datalist id="pLocs"></datalist>'+
   (L?'<span class="small">Area cost factor '+L.acf+', sustainment factor '+(L.sacf||L.acf)+', SIOH '+sioh_(L)+'% <label style="margin-left:10px"><input type="checkbox" id="pRem" style="width:auto" '+(L.remote?'checked':'')+'> Remote site (9% SIOH, needs justification)</label></span>':'')+'</div>'+
   (mode==='build'?'<div class="wide"><label class="f">New facility type</label><select id="pG">'+gOpts+'</select></div><div><label class="f">Size (SF, or units for per-unit types)</label><input type="number" id="pQ" value="'+esc(p.qty||'')+'"></div><div><label class="f">Design complexity</label><select id="pDC">'+Object.entries(DC_).map(([k,v])=>'<option value="'+k+'" '+((p.dc||'low')===k?'selected':'')+'>'+esc(v[0])+'</option>').join('')+'</select></div><div><label class="f">Supporting facilities ($, optional)</label><input type="number" id="pS" value="'+esc(p.sup||'')+'" placeholder="utilities, paving, site work"></div><div><label class="f"><input type="checkbox" id="pM" style="width:auto" '+(p.med?'checked':'')+'> Medical facility</label></div>':'')+
   (mode==='renew'?'<div class="wide"><label class="f">Existing facility (FAC)</label><select id="pF">'+fOpts+'</select></div><div><label class="f">Size</label><input type="number" id="pQ" value="'+esc(p.qty||'')+'"></div><div><label class="f">Share of the building renewed (%)</label><input type="number" id="pSh" value="'+esc(p.share||'')+'" placeholder="e.g. 60"></div>':'')+
+  (mode0==='host'?'<div><label class="f">US share of construction (%)</label><input type="number" id="pUS" value="'+esc(p.us??'')+'" placeholder="from the agreement"></div>':'')+
+  (mode==='lease'?'<div><label class="f">Rent ($ per SF per year)</label><input type="number" id="pR" value="'+esc(p.rent||'')+'"></div><div><label class="f">Space needed (SF)</label><input type="number" id="pQ" value="'+esc(p.qty||'')+'"></div><div><label class="f">Fit-out ($ per SF, optional)</label><input type="number" id="pFt" value="'+esc(p.fit||'')+'"></div>':'')+
+  (mode==='joint'?'<div><label class="f">Yearly charge from the host ($)</label><input type="number" id="pCh" value="'+esc(p.charge||'')+'"></div><div><label class="f">One-time move and fit-up ($, optional)</label><input type="number" id="pO" value="'+esc(p.once||'')+'"></div>':'')+
   (mode==='build'?'<div class="wide"><label class="f">FAC for yearly sustainment</label><select id="pF">'+fOpts+'</select></div>':'')+
   (mode==='keep'?'<div class="wide"><label class="f">Existing facility (FAC)</label><select id="pF">'+fOpts+'</select></div><div><label class="f">Size</label><input type="number" id="pQ" value="'+esc(p.qty||'')+'"></div>':'')+
   '</div><div id="pOut" class="small" style="margin-top:8px"></div><div class="row"><button class="go" id="pFill">Fill cost lines</button></div></details>';
@@ -459,7 +515,7 @@ function renderPricer(a){const box=document.getElementById('pricer');if(!box) re
   // The matching FAC for sustainment, which the person can change.
   if(id==='#pG'&&p[k]!==''){const g=PD_.guc[Number(p[k])];if(g&&g.fac!=null){p.fac=String(g.fac);const fe=box.querySelector('#pF');if(fe) fe.value=p.fac;}}
   save();show();};};
- bind('#pG','guc');bind('#pQ','qty');bind('#pDC','dc');bind('#pS','sup');bind('#pM','med');bind('#pF','fac');bind('#pSh','share');
+ bind('#pG','guc');bind('#pQ','qty');bind('#pDC','dc');bind('#pS','sup');bind('#pM','med');bind('#pF','fac');bind('#pSh','share');bind('#pUS','us');bind('#pR','rent');bind('#pFt','fit');bind('#pCh','charge');bind('#pO','once');
  function show(){const r=priceCalc(a);box.querySelector('#pOut').innerHTML=(r.first?'<b>One-time investment '+$$(r.first)+'</b>':'')+(r.sr?(r.first?' · ':'')+'<b>Sustainment '+$$(r.sr)+' a year</b>':'')+(r.notes.length?'<br>'+r.notes.map(esc).join('<br>'):'');box.querySelector('#pFill').disabled=!r.lines.length;}
  show();
  box.querySelector('#pFill').onclick=()=>{const r=priceCalc(a);if(!r.lines.length) return;a.costs=a.costs.filter(c=>!c.auto).concat(r.lines.map(l=>({id:uid(),auto:true,...l})));
@@ -494,7 +550,7 @@ async function aiRationale(){if(!aiReady()) return;const R=results();const rec=E
  const src=L.join('\n');const b=$('#bAIr');b.disabled=true;b.textContent='Writing…';
  try{const j=await CARLAI.ask('claude',RAT_SYS,'SOURCES:\n'+src);const t=String(j.rationale||'').trim();if(!t) throw new Error('Nothing returned');
   const bad=numCheck(t,src);E.recommend.rationale=t;E.recommend.ai_check=bad.length?'Check these numbers, not found in the analysis: '+bad.join(', '):'';
-  log('Rationale written with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();vRec();}
+  log('Rationale written with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();render();}
  catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Write rationale with AI';}}
 
 // ---------- Build my AoA: EARL does the heavy lifting, you review and decide ----------
@@ -542,6 +598,7 @@ async function buildAoA(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
   E.build={at:new Date().toISOString(),coas,sq:sqItems,sqErr:SQ&&SQ.err||'',questions:(M.questions||[]).slice(0,5).map((q,i)=>({id:'q'+(i+1),q:String(q.q||''),why:String(q.why||''),a:''})),judge:J&&!J.err?J:{cells:[],scores:[]},judgeErr:J&&J.err||'',applied:false};
   log('Build my AoA: proposals ready',coas.length+' courses of action, '+E.build.questions.length+' questions');save();st('');vBuild();}
  catch(err){st('');alert('Build failed: '+err.message);if(btn) btn.disabled=false;}}
+function needQty(){const n=noraData();return n&&(n.gaps||[]).map(g=>Number(g.qty_need)).find(x=>x>0)||'';}
 function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>c.keep);
  const others=E.alts.filter(a=>a.type!=='status_quo'&&!a.fromBuild);
  if(others.length&&!confirm('You already have '+others.length+' alternative(s) you entered yourself. Keep them alongside the built ones?')) E.alts=E.alts.filter(a=>a.type==='status_quo'||a.fromBuild);
@@ -552,12 +609,15 @@ function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>
   const mode=PMODE[c.type]||'none';const g=c.guc!=null?PD_.guc[c.guc]:null;
   if(mode==='build'&&g) a.price={guc:String(c.guc),qty:String(c.qty||''),dc:'low',fac:g.fac!=null?String(g.fac):''};
   if(mode==='renew'&&g) a.price={fac:g.fac!=null?String(g.fac):'',qty:String(c.qty||''),share:String(c.share||'')};
+  if(mode==='host'&&g) a.price={guc:String(c.guc),qty:String(c.qty||''),dc:'low',fac:g.fac!=null?String(g.fac):'',us:c.us??''};
+  if(mode==='lease') a.price={rent:String(c.rent||''),qty:String(c.qty||needQty()||''),fit:String(c.fit||'')};
+  if(mode==='joint') a.price={charge:String(c.charge||''),once:String(c.once||'')};
   E.alts.push(a);map[c.id]=a.id;});
  // status quo upkeep: the existing quantity from NORA's gaps, on the primary facility's FAC
  const n=noraData();const have=n&&(n.gaps||[]).map(g=>Number(g.qty_have)).find(x=>x>0);const prim=kept.find(c=>PMODE[c.type]==='build'&&c.guc!=null);
  if(have&&prim&&PD_.guc[prim.guc].fac!=null&&!sq.price) sq.price={fac:String(PD_.guc[prim.guc].fac),qty:String(have)};
  // what the status quo costs the mission each year, from the record or estimated and confirmed by you
- sq.costs=sq.costs.filter(c=>!c.sqAuto);(B.sq||[]).filter(x=>x.keep&&Number(x.amount)>0).forEach(x=>sq.costs.push({id:uid(),sqAuto:true,cat:x.cat,amount:Math.round(Number(x.amount)),start:1,end:'',label:x.label+' \u2013 '+(x.basis==='stated'?'from the requirement record: \u201c'+x.quote+'\u201d':'estimate confirmed by the analyst: '+x.method)}));
+ sq.costs=sq.costs.filter(c=>!c.sqAuto);(B.sq||[]).filter(x=>x.keep&&Number(x.amount)>0).forEach(x=>sq.costs.push({id:uid(),sqAuto:true,est:x.basis!=='stated',cat:x.cat,amount:Math.round(Number(x.amount)),start:1,end:'',label:x.label+' \u2013 '+(x.basis==='stated'?'from the requirement record: \u201c'+x.quote+'\u201d':'estimate confirmed by the analyst: '+x.method)}));
  // AI screening and scores, marked as proposed
  (B.judge.cells||[]).forEach(x=>{const a=map[x.coa],q=E.reqs.find(r=>r.id===x.req);if(a&&q&&['pass','partial','fail'].includes(x.v)){E.cells[a+'|'+q.id]=x.v;(E.cellWhy=E.cellWhy||{})[a+'|'+q.id]=x.why||'';}});
  (B.judge.scores||[]).forEach(x=>{const a=E.alts.find(z=>z.id===map[x.coa]);const s=Math.max(1,Math.min(5,Math.round(Number(x.s)||0)));if(a&&s&&E.criteria.some(c=>c.id===x.crit)){a.scores[x.crit]=s;(a.scoreWhy=a.scoreWhy||{})[x.crit]=x.why||'';}});
@@ -567,7 +627,7 @@ function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>
  // price everything EARL can price
  let priced=0;E.alts.forEach(a=>{if(!a.price) return;const r=priceCalc(a);if(r.lines.length){a.costs=a.costs.filter(c=>!c.auto).concat(r.lines.map(l=>({id:uid(),auto:true,...l})));priced++;}});
  const R=results();if(R.lead&&!E.recommend.alt) E.recommend.alt=R.lead.a.id;
- B.applied=true;B.priced=priced;log('Build my AoA: applied',kept.length+' courses of action, '+priced+' priced from the DoD tables');save();STEP='res';render();window.scrollTo(0,0);}
+ B.applied=true;B.priced=priced;log('Build my AoA: applied',kept.length+' courses of action, '+priced+' priced from the DoD tables');save();STEP='done';render();window.scrollTo(0,0);}
 function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const signed=window.CARLAI&&CARLAI.state().ok;
  const badge=c=>c.basis==='notes'?'<span class="pill ok">From your notes</span>':c.basis==='standard'?'<span class="pill">Standard alternative</span>':'<span class="pill warn">AI suggestion</span>';
  const reqs=E.reqs.filter(q=>q.must);
@@ -579,7 +639,9 @@ function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const si
    B.coas.map((c,i)=>{const g=c.guc!=null?PD_.guc[c.guc]:null;const fails=(B.judge.cells||[]).filter(x=>x.coa===c.id&&x.v==='fail');const mode=PMODE[c.type]||'none';
     return '<div class="card" style="margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px"><label style="font-weight:600"><input type="checkbox" data-i="'+i+'" data-f="keep" '+(c.keep?'checked':'')+' style="width:auto"> '+esc(c.name)+'</label> '+badge(c)+' <span class="small">'+esc(ATYPES[c.type])+(c.from?' \u00b7 proposed by '+(c.from.includes(',')?'both planners':'one planner'):'')+'</span>'+
      '<p style="margin:6px 0">'+esc(c.desc)+'</p>'+(c.quote?'<p class="small">'+(c.quoteOk?'Rests on: ':'Quote not found in your notes, so treated as a suggestion: ')+'<q>'+esc(c.quote)+'</q></p>':'')+(c.reason?'<p class="small">'+esc(c.reason)+'</p>':'')+
-     (mode==='build'||mode==='renew'?'<div class="form" style="margin-top:6px"><div class="wide"><label class="f">'+(mode==='build'?'Facility type to price':'Facility type of the existing building')+'</label><select data-i="'+i+'" data-f="guc"><option value="">Not priced</option>'+PD_.guc.map((x,k)=>x.usd?'<option value="'+k+'" '+(c.guc===k?'selected':'')+'>'+esc(x.c+' \u2013 '+x.n)+'</option>':'').join('')+'</select></div><div><label class="f">Size'+(c.unit?' ('+esc(c.unit)+')':'')+'</label><input type="number" data-i="'+i+'" data-f="qty" value="'+esc(c.qty)+'"></div>'+(mode==='renew'?'<div><label class="f">Share renewed (%)</label><input type="number" data-i="'+i+'" data-f="share" value="'+esc(c.share)+'"></div>':'')+'</div>':'<p class="small">No published unit costs for this type. Enter its costs on step 3 after applying.</p>')+
+     (mode==='lease'?'<div class="form" style="margin-top:6px"><div><label class="f">Rent ($ per SF per year)</label><input type="number" data-i="'+i+'" data-f="rent" value="'+esc(c.rent||'')+'" placeholder="ask the real estate office"></div><div><label class="f">Space (SF)</label><input type="number" data-i="'+i+'" data-f="qty" value="'+esc(c.qty||needQty())+'"></div><div><label class="f">Fit-out ($ per SF, optional)</label><input type="number" data-i="'+i+'" data-f="fit" value="'+esc(c.fit||'')+'"></div></div>':'')+
+     (mode==='joint'?'<div class="form" style="margin-top:6px"><div><label class="f">Yearly charge from the host ($)</label><input type="number" data-i="'+i+'" data-f="charge" value="'+esc(c.charge||'')+'"></div><div><label class="f">One-time move and fit-up ($, optional)</label><input type="number" data-i="'+i+'" data-f="once" value="'+esc(c.once||'')+'"></div></div>':'')+
+     (mode==='build'||mode==='renew'||mode==='host'?'<div class="form" style="margin-top:6px"><div class="wide"><label class="f">'+(mode==='renew'?'Facility type of the existing building':'Facility type to price')+'</label><select data-i="'+i+'" data-f="guc"><option value="">Not priced</option>'+PD_.guc.map((x,k)=>x.usd?'<option value="'+k+'" '+(c.guc===k?'selected':'')+'>'+esc(x.c+' \u2013 '+x.n)+'</option>':'').join('')+'</select></div><div><label class="f">Size'+(c.unit?' ('+esc(c.unit)+')':'')+'</label><input type="number" data-i="'+i+'" data-f="qty" value="'+esc(c.qty)+'"></div>'+(mode==='renew'?'<div><label class="f">Share renewed (%)</label><input type="number" data-i="'+i+'" data-f="share" value="'+esc(c.share)+'"></div>':'')+(mode==='host'?'<div><label class="f">US share of construction (%)</label><input type="number" data-i="'+i+'" data-f="us" value="'+esc(c.us??'')+'" placeholder="from the agreement"></div>':'')+'</div>':(mode==='lease'||mode==='joint'?'<p class="small">Leave blank if unknown; it will be listed as not costed, not ranked as free.</p>':'<p class="small">No published unit costs for this type. Enter its costs under Adjust details after applying.</p>'))+
      (fails.length?'<div class="find warn" style="margin-top:6px"><b>Proposed screen-out:</b> '+fails.map(x=>esc((reqs.find(q=>q.id===x.req)||{}).text||'requirement')+(x.why?' \u2013 '+esc(x.why):'')).join('; ')+'</div>':'')+'</div>';}).join('')+
    '<h3>What the status quo costs the mission each year</h3><p class="small">Routine sustainment is priced from the DoD tables. These are the other costs of staying put. Estimates show their arithmetic and assumptions: check every one, change the amount, or untick it.</p>'+
    (B.sqErr?'<div class="find warn"><b>The estimate did not run:</b> '+esc(B.sqErr)+'. Add status quo costs on step 4.</div>':'')+
@@ -593,7 +655,7 @@ function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const si
  const ap=$('#bApply');if(ap) ap.onclick=applyBuild;}
 
 // ---------- Analysis of Alternatives document ----------
-function aoaHTML(){const R=results();const S=sensitivity();const p=E.project;const N=period();const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const n=noraData();
+function aoaHTML(){const R=results();const RI=rangeInfo();const S=sensitivity();const p=E.project;const N=period();const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const n=noraData();
  const tb=(h,rows,cls)=>'<table'+(cls?' class="'+cls+'"':'')+'><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
  const orig=a=>a.type==='status_quo'?'Required baseline':a.origin==='notes'?'From the requirement record':a.origin==='standard'?'Standard alternative':a.origin==='idea'?'Suggested during analysis':'Entered by the analyst';
  const rr=rec&&R.rows.find(x=>x.a===rec);const other=rec&&R.ok.find(x=>x.a!==rec);
@@ -611,7 +673,8 @@ function aoaHTML(){const R=results();const S=sensitivity();const p=E.project;con
  ((E.alts.find(a=>a.type==='status_quo')||{costs:[]}).costs.filter(c=>c.sqAuto).length?'<h3>Status quo mission costs</h3><ul>'+E.alts.find(a=>a.type==='status_quo').costs.filter(c=>c.sqAuto).map(c=>'<li>'+$$(Number(c.amount)||0)+' a year: '+esc(c.label)+'</li>').join('')+'</ul>':'')+(cons.length?'<h3>Constraints</h3><ul>'+cons.map(c=>'<li>'+esc(c.text.replace(/^Constraint: /,''))+'</li>').join('')+'</ul>':'')+
  '<h2>3. Alternatives identified</h2>'+tb(['Alternative','Type','Origin','Disposition'],E.alts.map(a=>[a.name,ATYPES[a.type],orig(a),feasible(a)?'Carried forward':'Screened out: '+failReasons(a).join('; ')]))+
  '<h2>4. Description of each alternative</h2>'+E.alts.map(a=>'<h3>'+esc(a.name)+'</h3><p>'+esc(a.desc||'—')+'</p>'+(a.origin_quote?'<p class="q">From the requirement record: “'+esc(a.origin_quote)+'”</p>':'')).join('')+
- '<h2>5. Life-cycle cost</h2>'+tb(['Rank','Alternative','NPV of cost','Undiscounted','Residual credit'],R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>[r.rank||'—',r.a.name,r.ok?$$(r.npv):'Screened out',$$(r.und),$$(r.rv)]))+
+ '<h2>5. Life-cycle cost</h2>'+tb(['Rank','Alternative','NPV of cost','Likely range','Undiscounted','Residual credit'],R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>[r.rank||'—',r.a.name,r.ok?$$(r.npv):r.unpriced?'Not costed':'Screened out',r.ok?$r(RI.rg[r.a.id]):'—',$$(r.und),$$(r.rv)]))+
+ '<p>'+esc(rangeText(RI))+' Ranges apply EARL’s planning bands to the inputs it estimated: '+Object.values(RANGE).map(x=>x[2].toLowerCase()+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs entered by the analyst are taken as given.</p>'+
  '<p class="m">Unit costs, area cost factors and sustainment costs from UFS 3-701-01 (July 2026 tables) and UFS 3-730-01; SIOH per OASD(EI&amp;E), 14 Apr 2022; discounting per OMB Circular A-94 Appendix C ('+esc(APPC.edition)+'). Each cost basis is listed in Appendix A.</p>'+
  '<h2>6. Non-cost factors</h2>'+tb(['Factor','Weight'].concat(E.alts.map(x=>x.name)),E.criteria.map(c=>[c.name,c.weight].concat(E.alts.map(x=>x.scores[c.id]??'—'))).concat([['Weighted score',''].concat(E.alts.map(x=>wscore(x).toFixed(2)))]))+
  E.alts.filter(x=>x.why).map(x=>'<p><b>'+esc(x.name)+':</b> '+esc(x.why)+'</p>').join('')+
@@ -655,7 +718,7 @@ function vRes(){const v=$('#view');const R=results();const S=sensitivity();const
  v.innerHTML='<div class="panel"><h2>Results</h2><p class="lead">Net present value of cost over '+N+' years at '+rate().toFixed(2)+'%. Lower is better. Screened-out alternatives are shown greyed and not ranked.</p>'+
  '<div class="chart">'+R.rows.slice().sort((a,b)=>(b.ok-a.ok)||(a.npv-b.npv)).map(r=>'<div class="'+(r.ok?'':'out-alt')+'">'+(r.rank?r.rank+'. ':'')+esc(r.a.name)+'</div><div><div class="bar '+(r===R.lead?'lo':'')+'" style="width:'+Math.max(1,Math.abs(r.npv)/max*100)+'%;'+(r.ok?'':'opacity:.4')+'"></div></div><div class="num">'+$k(r.npv)+'</div>').join('')+'</div>'+
  '<table style="margin-top:16px"><thead><tr><th>Alternative</th><th>Status</th><th class="num">NPV of cost</th><th class="num">Undiscounted</th><th class="num">Residual credit</th><th class="num">Non-cost score</th><th class="num">NPV per score point</th><th class="num">vs. status quo</th></tr></thead><tbody>'+
- R.rows.map(r=>{const sq=R.rows.find(x=>x.a.type==='status_quo');return '<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+esc(r.a.name)+'</td><td>'+(r.ok?'Rank '+r.rank:'Screened out')+'</td><td class="num">'+$$(r.npv)+'</td><td class="num">'+$$(r.und)+'</td><td class="num">'+$$(r.rv)+'</td><td class="num">'+r.ws.toFixed(2)+'</td><td class="num">'+(r.ws?$$(r.npv/r.ws):'—')+'</td><td class="num">'+(sq&&sq!==r?$$(r.npv-sq.npv):'—')+'</td></tr>';}).join('')+'</tbody></table>'+
+ R.rows.map(r=>{const sq=R.rows.find(x=>x.a.type==='status_quo');return '<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+esc(r.a.name)+'</td><td>'+(r.ok?'Rank '+r.rank:r.unpriced?'Not costed':'Screened out')+'</td><td class="num">'+$$(r.npv)+'</td><td class="num">'+$$(r.und)+'</td><td class="num">'+$$(r.rv)+'</td><td class="num">'+r.ws.toFixed(2)+'</td><td class="num">'+(r.ws?$$(r.npv/r.ws):'—')+'</td><td class="num">'+(sq&&sq!==r?$$(r.npv-sq.npv):'—')+'</td></tr>';}).join('')+'</tbody></table>'+
  (R.rows.some(r=>!r.ok)?'<p class="small">'+R.rows.filter(r=>!r.ok).map(r=>'<b>'+esc(r.a.name)+'</b>: '+esc(failReasons(r.a).join('; '))).join('<br>')+'</p>':'')+
  savingsBlock(R)+'</div>'+
  (S?'<div class="panel"><h2>Sensitivity</h2><p class="lead">Each line changes one input and re-ranks. Where the lowest-cost alternative changes, the decision is sensitive to that input and the memo must say so.</p>'+
@@ -714,8 +777,7 @@ function tables(){const N=period(),i=rate();const rows=[['EARL economic analysis
 function memoHTML(){const R=results();const S=sensitivity();const p=E.project;const N=period();const a=E.alts.find(x=>x.id===E.recommend.alt);
  const tb=(h,rows)=>'<table><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
  return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Economic Analysis</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:17pt;margin:0 0 4pt}h2{font-size:12.5pt;margin:14pt 0 5pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4pt 0}th,td{border:1px solid #999;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.cui{text-align:center;font-weight:bold;font-size:10pt}</style></head><body>'+
- '<div class="cui">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN – MARK PER DoDI 5200.48 AS REQUIRED</div>'+
- '<h1>Economic Analysis and Recommendation: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,p.service].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(E.recommend.by||'—')+', '+today()+', in accordance with DoDI 7041.03. Prepared with EARL; the decision rests with '+esc(E.recommend.authority||'the decision authority')+'.</div>'+
+  '<h1>Economic Analysis and Recommendation: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,p.service].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(E.recommend.by||'—')+', '+today()+', in accordance with DoDI 7041.03. Prepared with EARL; the decision rests with '+esc(E.recommend.authority||'the decision authority')+'.</div>'+
  '<h2>1. Recommendation</h2><p>'+esc(E.recommend.rationale||(a?a.name+' is recommended.':'(not yet selected)'))+'</p>'+
  '<h2>2. Objective</h2><p>'+esc(E.objective||'—')+'</p>'+
  '<h2>3. Ground rules and assumptions</h2>'+tb(['Item','Value'],[['Base fiscal year','FY'+E.base_fy],['Period of analysis',N+' years (lead time '+E.lead+', economic life '+E.life+')'],['Dollars',E.dollars==='nominal'?'Then-year':'Constant FY'+E.base_fy],['Discount rate',rate().toFixed(2)+'% '+(E.rate_override!==''?'(override)':'('+APPC.edition+', interpolated)')],['Convention',{mixed:'Mid-year for recurring, end-of-year for one-time',mid:'Mid-year',end:'End-of-year'}[E.convention]]])+(E.assumptions?'<p>'+esc(E.assumptions).replace(/\n/g,'<br>')+'</p>':'')+
@@ -725,7 +787,7 @@ function memoHTML(){const R=results();const S=sensitivity();const p=E.project;co
  '<h2>7. Non-cost factors</h2>'+tb(['Factor','Weight'].concat(E.alts.map(x=>x.name)),E.criteria.map(c=>[c.name,c.weight].concat(E.alts.map(x=>x.scores[c.id]??'—'))))+E.alts.filter(x=>x.why).map(x=>'<p><b>'+esc(x.name)+':</b> '+esc(x.why)+'</p>').join('')+
  (S?'<h2>8. Sensitivity</h2>'+(S.be!=null?'<p>Break-even: '+esc(S.R.lead.a.name)+' remains lowest-cost until its investment costs rise '+S.be.toFixed(1)+'%.</p>':'')+tb(['Case','Lowest-cost alternative'].concat(R.ok.map(r=>r.a.name)),S.rows.map(x=>[x.lbl,x.leader+(x.changes?' (changes)':'')].concat(R.ok.map(r=>$k(x.npvs[r.a.id]))))):'')+
  '<h2>9. Decision</h2>'+tb(['Decision authority','Decision','Date'],[[E.recommend.authority||'',({approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'})[E.recommend.decision]||'Pending',E.recommend.date||'']])+
- '<div class="cui" style="margin-top:14pt">CONTROLLED UNCLASSIFIED INFORMATION WHEN FILLED IN</div></body></html>';}
+ '</body></html>';}
 
 $('#bSave').onclick=()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();};
 $('#bNew').onclick=()=>{if(!confirm('Start a new analysis? Save a file of the current one first if you need it.')) return;E=BLANK();log('Analysis created');save();STEP='basis';render();};
