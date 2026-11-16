@@ -260,7 +260,7 @@ const BLANK=()=>({schema:'earl-1',id:uid(),created:new Date().toISOString(),
  project:{name:'',installation:'',service:''},objective:'',assumptions:'',base_fy:new Date().getFullYear()+1,lead:3,life:25,dollars:'real',rate_override:'',convention:'mixed',
  alts:[{id:uid(),name:'Status quo',type:'status_quo',desc:'Continue in the existing facilities with no new investment.',screen:'',screen_reason:'',costs:[],residual:{on:false,life:40},scores:{}}],
  reqs:[],cells:{},criteria:DEF_CRIT.map(([n,w])=>({id:uid(),name:n,weight:w})),recommend:{alt:'',rationale:''},log:[]});
-let E=load()||BLANK();let STEP='basis';
+let E=load()||BLANK();let STEP=(E.alts.length<=1&&!E.build)?'build':'basis';
 function load(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('earl_project',JSON.stringify(E));
@@ -293,13 +293,13 @@ function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);return {a,
  const ok=rows.filter(r=>r.ok).sort((x,y)=>x.npv-y.npv);ok.forEach((r,i)=>r.rank=i+1);return {rows,ok,lead:ok[0],second:ok[1]};}
 
 // ---------- steps ----------
-const STEPS=[['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
+const STEPS=[['build','Build my AoA',()=>E.build&&E.build.applied?'✓':''],['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
 function renderSteps(){const nav=$('#steps');
  if(!nav.dataset.built){nav.innerHTML=STEPS.map((s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>').join('')+'<div class="gate"></div>';
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
  STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
  const R=results();nav.querySelector('.gate').innerHTML='<b>Gate 2:</b> preferred alternative approved.<br>'+(R.lead?'Lowest life-cycle cost: <b>'+esc(R.lead.a.name)+'</b> '+$k(R.lead.npv):'No feasible alternative costed yet.');}
-function render(){renderSteps();({basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
+function render(){renderSteps();({build:vBuild,basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
 function bindAll(root,obj,after){root.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(el.type==='checkbox') el.checked=!!obj[k];else el.value=obj[k]??'';el.oninput=el.onchange=()=>{obj[k]=el.type==='checkbox'?el.checked:el.type==='number'?(el.value===''?'':Number(el.value)):el.value;save();if(after) after(k,el);};});}
 const opts=(o,sel,blank)=>(blank!==undefined?'<option value="">'+blank+'</option>':'')+Object.entries(o).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===sel?'selected':'')+'>'+esc(Array.isArray(v)?v[0]:v)+'</option>').join('');
 
@@ -497,6 +497,119 @@ async function aiRationale(){if(!aiReady()) return;const R=results();const rec=E
   log('Rationale written with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();vRec();}
  catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Write rationale with AI';}}
 
+// ---------- Build my AoA: EARL does the heavy lifting, you review and decide ----------
+const BTYPES=Object.keys(ATYPES).filter(k=>k!=='status_quo');
+function bNotes(n){return (n&&n.sessions||[]).map(s=>'['+(s.title||s.type||'Session')+(s.date?' '+s.date:'')+']\n'+(s.notes||'')).join('\n\n').slice(0,40000);}
+function bSources(n){const L=earlSources();if(E.project.installation) L.push('INSTALLATION: '+E.project.installation);
+ if(n){(n.gaps||[]).forEach(g=>L.push('CAPABILITY GAP: '+[g.area,'current: '+(g.current||''),'required: '+(g.required||''),(g.qty_have||g.qty_need)?('have '+(g.qty_have||0)+' / need '+(g.qty_need||0)+' '+(g.unit||'')):'',g.impact?('impact: '+g.impact):''].filter(Boolean).join('; ')));
+  (n.assumptions||[]).forEach(a=>L.push('ASSUMPTION: '+(a.text||a)));(n.risks||[]).forEach(r=>L.push('RISK: '+(r.text||'')));
+  const p=n.project||{};if(p.driver||p.mission) L.push('DRIVER AND MISSION: '+[p.mission,p.driver,p.driver_detail].filter(Boolean).join('; '));}
+ return L.join('\n');}
+function gucCatalog(){return PD_.guc.map((g,i)=>g.usd?i+': '+g.n+' ('+(g.per==='VF'?'per unit':'SF')+')':null).filter(Boolean).join('\n');}
+const COA_SYS=`You are a DoD military construction planner preparing the alternatives for an economic analysis under DoDI 7041.03. Propose every reasonable course of action (COA) that could meet the requirement, including ones likely to be rejected, so a reviewer sees they were considered. Always consider: new construction, addition, renovate or modernize, convert another existing facility, lease, joint use or another installation, host-nation (overseas only), and approaches such as phasing or consolidation where the sources make them plausible. Do NOT include the status quo; it is added separately.
+For each COA give: a short name; type (one of: ${BTYPES.join(', ')}); a one-to-two sentence neutral description; basis: "notes" if the sources name or clearly imply this option (then quote the exact words from SOURCES in "quote"), "standard" if it comes from the standard list, or "idea" if it is your own suggestion; the facility type as the number from FACILITY TYPES that best fits ("guc", or null); the size in "qty" with "unit" (use the gap quantities in SOURCES; never invent a number: use null when SOURCES give none); for renovate or convert, "share" = percent of the existing building renewed if SOURCES say, else null; and "plausible": true or false with a one-line "reason".
+Then list "questions": only facts a person must supply to price or judge a COA (e.g. which existing building, its size, whether a lease market exists). At most five.
+Use ONLY facts in SOURCES. Return ONLY JSON: {"coas":[{"name":"","type":"","desc":"","basis":"","quote":"","guc":0,"qty":0,"unit":"","share":null,"plausible":true,"reason":""}],"questions":[{"q":"","why":""}]}`;
+const MERGE_SYS=`You are the arbiter for two planners who each proposed courses of action for a DoD military construction economic analysis. Merge their lists into one: combine duplicates (same type and substance) into one entry, keep every distinct COA from either list, prefer the entry with a verified quote and a stated size, and record in "from" which planner(s) proposed it ("A", "B" or "A,B"). Keep the same fields. Merge the questions, dropping duplicates, at most five. Use ONLY what the two lists contain. Return ONLY JSON: {"coas":[{"name":"","type":"","desc":"","basis":"","quote":"","guc":0,"qty":0,"unit":"","share":null,"plausible":true,"reason":"","from":"A,B"}],"questions":[{"q":"","why":""}]}`;
+const JUDGE_SYS=`You assess courses of action for a DoD military construction economic analysis. For each COA and each MUST-HAVE requirement, say whether the COA meets it: "pass", "partial" or "fail", with a one-line reason drawn from SOURCES; "fail" only when the COA clearly cannot meet it. Then score each COA from 1 (poor) to 5 (excellent) on each non-cost factor, with a one-line reason. Be even-handed; do not consider cost. Use ONLY facts in SOURCES and the COA descriptions; where SOURCES say nothing, score 3 and say so.
+Return ONLY JSON: {"cells":[{"coa":"<coa id>","req":"<requirement id>","v":"pass|partial|fail","why":""}],"scores":[{"coa":"<coa id>","crit":"<factor id>","s":3,"why":""}]}`;
+const norm=t=>String(t||'').toLowerCase().replace(/[\u2018\u2019]/g,"'").replace(/[\u201c\u201d]/g,'"').replace(/\s+/g,' ').trim();
+async function buildAoA(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) so EARL can use AI, then reload this page.');return;}
+ const n=noraData();if(n&&!E.objective) importNora();
+ if(!E.objective&&!n){alert('EARL needs either a NORA project in this browser or an objective on step 1.');return;}
+ if(!E.price) E.price={};if(!E.price.loc){const g=guessLoc_();if(g) E.price.loc=locObj_(g);}
+ const st=t=>{const el=$('#bStat');if(el) el.textContent=t;};const btn=$('#bBuild');if(btn) btn.disabled=true;
+ try{const src=bSources(n),notes=bNotes(n);const U='SOURCES:\n'+src+(notes?'\n\nELICITATION NOTES:\n'+notes:'')+'\n\nFACILITY TYPES (number: name):\n'+gucCatalog();
+  st('Two AI planners are proposing courses of action…');
+  const [A,B]=await Promise.all([CARLAI.ask('claude',COA_SYS,U).catch(e=>({err:e.message})),CARLAI.ask('gemini',COA_SYS,U).catch(e=>({err:e.message}))]);
+  const ok=[A,B].filter(x=>x&&!x.err&&Array.isArray(x.coas));if(!ok.length) throw new Error((A&&A.err)||(B&&B.err)||'No proposals returned');
+  st('The arbiter is merging the two lists…');
+  let M=ok.length===2?await CARLAI.ask('claude',MERGE_SYS,'PLANNER A:\n'+JSON.stringify(A)+'\n\nPLANNER B:\n'+JSON.stringify(B)):{coas:ok[0].coas.map(c=>({...c,from:ok[0]===A?'A':'B'})),questions:ok[0].questions||[]};
+  const hay=norm(src+' '+notes);
+  const coas=(M.coas||[]).filter(c=>BTYPES.includes(c.type)).map((c,i)=>{const q=String(c.quote||'').trim();const qv=q&&hay.includes(norm(q));
+   const gi=Number.isInteger(c.guc)&&PD_.guc[c.guc]&&PD_.guc[c.guc].usd?c.guc:null;
+   return {id:'c'+(i+1),keep:c.plausible!==false,name:String(c.name||ATYPES[c.type]).slice(0,80),type:c.type,desc:String(c.desc||''),basis:c.basis==='notes'&&qv?'notes':c.basis==='standard'?'standard':'idea',quote:q,quoteOk:qv,guc:gi,qty:Number(c.qty)||'',unit:c.unit||'',share:Number(c.share)||'',reason:String(c.reason||''),from:c.from||'',plausible:c.plausible!==false};});
+  if(!coas.length) throw new Error('The planners returned no usable courses of action');
+  st('Screening each course of action and scoring the non-cost factors…');
+  const reqs=E.reqs.filter(q=>q.must);const J=await CARLAI.ask('claude',JUDGE_SYS,'SOURCES:\n'+src+'\n\nCOURSES OF ACTION:\n'+coas.concat([{id:'sq',name:'Status quo',type:'status_quo',desc:(E.alts.find(a=>a.type==='status_quo')||{}).desc||'Continue in the existing facilities.'}]).map(c=>c.id+': '+c.name+' ('+ATYPES[c.type]+') – '+c.desc).join('\n')+'\n\nMUST-HAVE REQUIREMENTS:\n'+(reqs.map(q=>q.id+': '+q.text).join('\n')||'(none recorded)')+'\n\nNON-COST FACTORS:\n'+E.criteria.map(c=>c.id+': '+c.name).join('\n')).catch(e=>({err:e.message}));
+  E.build={at:new Date().toISOString(),coas,questions:(M.questions||[]).slice(0,5).map((q,i)=>({id:'q'+(i+1),q:String(q.q||''),why:String(q.why||''),a:''})),judge:J&&!J.err?J:{cells:[],scores:[]},judgeErr:J&&J.err||'',applied:false};
+  log('Build my AoA: proposals ready',coas.length+' courses of action, '+E.build.questions.length+' questions');save();st('');vBuild();}
+ catch(err){st('');alert('Build failed: '+err.message);if(btn) btn.disabled=false;}}
+function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>c.keep);
+ const others=E.alts.filter(a=>a.type!=='status_quo'&&!a.fromBuild);
+ if(others.length&&!confirm('You already have '+others.length+' alternative(s) you entered yourself. Keep them alongside the built ones?')) E.alts=E.alts.filter(a=>a.type==='status_quo'||a.fromBuild);
+ E.alts=E.alts.filter(a=>!a.fromBuild);let sq=E.alts.find(a=>a.type==='status_quo');
+ if(!sq){sq={id:uid(),name:'Status quo',type:'status_quo',desc:'Continue in the existing facilities with no new investment.',screen:'',screen_reason:'',costs:[],residual:{on:false,life:40},scores:{}};E.alts.unshift(sq);}
+ const map={sq:sq.id};
+ kept.forEach(c=>{const a={id:uid(),fromBuild:true,origin:c.basis,origin_quote:c.quoteOk?c.quote:'',name:c.name,type:c.type,desc:c.desc,screen:'',screen_reason:'',costs:[],residual:{on:['new','addition','renovate','convert'].includes(c.type),life:40},scores:{}};
+  const mode=PMODE[c.type]||'none';const g=c.guc!=null?PD_.guc[c.guc]:null;
+  if(mode==='build'&&g) a.price={guc:String(c.guc),qty:String(c.qty||''),dc:'low',fac:g.fac!=null?String(g.fac):''};
+  if(mode==='renew'&&g) a.price={fac:g.fac!=null?String(g.fac):'',qty:String(c.qty||''),share:String(c.share||'')};
+  E.alts.push(a);map[c.id]=a.id;});
+ // status quo upkeep: the existing quantity from NORA's gaps, on the primary facility's FAC
+ const n=noraData();const have=n&&(n.gaps||[]).map(g=>Number(g.qty_have)).find(x=>x>0);const prim=kept.find(c=>PMODE[c.type]==='build'&&c.guc!=null);
+ if(have&&prim&&PD_.guc[prim.guc].fac!=null&&!sq.price) sq.price={fac:String(PD_.guc[prim.guc].fac),qty:String(have)};
+ // AI screening and scores, marked as proposed
+ (B.judge.cells||[]).forEach(x=>{const a=map[x.coa],q=E.reqs.find(r=>r.id===x.req);if(a&&q&&['pass','partial','fail'].includes(x.v)){E.cells[a+'|'+q.id]=x.v;(E.cellWhy=E.cellWhy||{})[a+'|'+q.id]=x.why||'';}});
+ (B.judge.scores||[]).forEach(x=>{const a=E.alts.find(z=>z.id===map[x.coa]);const s=Math.max(1,Math.min(5,Math.round(Number(x.s)||0)));if(a&&s&&E.criteria.some(c=>c.id===x.crit)){a.scores[x.crit]=s;(a.scoreWhy=a.scoreWhy||{})[x.crit]=x.why||'';}});
+ E.alts.forEach(a=>{const w=Object.entries(a.scoreWhy||{}).map(([k,v])=>{const c=E.criteria.find(z=>z.id===k);return c&&v?c.name+': '+v:'';}).filter(Boolean);if(w.length) a.why=w.join(' ');});
+ // answers become recorded assumptions
+ const qa=B.questions.filter(q=>q.a.trim());if(qa.length) E.assumptions=(E.assumptions?E.assumptions+'\n':'')+qa.map(q=>q.q+' – '+q.a.trim()).join('\n');
+ // price everything EARL can price
+ let priced=0;E.alts.forEach(a=>{if(!a.price) return;const r=priceCalc(a);if(r.lines.length){a.costs=a.costs.filter(c=>!c.auto).concat(r.lines.map(l=>({id:uid(),auto:true,...l})));priced++;}});
+ const R=results();if(R.lead&&!E.recommend.alt) E.recommend.alt=R.lead.a.id;
+ B.applied=true;B.priced=priced;log('Build my AoA: applied',kept.length+' courses of action, '+priced+' priced from the DoD tables');save();STEP='res';render();window.scrollTo(0,0);}
+function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const signed=window.CARLAI&&CARLAI.state().ok;
+ const badge=c=>c.basis==='notes'?'<span class="pill ok">From your notes</span>':c.basis==='standard'?'<span class="pill">Standard alternative</span>':'<span class="pill warn">AI suggestion</span>';
+ const reqs=E.reqs.filter(q=>q.must);
+ v.innerHTML='<div class="panel"><h2>Build my AoA</h2><p class="lead">EARL reads NORA\u2019s requirements, gaps and notes, has two AI planners (Claude and Gemini) propose every reasonable course of action on their own, merges them, screens each against the must-have requirements, scores the non-cost factors and prices what the DoD tables cover. You review, answer what only you know, and EARL writes the analysis of alternatives.</p>'+
+  '<div class="mentor">'+(n?'NORA: <b>'+esc(n.project.name||'(untitled)')+'</b> \u2013 '+(n.requirements||[]).filter(r=>r.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gap'+((n.gaps||[]).length===1?'':'s')+', '+(n.sessions||[]).length+' session'+((n.sessions||[]).length===1?'':'s')+'.':'No NORA project in this browser; EARL will work from the objective on step 1.')+' Location: '+(E.price&&E.price.loc?esc(E.price.loc.label):(guessLoc_()?esc(siteLabel_(guessLoc_())):'<b>not found</b> \u2013 set it on step 3'))+'. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use this.</b>')+'</div>'+
+  '<div class="row"><button class="go" id="bBuild" '+(signed?'':'disabled')+'>'+(B?'Build again':'Build my AoA')+'</button><span class="small" id="bStat"></span></div></div>'+
+  (B?'<div class="panel"><h2>Review the courses of action</h2><p class="lead">Keep or drop each one, fix the facility type or size where EARL guessed, then apply. Labels show where each came from: your own notes (with the words it rests on), the standard DoD list, or an AI suggestion to consider.</p>'+
+   (B.judgeErr?'<div class="find warn"><b>Screening and scoring did not run:</b> '+esc(B.judgeErr)+'. You can still apply and screen by hand.</div>':'')+
+   B.coas.map((c,i)=>{const g=c.guc!=null?PD_.guc[c.guc]:null;const fails=(B.judge.cells||[]).filter(x=>x.coa===c.id&&x.v==='fail');const mode=PMODE[c.type]||'none';
+    return '<div class="card" style="margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px"><label style="font-weight:600"><input type="checkbox" data-i="'+i+'" data-f="keep" '+(c.keep?'checked':'')+' style="width:auto"> '+esc(c.name)+'</label> '+badge(c)+' <span class="small">'+esc(ATYPES[c.type])+(c.from?' \u00b7 proposed by '+(c.from.includes(',')?'both planners':'one planner'):'')+'</span>'+
+     '<p style="margin:6px 0">'+esc(c.desc)+'</p>'+(c.quote?'<p class="small">'+(c.quoteOk?'Rests on: ':'Quote not found in your notes, so treated as a suggestion: ')+'<q>'+esc(c.quote)+'</q></p>':'')+(c.reason?'<p class="small">'+esc(c.reason)+'</p>':'')+
+     (mode==='build'||mode==='renew'?'<div class="form" style="margin-top:6px"><div class="wide"><label class="f">'+(mode==='build'?'Facility type to price':'Facility type of the existing building')+'</label><select data-i="'+i+'" data-f="guc"><option value="">Not priced</option>'+PD_.guc.map((x,k)=>x.usd?'<option value="'+k+'" '+(c.guc===k?'selected':'')+'>'+esc(x.c+' \u2013 '+x.n)+'</option>':'').join('')+'</select></div><div><label class="f">Size'+(c.unit?' ('+esc(c.unit)+')':'')+'</label><input type="number" data-i="'+i+'" data-f="qty" value="'+esc(c.qty)+'"></div>'+(mode==='renew'?'<div><label class="f">Share renewed (%)</label><input type="number" data-i="'+i+'" data-f="share" value="'+esc(c.share)+'"></div>':'')+'</div>':'<p class="small">No published unit costs for this type. Enter its costs on step 3 after applying.</p>')+
+     (fails.length?'<div class="find warn" style="margin-top:6px"><b>Proposed screen-out:</b> '+fails.map(x=>esc((reqs.find(q=>q.id===x.req)||{}).text||'requirement')+(x.why?' \u2013 '+esc(x.why):'')).join('; ')+'</div>':'')+'</div>';}).join('')+
+   (B.questions.length?'<h3>Only you can answer these</h3>'+B.questions.map((q,i)=>'<div style="margin:8px 0"><label class="f">'+esc(q.q)+(q.why?' <span class="small">('+esc(q.why)+')</span>':'')+'</label><input data-q="'+i+'" value="'+esc(q.a)+'" placeholder="Leave blank if unknown"></div>').join(''):'')+
+   '<div class="row"><button class="go" id="bApply">Apply: price, screen, score and rank</button><span class="small">Screening and scores are AI proposals; you can change any of them on steps 3 and 5.</span></div></div>':'');
+ const b=$('#bBuild');if(b) b.onclick=buildAoA;
+ v.querySelectorAll('[data-f]').forEach(el=>{const c=B.coas[Number(el.dataset.i)],f=el.dataset.f;el.onchange=el.oninput=()=>{c[f]=f==='keep'?el.checked:f==='guc'?(el.value===''?null:Number(el.value)):el.value;save();};});
+ v.querySelectorAll('[data-q]').forEach(el=>el.oninput=()=>{B.questions[Number(el.dataset.q)].a=el.value;save();});
+ const ap=$('#bApply');if(ap) ap.onclick=applyBuild;}
+
+// ---------- Analysis of Alternatives document ----------
+function aoaHTML(){const R=results();const S=sensitivity();const p=E.project;const N=period();const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const n=noraData();
+ const tb=(h,rows,cls)=>'<table'+(cls?' class="'+cls+'"':'')+'><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
+ const orig=a=>a.type==='status_quo'?'Required baseline':a.origin==='notes'?'From the requirement record':a.origin==='standard'?'Standard alternative':a.origin==='idea'?'Suggested during analysis':'Entered by the analyst';
+ const rr=rec&&R.rows.find(x=>x.a===rec);const other=rec&&R.ok.find(x=>x.a!==rec);
+ const exec=rec?esc(rec.name)+' is recommended. Its net present value of cost is '+$$(rr.npv)+' over '+N+' years at '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+(other?', '+(rr.npv<=other.npv?$$(other.npv-rr.npv)+' less than':$$(rr.npv-other.npv)+' more than')+' the next feasible alternative, '+esc(other.a.name):'')+'. '+R.ok.length+' of '+E.alts.length+' alternatives were carried through the full analysis.':'No alternative has been recommended yet.';
+ const reqs=E.reqs.filter(q=>q.must&&!String(q.src||'').startsWith('C:')),cons=E.reqs.filter(q=>String(q.src||'').startsWith('C:'));
+ const cats=k=>(CATS[k]||[k])[0];
+ return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>Analysis of Alternatives</title><style>'+
+ 'body{font:10.5pt Lora,Georgia,serif;color:#1A1410;max-width:7.5in;margin:0 auto;padding:.4in;line-height:1.35}h1{font:600 24pt "Bodoni Moda","Bodoni 72",Georgia,serif;color:#1B2F4E;margin:0 0 2pt}h2{font:600 14pt "Bodoni Moda","Bodoni 72",Georgia,serif;color:#1B2F4E;margin:16pt 0 5pt;border-bottom:1px solid #C9B998;padding-bottom:2pt}h3{font:600 11.5pt Lora,Georgia,serif;color:#1B2F4E;margin:10pt 0 3pt}'+
+ 'table{border-collapse:collapse;width:100%;font-size:9pt;margin:4pt 0 8pt}th{text-align:left;color:#1B2F4E;border-bottom:1.5pt solid #1B2F4E;padding:3pt 5pt;font-size:8pt;text-transform:uppercase;letter-spacing:.5pt}td{border-bottom:.5pt solid #C9B998;padding:3pt 5pt;vertical-align:top}.m{color:#5C4A33;font-style:italic}.ex{border-left:3pt solid #1B2F4E;padding:4pt 10pt;margin:8pt 0}.q{color:#5C4A33;font-style:italic}</style></head><body>'+
+ '<h1>Analysis of Alternatives</h1><div class="m">'+esc(p.name||'(untitled)')+(p.installation?' · '+esc(p.installation):'')+(p.service?' · '+esc(p.service):'')+'<br>Prepared '+today()+(E.recommend.by?' by '+esc(E.recommend.by):'')+' in accordance with DoDI 7041.03. The decision rests with '+esc(E.recommend.authority||'the decision authority')+'.</div>'+
+ '<h2>Executive summary</h2><div class="ex">'+exec+'</div>'+(E.recommend.rationale?E.recommend.rationale.split(/\n\s*\n/).map(x=>'<p>'+esc(x)+'</p>').join(''):'')+
+ '<h2>1. Requirement</h2><p>'+esc(E.objective||'—')+'</p>'+(reqs.length?tb(['ID','Must-have requirement'],reqs.map(q=>[q.src&&q.src!=='manual'?q.src:'',q.text])):'')+
+ '<h2>2. Assumptions and constraints</h2>'+tb(['Ground rule','Value'],[['Base fiscal year','FY'+E.base_fy],['Period of analysis',N+' years (lead time '+E.lead+', economic life '+E.life+')'],['Dollars',E.dollars==='nominal'?'Then-year':'Constant FY'+E.base_fy],['Discount rate',rate().toFixed(2)+'% ('+(E.rate_override!==''?'override':APPC.edition+', interpolated')+')'],['Location',E.price&&E.price.loc?E.price.loc.label+'; area cost factor '+E.price.loc.acf:'—']])+
+ (E.assumptions?'<p>'+esc(E.assumptions).replace(/\n/g,'<br>')+'</p>':'')+(cons.length?'<h3>Constraints</h3><ul>'+cons.map(c=>'<li>'+esc(c.text.replace(/^Constraint: /,''))+'</li>').join('')+'</ul>':'')+
+ '<h2>3. Alternatives identified</h2>'+tb(['Alternative','Type','Origin','Disposition'],E.alts.map(a=>[a.name,ATYPES[a.type],orig(a),feasible(a)?'Carried forward':'Screened out: '+failReasons(a).join('; ')]))+
+ '<h2>4. Description of each alternative</h2>'+E.alts.map(a=>'<h3>'+esc(a.name)+'</h3><p>'+esc(a.desc||'—')+'</p>'+(a.origin_quote?'<p class="q">From the requirement record: “'+esc(a.origin_quote)+'”</p>':'')).join('')+
+ '<h2>5. Life-cycle cost</h2>'+tb(['Rank','Alternative','NPV of cost','Undiscounted','Residual credit'],R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>[r.rank||'—',r.a.name,r.ok?$$(r.npv):'Screened out',$$(r.und),$$(r.rv)]))+
+ '<p class="m">Unit costs, area cost factors and sustainment costs from UFS 3-701-01 (July 2026 tables) and UFS 3-730-01; SIOH per OASD(EI&amp;E), 14 Apr 2022; discounting per OMB Circular A-94 Appendix C ('+esc(APPC.edition)+'). Each cost basis is listed in Appendix A.</p>'+
+ '<h2>6. Non-cost factors</h2>'+tb(['Factor','Weight'].concat(E.alts.map(x=>x.name)),E.criteria.map(c=>[c.name,c.weight].concat(E.alts.map(x=>x.scores[c.id]??'—'))).concat([['Weighted score',''].concat(E.alts.map(x=>wscore(x).toFixed(2)))]))+
+ E.alts.filter(x=>x.why).map(x=>'<p><b>'+esc(x.name)+':</b> '+esc(x.why)+'</p>').join('')+
+ (n&&(n.risks||[]).length?'<h2>7. Risks</h2>'+tb(['Risk','Likelihood','Impact','Response'],n.risks.map(r=>[r.text||'',r.l||'',r.i||'',r.response||''])):'<h2>7. Risks</h2><p>No risks recorded in the requirement record.</p>')+
+ '<h2>8. Sensitivity</h2>'+(S?(S.be!=null?'<p>Break-even: '+esc(S.R.lead.a.name)+' remains lowest-cost until its investment costs rise '+S.be.toFixed(1)+'%.</p>':'')+tb(['Case','Lowest-cost alternative'].concat(R.ok.map(r=>r.a.name)),S.rows.map(x=>[x.lbl,x.leader+(x.changes?' (ranking changes)':'')].concat(R.ok.map(r=>$k(x.npvs[r.a.id]))))):'<p>Needs at least two feasible alternatives with costs.</p>')+
+ '<h2>9. Comparison</h2>'+tb(['Measure'].concat(E.alts.map(x=>x.name)),[['Meets must-have requirements'].concat(E.alts.map(a=>feasible(a)?'Yes':'No')),['NPV of cost'].concat(E.alts.map(a=>{const r=R.rows.find(z=>z.a===a);return r.ok?$k(r.npv):'—';})),['Rank'].concat(E.alts.map(a=>{const r=R.rows.find(z=>z.a===a);return r.rank||'—';})),['Non-cost score (of 5)'].concat(E.alts.map(a=>wscore(a).toFixed(2)))])+
+ '<h2>10. Recommendation and decision</h2><p>'+(rec?esc(rec.name)+' is recommended.':'Pending.')+'</p>'+tb(['Decision authority','Decision','Date'],[[E.recommend.authority||'',({approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'})[E.recommend.decision]||'Pending',E.recommend.date||'']])+
+ '<h2>Appendix A – Cost basis</h2>'+E.alts.map(a=>'<h3>'+esc(a.name)+'</h3>'+(a.costs.length?tb(['Category','Amount','Years','Basis'],a.costs.map(c=>[cats(c.cat),$$(Number(c.amount)||0),c.end?c.start+'–'+c.end:(CATS[c.cat]&&CATS[c.cat][1]?c.start+' on':String(c.start)),c.label||''])):'<p>No costs entered.</p>')).join('')+
+ (E.reqs.some(q=>q.must)?'<h2>Appendix B – Screening detail</h2>'+tb(['Requirement'].concat(E.alts.map(x=>x.name)),E.reqs.filter(q=>q.must).map(q=>[q.text].concat(E.alts.map(x=>{const v=E.cells[x.id+'|'+q.id];const w=(E.cellWhy||{})[x.id+'|'+q.id];return (({pass:'Meets',partial:'Partly',fail:'Fails'})[v]||'—')+(w?' – '+w:'');})))):'')+
+ '<h2>Appendix C – Sources</h2><ul><li>DoD Instruction 7041.03, Economic Analysis for Decision-making</li><li>OMB Circular A-94, Appendix C ('+esc(APPC.edition)+')</li><li>UFS 3-701-01, DoD Facilities Pricing Guide, data tables July 2026</li><li>UFS 3-730-01, Programming Cost Estimates for Military Construction</li><li>OASD(EI&amp;E) memorandum on SIOH rates, 14 April 2022</li>'+(n?'<li>Requirement record (NORA): '+esc(n.project.name||'')+'</li>':'')+'</ul>'+
+ '</body></html>';}
+
 // ---------- 4 non-cost ----------
 function vBens(){const v=$('#view');const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0);
  v.innerHTML='<div class="panel"><h2>Non-cost factors</h2><p class="lead">Benefits that are hard to price still decide many projects. Weight what matters, score each alternative 1 (poor) to 5 (excellent), and write down why. DoDI 7041.03 bases the decision on both the numbers and these factors.</p>'+
@@ -550,6 +663,7 @@ function vRec(){const v=$('#view');const R=results();
  '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button><button id="bAIr">Write rationale with AI</button></div>'+(E.recommend.ai_check?'<div class="mentor">'+esc(E.recommend.ai_check)+'</div>':'')+
  '<h3>Decision</h3><div class="form"><div><label class="f">Decision</label><select id="dd">'+opts({'':'Pending',approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'},E.recommend.decision||'')+'</select></div><div><label class="f">Date</label><input type="date" id="ddt"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">The memo supports the decision and the DD 1391; the tables and file are the record. The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p><div class="outs">'+
+ out('aoa','Analysis of Alternatives (AoA)','The full AoA: executive summary, requirement, assumptions and constraints, every alternative and its origin, life-cycle cost, non-cost factors, risks, sensitivity, comparison, recommendation and appendices with the cost basis, screening detail and sources. Opens in Word.','Download AoA')+
  out('memo','Economic analysis and recommendation memo','Objective, assumptions, alternatives, screening, costs, sensitivity, non-cost factors and recommendation. Opens in Word.','Download .doc')+
  out('print','Print or save as PDF','The same memo, formatted for printing.','Open printable')+
  out('csv','Cost and results tables','Year-by-year cost streams, discount factors and present values for every alternative.','Download .csv')+
@@ -561,7 +675,7 @@ function vRec(){const v=$('#view');const R=results();
  dd.onchange=()=>{E.recommend.decision=dd.value;log('Decision recorded',dd.options[dd.selectedIndex].text);save();};ddt.onchange=()=>{E.recommend.date=ddt.value;save();};
  $('#bAIr').onclick=aiRationale;
  $('#bDr').onclick=()=>{if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();save();vRec();};
- v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({memo:()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(memoHTML());w.document.close();setTimeout(()=>w.print(),400);},csv:()=>dl(fname('EA-Tables','csv'),csv(tables()),'text/csv'),json:()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();}})[b.dataset.out]());
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({aoa:()=>{dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');save();},memo:()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(memoHTML());w.document.close();setTimeout(()=>w.print(),400);},csv:()=>dl(fname('EA-Tables','csv'),csv(tables()),'text/csv'),json:()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();}})[b.dataset.out]());
  $('#lg').innerHTML=E.log.length?E.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 function draftRationale(){const R=results();const S=sensitivity();const a=E.alts.find(x=>x.id===E.recommend.alt)||R.lead?.a;if(!a) return '';const r=R.rows.find(x=>x.a===a);const sq=R.rows.find(x=>x.a.type==='status_quo');
