@@ -399,7 +399,7 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  '<label class="small">From</label><input type="date" id="rf" style="width:150px"><label class="small">To</label><input type="date" id="rt2" style="width:150px"><select id="rmo" style="width:auto"><option value="">Pick a month</option>'+[...new Set(Q.records.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse().map(m=>'<option>'+m+'</option>').join('')+'</select></div>'+
  '<div class="row"><label class="small"><input type="checkbox" id="rbp" style="width:auto"> Leave out boilerplate</label><label class="small"><input type="checkbox" id="rsrc" style="width:auto"> Show report dates on each line</label>'+(R.scope!=='building'?'<button id="bAll">Download one report per building</button>':'')+'</div>'+
  '<div class="row"><button id="bSum">Write the summary with AI</button><span class="small" id="sumMsg">'+(sumGet()?(sumGet().check?'<b style="color:#9b2c2c">'+esc(sumGet().check)+'</b> ':'')+'Summary included below. Write again to refresh it.':'Two or three paragraphs for the COR or PM, from this report only, through CARL. Every number is checked against the report.')+'</span></div>'+
- '<div class="row"><button class="go" id="bDoc">Download Word</button></div><div class="preview" id="pv" style="margin-top:12px"></div></div>';
+ '<div class="row"><button class="go" id="bDoc">Download Word</button></div><div id="pv" style="margin-top:12px;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:#fff"></div></div>';
  v.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{R.scope=b.dataset.sc;R.key='';vRep();});
  if($('#rk')) $('#rk').onchange=e=>{R.key=e.target.value;pv();};
  $('#rf').value=R.from;$('#rt2').value=R.to;$('#rf').onchange=e=>{R.from=e.target.value;pv();};$('#rt2').onchange=e=>{R.to=e.target.value;pv();};
@@ -408,7 +408,7 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  $('#bDoc').onclick=()=>preDl(()=>{dl(fn('doc'),reportDoc(R.scope,R.key),'application/msword');log('Report downloaded',sumKey());save();});
  if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('QUINN_'+b+'_'+R.from+'_to_'+R.to+'.doc',reportDoc('building',b),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
  $('#bSum').onclick=writeSummary;
- pv();function pv(){$('#pv').innerHTML=report();}}
+ pv();function pv(){$('#pv').innerHTML='<iframe id="pvf" title="Report preview" style="width:100%;border:0;min-height:600px;background:#fff"></iframe>';const f=$('#pvf');f.onload=()=>{try{f.style.height=(f.contentDocument.documentElement.scrollHeight+20)+'px';}catch(e){}};f.srcdoc=reportDoc(R.scope,R.key);}}
 // ---------- AI summary of the consolidated report ----------
 function sumKey(scope=R.scope,key=R.key){return scope+'|'+key+'|'+R.from+'|'+R.to;}
 function sumGet(scope,key){return (Q.summaries||{})[sumKey(scope,key)]||null;}
