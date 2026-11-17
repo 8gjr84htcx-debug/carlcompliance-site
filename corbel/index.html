@@ -32,6 +32,7 @@
 
 
 
+
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Corbel &ndash; The Bishop Foundry</title>
@@ -557,12 +558,13 @@
     var to=String(c.to||'').toLowerCase();var ir=J('irma_project');if(ir&&to){var it=(ir.items||[]).filter(function(x){return String(x.to||'').toLowerCase()===to;});o.irma=it.length?it.filter(function(x){return x.status!=='closed';}).length+' open of '+it.length+(it.length===1?' RFI or submittal':' RFIs and submittals'):'No RFIs or submittals yet';}else o.irma=to?'No RFIs or submittals yet':'Linked once the project has a task order';
     var q=J('quinn_project');if(q&&to){var bl=(q.registry||[]).filter(function(r){return String(r.to||'').toLowerCase()===to;}).map(function(r){return r.building;});var rs=(q.records||[]).filter(function(r){return bl.indexOf(r.building)>=0;}),od=(q.issues||[]).filter(function(i){return bl.indexOf(i.building)>=0&&i.status!=='closed';});o.quinn=rs.length?rs.length+' inspection reports, '+od.length+' open deficienc'+(od.length===1?'y':'ies'):'No inspection reports yet';}else o.quinn=to?'No inspection reports yet':'Linked once the project has a task order';
     var ad=J('adam_portfolio');var ar=ad&&ad.reqs?ad.reqs.filter(function(r){return (r.links||[]).some(function(l){return l.pid===id;});}):[];o.adam=ar.length?'Serves '+ar.length+' posture requirement'+(ar.length===1?'':'s'):'Not linked to a posture requirement';
+    var hk=J('hank_portfolio');var hr=hk&&hk.items?hk.items[id]:null;o.hank=hr?(hr.dd&&hr.dd.finalDate?'Final DD Form 1354 done':hr.dates&&hr.dates.final?'Final acceptance '+hr.dates.final:hr.dates&&hr.dates.pis?'Placed in service '+hr.dates.pis:'Close-out started'):'Not in close-out yet';
     o.paula=c.priority?'Priority: '+c.priority:'Tracked in the portfolio';
     var next=!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
     return {o:o,next:next,c:c};}
    function show(){var id=sel.value,s=status(id);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
     nt.textContent=[s.c.service,s.c.fy?'FY'+s.c.fy:'',s.c.programmed?M(s.c.programmed)+' programmed':'',s.c.to?'Task order '+s.c.to:''].filter(Boolean).join('  ·  ')||'Every tool opens this project.';
-    ['adam','nora','earl','piper','sophie','irma','quinn','paula'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
+    ['adam','nora','earl','piper','sophie','irma','quinn','hank','paula'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
      d.textContent=s.o[t];d.style.fontWeight=s.next[0]===t?'700':'400';});}
    sel.onchange=function(){st=J('milcon_store')||st;st.active=sel.value;try{localStorage.setItem('milcon_store',JSON.stringify(st));}catch(e){}show();};
    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',show);else show();})();
@@ -582,7 +584,7 @@
         <li><span class="n">5</span><span class="t">Charter and design</span><span class="w">Cora</span></li>
         <li><span class="n">6</span><span class="t">Acquisition</span><span class="w">Sophie, Scott, Cora</span></li>
         <li><span class="n">7</span><span class="t">Construct</span><span class="w">Irma, Quinn, Piper</span></li>
-        <li><span class="n">8</span><span class="t">Close out</span><span class="w">Grant</span></li>
+        <li><span class="n">8</span><span class="t">Close out</span><span class="w">Hank</span></li>
       </ol>
       <p class="notice">These tools run in your browser. Use them with unclassified, publicly releasable information only. Controlled unclassified information belongs on government systems and AI services approved for it. The tools recommend; contracting officers and design agents decide.</p>
     </div>
@@ -743,6 +745,24 @@
         <p class="tool-pitch">Keeps construction quality on the record. QUINN consolidates inspection reports, tracks deficiencies to closure, manages punch lists, and tells you when a facility is ready for occupancy.</p>
         <div class="tool-buttons">
           <a href="/corbel/quinn.html" class="btn btn-primary">Open Quinn</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="tool-divider"></div>
+
+  <section class="tool-section" id="hank">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Hank</div>
+        <div class="tool-descriptor">Handover, Acceptance, and Notification Keeper</div>
+        <div class="tool-status ready">Ready to use</div>
+      </div>
+      <div class="tool-body">
+        <p class="tool-pitch">Closes the project out. HANK tracks turnover from substantial completion to final acceptance, prepares the DD Form 1354 data block by block, runs the warranty clock, works the close-out checklist with an owner and a source for every item, and files lessons learned where the next project will find them.</p>
+        <div class="tool-buttons">
+          <a href="/corbel/hank.html" class="btn btn-primary">Open Hank</a>
         </div>
       </div>
     </div>

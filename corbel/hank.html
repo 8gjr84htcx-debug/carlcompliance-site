@@ -1,0 +1,821 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="corbel-pf">/* Corbel portfolios: each portfolio keeps its own copy of every tool's data in this browser.
+   "My portfolio" uses the plain keys; any other portfolio stores its keys as pf:<id>:<key>. */
+(function(){
+ var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
+ var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
+ function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
+ function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
+ SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
+ SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
+ SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
+ var NAMES={'':'My portfolio',test:'Test portfolio'};
+ function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
+ function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
+ function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+   wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
+ window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
+  use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
+   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+  reset:function(id){return seed(id||'test');}};
+ function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
+  d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
+  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  document.body.insertBefore(d,document.body.firstChild);}
+ document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
+})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>HANK – Handover, Acceptance, and Notification Keeper</title>
+<style>
+
+
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;letter-spacing:.01em}
+header .sp{flex:1}
+header .saved{font-size:12.5px;color:var(--shoal)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+button.sm{font-size:12.5px;padding:3px 9px}
+button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
+nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
+nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
+nav.steps button.on{background:#fff;border-color:var(--line);font-weight:600}
+nav.steps button.on .n{background:var(--depth);border-color:var(--depth);color:#fff}
+nav.steps button .c{margin-left:auto;font-size:12px;color:var(--mute);font-weight:400}
+nav.steps .gate{margin-top:10px;font-size:12.5px;color:var(--mute);padding:10px 12px;border-top:1px solid var(--line)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+h2{font:600 21px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+h3{font:600 16px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:18px 0 8px;color:var(--depth)}
+.lead{color:var(--mute);margin:0 0 14px;font-size:14px;max-width:78ch}
+.mentor{font-size:13.5px;background:#f3f8f7;border-left:3px solid var(--shoal);padding:9px 12px;border-radius:4px;margin:0 0 14px;max-width:90ch}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px}
+.form .wide{grid-column:1/-1}
+label.f{font-size:12.5px;color:var(--mute);display:block;margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+textarea.tall{min-height:200px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap}
+td input,td select,td textarea{font-size:13px;padding:4px 6px}
+td textarea{min-height:44px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}
+.pill.ok{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.warn{background:var(--warnbg);border-color:#ecd59a;color:var(--warn)}
+.pill.bad{background:var(--badbg);border-color:#e6bcbc;color:var(--bad)}
+.small{font-size:12.5px;color:var(--mute)}
+.empty{color:var(--mute);padding:22px 8px;text-align:center;font-size:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.card.withdrawn{opacity:.55}
+.card .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.card .id{font:600 14px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+@media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.flags{margin-top:6px}
+q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+.check li{margin:4px 0;list-style:none}
+.check{padding-left:0}
+.check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
+.check .n::before{content:"\25CB";color:var(--warn);margin-right:8px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.quad div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:70px;font-size:13px}
+.quad b{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:3px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1000px){.cols2{grid-template-columns:1fr}}
+.qbank li{margin:5px 0;font-size:13.5px}
+.engines{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eng{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c4cfcc}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h4{margin:0 0 8px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.score{font-weight:700;padding:1px 7px;border-radius:5px}
+.s-hi{background:var(--badbg);color:var(--bad)}.s-md{background:var(--warnbg);color:var(--warn)}.s-lo{background:var(--okbg);color:var(--ok)}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.outs .card h4{margin:0 0 4px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,nav.steps{display:none}.wrap{display:block}}
+
+:root{--s1:#2a78d6;--s2:#eb6834;--good:#0ca30c;--watch:#fab219;--crit:#d03b3b;--na:#c3c2b7;--grid:#e1e0d9;--axis:#c3c2b7;--muted2:#898781;--surf:#fcfcfb;--seq250:#86b6ef;--seq350:#5598e7;--seq450:#2a78d6;--seq550:#1c5cab;--seq650:#104281}
+.wrap{grid-template-columns:200px minmax(0,1fr)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters select,.filters input{width:auto;font-size:13px;padding:5px 8px}
+.filters .small{margin-left:auto}
+.grid{display:grid;gap:14px}
+.g-kpi{grid-template-columns:1.3fr repeat(5,1fr)}
+.g-2{grid-template-columns:1.6fr 1fr}.g-11{grid-template-columns:1fr 1fr}
+@media(max-width:1200px){.g-kpi{grid-template-columns:repeat(3,1fr)}.g-2,.g-11{grid-template-columns:1fr}}
+.tile{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.tile .lab{font-size:12.5px;color:var(--mute)}
+.tile .val{font:600 26px/1.15 system-ui,"Segoe UI",sans-serif;color:var(--ink);margin-top:4px}
+.tile .sub{font-size:12px;color:var(--mute);margin-top:3px}
+.hero .val{font-size:44px}
+.card2{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.card2 h3{margin:0 0 2px;font:600 15px system-ui,"Segoe UI",sans-serif;color:var(--ink)}
+.card2 .cap{font-size:12.5px;color:var(--mute);margin:0 0 8px}
+.card2 svg{display:block;width:100%;height:auto;overflow:visible}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mute);margin-top:6px}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.leg i.ln{height:2px;width:14px;border-radius:1px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:10px;padding:1px 8px;white-space:nowrap}
+.chip.g{background:#e3f4e3;color:#006300}.chip.w{background:#fff3d6;color:#7a5600}.chip.c{background:#fbe3e3;color:#9b2c2c}.chip.n{background:#eeedea;color:#52514e}
+.att{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.att .it{border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;background:#fff}
+.att .it:hover{border-color:var(--shoal)}
+.att .it b{font-size:13.5px}.att .it .r{font-size:12px;color:var(--mute);margin-top:3px}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px rgba(16,48,63,.15);padding:7px 10px;font-size:12.5px;display:none;max-width:320px}
+#tip .tv{font-weight:700;color:#0b0b0b}#tip .tl{color:#52514e}
+.ptable td,.ptable th{font-size:13px}.ptable tr.clk{cursor:pointer}.ptable tr.clk:hover td{background:#f3f8f7}
+.ptable th{cursor:pointer;user-select:none}
+.parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.parts div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font-size:12.5px}
+.meter{height:10px;border-radius:5px;background:#cde2fb;position:relative;overflow:hidden;margin-top:8px}
+.meter b{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:5px}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs2 button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
+.samp{background:#fff3d6;border:1px solid #ecd59a;color:#7a5600;border-radius:8px;padding:6px 10px;font-size:12.5px;margin-bottom:12px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}nav.steps{position:static!important;top:auto}.wrap>*{min-width:0}.panel,.card2{overflow-x:auto}header{flex-wrap:wrap}.g-kpi{grid-template-columns:1fr 1fr}.g-kpi>*:first-child{grid-column:1/-1}.filters{flex-wrap:wrap}.filters select,.filters input{flex:1 1 140px;max-width:100%;min-width:0}main,#view{min-width:0;max-width:100%;overflow-x:hidden}svg{max-width:100%;height:auto}}
+@media print{.filters,nav.steps,header,.noprint{display:none!important}.wrap{display:block}}
+
+.tl{width:100%;height:auto;display:block;overflow:visible}
+.req{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px 14px;margin:10px 0}
+.req h4{margin:0 0 2px;font:600 15px system-ui,"Segoe UI",sans-serif}
+.req .meta{font-size:12.5px;color:var(--mute)}
+.lk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;padding:4px 0;border-top:1px dashed var(--line)}
+.lk:first-of-type{border-top:none}
+.sug{background:#f3f8f7;border:1px dashed var(--shoal);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/corbel/">Corbel</a>
+ <h1>HANK <span style="font-weight:400;font-size:15px;opacity:.75">Handover, Acceptance, and Notification Keeper</span></h1>
+ <div class="sp"></div>
+ <span class="saved" id="saved"></span>
+ <button id="bOpen">Open…</button><input type="file" id="fOpen" accept=".json" hidden>
+ <button id="bSave">Save file</button>
+</header>
+<div class="wrap">
+ <nav class="steps" id="steps" aria-label="HANK views"></nav>
+ <main id="view"></main>
+</div>
+<script>
+'use strict';
+const INST={'andersen':[13.58,144.93,'Guam'],'naval base guam':[13.44,144.65,'Guam'],'camp blaz':[13.58,144.84,'Guam'],'guam':[13.45,144.78,'Guam'],'tinian':[15.0,145.63,'CNMI'],'saipan':[15.19,145.75,'CNMI'],'kadena':[26.35,127.77,'Japan'],'camp hansen':[26.46,127.92,'Japan'],'camp schwab':[26.52,128.04,'Japan'],'camp foster':[26.3,127.77,'Japan'],'futenma':[26.27,127.75,'Japan'],'yokota':[35.75,139.35,'Japan'],'misawa':[40.7,141.37,'Japan'],'iwakuni':[34.14,132.24,'Japan'],'yokosuka':[35.29,139.67,'Japan'],'sasebo':[33.16,129.72,'Japan'],'atsugi':[35.45,139.45,'Japan'],'camp zama':[35.5,139.39,'Japan'],'camp humphreys':[36.96,127.03,'Korea'],'osan':[37.09,127.03,'Korea'],'kunsan':[35.9,126.62,'Korea'],'daegu':[35.85,128.6,'Korea'],'pearl harbor':[21.35,-157.95,'Hawaii'],'hickam':[21.33,-157.95,'Hawaii'],'schofield':[21.5,-158.06,'Hawaii'],'kaneohe':[21.44,-157.75,'Hawaii'],'pmrf':[22.02,-159.78,'Hawaii'],'barking sands':[22.02,-159.78,'Hawaii'],'fort shafter':[21.35,-157.88,'Hawaii'],'wake':[19.28,166.65,'Wake Island'],'kwajalein':[8.72,167.73,'Marshall Islands'],'darwin':[-12.42,130.87,'Australia'],'tindal':[-14.52,132.38,'Australia'],'palau':[7.37,134.54,'Palau'],'yap':[9.5,138.1,'FSM'],'basa':[14.99,120.49,'Philippines'],'subic':[14.79,120.27,'Philippines'],'eielson':[64.67,-147.1,'Alaska'],'jber':[61.25,-149.8,'Alaska'],'elmendorf':[61.25,-149.8,'Alaska'],'fort wainwright':[64.83,-147.65,'Alaska'],'clear':[64.29,-149.19,'Alaska'],'stirling':[-32.23,115.68,'Australia'],'amberley':[-27.64,152.71,'Australia'],'townsville':[-19.25,146.77,'Australia'],'pearce':[-31.67,116.01,'Australia'],'learmonth':[-22.24,114.09,'Australia'],'diego garcia':[-7.31,72.41,'BIOT'],'singapore':[1.35,103.82,'Singapore'],'lombrum':[-2.04,147.38,'Papua New Guinea'],'manus':[-2.04,147.38,'Papua New Guinea']};
+// HANK closes projects out: turnover, the DD Form 1354 data, the warranty clock, the close-out checklist and lessons learned.
+// Sources checked 18 Nov 2026: DD Form 1354 (AUG 2022, WHS forms site); UFC 1-300-08 (3 Apr 2023); FAR 52.246-21 (acquisition.gov).
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toLocaleDateString('en-CA');
+const N=v=>{const x=Number(String(v??'').replace(/[$,]/g,''));return isFinite(x)?x:0;};
+const M=n=>{const a=Math.abs(n);return (n<0?'-':'')+(a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(a>=1e8?0:1)+'M':a>=1e3?'$'+Math.round(a/1e3)+'K':'$'+Math.round(a));};
+const dd=(a,b)=>Math.round((new Date(b+'T00:00')-new Date(a+'T00:00'))/864e5);
+const addD=(d,n)=>{const x=new Date(d+'T00:00');x.setDate(x.getDate()+n);return x.toLocaleDateString('en-CA');};
+const addY=(d,n)=>{const x=new Date(d+'T00:00');x.setFullYear(x.getFullYear()+n);return x.toLocaleDateString('en-CA');};
+const fd=d=>{if(!d) return '';const x=new Date(d+'T00:00');return isNaN(x)?d:x.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()]+' '+x.getFullYear();};
+const ymd=d=>String(d||'').replace(/-/g,'');
+const SRC={form:'DD Form 1354, AUG 2022',ufc:'UFC 1-300-08 (3 Apr 2023)',war:'FAR 52.246-21',asof:'checked 18 Nov 2026'};
+// Close-out checklist. Owner keys: dca (design and construction agent), co (contracting officer), ctr (contractor), rpao (real property accountable officer), pm (program office), user (facility user).
+const OWN={dca:'Design and construction agent',co:'Contracting officer',ctr:'Contractor',rpao:'Real property accountable officer',pm:'Program office',user:'Facility user'};
+const CHK=[['punch','Punch list and deficiencies corrected','ctr','Contract inspection clause; deficiencies listed in block 27 of the DD Form 1354'],
+ ['d1354','Draft DD Form 1354 started once funding is authorized','dca',SRC.ufc+' ¶ 2-6.1.1, 3-1.2.1.1'],
+ ['pis','Placed-in-service date recorded','dca',SRC.form+' block 7a'],
+ ['i1354','Interim DD Form 1354 signed by the agent at placed-in-service, after substantial completion','dca',SRC.ufc+' ¶ 2-6.2.2, 3-1.2.1.1'],
+ ['accept','Interim DD Form 1354 accepted into the property system (block 25)','rpao',SRC.ufc+' ¶ 3-1.4.2'],
+ ['omsi','As-built drawings, O&M manuals and warranties delivered','ctr','Contract closeout submittals'],
+ ['train','Operations and maintenance training given to the user','ctr','Contract closeout submittals'],
+ ['final','Final acceptance of the work','co','Contract inspection and acceptance clauses'],
+ ['war','Warranty period tracked from final acceptance (or from possession of any part)','pm',SRC.war+' (b)'],
+ ['winsp','Warranty inspection before the warranty ends','dca','Practice: inspect before the one-year warranty ends'],
+ ['costs','Final costs known','dca',SRC.ufc+' ¶ 2-6.3.1; aim for the fiscal quarter of the placed-in-service date (¶ 4-1.28)'],
+ ['f1354','Final DD Form 1354 at project close-out','dca',SRC.ufc+' ¶ 2-6.3.1, 3-1.2.1.3'],
+ ['funds','Excess funds released','pm','Funding lines in PAULA'],
+ ['file','Contract file closed','co','FAR subpart 4.8 (contract files)'],
+ ['lessons','Lessons learned recorded','pm','Program office practice']];
+const LCAT=[['req','Requirement','NORA'],['alt','Alternatives and economics','EARL'],['cost','Cost and the 1391','PIPER'],['crit','Criteria','CORA'],['sow','Statement of work and acquisition','SOPHIE'],['rfi','RFIs and submittals','IRMA'],['qa','Quality and inspections','QUINN'],['sched','Schedule','PAULA'],['stake','Stakeholders and coordination','PAULA']];
+// ---------- state ----------
+const DEF={schema:'hank-1',items:{},lessons:[],me:'',warn:60,log:[]};
+let G=load()||JSON.parse(JSON.stringify(DEF));let VIEW='list',CUR=null,TAB='dates';
+function load(){try{const j=JSON.parse(localStorage.getItem('hank_portfolio')||'null');if(j){j.items=j.items||{};j.lessons=j.lessons||[];j.log=j.log||[];j.warn=j.warn||60;}return j;}catch(e){return null;}}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('hank_portfolio',JSON.stringify(G));
+ // Lessons go to a shared list the other Corbel tools can read.
+ localStorage.setItem('corbel_lessons',JSON.stringify(G.lessons.map(l=>({...l,from:'HANK'}))));$('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},250);}
+function log(w,d){G.log.push({at:new Date().toISOString(),what:w,detail:d||''});G.log=G.log.slice(-300);}
+// ---------- projects from PAULA and the shared record ----------
+function projects(){let pa=null,st=null;try{pa=JSON.parse(localStorage.getItem('paula_project')||'null');}catch(e){}try{st=JSON.parse(localStorage.getItem('milcon_store')||'null');}catch(e){}
+ const L=(pa&&pa.projects||[]).filter(p=>p.name).map(p=>({...p}));Object.values(st&&st.projects||{}).forEach(r=>{const c=r.core||{};if(!c.name||L.some(p=>p.id===r.id)) return;L.push({id:r.id,...c,phase:c.phase||1});});return L;}
+const inClose=p=>N(p.phase)>=7||N(p.award)>0||!!G.items[p.id];
+function dcaFor(p){const svc=String(p.service||'').toLowerCase(),loc=String(p.installation||'').toLowerCase()+' '+String(p.country||'').toLowerCase();if(/guam|cnmi|tinian|saipan/.test(loc)||/navy|marine/.test(svc)) return 'NAVFAC Pacific';return 'USACE Pacific Ocean Division';}
+function rec(p){if(!G.items[p.id]) G.items[p.id]={pid:p.id,dates:{},chk:{},dd:{lines:[]},notes:''};const r=G.items[p.id];r.dates=r.dates||{};r.chk=r.chk||{};r.dd=r.dd||{lines:[]};r.dd.lines=r.dd.lines||[];return r;}
+// QUINN: open deficiencies on the project's task order.
+function quinnOpen(p){let q=null;try{q=JSON.parse(localStorage.getItem('quinn_project')||'null');}catch(e){}if(!q||!p.to) return null;const to=String(p.to).toLowerCase();
+ const bl=(q.registry||[]).filter(r=>String(r.to||'').toLowerCase()===to).map(r=>r.building);if(!bl.length) return null;const iss=(q.issues||[]).filter(i=>bl.includes(i.building));return {open:iss.filter(i=>i.status!=='closed'),all:iss,buildings:bl};}
+// Warranty: one year from final acceptance; a part the Government took possession of earlier runs one year from possession (FAR 52.246-21(b)).
+function warranty(r){const fa=r.dates.final,pos=r.dates.possession;if(!fa&&!pos) return null;const L=[];if(pos&&(!fa||pos<fa)) L.push({what:'Parts in Government possession from '+fd(pos),start:pos,end:addY(pos,1)});if(fa) L.push({what:'The work, from final acceptance',start:fa,end:addY(fa,1)});
+ const first=L.slice().sort((a,b)=>a.end.localeCompare(b.end))[0];const last=L.slice().sort((a,b)=>b.end.localeCompare(a.end))[0];return {L,first,last,left:dd(today(),first.end)};}
+function chkState(p,r,k){const s=r.chk[k]||{};if(s.st) return s;
+ // Worked out from the record where it can be.
+ if(k==='pis'&&r.dates.pis) return {st:'done',date:r.dates.pis,auto:'From the dates tab'};
+ if(k==='final'&&r.dates.final) return {st:'done',date:r.dates.final,auto:'From the dates tab'};
+ if(k==='war'&&r.dates.final) return {st:'done',date:r.dates.final,auto:'Warranty clock running'};
+ if(k==='d1354'&&r.dd.draft) return {st:'done',date:r.dd.draft,auto:'Draft started date'};
+ if(k==='closeout'&&r.dates.closeout) return {st:'done',date:r.dates.closeout,auto:'From the dates tab'};
+ if(k==='i1354'&&r.dd.interim) return {st:'done',date:r.dd.interim,auto:'Interim signed date'};
+ if(k==='accept'&&r.dd.accepted) return {st:'done',date:r.dd.accepted,auto:'Accepted date'};
+ if(k==='f1354'&&r.dd.finalDate) return {st:'done',date:r.dd.finalDate,auto:'Final 1354 date'};
+ if(k==='lessons'&&G.lessons.some(l=>l.pid===p.id)) return {st:'done',auto:'Lessons recorded'};
+ if(k==='punch'){const q=quinnOpen(p);if(q) return q.open.length?{st:'open',auto:q.open.length+' open deficienc'+(q.open.length===1?'y':'ies')+' in QUINN'}:{st:'done',auto:'No open deficiencies in QUINN'};}
+ return {st:''};}
+function progress(p){const r=rec(p);const ks=CHK.map(c=>c[0]);const done=ks.filter(k=>['done','na'].includes(chkState(p,r,k).st)).length;return {done,n:ks.length};}
+// ---------- screens ----------
+const VIEWS=[['list','Projects'],['one','Project'],['war','Warranty'],['les','Lessons learned'],['rep','Reports'],['data','Data and settings']];
+function renderSteps(){const nav=$('#steps');const P=projects().filter(inClose);const soon=P.filter(p=>{const w=warranty(rec(p));return w&&w.left>=0&&w.left<=G.warn;}).length;
+ nav.innerHTML=VIEWS.filter(([k])=>k!=='one'||CUR).map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k?'on':'')+'"><span class="n">'+(i+1)+'</span>'+(k==='one'&&CUR?esc(CUR.name.length>20?CUR.name.slice(0,19)+'…':CUR.name):t)+'<span class="c">'+(k==='war'&&soon?soon+' soon':k==='les'&&G.lessons.length?G.lessons.length:'')+'</span></button>').join('')+'<div class="gate">'+P.length+' projects in construction or close-out</div>';
+ nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
+function render(){renderSteps();({list:vList,one:vOne,war:vWar,les:vLes,rep:vRep,data:vData})[VIEW]();}
+function tiles(T){return '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">'+T.map(([l,v,c])=>'<div class="tile"><div class="lab">'+l+'</div><div class="val"'+(c?' style="color:'+c+'"':'')+'>'+v+'</div></div>').join('')+'</div>';}
+const dd1354St=r=>r.dd.finalDate?'Final':r.dd.accepted?'Interim accepted':r.dd.interim?'Interim signed':r.dd.draft?'Draft':'Not started';
+function vList(){const v=$('#view');const P=projects().filter(inClose).sort((a,b)=>N(b.phase)-N(a.phase)||String(a.forecast_finish||'').localeCompare(String(b.forecast_finish||'')));
+ const W=P.map(p=>warranty(rec(p))).filter(Boolean);const ending=W.filter(w=>w.left>=0&&w.left<=G.warn).length;const fin=P.filter(p=>rec(p).dd.finalDate).length;
+ v.innerHTML='<div class="panel"><h2>Close-out and turnover</h2><p class="lead">Every project in construction or close-out: turnover dates, the DD Form 1354, the warranty clock and the close-out checklist. Open a project to work its close-out.</p>'+
+  tiles([['Projects',String(P.length)],['Placed in service',String(P.filter(p=>rec(p).dates.pis).length)],['In warranty',String(W.filter(w=>w.left>=0||dd(today(),w.last.end)>=0).length)],['Warranty ending in '+G.warn+' days',String(ending),ending?'#9b2c2c':''],['Final DD 1354 done',String(fin)]])+
+  (P.length?'<table class="ptable"><thead><tr><th>Project</th><th>Placed in service</th><th>Final acceptance</th><th>Warranty ends</th><th>DD Form 1354</th><th>Checklist</th></tr></thead><tbody>'+P.map(p=>{const r=rec(p);const w=warranty(r);const g=progress(p);
+   return '<tr class="clk" data-op="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc([p.number,p.installation,p.to].filter(Boolean).join(' · '))+'</div></td><td>'+(r.dates.pis?fd(r.dates.pis):'<span class="small">'+(p.forecast_finish?'Forecast '+fd(p.forecast_finish):'–')+'</span>')+'</td><td>'+(r.dates.final?fd(r.dates.final):'–')+'</td><td'+(w&&w.left>=0&&w.left<=G.warn?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(w?fd(w.first.end)+(w.left<0?' <span class="small">(ended)</span>':'<div class="small">'+w.left+' days</div>'):'–')+'</td><td>'+dd1354St(r)+'</td><td><div class="meter" style="margin-top:4px"><b style="width:'+Math.round(g.done/g.n*100)+'%"></b></div><div class="small">'+g.done+' of '+g.n+'</div></td></tr>';}).join('')+'</tbody></table>':'<p class="small">No projects in construction or close-out. Projects at phase 7 or 8 in PAULA, or with a contract award, appear here.</p>')+
+  '<div class="row" style="margin-top:10px"><select id="addP" style="width:auto;max-width:360px"><option value="">Add another project…</option>'+projects().filter(p=>!inClose(p)).map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('')+'</select></div></div>';
+ v.querySelectorAll('[data-op]').forEach(t=>t.onclick=()=>{CUR=projects().find(p=>p.id===t.dataset.op);VIEW='one';TAB='dates';render();window.scrollTo(0,0);});
+ $('#addP').onchange=e=>{if(!e.target.value) return;rec(projects().find(p=>p.id===e.target.value));log('Project added to close-out');save();vList();renderSteps();};}
+function vOne(){const v=$('#view');const p=CUR;if(!p){VIEW='list';return render();}const r=rec(p);const g=progress(p);
+ v.innerHTML='<div class="panel" style="padding-bottom:12px"><h2 style="margin:0">'+esc(p.name)+'</h2><div class="small">'+esc([p.number,p.to,p.installation,p.service].filter(Boolean).join(' · '))+'</div><div class="meter" style="max-width:420px"><b style="width:'+Math.round(g.done/g.n*100)+'%"></b></div><div class="small">Close-out checklist '+g.done+' of '+g.n+'  ·  DD Form 1354: '+dd1354St(r)+'</div>'+
+  '<div class="tabs2" style="margin-top:12px">'+[['dates','Turnover dates'],['chk','Checklist'],['dd','DD Form 1354'],['les','Lessons']].map(([k,t])=>'<button data-t="'+k+'" class="'+(TAB===k?'on':'')+'">'+t+'</button>').join('')+'</div></div><div id="pt"></div>';
+ v.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{TAB=b.dataset.t;vOne();});({dates:tDates,chk:tChk,dd:tDD,les:tLes})[TAB](p,r);}
+function tDates(p,r){const t=$('#pt');const w=warranty(r);const F=[['subst','Substantial completion',''],['possession','Government took possession of part of the work (before final acceptance)','Starts a one-year warranty on that part ('+SRC.war+' (b))'],['pis','Placed-in-service date (beneficial occupancy)','Block 7a of the DD Form 1354 ('+SRC.form+')'],['final','Final acceptance','Starts the one-year warranty on the work ('+SRC.war+' (b))'],['closeout','Financial close-out','']];
+ t.innerHTML='<div class="panel"><h3 style="margin-top:0">Turnover dates</h3><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'+F.map(([k,l,h])=>'<div><label class="f">'+l+'</label><input type="date" data-dt="'+k+'" value="'+esc(r.dates[k]||'')+'">'+(h?'<div class="small">'+esc(h)+'</div>':'')+'</div>').join('')+'</div>'+
+  (p.forecast_finish?'<p class="small">PAULA forecast completion: '+fd(p.forecast_finish)+'.</p>':'')+'</div>'+
+  '<div class="panel"><h3 style="margin-top:0">Warranty</h3>'+(w?'<table class="ptable"><thead><tr><th>Covers</th><th>Starts</th><th>Ends</th><th>Days left</th></tr></thead><tbody>'+w.L.map(x=>'<tr><td>'+esc(x.what)+'</td><td>'+fd(x.start)+'</td><td>'+fd(x.end)+'</td><td'+(dd(today(),x.end)<=G.warn&&dd(today(),x.end)>=0?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(dd(today(),x.end)<0?'Ended':dd(today(),x.end))+'</td></tr>').join('')+'</tbody></table><p class="small">'+SRC.war+' (b): the warranty runs one year from final acceptance; for any part the Government took possession of earlier, one year from possession. Work repaired or replaced under the warranty carries its own year from the repair ((d)). Check the contract for a different period.</p>':'<p class="small">Enter final acceptance or the possession date to start the clock.</p>')+'</div>'+
+  '<div class="panel"><label class="f">Notes</label><textarea id="nt" rows="3">'+esc(r.notes||'')+'</textarea></div>';
+ t.querySelectorAll('[data-dt]').forEach(el=>el.onchange=()=>{r.dates[el.dataset.dt]=el.value;log('Turnover date set',p.name+': '+el.dataset.dt+' '+el.value);save();vOne();});$('#nt').onchange=e=>{r.notes=e.target.value;save();};}
+function tChk(p,r){const t=$('#pt');const dca=dcaFor(p);
+ t.innerHTML='<div class="panel"><h3 style="margin-top:0">Close-out checklist</h3><p class="small">Each item has an owner and the source behind it. Items marked “worked out” are filled from the turnover dates, the DD Form 1354 tab, QUINN or the lessons list; set a status yourself to override.</p><table class="ptable"><thead><tr><th>Item</th><th>Owner</th><th>Status</th><th>Date</th><th>Source</th></tr></thead><tbody>'+
+  CHK.map(([k,n,o,src])=>{const s=chkState(p,r,k);const own=(r.chk[k]||{}).who||(o==='dca'?dca:OWN[o]);
+   return '<tr><td><b>'+esc(n)+'</b>'+(s.auto?'<div class="small" style="color:#1F5566">Worked out: '+esc(s.auto)+'</div>':'')+'</td><td><input data-cw="'+k+'" value="'+esc(own)+'" style="min-width:150px"></td><td><select data-cs="'+k+'" style="width:auto"><option value="">'+(s.auto&&!(r.chk[k]||{}).st?'Worked out: '+({done:'Done',open:'Open',na:'N/A'}[s.st]||'–'):'Not started')+'</option>'+[['open','Open'],['done','Done'],['na','Not applicable']].map(([x,l])=>'<option value="'+x+'"'+((r.chk[k]||{}).st===x?' selected':'')+'>'+l+'</option>').join('')+'</select></td><td><input type="date" data-cd="'+k+'" value="'+esc((r.chk[k]||{}).date||s.date||'')+'" style="width:auto"></td><td class="small">'+esc(src)+'</td></tr>';}).join('')+'</tbody></table></div>';
+ const C=k=>r.chk[k]=r.chk[k]||{};
+ t.querySelectorAll('[data-cs]').forEach(el=>el.onchange=()=>{C(el.dataset.cs).st=el.value;if(el.value==='done'&&!C(el.dataset.cs).date) C(el.dataset.cs).date=today();log('Checklist item '+(el.value||'reset'),p.name+': '+el.dataset.cs);save();vOne();});
+ t.querySelectorAll('[data-cd]').forEach(el=>el.onchange=()=>{C(el.dataset.cd).date=el.value;save();});
+ t.querySelectorAll('[data-cw]').forEach(el=>el.onchange=()=>{C(el.dataset.cw).who=el.value;save();});}
+// ---------- DD Form 1354: the data, block by block, pre-filled from the record ----------
+function fundOf(p){const L=(p.funds||[]).filter(l=>!/^HN/.test(String(l.src||'')));const s=[...new Set(L.map(l=>String(l.src||'')+(l.fy?' FY'+l.fy:'')))].join('; ');return s;}
+function ddBlocks(p,r){const d=r.dd;const ver=d.finalDate?'FINAL':d.interim?'INTERIM':'DRAFT';return [
+ ['1','FROM (Organization Name)',d.from||dcaFor(p)],['2','DATE PREPARED (YYYYMMDD)',ymd(d.prepared||today())],['3','PROJECT/JOB NUMBER',d.job||p.number||''],['4','SERIAL NUMBER',d.serial||''],
+ ['5','TO (Organization – Installation Code and Name)',d.to||p.installation||''],['6','RPSUID/SITENAME/INSTCODE/INSTNAME',d.site||''],['7','CONTRACT NUMBER(S)',d.contract||p.to||''],['7a','RPA PLACED-IN-SERVICE DATE (YYYYMMDD)',ymd(r.dates.pis)],
+ ['8a','TYPE',d.type||'CAPITAL IMPROVEMENT'],['8b','WHEN/EVENT',d.event||'TOTAL ASSET PLACED-IN-SERVICE'],['8c','VERSION',d.version||ver],
+ ['24','STATEMENT OF COMPLETION – transferred by (title, name, date)',[d.byTitle,d.byName,ymd(d.interim)].filter(Boolean).join(' / ')],['25','ACCEPTED BY (title, name, date)',[d.accTitle,d.accName,ymd(d.accepted)].filter(Boolean).join(' / ')],['26','PROPERTY VOUCHER NUMBER',d.voucher||''],
+ ['27','CONSTRUCTION DEFICIENCIES',d.defs||(()=>{const q=quinnOpen(p);return q&&q.open.length?q.open.map(i=>i.building+': '+i.text).join('; '):'';})()],['28','PROJECT REMARKS',d.remarks||'']];}
+const LCOL=[['fac','10a. Facility no.'],['rpuid','10b. RPUID'],['cat','11. CATCODE'],['catd','12. CATCODE description'],['cons','13. Cons type code'],['sust','14. Sust code'],['uma','15. UMA (primary)'],['q1','16. Quantity'],['umo','17. UMO (secondary)'],['q2','18. Quantity'],['cost','19. Cost'],['fund','20. Fund source'],['forg','21. Fund org'],['int','22. RPA int type code'],['rmk','23. Item remarks']];
+function tDD(p,r){const t=$('#pt');const d=r.dd;if(!d.lines.length) d.lines.push({id:uid(),cat:p.catcode||'',catd:'',cost:String(N(p.cwe)||N(p.award)||''),fund:fundOf(p)});
+ const B=ddBlocks(p,r);const inp=(k,l,typ)=>'<div><label class="f">'+l+'</label><input'+(typ?' type="'+typ+'"':'')+' data-dd="'+k+'" value="'+esc(d[k]||'')+'"></div>';
+ t.innerHTML='<div class="panel"><h3 style="margin-top:0">DD Form 1354 – Transfer and Acceptance of DoD Real Property</h3><p class="small">The data for each block of the '+SRC.form+', pre-filled from the project record and ready to enter on the official form. The design and construction agent prepares the draft and interim and signs the interim at placed-in-service; the real property accountable officer accepts it in block 25; the final follows once final costs are known ('+SRC.ufc+' ¶ 2-6, 3-1). Block-by-block instructions are in '+SRC.ufc+'.</p>'+
+  '<div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">'+inp('draft','Draft started','date')+inp('interim','Interim signed by the agent','date')+inp('accepted','Interim accepted (block 25)','date')+inp('finalDate','Final DD Form 1354','date')+'</div></div>'+
+  '<div class="panel"><h3 style="margin-top:0">Header and signature blocks</h3><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px">'+
+  inp('from','1. From (organization) – default '+dcaFor(p))+inp('job','3. Project/job number – default '+(p.number||'none'))+inp('serial','4. Serial number')+inp('to','5. To (installation code and name)')+inp('site','6. RPSUID / site / installation code and name')+inp('contract','7. Contract number(s) – default '+(p.to||'none'))+
+  '<div><label class="f">8a. Type</label><select data-dd="type">'+['CAPITAL IMPROVEMENT','ACQUISITION','TRANSFER BETWEEN SERVICES','INVENTORY ADJUSTMENT'].map(x=>'<option'+((d.type||'CAPITAL IMPROVEMENT')===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">8b. When/event</label><select data-dd="event">'+['TOTAL ASSET PLACED-IN-SERVICE','PARTIAL ASSET PLACED-IN-SERVICE'].map(x=>'<option'+((d.event||'TOTAL ASSET PLACED-IN-SERVICE')===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  inp('byTitle','24a. Transferred by – title')+inp('byName','24b. Transferred by – name')+inp('accTitle','25a. Accepted by – title')+inp('accName','25b. Accepted by – name')+inp('voucher','26. Property voucher number')+'</div>'+
+  '<label class="f" style="margin-top:10px">27. Construction deficiencies'+(quinnOpen(p)?' – default from QUINN':'')+'</label><textarea data-dd="defs" rows="2" placeholder="'+esc(B.find(b=>b[0]==='27')[2])+'">'+esc(d.defs||'')+'</textarea><label class="f">28. Project remarks</label><textarea data-dd="remarks" rows="2">'+esc(d.remarks||'')+'</textarea></div>'+
+  '<div class="panel"><h3 style="margin-top:0">Real property items (blocks 9–23)</h3><div style="overflow-x:auto"><table class="ptable" style="font-size:12.5px"><thead><tr><th>9.</th>'+LCOL.map(c=>'<th>'+esc(c[1])+'</th>').join('')+'<th></th></tr></thead><tbody>'+
+  d.lines.map((l,i)=>'<tr><td>'+(i+1)+'</td>'+LCOL.map(([k])=>'<td><input data-ln="'+i+'|'+k+'" value="'+esc(l[k]||'')+'" style="width:'+(['catd','rmk','fund'].includes(k)?150:90)+'px"></td>').join('')+'<td><button class="sm" data-lx="'+i+'">✕</button></td></tr>').join('')+'</tbody></table></div><div class="row"><button class="sm" id="lnAdd">Add an item</button><span class="small">Cost total: '+M(d.lines.reduce((a,l)=>a+N(l.cost),0))+(N(p.cwe)||N(p.award)?' · contract '+M(N(p.cwe)||N(p.award)):'')+'</span></div></div>';
+ t.querySelectorAll('[data-dd]').forEach(el=>el.onchange=()=>{d[el.dataset.dd]=el.value;log('DD 1354 field set',p.name+': '+el.dataset.dd);save();if(['draft','interim','accepted','finalDate'].includes(el.dataset.dd)) vOne();});
+ t.querySelectorAll('[data-ln]').forEach(el=>el.onchange=()=>{const [i,k]=el.dataset.ln.split('|');d.lines[+i][k]=el.value;save();if(k==='cost') vOne();});
+ t.querySelectorAll('[data-lx]').forEach(b=>b.onclick=()=>{d.lines.splice(+b.dataset.lx,1);save();vOne();});$('#lnAdd').onclick=()=>{d.lines.push({id:uid()});save();vOne();};}
+function tLes(p,r){const t=$('#pt');const L=G.lessons.filter(l=>l.pid===p.id);t.innerHTML='<div class="panel"><h3 style="margin-top:0">Lessons from this project</h3>'+lesForm(p.id)+lesList(L)+'</div>';bindLes(p.id,()=>vOne());}
+function lesForm(pid){return '<div class="form" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><label class="f">Area</label><select id="lCat">'+LCAT.map(([k,n,t])=>'<option value="'+k+'">'+n+' ('+t+')</option>').join('')+'</select></div>'+(pid?'':'<div><label class="f">Project</label><select id="lP"><option value="">None</option>'+projects().map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('')+'</select></div>')+
+ '<div style="grid-column:1/-1"><label class="f">What happened</label><input id="lW" placeholder="e.g. The Guam Power Authority substation date was not confirmed before award"></div><div style="grid-column:1/-1"><label class="f">Do this next time</label><input id="lR" placeholder="e.g. Get the utility provider’s delivery date in writing before the 1391 is validated"></div></div><div class="row"><button class="sm go" id="lAdd">Add the lesson</button></div>';}
+function lesList(L){return L.length?'<table class="ptable" style="margin-top:10px"><thead><tr><th>Area</th><th>What happened</th><th>Do this next time</th><th>Project</th><th></th></tr></thead><tbody>'+L.map(l=>{const c=LCAT.find(x=>x[0]===l.cat)||LCAT[0];const p=projects().find(x=>x.id===l.pid);return '<tr><td>'+esc(c[1])+'<div class="small">for '+c[2]+'</div></td><td>'+esc(l.what)+'</td><td>'+esc(l.rec)+'</td><td class="small">'+esc(p?p.name:'–')+'<div>'+fd(l.date)+'</div></td><td><button class="sm" data-lr="'+l.id+'">✕</button></td></tr>';}).join('')+'</tbody></table>':'<p class="small">None yet.</p>';}
+function bindLes(pid,re){$('#lAdd').onclick=()=>{const w=$('#lW').value.trim(),rr=$('#lR').value.trim();if(!w) return $('#lW').focus();G.lessons.push({id:uid(),pid:pid||($('#lP')?$('#lP').value:''),cat:$('#lCat').value,what:w,rec:rr,date:today(),by:G.me||''});log('Lesson recorded',w.slice(0,60));save();re();};
+ document.querySelectorAll('[data-lr]').forEach(b=>b.onclick=()=>{G.lessons=G.lessons.filter(l=>l.id!==b.dataset.lr);save();re();});}
+function vLes(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Lessons learned</h2><p class="lead">What to do differently, filed by the area of the work and the Corbel tool that handles it. They are kept in a shared list in this browser so the other tools can draw on them.</p>'+lesForm('')+lesList(G.lessons)+'</div>';bindLes('',vLes);}
+function vWar(){const v=$('#view');const P=projects().filter(inClose).map(p=>({p,w:warranty(rec(p))})).filter(x=>x.w).sort((a,b)=>a.w.first.end.localeCompare(b.w.first.end));
+ v.innerHTML='<div class="panel"><h2>Warranty</h2><p class="lead">Every warranty clock, soonest first. Schedule the warranty inspection before a clock runs out; anything flagged within '+G.warn+' days is red. '+SRC.war+' (b), '+SRC.asof+'.</p>'+(P.length?'<table class="ptable"><thead><tr><th>Project</th><th>Covers</th><th>Ends</th><th>Days left</th><th>Warranty inspection</th></tr></thead><tbody>'+P.flatMap(({p,w})=>w.L.map((x,i)=>{const left=dd(today(),x.end);const ws=chkState(p,rec(p),'winsp');return '<tr><td>'+(i?'':'<b>'+esc(p.name)+'</b>')+'</td><td class="small">'+esc(x.what)+'</td><td>'+fd(x.end)+'</td><td'+(left>=0&&left<=G.warn?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(left<0?'Ended':left)+'</td><td>'+(i?'':ws.st==='done'?'Done '+fd(ws.date):'Not done')+'</td></tr>';})).join('')+'</tbody></table>':'<p class="small">No warranty clocks yet. Enter final acceptance on a project’s turnover dates.</p>')+'</div>';}
+// ---------- reports ----------
+function kTiles(T){const w=Math.floor(100/T.length);return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:10pt 0 4pt"><tr>'+T.map(([l,v,c],i)=>'<td width="'+w+'%" bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:7pt 9pt">'+cdP(esc(l).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1.5pt;color:'+CD.mute)+cdP(v,'margin:2pt 0 0;font-size:17pt;color:'+(c||CD.navy))+'</td>'+(i<T.length-1?'<td width="6" style="width:5pt">&nbsp;</td>':'')).join('')+'</tr></table>';}
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+const fdt=()=>fd(today());
+function report(){const P=projects().filter(inClose);const W=P.map(p=>({p,w:warranty(rec(p))})).filter(x=>x.w);const soon=W.filter(x=>x.w.left>=0&&x.w.left<=G.warn);
+ const noAcc=P.filter(p=>{const r=rec(p);return r.dates.pis&&!r.dd.accepted;});const noFin=P.filter(p=>{const r=rec(p);return r.dates.pis&&!r.dd.finalDate;});
+ let b=cdBand('Status report','Close-out and Turnover',fdt()+(G.me?'  ·  '+G.me:''));
+ b+=kTiles([['Projects',String(P.length)],['Placed in service',String(P.filter(p=>rec(p).dates.pis).length)],['1354 not accepted',String(noAcc.length),noAcc.length?'#9B2C2C':null],['Warranty ending',String(soon.length),soon.length?'#9B2C2C':null],['Final 1354 done',String(P.filter(p=>rec(p).dd.finalDate).length)]]);
+ b+=cdH('Bottom line')+cdP((noAcc.length?noAcc.length+' project'+(noAcc.length>1?'s are':' is')+' in service without an accepted interim DD Form 1354, so '+(noAcc.length>1?'they are':'it is')+' not yet in the real property record: '+noAcc.slice(0,4).map(p=>esc(p.name)).join(', ')+'. ':'Every project in service has an accepted interim DD Form 1354. ')+(soon.length?soon.length+' warranty clock'+(soon.length>1?'s end':' ends')+' within '+G.warn+' days; schedule the warranty inspection'+(soon.length>1?'s':'')+' now.':''));
+ b+=cdH('Projects')+cdTable(['Project','Placed in service','Final acceptance','Warranty ends','DD Form 1354','Checklist'],P.map(p=>{const r=rec(p),w=warranty(r),g=progress(p);return [esc(p.name)+'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc([p.number,p.installation].filter(Boolean).join('  ·  '))+'</span>',r.dates.pis?fd(r.dates.pis):'–',r.dates.final?fd(r.dates.final):'–',w?fd(w.first.end):'–',dd1354St(r),g.done+' of '+g.n];}));
+ const open=P.flatMap(p=>{const r=rec(p);if(!r.dates.pis&&!r.dates.subst) return [];return CHK.filter(([k])=>!['done','na'].includes(chkState(p,r,k).st)).map(([k,n,o,src])=>[esc(p.name),esc(n),esc((r.chk[k]||{}).who||(o==='dca'?dcaFor(p):OWN[o])),esc(src)]);});
+ if(open.length) b+=cdH('Open close-out items (projects past substantial completion)')+cdTable(['Project','Item','Owner','Source'],open);
+ if(G.lessons.length) b+=cdH('Lessons learned')+cdTable(['Area','What happened','Do this next time'],G.lessons.map(l=>{const c=LCAT.find(x=>x[0]===l.cat)||LCAT[0];return [esc(c[1])+' ('+c[2]+')',esc(l.what),esc(l.rec)];}));
+ b+=cdH('Sources')+cdP(esc(SRC.form)+' (block labels); '+esc(SRC.ufc)+' (draft, interim and final versions, who prepares and accepts); '+esc(SRC.war)+' (warranty period); '+esc(SRC.asof)+'. Service deadlines for the final DD Form 1354 follow each Service’s own timeline.','font-size:9pt');
+ b+=cdFoot('Prepared with Corbel HANK  ·  '+fdt()+'  ·  Advisory; the contracting officer and the real property accountable officer decide.');return cdDoc('Close-out and Turnover',[b]);}
+function ddSheet(p){const r=rec(p);const B=ddBlocks(p,r);let b=cdBand('Form data','DD Form 1354 data – '+p.name,'Prepared '+fdt()+'  ·  for entry on '+SRC.form+'; not the official form');
+ b+=cdH('Header, transaction and signature blocks')+cdTable(['Block','Label','Entry'],B.map(x=>[x[0],esc(x[1]),esc(x[2]||'–')]));
+ b+=cdH('Real property items (blocks 9–23)')+cdTable(['9.'].concat(LCOL.map(c=>esc(c[1].replace(/^\d+[ab]?\. /,'')))),r.dd.lines.map((l,i)=>[String(i+1)].concat(LCOL.map(([k])=>esc(l[k]||'')))));
+ b+=cdFoot('Prepared with Corbel HANK  ·  Block instructions: '+SRC.ufc);return cdDoc('DD Form 1354 data',[b],true);}
+function book(){const P=projects().filter(inClose);return [
+ {name:'Close-out',rows:[['Project','Number','Installation','Task order','Substantial completion','Possession','Placed in service','Final acceptance','Financial close-out','Warranty ends','DD Form 1354','Checklist done','Checklist items']].concat(P.map(p=>{const r=rec(p),w=warranty(r),g=progress(p);return [p.name,p.number||'',p.installation||'',p.to||'',r.dates.subst||'',r.dates.possession||'',r.dates.pis||'',r.dates.final||'',r.dates.closeout||'',w?w.first.end:'',dd1354St(r),g.done,g.n];}))},
+ {name:'Checklist',rows:[['Project','Item','Owner','Status','Date','How set','Source']].concat(P.flatMap(p=>{const r=rec(p);return CHK.map(([k,n,o,src])=>{const s=chkState(p,r,k);return [p.name,n,(r.chk[k]||{}).who||(o==='dca'?dcaFor(p):OWN[o]),{done:'Done',open:'Open',na:'Not applicable'}[s.st]||'Not started',(r.chk[k]||{}).date||s.date||'',(r.chk[k]||{}).st?'Reviewer':s.auto?'Worked out: '+s.auto:'',src];});}))},
+ {name:'DD 1354 blocks',rows:[['Project','Block','Label','Entry']].concat(P.flatMap(p=>ddBlocks(p,rec(p)).map(b=>[p.name,b[0],b[1],b[2]||''])))},
+ {name:'DD 1354 items',rows:[['Project','9. Item no.'].concat(LCOL.map(c=>c[1]))].concat(P.flatMap(p=>rec(p).dd.lines.map((l,i)=>[p.name,i+1].concat(LCOL.map(([k])=>k==='cost'&&l[k]?N(l[k]):l[k]||'')))))},
+ {name:'Warranty',rows:[['Project','Covers','Starts','Ends','Days left']].concat(P.flatMap(p=>{const w=warranty(rec(p));return w?w.L.map(x=>[p.name,x.what,x.start,x.end,dd(today(),x.end)]):[];}))},
+ {name:'Lessons',rows:[['Area','For tool','What happened','Do this next time','Project','Date']].concat(G.lessons.map(l=>{const c=LCAT.find(x=>x[0]===l.cat)||LCAT[0];return [c[1],c[2],l.what,l.rec,(projects().find(x=>x.id===l.pid)||{}).name||'',l.date];}))},
+ {name:'Sources',rows:[['Source','Used for'],[SRC.form,'Block numbers and labels'],[SRC.ufc,'Draft, interim and final DD Form 1354; who prepares and accepts'],[SRC.war,'Warranty period'],['Checked','18 Nov 2026']]}];}
+function vRep(){const v=$('#view');const P=projects().filter(inClose);v.innerHTML='<div class="panel"><h2>Reports</h2><div class="outs">'+
+ '<div class="card"><h4>Close-out and turnover report</h4><p>Word: where every project stands, interim DD Forms 1354 not yet accepted, warranty clocks ending soon, open close-out items with owners and sources, lessons learned.</p><button class="sm go" id="oDoc">Download Word</button></div>'+
+ '<div class="card"><h4>Close-out workbook</h4><p>Excel: turnover dates, the full checklist, DD Form 1354 blocks and items for every project, warranty clocks, lessons and sources.</p><button class="sm go" id="oXl">Download Excel</button></div>'+
+ '<div class="card"><h4>DD Form 1354 data sheet</h4><p>Word: one project’s entries block by block, ready to transfer to the official form.</p><select id="oP" style="margin-bottom:8px">'+P.map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('')+'</select><button class="sm go" id="oDD"'+(P.length?'':' disabled')+'>Download Word</button></div></div></div>';
+ $('#oDoc').onclick=()=>{dl('HANK_Closeout_Report_'+today()+'.doc',report(),'application/msword');log('Close-out report downloaded');save();};
+ $('#oXl').onclick=()=>{XL.save('HANK_Closeout_'+today()+'.xlsx',book());log('Close-out workbook downloaded');save();};
+ $('#oDD').onclick=()=>{const p=P.find(x=>x.id===$('#oP').value);if(!p) return;dl('HANK_DD1354_Data_'+String(p.number||p.name).replace(/[^A-Za-z0-9]+/g,'_')+'_'+today()+'.doc',ddSheet(p),'application/msword');log('DD 1354 data sheet downloaded',p.name);save();};}
+function vData(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Data and settings</h2><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px"><div><label class="f">Flag warranties ending within this many days</label><input type="number" min="15" max="180" id="tW" value="'+G.warn+'"></div><div><label class="f">Your name (on reports)</label><input id="me" value="'+esc(G.me)+'"></div></div><p class="small">Sources: '+esc(SRC.form)+'; '+esc(SRC.ufc)+'; '+esc(SRC.war)+'; '+esc(SRC.asof)+'.</p></div>'+
+ '<div class="panel"><h2>Log</h2><div class="small">'+(G.log.slice().reverse().slice(0,100).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
+ $('#tW').onchange=e=>{G.warn=Math.max(15,N(e.target.value));save();renderSteps();};$('#me').oninput=e=>{G.me=e.target.value;save();};}
+$('#bSave').onclick=()=>dl('HANK_'+today()+'.json',JSON.stringify(G,null,1),'application/json');
+$('#bOpen').onclick=()=>$('#fOpen').click();$('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='hank-1') throw 0;if(!confirm('Replace the close-out data in this browser with this file?')) return;G=j;save();render();}catch(err){alert('That is not a HANK file.');}});};
+render();
+</script>
+<script id="corbel-lib">
+// ---------- Corbel Word forms: one look for every printed sheet ----------
+// Word reads this HTML as a document. Georgia stands in for the site's serif; colors are the site's.
+// Styles are written inline so Word and other word processors render them the same way.
+const CD={navy:'#1B2F4E',deep:'#0F1E36',gold:'#E8D5A8',taupe:'#8B6F3D',taupe2:'#5C4A33',rule:'#C9B998',ink:'#1A1410',tint:'#F6F1E7',tint2:'#FBF8F2',mute:'#7A7065'};
+const CDF='font-family:Georgia,\'Times New Roman\',serif;';
+const CDK=CDF+'font-size:7.5pt;letter-spacing:2pt;text-transform:uppercase;color:'+CD.taupe+';';
+function cdDoc(title,pages,landscape){const sz=landscape?'11.0in 8.5in;mso-page-orientation:landscape':'8.5in 11.0in';
+ return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+ '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+ '<style>@page Section1{size:'+sz+';margin:0.6in 0.7in 0.6in 0.7in}div.Section1{page:Section1}body{'+CDF+'font-size:10.5pt;color:'+CD.ink+'}p{margin:0 0 6pt}table{border-collapse:collapse}td{vertical-align:top}</style></head>'+
+ '<body style="'+CDF+'font-size:10.5pt;color:'+CD.ink+'"><div class="Section1">'+pages.join('<br clear="all" style="page-break-before:always;mso-break-type:page-break">')+'</div></body></html>';}
+function cdP(t,st){return '<p style="'+CDF+'margin:0 0 6pt;'+(st||'')+'">'+t+'</p>';}
+// Writing lines: a small table of underlined rows works in every word processor.
+function cdLines(n,bg){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+Array(n).fill('<tr><td height="24" style="height:18pt;border-bottom:0.75pt solid '+CD.rule+(bg?';background:'+bg:'')+'"'+(bg?' bgcolor="'+bg+'"':'')+'>&nbsp;</td></tr>').join('')+'</table>';}
+// The navy band at the top of each page.
+function cdBand(kind,title,sub,chip){return '<table width="100%" cellpadding="14" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.navy+'" style="background:'+CD.navy+';padding:14pt 16pt">'+
+ cdP('CORBEL &nbsp;&middot;&nbsp; '+esc(kind).toUpperCase(),'margin:0 0 6pt;font-size:7.5pt;letter-spacing:2.5pt;color:'+CD.gold)+
+ cdP(esc(title),'margin:0;font-size:20pt;line-height:120%;color:#FFFFFF')+(sub?cdP(esc(sub),'margin:5pt 0 0;font-size:9.5pt;font-style:italic;color:'+CD.gold):'')+'</td></tr></table>'+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td height="4" bgcolor="'+CD.gold+'" style="height:3pt;background:'+CD.gold+';font-size:2pt;line-height:2pt">&nbsp;</td></tr></table>'+
+ (chip?'<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-top:8pt"><tr><td bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:3pt 8pt">'+cdP(esc(chip).toUpperCase(),'margin:0;font-size:8pt;letter-spacing:1.5pt;color:'+CD.navy)+'</td></tr></table>':'');}
+// Name / title / date boxes.
+function cdWho(fields){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:10pt"><tr>'+fields.map((f,i)=>'<td width="'+Math.floor(100/fields.length)+'%" style="padding:0 '+(i<fields.length-1?'14pt':'0')+' 0 0">'+cdP(esc(f).toUpperCase(),CDK+'margin:0 0 4pt')+cdLines(1)+'</td>').join('')+'</tr></table>';}
+function cdLead(t){return cdP(t,'margin:12pt 0 4pt;font-style:italic;color:'+CD.taupe2);}
+function cdH(t){return cdP(esc(t),'margin:16pt 0 2pt;font-size:13pt;color:'+CD.navy)+'<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:8pt"><tr><td height="2" style="height:1pt;border-top:0.75pt solid '+CD.gold+';font-size:1pt">&nbsp;</td></tr></table>';}
+// "What we have so far": tinted rows with tick boxes.
+function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows.map(([a,b],i)=>{const bg=i%2?CD.tint2:CD.tint;const td=(w,c)=>'<td'+(w?' width="'+w+'"':'')+' bgcolor="'+bg+'" style="background:'+bg+';padding:6pt 8pt;border-bottom:0.5pt solid '+CD.rule+'">'+c+'</td>';
+  return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
+// One question: number and question, then a ruled answer box with a gold edge.
+function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
+// A data table with a navy header row and tinted stripes.
+function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
+ '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
+ rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
+function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+
+// ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
+// Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
+const XL=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const col=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+ const STY='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="3"><font><sz val="10"/><color rgb="FF1A1410"/><name val="Georgia"/></font><font><b/><sz val="9"/><color rgb="FFE8D5A8"/><name val="Georgia"/></font><font><sz val="9"/><i/><color rgb="FF7A7065"/><name val="Georgia"/></font></fonts>'+
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'+
+  '<xf numFmtId="3" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)){const ss=(Number.isInteger(v)&&Math.abs(v)>=1000&&(s===2||s===3))?(s===2?5:6):s;return '<c r="'+ref+'" s="'+ss+'"><v>'+v+'</v></c>';}return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
+  const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+   '<sheetViews><sheetView workbookViewId="0"'+(sh.zoom?' zoomScale="'+sh.zoom+'"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+
+   '<cols>'+Array.from({length:nc},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(W[i]||16)+'" customWidth="1"/>').join('')+'</cols>'+
+   '<sheetData>'+rows+note+'</sheetData>'+(R.length>1?'<autoFilter ref="A1:'+col(nc-1)+R.length+'"/>':'')+'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';}
+ function book(sheets){const names=sheets.map((s,i)=>String(s.name||('Sheet'+(i+1))).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31));
+  const F=[['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
+    '<definedNames>'+sheets.map((s,i)=>s.rows.length>1?'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+x(names[i])+'\'!$A$1:$'+col(Math.max(...s.rows.map(r=>r.length))-1)+'$'+s.rows.length+'</definedName>':'').join('')+'</definedNames></workbook>'],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',STY]].concat(sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(s)]));
+  return zip(F);}
+ // Column widths from the content: header and the longest cell, capped.
+ function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
+ function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ return {save,book,fit};})();
+
+// ---------- Corbel Word documents: a real .docx, built in the page ----------
+// Every tool lays its documents out as simple styled HTML (docstyle.js). DX turns that
+// layout into WordprocessingML: paragraphs, runs, tables, shading, borders, page breaks.
+const DX=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ // Lengths to points.
+ function pt(v,base){if(v==null||v==='') return null;v=String(v).trim();const m=v.match(/^(-?[\d.]+)\s*(pt|px|in|cm|mm|em|%)?$/);if(!m) return null;const n=parseFloat(m[1]);
+  switch(m[2]){case 'px':return n*0.75;case 'in':return n*72;case 'cm':return n*28.35;case 'mm':return n*2.835;case 'em':return n*(base||10.5);case '%':return null;default:return m[2]==='pt'?n:n*0.75;}}
+ function hex(c){if(!c) return null;c=String(c).trim().toLowerCase();if(c==='transparent'||c==='none'||c==='inherit') return null;
+  const N={white:'FFFFFF',black:'000000',red:'C00000',green:'2E7D32',gray:'808080',grey:'808080',navy:'1B2F4E'};if(N[c]) return N[c];
+  let m=c.match(/^#([0-9a-f]{3})$/);if(m) return m[1].split('').map(h=>h+h).join('').toUpperCase();m=c.match(/^#([0-9a-f]{6})$/);if(m) return m[1].toUpperCase();
+  m=c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);if(m) return [m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('').toUpperCase();return null;}
+ function css(s){const o={};String(s||'').split(';').forEach(d=>{const i=d.indexOf(':');if(i<0) return;const k=d.slice(0,i).trim().toLowerCase(),v=d.slice(i+1).trim();if(k) o[k]=v;});
+  // Expand shorthands we use.
+  const box=(k)=>{if(o[k]==null) return;const p=o[k].split(/\s+/);const [t,r,b,l]=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;
+   ['top','right','bottom','left'].forEach((s,i)=>{if(o[k+'-'+s]==null) o[k+'-'+s]=[t,r,b,l][i];});};box('margin');box('padding');
+  if(o.border!=null) ['top','right','bottom','left'].forEach(s=>{if(o['border-'+s]==null) o['border-'+s]=o.border;});
+  if(o.background&&!o['background-color']) o['background-color']=o.background.split(/\s+/)[0];
+  if(o.font){const m=o.font.match(/^(.*?)([\d.]+(?:pt|px|em|%))(?:\/[\d.]+\S*)?\s+(.+)$/);if(m){if(!o['font-size']) o['font-size']=m[2];if(!o['font-family']) o['font-family']=m[3];if(/bold|[6-9]00/.test(m[1])&&!o['font-weight']) o['font-weight']='bold';if(/italic/.test(m[1])&&!o['font-style']) o['font-style']='italic';}}
+  return o;}
+ function border(v){if(!v) return null;v=String(v).trim();if(/^(none|0)$/.test(v)) return {none:true};const w=v.match(/([\d.]+)(pt|px)/),c=v.match(/(#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|\b[a-z]+\b(?=\s*$))/);
+  const style=/dashed/.test(v)?'dashed':/dotted/.test(v)?'dotted':/double/.test(v)?'double':'single';
+  const wpt=w?(w[2]==='px'?parseFloat(w[1])*0.75:parseFloat(w[1])):0.75;return {sz:Math.max(2,Math.min(96,Math.round(wpt*8))),color:hex(c&&c[1])||'000000',style};}
+ const BLOCK=new Set(['P','DIV','H1','H2','H3','H4','H5','H6','TABLE','UL','OL','LI','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','CENTER','HR','PRE','DL','DT','DD','FORM','FIELDSET','NAV','MAIN','ASIDE','FIGURE']);
+ // Web fonts become the first family in the list that Word installs; the Corbel serif falls back to Georgia.
+ function wordFont(list){const F=list.split(',').map(f=>f.replace(/['"]/g,'').trim()).filter(Boolean);const ok=['Georgia','Calibri','Arial','Cambria','Times New Roman','Corbel','Consolas','Segoe UI','Verdana','Tahoma','Garamond','Book Antiqua','Palatino Linotype','Courier New'];
+  return F.find(f=>ok.includes(f))||(F.some(f=>/serif/i.test(f)&&!/sans/i.test(f))?'Georgia':F.some(f=>/sans/i.test(f))?'Calibri':F[0]);}
+ const HSZ={H1:20,H2:15,H3:13,H4:11.5,H5:10.5,H6:9.5};
+ // Inherited run style.
+ function runCtx(base,el,st){const r=Object.assign({},base);const t=el.tagName;
+  if(t==='B'||t==='STRONG'||t==='TH'||/^H\d$/.test(t)) r.b=true;if(t==='I'||t==='EM'||t==='CITE') r.i=true;if(t==='U') r.u=true;if(t==='S'||t==='DEL'||t==='STRIKE') r.strike=true;
+  if(t==='SUP') r.va='superscript';if(t==='SUB') r.va='subscript';if(t==='SMALL') r.sz=(r.sz||10.5)*0.85;if(HSZ[t]&&!st['font-size']) r.sz=HSZ[t];
+  if(t==='CODE'||t==='TT'||t==='KBD') r.font='Consolas';if(t==='A') {r.color=r.color||'1B2F4E';}
+  if(t==='FONT'){if(el.getAttribute('color')) r.color=hex(el.getAttribute('color'))||r.color;if(el.getAttribute('face')) r.font=el.getAttribute('face').split(',')[0].replace(/['"]/g,'').trim();}
+  if(st['font-size']){const v=st['font-size'];const p=/%$/.test(v)?(r.sz||10.5)*parseFloat(v)/100:/em$/.test(v)?(r.sz||10.5)*parseFloat(v):pt(v);if(p) r.sz=p;}
+  if(st.color) r.color=hex(st.color)||r.color;if(st['font-weight']) r.b=/bold|[6-9]00/.test(st['font-weight']);if(st['font-style']) r.i=/italic|oblique/.test(st['font-style']);
+  if(st['text-decoration']) {r.u=/underline/.test(st['text-decoration']);r.strike=/line-through/.test(st['text-decoration']);}
+  if(st['text-transform']) r.caps=/uppercase/.test(st['text-transform']);if(st['letter-spacing']) r.ls=pt(st['letter-spacing'])||0;
+  if(st['font-family']) r.font=wordFont(st['font-family']);if(st['vertical-align']&&/super|sub/.test(st['vertical-align'])) r.va=/super/.test(st['vertical-align'])?'superscript':'subscript';
+  if(st['background-color']&&el.tagName!=='TD'&&el.tagName!=='TH'&&!BLOCK.has(t)) r.hl=hex(st['background-color']);
+  if(st.display==='none'||st.visibility==='hidden') r.hide=true;return r;}
+ function rPr(r){let s='';if(r.font) s+='<w:rFonts w:ascii="'+x(r.font)+'" w:hAnsi="'+x(r.font)+'" w:cs="'+x(r.font)+'"/>';if(r.b) s+='<w:b/>';if(r.i) s+='<w:i/>';if(r.caps) s+='<w:caps/>';if(r.strike) s+='<w:strike/>';
+  if(r.color) s+='<w:color w:val="'+r.color+'"/>';if(r.ls) s+='<w:spacing w:val="'+Math.round(r.ls*20)+'"/>';if(r.sz) s+='<w:sz w:val="'+Math.max(2,Math.round(r.sz*2))+'"/><w:szCs w:val="'+Math.max(2,Math.round(r.sz*2))+'"/>';
+  if(r.hl) s+='<w:shd w:val="clear" w:color="auto" w:fill="'+r.hl+'"/>';if(r.u) s+='<w:u w:val="single"/>';if(r.va) s+='<w:vertAlign w:val="'+r.va+'"/>';return s?'<w:rPr>'+s+'</w:rPr>':'';}
+ function run(text,r){if(r.hide||text==='') return '';return '<w:r>'+rPr(r)+'<w:t xml:space="preserve">'+x(text)+'</w:t></w:r>';}
+ function conv(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const styleText=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  // Simple tag rules from the <style> block (p{...}, td{...}, body{...}).
+  const RULES={};styleText.replace(/@page[^{]*\{[^}]*\}/g,'').replace(/([a-z0-9,\s.]+)\{([^}]*)\}/gi,(m,sel,body)=>{sel.split(',').forEach(s=>{s=s.trim().toUpperCase();if(/^[A-Z0-9]+$/.test(s)) RULES[s]=Object.assign(RULES[s]||{},css(body));});return m;});
+  const st=el=>Object.assign({},RULES[el.tagName]||{},css(el.getAttribute&&el.getAttribute('style')));
+  const land=/landscape/i.test(styleText)||/size:\s*11(\.0)?in\s+8\.5in/i.test(styleText);
+  const pm=styleText.match(/@page[^{]*\{[^}]*margin:\s*([^;}]+)/i);let mg=[0.75,0.75,0.75,0.75].map(v=>v*72);
+  if(pm){const p=pm[1].trim().split(/\s+/).map(v=>pt(v));const q=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;if(q.every(v=>v!=null)) mg=q;}
+  const pageW=land?792:612,pageH=land?612:792,textW=pageW-mg[1]-mg[3];
+  const body=doc.body;const bst=st(body);const R0=runCtx({},body,bst);
+  // ---- paragraph assembly ----
+  function pPr(s,extra){let o='';extra=extra||{};if(extra.style) o+='<w:pStyle w:val="'+extra.style+'"/>';if(extra.keep) o+='<w:keepNext/>';if(extra.pb) o+='<w:pageBreakBefore/>';
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return b&&!b.none?'<w:'+k+' w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="2" w:color="'+b.color+'"/>':'';}).join('');if(bd) o+='<w:pBdr>'+bd+'</w:pBdr>';
+   const bg=hex(s['background-color']);if(bg&&!extra.inCell) o+='<w:shd w:val="clear" w:color="auto" w:fill="'+bg+'"/>';
+   const before=pt(s['margin-top']),after=pt(s['margin-bottom']);const lh=s['line-height'];let line='';
+   if(lh){if(/%$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh)/100)+'" w:lineRule="auto"';else if(/^[\d.]+$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh))+'" w:lineRule="auto"';else {const p=pt(lh);if(p) line=' w:line="'+Math.round(p*20)+'" w:lineRule="exact"';}}
+   o+='<w:spacing w:before="'+Math.round((before||0)*20)+'" w:after="'+Math.round((after||0)*20)+'"'+line+'/>';
+   const il=(pt(s['margin-left'])||0)+(pt(s['padding-left'])||0)+(extra.indent||0);if(il||extra.hang) o+='<w:ind w:left="'+Math.round(il*20)+'"'+(extra.hang?' w:hanging="'+Math.round(extra.hang*20)+'"':'')+'/>';
+   const ta=s['text-align'];if(ta) o+='<w:jc w:val="'+(ta==='center'?'center':ta==='right'?'right':ta==='justify'?'both':'left')+'"/>';
+   if(extra.mark) o+='<w:rPr>'+rPr(extra.mark).replace(/^<w:rPr>|<\/w:rPr>$/g,'')+'</w:rPr>';
+   return '<w:pPr>'+o+'</w:pPr>';}
+  // Inline content to runs. Leading/trailing whitespace is trimmed per paragraph, as a browser would.
+  function inl(node,r,acc){
+   if(node.nodeType===3){let t=node.nodeValue.replace(/[\t\n\r ]+/g,' ');acc.push({t,r});return;}
+   if(node.nodeType!==1) return;const t=node.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='TITLE'||t==='HEAD') return;
+   if(t==='BR'){acc.push({br:true,r});return;}
+   if(t==='INPUT'){const ty=(node.getAttribute('type')||'').toLowerCase();if(ty==='checkbox'||ty==='radio') acc.push({t:node.checked||node.hasAttribute('checked')?'☒ ':'☐ ',r});else acc.push({t:node.value||node.getAttribute('value')||'',r});return;}
+   if(t==='IMG'){if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
+   const s=st(node);const rr=runCtx(r,node,s);for(const c of node.childNodes) inl(c,rr,acc);}
+  function para(acc,s,extra){// acc: [{t,r}|{br}]
+   let i=0;while(i<acc.length&&!acc[i].br&&acc[i].t!=null&&!acc[i].t.trim()){i++;}let j=acc.length-1;while(j>=i&&!acc[j].br&&acc[j].t!=null&&!acc[j].t.trim()) j--;
+   const items=acc.slice(i,j+1);if(items.length){items[0]=Object.assign({},items[0],{t:items[0].t!=null?items[0].t.replace(/^ +/,''):items[0].t});const L=items.length-1;items[L]=Object.assign({},items[L],{t:items[L].t!=null?items[L].t.replace(/ +$/,''):items[L].t});}
+   // In a narrow table cell, spaced capitals (column headings) shrink their spacing, then their size, so no word breaks mid-word.
+   if(extra&&extra.fitW){const fw=extra.fitW;items.forEach((it,k)=>{if(it.br||!it.t) return;const r0=it.r;const up=/[A-Z]/.test(it.t)&&it.t===it.t.toUpperCase();if(!(r0.caps||r0.ls)) return;const r=Object.assign({},r0,{caps:r0.caps||up});const sz=r.sz||10.5;const longest=Math.max(0,...it.t.split(/\s+/).map(w=>w.length));if(!longest) return;
+     const wid=(ls,z)=>longest*(z*(r.caps?0.8:0.6)+ls);if(wid(r.ls||0,sz)<=fw) return;const nr=Object.assign({},r0);
+     nr.ls=Math.max(0,(fw/longest)-sz*(r.caps?0.8:0.6));if(wid(nr.ls,sz)>fw||nr.ls<0.2){nr.ls=0;nr.sz=Math.max(5.5,fw/(longest*(r.caps?0.8:0.6)));}items[k]=Object.assign({},it,{r:nr});});}
+   const mark=(acc[0]&&acc[0].r)||extra&&extra.r0;
+   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else rs+=run(it.t,it.r);}
+   return '<w:p>'+pPr(s,Object.assign({},extra,{mark}))+rs+'</w:p>';}
+  // Is this element's content purely inline?
+  function hasBlock(el){for(const c of el.children){if(BLOCK.has(c.tagName)) return true;if(c.tagName==='BR'&&/page-break-before/.test(c.getAttribute('style')||'')) return true;if(!BLOCK.has(c.tagName)&&hasBlock(c)) return true;}return false;}
+  const isPB=el=>el.tagName==='BR'&&/page-break-before\s*:\s*always|mso-break-type\s*:\s*page-break/i.test(el.getAttribute('style')||'');
+  // Block walker: returns an array of body-level XML strings.
+  function blocks(el,r,ps,ctx){const out=[];let acc=[];let pendPB=false;
+   const flush=()=>{if(acc.some(a=>a.br||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
+   for(const c of el.childNodes){
+    if(c.nodeType===3){acc.push({t:c.nodeValue.replace(/[\t\n\r ]+/g,' '),r});continue;}
+    if(c.nodeType!==1) continue;const t=c.tagName;
+    if(isPB(c)){flush();pendPB=true;continue;}
+    if(t==='SCRIPT'||t==='STYLE'||t==='HEAD'||t==='TITLE') continue;
+    if(!BLOCK.has(t)&&!hasBlock(c)){inl(c,r,acc);continue;}
+    flush();const s=st(c);const rr=runCtx(r,c,s);if(rr.hide) continue;
+    if(t==='TABLE'){if(c.hasAttribute('data-keepprev')){for(let q=out.length-1;q>=0&&q>=out.length-3;q--){out[q]=out[q].replace(/<w:pPr>(?!<w:keepNext\/>)/g,'<w:pPr><w:keepNext/>');if(/^<w:tbl>/.test(out[q])) break;}}
+     out.push(...table(c,rr,ctx,pendPB));pendPB=false;continue;}
+    if(t==='HR'){out.push('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="C9B998"/></w:pBdr><w:spacing w:before="60" w:after="60"/></w:pPr></w:p>');continue;}
+    if(t==='UL'||t==='OL'){let n=0;for(const li of c.children){if(li.tagName!=='LI') continue;n++;const ls=Object.assign({},s,st(li));const lr=runCtx(rr,li,ls);const a=[{t:(t==='OL'?n+'.':'•')+'\t',r:lr}];
+      if(hasBlock(li)){const sub=blocks(li,lr,ls,ctx);out.push(...sub);}else{for(const k of li.childNodes) inl(k,lr,a);out.push(para(a,Object.assign({'margin-bottom':'3pt'},ls),{indent:(ctx.depth||0)*14+18,hang:14,inCell:ctx.inCell}));}}continue;}
+    // Boxed div (background or border): render as a one-cell table so the box survives.
+    if((t==='DIV'||t==='BLOCKQUOTE')&&(hex(s['background-color'])||['top','right','bottom','left'].some(k=>{const b=border(s['border-'+k]);return b&&!b.none;}))&&!ctx.noBox){
+     out.push(...boxTable(c,rr,s,ctx,pendPB));pendPB=false;continue;}
+    if(hasBlock(c)){const sub=blocks(c,rr,s,ctx);if(pendPB&&sub.length){sub[0]=sub[0].replace('<w:pPr>','<w:pPr><w:pageBreakBefore/>');pendPB=false;}out.push(...sub);}
+    else{const a=[];for(const k of c.childNodes) inl(k,rr,a);const ex={pb:pendPB,inCell:ctx.inCell,r0:rr,keep:/^H\d$/.test(t),fitW:ctx.inCell?ctx.width:0};
+     if(/^H\d$/.test(t)&&!s['margin-top']) s['margin-top']='10pt';if(/^H\d$/.test(t)&&!s['margin-bottom']) s['margin-bottom']='4pt';
+     if(!a.some(q=>q.br||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
+     else out.push(para(a,s,ex));pendPB=false;}
+   }
+   flush();return out;}
+  function shd(fill){return fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+fill+'"/>':'';}
+  function boxTable(el,r,s,ctx,pb){const w=ctx.width||textW;const pad=k=>Math.round((pt(s['padding-'+k])||4)*20);
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return '<w:'+k+' '+(b&&!b.none?'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"':'w:val="nil"')+'/>';}).join('');
+   const inner=blocks(el,r,Object.assign({},s,{'margin-top':'0','margin-bottom':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:w-12,noBox:true}));
+   const pre=pb?['<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>']:[];
+   const sp=pt(s['margin-bottom']);
+   return pre.concat(['<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="'+pad('top')+'" w:type="dxa"/><w:left w:w="'+pad('left')+'" w:type="dxa"/><w:bottom w:w="'+pad('bottom')+'" w:type="dxa"/><w:right w:w="'+pad('right')+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="'+Math.round(w*20)+'"/></w:tblGrid>'+
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tcBorders>'+bd+'</w:tcBorders>'+shd(hex(s['background-color']))+'</w:tcPr>'+(inner.length&&/<w:p>|<w:p /.test(inner[inner.length-1])?inner.join(''):inner.join('')+'<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>')+'</w:tc></w:tr></w:tbl>',
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="'+Math.round((sp||4)*20)+'" w:line="20" w:lineRule="exact"/></w:pPr></w:p>']);}
+  function table(tb,r,ctx,pb){const ts=st(tb);const avail=ctx.width||textW;
+   const rows=[];const collect=(e)=>{for(const c of e.children){if(c.tagName==='TR') rows.push(c);else if(/^(THEAD|TBODY|TFOOT)$/.test(c.tagName)) collect(c);}};collect(tb);if(!rows.length) return [];
+   const wAttr=tb.getAttribute('width')||ts.width;let W;if(wAttr&&/%$/.test(wAttr)) W=avail*parseFloat(wAttr)/100;else if(wAttr&&pt(wAttr)) W=Math.min(avail,pt(/^\d+$/.test(wAttr)?wAttr+'px':wAttr));else W=null;
+   const cp=tb.getAttribute('cellpadding');const cpad=cp!=null?parseFloat(cp)*0.75:1.5;
+   const keep=/page-break-inside\s*:\s*avoid/.test(tb.getAttribute('style')||'');
+   // Grid: widest row decides the column count; widths from the first row that states them.
+   const cells=rows.map(tr=>[...tr.children].filter(c=>c.tagName==='TD'||c.tagName==='TH'));
+   const ncol=Math.max(1,...cells.map(rc=>rc.reduce((a,c)=>a+(parseInt(c.getAttribute('colspan'))||1),0)));
+   const tw=W||avail;const cw=Array(ncol).fill(null);
+   for(const rc of cells){let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;const cs=css(c.getAttribute('style'));const a=c.getAttribute('width')||cs.width;
+     if(span===1&&a&&cw[k]==null){if(/%$/.test(a)) cw[k]=tw*parseFloat(a)/100;else{const p=pt(/^\d+$/.test(a)?a+'px':a);if(p) cw[k]=p;}}k+=span;}}
+   const known=cw.filter(v=>v!=null).reduce((a,b)=>a+b,0),unk=cw.filter(v=>v==null).length;
+   let grid;if(unk){const rest=Math.max(tw-known,unk*24);
+    // Columns without a stated width share the rest by content, the way a browser's auto layout does:
+    // the longest word must fit (caps and letter-spacing count extra), then longer text gets more room.
+    const need=Array(ncol).fill(0),want=Array(ncol).fill(1);
+    cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1&&cw[k]==null){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+      const hd=c.tagName==='TH'||/text-transform\s*:\s*uppercase|letter-spacing/.test(c.innerHTML);const f=hd?1.45:1;
+      const lw=Math.max(0,...t.split(' ').map(w=>w.length))*f;need[k]=Math.max(need[k],lw);want[k]=Math.max(want[k],Math.min(t.length*f,60));}k+=span;}});
+    const ix=cw.map((v,i)=>v==null?i:-1).filter(i=>i>=0);const chr=5.2;// points per character at body size
+    let base=ix.map(i=>Math.max(24,need[i]*chr+8));const bsum=base.reduce((a,b)=>a+b,0);
+    if(bsum>=rest){grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]*rest/bsum);}
+    else{const extra=rest-bsum;const ww=ix.map(i=>Math.max(1,want[i]*chr+8-(need[i]*chr+8)));const wsum=ww.reduce((a,b)=>a+b,0);grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]+extra*ww[j]/wsum);}}
+   else grid=cw.slice();
+   // Like a browser, never make a column narrower than its longest word (headings in capitals shrink instead, below).
+   {const minW=Array(ncol).fill(0);cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+     if(t&&t===t.toUpperCase()&&/[A-Z]{3}/.test(t)){const lw=Math.max(0,...t.split(' ').map(w=>w.length));minW[k]=Math.max(minW[k],lw*6.5*0.78+12);}
+     else if(t){const fs=pt((c.querySelector('[style*="font-size"]')||c).style.fontSize)||9.5;const lw=Math.max(0,...t.split(' ').map(w=>w.length));const pd=(pt(css(c.getAttribute('style'))['padding-left'])??cpad)+(pt(css(c.getAttribute('style'))['padding-right'])??cpad);
+      minW[k]=Math.max(minW[k],lw*fs*0.68+pd+2);}}k+=span;}});
+    const tot0=grid.reduce((a,b)=>a+b,0);let short=0;grid=grid.map((g,i)=>{if(g<minW[i]){short+=minW[i]-g;return minW[i];}return g;});
+    if(short>0){const slack=grid.map((g,i)=>Math.max(0,g-minW[i]));const sl=slack.reduce((a,b)=>a+b,0);if(sl>0){const take=Math.min(short,sl);grid=grid.map((g,i)=>g-take*slack[i]/sl);}}
+    if(W) {const t=grid.reduce((a,b)=>a+b,0);if(t>tot0+0.5) grid=grid.map(g=>g*tot0/t);}}
+   const sum=grid.reduce((a,b)=>a+b,0);const scale=W||sum>avail?(W||avail)/sum:1;grid=grid.map(v=>v*scale);const tot=grid.reduce((a,b)=>a+b,0);
+   const tblBd=tb.getAttribute('border')&&tb.getAttribute('border')!=='0';
+   let o='<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(tot*20)+'" w:type="dxa"/>'+(ts['margin-left']==='auto'||tb.getAttribute('align')==='center'?'<w:jc w:val="center"/>':'')+'<w:tblLayout w:type="fixed"/>'+
+    (tblBd?'<w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(k=>'<w:'+k+' w:val="single" w:sz="4" w:space="0" w:color="C9B998"/>').join('')+'</w:tblBorders>':'')+
+    '<w:tblCellMar><w:top w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:left w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:bottom w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:right w:w="'+Math.round(cpad*20)+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'+grid.map(g=>'<w:gridCol w:w="'+Math.round(g*20)+'"/>').join('')+'</w:tblGrid>';
+   const vm={};// rowspan carry: col -> remaining
+   rows.forEach((tr,ri)=>{const trs=st(tr);const trBg=hex(tr.getAttribute('bgcolor'))||hex(trs['background-color']);let hRow=0;let k=0;let tcs='';const rc=cells[ri];let ci=0;
+    const emitMerge=()=>{while(vm[k]&&vm[k].n>0){const m=vm[k];tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(m.w*20)+'" w:type="dxa"/>'+(m.span>1?'<w:gridSpan w:val="'+m.span+'"/>':'')+'<w:vMerge/>'+m.pr+'</w:tcPr><w:p/></w:tc>';m.n--;k+=m.span;}};
+    emitMerge();
+    for(const c of rc){emitMerge();const span=parseInt(c.getAttribute('colspan'))||1;const rs=parseInt(c.getAttribute('rowspan'))||1;const cs=st(c);const w=grid.slice(k,k+span).reduce((a,b)=>a+b,0);
+     const fill=hex(c.getAttribute('bgcolor'))||hex(cs['background-color'])||trBg;
+     const bd=['top','left','bottom','right'].map(s=>{const b=border(cs['border-'+s]);return b?'<w:'+s+' '+(b.none?'w:val="nil"':'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"')+'/>':'';}).join('');
+     const mar=['top','left','bottom','right'].map(s=>{const p=pt(cs['padding-'+s]);return p!=null?'<w:'+s+' w:w="'+Math.round(p*20)+'" w:type="dxa"/>':'';}).join('');
+     const va=cs['vertical-align']||c.getAttribute('valign');const h=pt(cs.height)||(c.getAttribute('height')?parseFloat(c.getAttribute('height'))*0.75:0);if(h>hRow) hRow=h;
+     const pr=(bd?'<w:tcBorders>'+bd+'</w:tcBorders>':'')+shd(fill)+(mar?'<w:tcMar>'+mar+'</w:tcMar>':'')+(va==='middle'?'<w:vAlign w:val="center"/>':va==='bottom'?'<w:vAlign w:val="bottom"/>':'');
+     const cr=runCtx(r,c,cs);const padL=pt(cs['padding-left']),padR=pt(cs['padding-right']);const inner=blocks(c,cr,Object.assign({},cs,{'padding-left':'0','margin-left':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:Math.max(24,w-(padL!=null?padL:cpad)-(padR!=null?padR:cpad)),depth:(ctx.depth||0)}));
+     let body=inner.join('');if(!inner.length||/<\/w:tbl>$/.test(inner[inner.length-1])) body+='<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'+(cr.sz&&cr.sz<6?'<w:rPr><w:sz w:val="'+Math.max(2,Math.round(cr.sz*2))+'"/></w:rPr>':'')+'</w:pPr></w:p>';
+     tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(span>1?'<w:gridSpan w:val="'+span+'"/>':'')+(rs>1?'<w:vMerge w:val="restart"/>':'')+pr+'</w:tcPr>'+body+'</w:tc>';
+     if(rs>1) vm[k]={n:rs-1,span,w,pr};k+=span;ci++;}
+    emitMerge();
+    if(k<ncol){const w=grid.slice(k).reduce((a,b)=>a+b,0);tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(ncol-k>1?'<w:gridSpan w:val="'+(ncol-k)+'"/>':'')+'</w:tcPr><w:p/></w:tc>';}
+    const trPr=(hRow?'<w:trHeight w:val="'+Math.round(hRow*20)+'" w:hRule="'+(hRow<=6?'exact':'atLeast')+'"/>':'')+(keep||rows.length<=3?'<w:cantSplit/>':'')+(ri===0&&rc.some(c=>c.tagName==='TH')?'<w:tblHeader/>':'');
+    o+='<w:tr>'+(trPr?'<w:trPr>'+trPr+'</w:trPr>':'')+tcs+'</w:tr>';});
+   o+='</w:tbl>';
+   const out=[];if(pb) out.push('<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>');
+   const mt=pt(ts['margin-top']);if(mt) out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round(mt*20))+'" w:lineRule="exact"/></w:pPr></w:p>');
+   out.push(o);
+   // Word needs a paragraph between two tables or they merge; a hairline one keeps the gap as small as the HTML's.
+   const mb=pt(ts['margin-bottom']);out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round((mb||0)*20))+'" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>');
+   if(keep) out[out.length-2]=out[out.length-2].replace(/<w:p>((?:(?!<\/w:p>).)*)<\/w:p>/g,(m,b)=>'<w:p>'+b.replace('<w:pPr>','<w:pPr><w:keepNext/>')+'</w:p>');
+   return out;}
+  let parts=blocks(body,R0,bst,{depth:0});
+  // Drop trailing spacer paragraphs at the very end of the document.
+  while(parts.length>1&&/w:line="20" w:lineRule="exact"/.test(parts[parts.length-1])) parts.pop();
+  const twip=v=>Math.round(v*20);
+  const sect='<w:sectPr><w:pgSz w:w="'+twip(pageW)+'" w:h="'+twip(pageH)+'"'+(land?' w:orient="landscape"':'')+'/><w:pgMar w:top="'+twip(mg[0])+'" w:right="'+twip(mg[1])+'" w:bottom="'+twip(mg[2])+'" w:left="'+twip(mg[3])+'" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>';
+  const title=(doc.title||'').trim();
+  const font=(R0.font||'Georgia');const sz=Math.round((R0.sz||10.5)*2);const color=R0.color||'1A1410';
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const files=[
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>'],
+   ['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+x(title)+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>'],
+   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>'],
+   ['word/settings.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings '+W+'><w:zoom w:percent="100"/><w:defaultTabStop w:val="360"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>'],
+   ['word/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+x(font)+'" w:hAnsi="'+x(font)+'" w:eastAsia="'+x(font)+'" w:cs="'+x(font)+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'+
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'+
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
+   ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
+  return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
+ function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
+ function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
+ return {conv,save,hook};})();
+// ---------- Corbel PowerPoint decks: a real .pptx, built in the page ----------
+// A deck is a list of slides; each slide is a title, an optional kicker and a list of shapes placed in inches on a 13.333 x 7.5 in (16:9) page.
+// Shapes: text, box (a filled rectangle), table, bars (a simple horizontal bar chart drawn with rectangles), tiles (headline numbers).
+const PX=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});}
+ const X=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
+ const E=n=>Math.round(n*914400);const hx=c=>String(c||'000000').replace('#','').toUpperCase();
+ const C={navy:'1B2F4E',deep:'0F1E36',gold:'E8D5A8',taupe:'8B6F3D',rule:'C9B998',ink:'1A1410',tint:'F6F1E7',tint2:'FBF8F2',mute:'7A7065',red:'9B2C2C',amber:'B7791F',green:'2E7D32',white:'FFFFFF'};
+ const FONT='Georgia';
+ const NS='xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"';
+ let ID=2;
+ // A run list: a string, or [{t,b,i,c,sz}]
+ function runs(t,o){o=o||{};const L=Array.isArray(t)?t:[{t}];return L.map(r=>{const sz=Math.round((r.sz||o.sz||14)*100);return '<a:r><a:rPr lang="en-US" sz="'+sz+'"'+((r.b??o.b)?' b="1"':'')+((r.i??o.i)?' i="1"':'')+' dirty="0"><a:solidFill><a:srgbClr val="'+hx(r.c||o.c||C.ink)+'"/></a:solidFill><a:latin typeface="'+FONT+'"/><a:cs typeface="'+FONT+'"/></a:rPr><a:t>'+X(r.t)+'</a:t></a:r>';}).join('');}
+ function paras(ps,o){o=o||{};return (Array.isArray(ps)?ps:[ps]).map(p=>{const P=typeof p==='string'||Array.isArray(p)?{t:p}:p;const bul=P.bullet??o.bullet;const al=P.align||o.align||'l';
+   return '<a:p><a:pPr algn="'+al+'"'+(bul?' marL="228600" indent="-228600"':'')+'><a:spcBef><a:spcPts val="'+Math.round((P.before??o.before??4)*100)+'"/></a:spcBef>'+(bul?'<a:buFont typeface="Arial"/><a:buChar char="•"/>':'<a:buNone/>')+'</a:pPr>'+runs(P.t,{...o,...P})+'<a:endParaRPr lang="en-US" sz="'+Math.round((P.sz||o.sz||14)*100)+'"/></a:p>';}).join('');}
+ function sp(x,y,w,h,{fill,line,text,o,anchor,inset}){const id=ID++;return '<p:sp><p:nvSpPr><p:cNvPr id="'+id+'" name="Shape '+id+'"/><p:cNvSpPr'+(text!=null?' txBox="1"':'')+'/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="'+E(x)+'" y="'+E(y)+'"/><a:ext cx="'+E(w)+'" cy="'+E(h)+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom>'+(fill?'<a:solidFill><a:srgbClr val="'+hx(fill)+'"/></a:solidFill>':'<a:noFill/>')+(line?'<a:ln w="9525"><a:solidFill><a:srgbClr val="'+hx(line)+'"/></a:solidFill></a:ln>':'<a:ln><a:noFill/></a:ln>')+'</p:spPr>'+
+  '<p:txBody><a:bodyPr wrap="square" lIns="'+E(inset??.08)+'" rIns="'+E(inset??.08)+'" tIns="'+E(inset??.05)+'" bIns="'+E(inset??.05)+'" anchor="'+(anchor||'t')+'"><a:normAutofit/></a:bodyPr><a:lstStyle/>'+(text!=null?paras(text,o):'<a:p><a:endParaRPr lang="en-US"/></a:p>')+'</p:txBody></p:sp>';}
+ function table(x,y,w,cols,rows,o){o=o||{};const id=ID++;const tw=cols.reduce((a,b)=>a+b,0);const cw=cols.map(c=>c/tw*w);const rh=o.rh||.36;const sz=o.sz||11;
+  const cell=(v,hdr,i)=>{const P=typeof v==='object'&&v&&!Array.isArray(v)?v:{t:v};const fill=hdr?C.navy:P.fill||(i%2?C.tint2:C.white);
+   return '<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>'+paras([{t:String(P.t??''),b:hdr||P.b,c:hdr?C.gold:P.c||C.ink,sz:hdr?sz-1:sz,align:P.align||'l',before:0}])+'</a:txBody><a:tcPr marL="'+E(.07)+'" marR="'+E(.07)+'" marT="'+E(.04)+'" marB="'+E(.04)+'">'+
+    ['L','R','T','B'].map(s=>'<a:ln'+s+' w="6350"><a:solidFill><a:srgbClr val="'+C.rule+'"/></a:solidFill></a:ln'+s+'>').join('')+'<a:solidFill><a:srgbClr val="'+hx(fill)+'"/></a:solidFill></a:tcPr></a:tc>';};
+  return '<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="'+id+'" name="Table '+id+'"/><p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr><p:xfrm><a:off x="'+E(x)+'" y="'+E(y)+'"/><a:ext cx="'+E(w)+'" cy="'+E(rh*rows.length)+'"/></p:xfrm><a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/table"><a:tbl><a:tblPr firstRow="1"/><a:tblGrid>'+cw.map(c=>'<a:gridCol w="'+E(c)+'"/>').join('')+'</a:tblGrid>'+
+   rows.map((r,i)=>'<a:tr h="'+E(i===0&&!o.nohead?(o.hh||Math.min(rh,.42)):rh)+'">'+r.map(v=>cell(v,i===0&&!o.nohead,i)).join('')+'</a:tr>').join('')+'</a:tbl></a:graphicData></a:graphic></p:graphicFrame>';}
+ function shape(s){if(s.k==='text') return sp(s.x,s.y,s.w,s.h,{fill:s.fill,line:s.line,text:s.text,o:s.o,anchor:s.anchor});
+  if(s.k==='box') return sp(s.x,s.y,s.w,s.h,{fill:s.fill,line:s.line,text:s.text??null,o:s.o,anchor:s.anchor});
+  if(s.k==='table') return table(s.x,s.y,s.w,s.cols,s.rows,s.o);
+  if(s.k==='tiles'){const n=s.items.length,g=.15,w=(s.w-g*(n-1))/n;return s.items.map((t,i)=>sp(s.x+i*(w+g),s.y,w,s.h||1.05,{fill:C.tint,line:C.rule,text:[{t:String(t[0]).toUpperCase(),sz:9,c:C.mute,before:0},{t:String(t[1]),sz:24,c:t[2]||C.navy,before:2}],anchor:'ctr',inset:.12})).join('');}
+  if(s.k==='bars'){const L=s.items;if(!L.length) return '';const mx=Math.max(...L.map(b=>b.v),1);const rh=Math.min(.42,s.h/L.length);const lw=s.lw||3.2;let o='';
+   L.forEach((b,i)=>{const y=s.y+i*rh;const bw=Math.max(.02,(s.w-lw-1.2)*b.v/mx);o+=sp(s.x,y,lw-.1,rh,{text:[{t:b.l,sz:11,before:0}],anchor:'ctr',inset:.02})+sp(s.x+lw,y+rh*.18,bw,rh*.64,{fill:b.c||C.navy})+sp(s.x+lw+bw+.05,y,1.15,rh,{text:[{t:b.lab||String(b.v),sz:10,c:C.mute,before:0}],anchor:'ctr',inset:.02});});
+   if(s.line!=null){const lx=s.x+lw+(s.w-lw-1.2)*s.line/mx;o+=sp(lx,s.y-.1,.02,L.length*rh+.2,{fill:C.red})+sp(lx+.05,s.y-.35,2.4,.3,{text:[{t:s.lineLabel||'',sz:10,c:C.red,b:true,before:0}],inset:.01});}return o;}
+  return '';}
+ // Title band on every slide: navy bar with kicker and title, a gold rule, footer.
+ function slideXml(s,n,N,deck){ID=2;const W=13.333;let o='';
+  if(s.cover){o+=sp(0,0,W,7.5,{fill:C.navy})+sp(.8,2.2,W-1.6,.4,{text:[{t:'CORBEL  ·  '+String(deck.kind||'BRIEF').toUpperCase(),sz:12,c:C.gold,before:0}]})+sp(.8,2.7,W-1.6,1.6,{text:[{t:s.title,sz:40,c:C.white,before:0}]})+sp(.8,4.35,W-1.6,.04,{fill:C.gold})+sp(.8,4.55,W-1.6,1,{text:[{t:s.sub||'',sz:16,i:true,c:C.gold,before:0}]})+sp(.8,6.6,W-1.6,.4,{text:[{t:deck.foot||'',sz:10,c:C.gold,before:0}]});}
+  else{o+=sp(0,0,W,1.15,{fill:C.navy})+sp(.5,.12,W-1,.3,{text:[{t:String(s.kicker||deck.kind||'').toUpperCase(),sz:10,c:C.gold,before:0}]})+sp(.5,.4,W-1,.7,{text:[{t:s.title,sz:26,c:C.white,before:0}],anchor:'t'})+sp(0,1.15,W,.05,{fill:C.gold});
+   (s.shapes||[]).forEach(x=>o+=shape(x));
+   o+=sp(.5,7.05,W-2,.3,{text:[{t:deck.foot||'',sz:9,c:C.mute,before:0}]})+sp(W-1.3,7.05,.8,.3,{text:[{t:n+' / '+N,sz:9,c:C.mute,before:0,align:'r'}]});}
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sld '+NS+'><p:cSld><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="0" cy="0"/><a:chOff x="0" y="0"/><a:chExt cx="0" cy="0"/></a:xfrm></p:grpSpPr>'+o+'</p:spTree></p:cSld>'+(s.notes?'':'')+'<p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sld>';}
+ const THEME='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="Corbel"><a:themeElements><a:clrScheme name="Corbel"><a:dk1><a:srgbClr val="1A1410"/></a:dk1><a:lt1><a:srgbClr val="FFFFFF"/></a:lt1><a:dk2><a:srgbClr val="1B2F4E"/></a:dk2><a:lt2><a:srgbClr val="F6F1E7"/></a:lt2><a:accent1><a:srgbClr val="1B2F4E"/></a:accent1><a:accent2><a:srgbClr val="8B6F3D"/></a:accent2><a:accent3><a:srgbClr val="E8D5A8"/></a:accent3><a:accent4><a:srgbClr val="9B2C2C"/></a:accent4><a:accent5><a:srgbClr val="2E7D32"/></a:accent5><a:accent6><a:srgbClr val="7A7065"/></a:accent6><a:hlink><a:srgbClr val="1F5566"/></a:hlink><a:folHlink><a:srgbClr val="5C4A33"/></a:folHlink></a:clrScheme><a:fontScheme name="Corbel"><a:majorFont><a:latin typeface="Georgia"/><a:ea typeface=""/><a:cs typeface=""/></a:majorFont><a:minorFont><a:latin typeface="Georgia"/><a:ea typeface=""/><a:cs typeface=""/></a:minorFont></a:fontScheme><a:fmtScheme name="Corbel"><a:fillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="19050"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln><a:ln w="28575"><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill><a:solidFill><a:schemeClr val="phClr"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme></a:themeElements></a:theme>';
+ const MASTER='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldMaster '+NS+'><p:cSld><p:bg><p:bgPr><a:solidFill><a:srgbClr val="FFFFFF"/></a:solidFill><a:effectLst/></p:bgPr></p:bg><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1" accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5" accent6="accent6" hlink="hlink" folHlink="folHlink"/><p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rId1"/></p:sldLayoutIdLst><p:txStyles><p:titleStyle><a:lvl1pPr><a:defRPr sz="2800"/></a:lvl1pPr></p:titleStyle><p:bodyStyle><a:lvl1pPr><a:defRPr sz="1400"/></a:lvl1pPr></p:bodyStyle><p:otherStyle><a:lvl1pPr><a:defRPr sz="1400"/></a:lvl1pPr></p:otherStyle></p:txStyles></p:sldMaster>';
+ const LAYOUT='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:sldLayout '+NS+' type="blank" preserve="1"><p:cSld name="Blank"><p:spTree><p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr><p:grpSpPr/></p:spTree></p:cSld><p:clrMapOvr><a:masterClrMapping/></p:clrMapOvr></p:sldLayout>';
+ const REL=(id,type,t)=>'<Relationship Id="'+id+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/'+type+'" Target="'+t+'"/>';
+ const RELS=L=>'<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+L.join('')+'</Relationships>';
+ function build(deck){const S=deck.slides;const N=S.length;const f=[];
+  f.push(['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/ppt/presentation.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"/><Override PartName="/ppt/slideMasters/slideMaster1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml"/><Override PartName="/ppt/slideLayouts/slideLayout1.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml"/><Override PartName="/ppt/theme/theme1.xml" ContentType="application/vnd.openxmlformats-officedocument.theme+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/><Override PartName="/docProps/app.xml" ContentType="application/vnd.openxmlformats-officedocument.extended-properties+xml"/>'+S.map((s,i)=>'<Override PartName="/ppt/slides/slide'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.presentationml.slide+xml"/>').join('')+'</Types>']);
+  f.push(['_rels/.rels',RELS([REL('rId1','officeDocument','ppt/presentation.xml'),'<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/>',REL('rId3','extended-properties','docProps/app.xml')])]);
+  f.push(['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+X(deck.title||'')+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>']);
+  f.push(['docProps/app.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><Application>Corbel</Application><Slides>'+N+'</Slides></Properties>']);
+  f.push(['ppt/presentation.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><p:presentation '+NS+' saveSubsetFonts="1"><p:sldMasterIdLst><p:sldMasterId id="2147483648" r:id="rId1"/></p:sldMasterIdLst><p:sldIdLst>'+S.map((s,i)=>'<p:sldId id="'+(256+i)+'" r:id="rId'+(i+3)+'"/>').join('')+'</p:sldIdLst><p:sldSz cx="12192000" cy="6858000"/><p:notesSz cx="6858000" cy="9144000"/></p:presentation>']);
+  f.push(['ppt/_rels/presentation.xml.rels',RELS([REL('rId1','slideMaster','slideMasters/slideMaster1.xml'),REL('rId2','theme','theme/theme1.xml')].concat(S.map((s,i)=>REL('rId'+(i+3),'slide','slides/slide'+(i+1)+'.xml'))))]);
+  f.push(['ppt/slideMasters/slideMaster1.xml',MASTER]);f.push(['ppt/slideMasters/_rels/slideMaster1.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml'),REL('rId2','theme','../theme/theme1.xml')])]);
+  f.push(['ppt/slideLayouts/slideLayout1.xml',LAYOUT]);f.push(['ppt/slideLayouts/_rels/slideLayout1.xml.rels',RELS([REL('rId1','slideMaster','../slideMasters/slideMaster1.xml')])]);
+  f.push(['ppt/theme/theme1.xml',THEME]);
+  S.forEach((s,i)=>{f.push(['ppt/slides/slide'+(i+1)+'.xml',slideXml(s,i+1,N,deck)]);f.push(['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml')])]);});
+  return zip(f);}
+ function save(name,deck){const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+ // Split long tables over several slides.
+ function chunk(rows,n){const h=rows[0],b=rows.slice(1),out=[];for(let i=0;i<b.length;i+=n) out.push([h].concat(b.slice(i,i+n)));return out.length?out:[[h]];}
+ return {save,build,chunk,C};})();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ // Engines are named for their job on screen; which service runs each stays here.
+ var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'){if(x.role==='arbiter'){x.model='reviewer';x.label='Reviewer';}else if(/gemini|reader-b/i.test(x.model)){x.model='reader-b';x.label='Reader B';}else{x.model='reader-a';x.label='Reader A';}}});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ // Connecting other AI services (the .mil build's GenAI.mil, for one) is an administrator task.
+ function gate(){var adm=false;try{adm=localStorage.getItem('carl_ai_admin')==='1';}catch(e){}var b=document.getElementById('bSettings');if(b&&!adm) b.style.display='none';}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',gate);else gate();
+})();
+</script>
+</body>
+</html>
