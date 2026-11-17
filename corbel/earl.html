@@ -227,7 +227,7 @@ td.num input{text-align:right}
  <h1>EARL <span style="font-weight:400;font-size:15px;opacity:.75">Economic Analysis and Recommendation Ledger</span></h1>
  <div class="sp"></div>
  <span class="saved" id="saved"></span>
- <button id="bNew">New analysis</button>
+ 
  <button id="bOpen">Open…</button>
  <input type="file" id="fOpen" accept=".json" hidden>
  <button id="bSave">Save file</button>
@@ -270,6 +270,7 @@ function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setIt
  if(rec_alt&&Array.isArray(rec.rtm)){const h=rec.rtm[0];const ci=h.indexOf('EARL alternative'),ri=h.indexOf('Req ID');if(ci>=0) rec.rtm.slice(1).forEach(row=>{const q=E.reqs.find(x=>x.src===row[ri]);row[ci]=q?rec_alt.name+': '+({pass:'meets',partial:'partly meets',fail:'does not meet'}[E.cells[rec_alt.id+'|'+q.id]]||'not assessed'):rec_alt.name;});}
  localStorage.setItem('milcon_record',JSON.stringify(rec));
  $('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){console.warn(e);$('#saved').textContent='Not saved – use Save file';}},300);}
+function lt(iso){const d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
 function log(what,detail){E.log.push({at:new Date().toISOString(),what,detail:detail||''});}
 
 // ---------- engine ----------
@@ -287,8 +288,11 @@ function npv(a,opt={}){const i=opt.rate??rate(opt.N);const st=stream(a,opt);let 
   const v=st.one[t]*f1+st.rec[t]*f2;pv+=v;und+=st.one[t]+st.rec[t];cum.push(pv);}
  const rv=st.res*factor(st.N,i,false);pv-=rv;und-=st.res;cum[st.N]-=rv;
  return {pv,und,rv:st.res,cum,inv:st.one.reduce((s,x)=>s+x,0),annRec:st.rec[st.N]||0};}
-function feasible(a){if(a.screen==='out') return false;return !E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail');}
-function failReasons(a){const r=[];if(a.screen==='out') r.push(a.screen_reason||'Screened out');E.reqs.filter(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail').forEach(q=>r.push('Fails: '+q.text));return r;}
+// The status quo is always the baseline, but it cannot be recommended when NORA shows a gap it leaves open.
+function sqGap(){if(E.sq_ok) return null;try{return (noraData()?.gaps||[]).find(g=>g.qty_have!==''&&g.qty_have!=null&&Number(g.qty_need)>Number(g.qty_have))||null;}catch(e){return null;}}
+function sqGapText(g){return 'Does not close the gap: '+Number(g.qty_have).toLocaleString()+' of '+Number(g.qty_need).toLocaleString()+' '+(g.unit||'')+(g.area?' ('+g.area+')':'');}
+function feasible(a){if(a.screen==='out') return false;if(a.type==='status_quo'&&sqGap()) return false;return !E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail');}
+function failReasons(a){const r=[];if(a.screen==='out') r.push(a.screen_reason||'Screened out');if(a.type==='status_quo'&&a.screen!=='out'){const g=sqGap();if(g) r.push(sqGapText(g));}E.reqs.filter(q=>q.must&&E.cells[a.id+'|'+q.id]==='fail').forEach(q=>r.push('Fails: '+q.text));return r;}
 function wscore(a){const W=E.criteria.reduce((s,c)=>s+(Number(c.weight)||0),0)||1;return E.criteria.reduce((s,c)=>s+(Number(c.weight)||0)*(Number(a.scores[c.id])||0),0)/W;}
 function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);const unpriced=feasible(a)&&!a.costs.some(c=>Number(c.amount)>0);return {a,unpriced,ok:feasible(a)&&!unpriced,npv:n.pv,und:n.und,rv:n.rv,cum:n.cum,ws:wscore(a)};});
  const ok=rows.filter(r=>r.ok).sort((x,y)=>x.npv-y.npv);ok.forEach((r,i)=>r.rank=i+1);return {rows,ok,lead:ok[0],second:ok[1]};}
@@ -309,29 +313,35 @@ const $r=(g)=>g?$k(g.lo)+' – '+$k(g.hi):'—';
 function rangeText(RI){const R=RI.R;if(!R.lead) return 'No alternative is costed yet.';if(RI.holds===null) return 'Only one alternative is costed, so there is nothing to compare it with.';
  if(RI.holds) return 'The ranking holds: even at the high end of its range, '+R.lead.a.name+' costs less than every other alternative at the low end of its range.';
  return 'The ranking depends on estimates: '+RI.beat.map(r=>r.a.name).join(', ')+' could cost less than '+R.lead.a.name+' if the estimates move within their ranges.';}
-function vDone(){const v=$('#view');const RI=rangeInfo();const R=RI.R;const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const rr=rec&&R.rows.find(x=>x.a===rec);
+function vDone(){const v=$('#view');{const R0=results();if(E.recommend.alt&&!R0.ok.some(r=>r.a.id===E.recommend.alt)&&R0.lead){const was=(E.alts.find(a=>a.id===E.recommend.alt)||{}).name;E.recommend.alt=R0.lead.a.id;log('Recommendation moved',(was||'—')+' is no longer eligible; now '+R0.lead.a.name);save();}}
+ if(!E.recommend.by&&window.CARLAI&&CARLAI.state().user){E.recommend.by=CARLAI.state().user;save();}
+ const RI=rangeInfo();const R=RI.R;const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const rr=rec&&R.rows.find(x=>x.a===rec);
  const org=a=>a.type==='status_quo'?'<span class="pill">Baseline</span>':a.origin==='notes'?'<span class="pill ok">Your notes</span>':a.origin==='standard'?'<span class="pill">Standard</span>':a.origin?'<span class="pill warn">AI suggestion</span>':'<span class="pill">You</span>';
  const todo=[];const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) todo.push(est.length+' status quo cost estimate'+(est.length>1?'s':'')+' (confirmed when you applied; reconfirm with CE or finance)');
  const un=R.rows.filter(r=>r.unpriced);if(un.length) todo.push('Not costed, so not ranked: '+un.map(r=>r.a.name).join(', ')+'. Add their costs under Adjust details → Life-cycle costs.');
  const ai=Object.keys(E.cellWhy||{}).length;if(ai) todo.push(ai+' screening calls proposed by AI. Review them under Adjust details → Alternatives and screening.');
  if(RI.drv.length&&RI.holds===false) todo.push('Firm up first: '+RI.drv.map(d=>(d.c.label||'').split(/ – |: /)[0]+' ('+$k(d.sw)+' swing)').join('; ')+'.');
- const gp=(noraData()?.gaps||[]).find(g=>Number(g.qty_have)>=0&&Number(g.qty_need)>Number(g.qty_have)&&g.qty_have!=='');if(R.lead&&R.lead.a.type==='status_quo'&&gp) todo.unshift('The status quo ranks first, but NORA shows a gap ('+gp.qty_have+' of '+gp.qty_need+' '+(gp.unit||'')+' for '+(gp.area||'the requirement')+'). If it cannot meet a must-have, screen it out under Adjust details → Alternatives and screening.');
+ if(E.sq_ok) todo.push('You marked the status quo as able to meet the need, although NORA shows a gap. The memo will say so.');
  if(!E.recommend.rationale) todo.push('No rationale yet. Write it with AI below or by hand under Adjust details → Recommendation.');
  const stale=E.build&&E.build.noraSig&&noraSig()&&E.build.noraSig!==noraSig();
  v.innerHTML=(stale?'<div class="panel"><div class="find warn"><b>NORA has changed since this AoA was built.</b> Requirements, gaps or constraints were added or edited. Build again to bring the courses of action, screening and costs up to date; your earlier answers are kept in the assumptions.</div><div class="row"><button class="go" id="dRe">Build again</button><button id="dKeep">Keep as is</button></div></div>':'')+'<div class="panel"><h2>Your analysis of alternatives</h2>'+
   (rec&&rr&&rr.ok?'<div class="kpis"><div class="card"><span class="small">Recommended</span><span class="big">'+esc(rec.name)+'</span><span class="small">'+esc(ATYPES[rec.type])+'</span></div><div class="card"><span class="small">NPV of cost, '+period()+' years</span><span class="big">'+$k(rr.npv)+'</span><span class="small">Likely '+$r(RI.rg[rec.id])+'</span></div><div class="card"><span class="small">Ranking</span><span class="big">'+(RI.holds===null?'—':RI.holds?'Holds':'Close')+'</span><span class="small">'+(RI.holds===false?'depends on estimates':'across estimate ranges')+'</span></div></div>'+
    '<div class="mentor">'+esc(rangeText(RI))+'</div>':'<div class="find warn">No alternative is costed and feasible yet. Use Adjust details to add costs, or build again.</div>')+
-  '<div class="row"><button class="go" id="dAoA">Download AoA</button><button id="dMemo">Download memo</button><button id="dAI">'+(E.recommend.rationale?'Rewrite rationale with AI':'Write rationale with AI')+'</button></div>'+
   '<p class="small">The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p></div>'+
   '<div class="panel"><h2>Ranking</h2><table><thead><tr><th>Rank</th><th>Alternative</th><th>From</th><th class="num">NPV of cost</th><th class="num">Likely range</th><th class="num">Non-cost score</th></tr></thead><tbody>'+
-  R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>'<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+(r.rank||'—')+'</td><td>'+esc(r.a.name)+(r.ok?'':'<br><span class="small">'+esc(r.unpriced?'Not costed':'Screened out: '+failReasons(r.a).join('; '))+'</span>')+'</td><td>'+org(r.a)+'</td><td class="num">'+(r.ok?$k(r.npv):'—')+'</td><td class="num">'+(r.ok?$r(RI.rg[r.a.id]):'—')+'</td><td class="num">'+r.ws.toFixed(2)+'</td></tr>').join('')+'</tbody></table>'+
+  R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>{const bl=!r.ok&&!r.unpriced&&r.a.type==='status_quo'&&r.a.screen!=='out'&&sqGap();return '<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+(r.rank||'—')+'</td><td>'+esc(r.a.name)+(r.ok?'':'<br><span class="small">'+esc(r.unpriced?'Not costed':bl?'Baseline, shown for comparison. '+failReasons(r.a).join('; ')+', so it cannot be recommended.':'Screened out: '+failReasons(r.a).join('; '))+'</span>'+(bl?' <a href="#" id="sqOk" class="small">It can meet the need</a>':''))+(r.ok&&r.a.type==='status_quo'&&E.sq_ok?'<br><span class="small">You marked it as able to meet the need. <a href="#" id="sqNo">Undo</a></span>':'')+'</td><td>'+org(r.a)+'</td><td class="num">'+(r.ok||bl?$k(r.npv):'—')+'</td><td class="num">'+(r.ok?$r(RI.rg[r.a.id]):'—')+'</td><td class="num">'+r.ws.toFixed(2)+'</td></tr>';}).join('')+'</tbody></table>'+
   '<p class="small">Likely range: '+Object.values(RANGE).map(x=>x[2]+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs you entered are taken as given.</p></div>'+
   (todo.length?'<div class="panel"><h2>Check before you send it</h2><ul>'+todo.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'')+
-  (E.recommend.rationale?'<div class="panel"><h2>Rationale</h2><p>'+esc(E.recommend.rationale).replace(/\n/g,'<br>')+'</p>'+(E.recommend.ai_check?'<div class="mentor">'+esc(E.recommend.ai_check)+'</div>':'')+'</div>':'');
+  (function(){const iss=E.recommend.rationale?ratIssues():[];return '<div class="panel" id="ratP"><h2>Rationale</h2>'+(E.recommend.rationale?'<p>'+esc(E.recommend.rationale).replace(/\n/g,'<br>')+'</p>':'<p class="small">Not written yet.</p>')+
+   (iss.length?'<div class="find warn"><b>Rewrite before you send it.</b> '+esc(iss.join(' '))+'</div>':E.recommend.rationale?'<div class="mentor">Names the recommended alternative; every number matches the analysis.</div>':'')+
+   '<div class="row"><button class="'+(iss.length||!E.recommend.rationale?'go':'')+'" id="dAI">'+(E.recommend.rationale?'Rewrite with AI':'Write with AI')+'</button><button id="dDr">'+(E.recommend.rationale?'Redraft from the analysis (no AI)':'Draft from the analysis (no AI)')+'</button></div></div>';})()+
+  outsPanel();
  if(stale){$('#dRe').onclick=()=>{STEP='build';render();window.scrollTo(0,0);};$('#dKeep').onclick=()=>{E.build.noraSig=noraSig();log('Kept AoA after NORA changed');save();vDone();};}
- $('#dAoA').onclick=()=>{dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');save();};
- $('#dMemo').onclick=()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword');
- $('#dAI').onclick=()=>{if(!E.recommend.alt&&rec) E.recommend.alt=rec.id;aiRationale();};}
+ $('#dAI').onclick=()=>{if(!E.recommend.alt&&rec) E.recommend.alt=rec.id;aiRationale();};
+ $('#dDr').onclick=()=>{if(!E.recommend.alt&&rec) E.recommend.alt=rec.id;if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();E.recommend.sig=recSig();E.recommend.ai_check='';log('Rationale drafted from the analysis');save();vDone();};
+ const so=$('#sqOk');if(so) so.onclick=e=>{e.preventDefault();if(!confirm('Treat the status quo as able to meet the need, although NORA shows a gap? It will be ranked and can be recommended.')) return;E.sq_ok=true;log('Status quo marked as able to meet the need');save();vDone();renderSteps();};
+ const sn=$('#sqNo');if(sn) sn.onclick=e=>{e.preventDefault();E.sq_ok=false;log('Status quo override removed');save();vDone();renderSteps();};
+ bindOuts(v);}
 
 // ---------- steps ----------
 const STEPS=[['build','Build my AoA',()=>E.build&&E.build.applied?'✓':''],['done','Your AoA',()=>E.recommend.alt?'✓':''],['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
@@ -339,7 +349,7 @@ function renderSteps(){const nav=$('#steps');
  if(!nav.dataset.built){const btn=(s,i)=>'<button data-s="'+s[0]+'"><span class="n">'+(i+1)+'</span>'+s[1]+'<span class="c"></span></button>';
   nav.innerHTML=STEPS.slice(0,2).map(btn).join('')+'<details id="adj"><summary style="cursor:pointer;padding:8px 10px;font-weight:600">Adjust details</summary>'+STEPS.slice(2).map((s,i)=>btn(s,i)).join('')+'</details><div class="gate"></div>';
   nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{STEP=b.dataset.s;render();window.scrollTo(0,0);});nav.dataset.built='1';}
- const adj=nav.querySelector('#adj');if(nav.dataset.last!==STEP){adj.open=!(['build','done'].includes(STEP)&&E.build&&E.build.applied);nav.dataset.last=STEP;}
+ const adj=nav.querySelector('#adj');if(nav.dataset.last!==STEP){adj.open=!['build','done'].includes(STEP);nav.dataset.last=STEP;}
  STEPS.forEach(s=>{const b=nav.querySelector('[data-s="'+s[0]+'"]');b.classList.toggle('on',STEP===s[0]);b.querySelector('.c').textContent=s[2]();});
  const R=results();nav.querySelector('.gate').innerHTML='<b>Gate 2:</b> preferred alternative approved.<br>'+(R.lead?'Lowest life-cycle cost: <b>'+esc(R.lead.a.name)+'</b> '+$k(R.lead.npv):'No feasible alternative costed yet.');}
 function render(){renderSteps();({build:vBuild,done:vDone,basis:vBasis,alts:vAlts,costs:vCosts,bens:vBens,res:vRes,rec:vRec})[STEP]();}
@@ -542,19 +552,35 @@ async function aiDescs(){if(!aiReady()) return;const todo=E.alts.filter(a=>!Stri
   let n=0;(j.descs||[]).forEach(d=>{const a=todo.find(x=>x.id===d.id);if(a&&d.desc){a.desc=String(d.desc).trim();n++;}});
   log('Descriptions written with AI',n+' alternatives');save();vAlts();}
  catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Write empty descriptions with AI';}}
+// The rationale must name the recommended alternative, use only the analysis's numbers, and match the current ranking.
+function recSig(){const R=results();return JSON.stringify([E.recommend.alt,R.ok.map(r=>[r.a.id,Math.round(r.npv/1000)])]);}
+function ratSrc(){const R=results();const rec=E.alts.find(a=>a.id===E.recommend.alt);const L=earlSources();L.push('BASIS: period of analysis '+period()+' years, '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+' discount rate, base FY'+E.base_fy);
+ R.rows.forEach(r=>L.push('ALTERNATIVE: '+r.a.name+' ('+ATYPES[r.a.type]+')'+(r.ok?' – rank '+r.rank+', NPV of cost '+$$(r.npv)+', non-cost score '+r.ws.toFixed(2):(r.a.type==='status_quo'&&sqGap()&&r.a.screen!=='out'?' – baseline, NPV of cost '+$$(r.npv)+'; ':' – screened out')+(failReasons(r.a).length?': '+failReasons(r.a).join('; '):''))+(r.a.desc?'; '+r.a.desc:'')));
+ if(rec) L.push('RECOMMENDED: '+rec.name);if(R.lead&&R.second) L.push('DIFFERENCE BETWEEN RANK 1 AND RANK 2: '+$$(R.second.npv-R.lead.npv));
+ const sq=R.rows.find(r=>r.a.type==='status_quo');if(sq&&rec&&sq.a!==rec) L.push('DIFFERENCE FROM THE STATUS QUO: '+$$(sq.npv-(R.rows.find(r=>r.a===rec)||{npv:0}).npv));
+ try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'% ('+S.be.toFixed(1)+'%)');}}catch(e){}
+ return L.join('\n');}
+function nameIn(t,name){const w=String(name).toLowerCase().match(/[a-z0-9]{3,}/g)||[];if(!w.length) return true;const T=String(t).toLowerCase();return w.filter(x=>T.includes(x)).length/w.length>=0.6;}
+function ratNums(t,src){const S=String(src).replace(/,/g,'');const ok=new Set();(S.match(/\d[\d.]*/g)||[]).forEach(x=>{ok.add(x);const n=Number(x);if(n>=1000){[(n/1e6).toFixed(2),(n/1e6).toFixed(1),(n/1e6).toFixed(0),(n/1e3).toFixed(0),(n/1e9).toFixed(2)].forEach(v=>ok.add(v));}if(/\./.test(x)){ok.add(String(Number(x)));ok.add(Number(x).toFixed(1));ok.add(Number(x).toFixed(0));}});
+ const T=String(t).replace(/\{[A-Z]+-\d+\}/g,'').replace(/\bDoDI \d{4}\.\d{2}\b/g,'').replace(/\b\d+(?:st|nd|rd|th)\b/gi,'').replace(/\bFY\s?\d{2,4}\b/g,'').replace(/,/g,'');const bad=[];
+ (T.match(/\$\s?\d[\d.]*|\d[\d.]*/g)||[]).forEach(m=>{const d=m.replace(/^\$\s?/,'').replace(/\.$/,'');const money=/^\$/.test(m);if(!money&&d.length<2) return;if(ok.has(d)||S.includes(d)) return;bad.push((money?'$':'')+d);});return [...new Set(bad)];}
+function ratIssues(){const t=String(E.recommend.rationale||'').trim();const rec=E.alts.find(a=>a.id===E.recommend.alt);const I=[];if(!t) return ['No rationale written yet.'];
+ const sents=t.split(/(?<=[.!?])\s+/).filter(x=>/recommend/i.test(x));if(rec&&(!nameIn(t,rec.name)||(sents.length&&!sents.some(x=>nameIn(x,rec.name))))) I.push('It does not say that '+rec.name+' is the recommended alternative.');
+ if(E.recommend.sig&&E.recommend.sig!==recSig()) I.push('The ranking or costs changed after it was written.');
+ const bad=ratNums(t,ratSrc());if(bad.length) I.push('Numbers not found in the analysis: '+bad.join(', ')+'.');return I;}
 const RAT_SYS=`You write the recommendation rationale for a DoD military construction economic analysis memo (DoDI 7041.03). Two or three short paragraphs: which alternative is recommended and why, how it compares on net present value of cost with the next best, what the sensitivity results show about how robust the ranking is, and how the non-cost factors bear on it. If the recommended alternative is not the lowest cost, say plainly what the extra cost buys. Use ONLY facts and figures in SOURCES, written exactly as given. No references to AI.
 Return ONLY JSON: {"rationale":"the paragraphs, separated by a blank line"}`;
-async function aiRationale(){if(!aiReady()) return;const R=results();const rec=E.alts.find(a=>a.id===E.recommend.alt);
+async function aiRationale(quiet){if(!aiReady()) return;const R=results();const rec=E.alts.find(a=>a.id===E.recommend.alt);
  if(!rec){alert('Pick the recommended alternative first.');return;}
- if(E.recommend.rationale&&!confirm('Replace the rationale with an AI draft?')) return;
+ if(!quiet&&E.recommend.rationale&&!confirm('Replace the rationale with an AI draft?')) return;
  const L=earlSources();L.push('BASIS: period of analysis '+period()+' years, '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+' discount rate, base FY'+E.base_fy);
  R.rows.forEach(r=>L.push('ALTERNATIVE: '+r.a.name+' ('+ATYPES[r.a.type]+')'+(r.ok?' – rank '+r.rank+', NPV of cost '+$$(r.npv)+', non-cost score '+r.ws.toFixed(2):' – screened out'+(r.a.screen_reason?': '+r.a.screen_reason:''))+(r.a.desc?'; '+r.a.desc:'')));
  L.push('RECOMMENDED: '+rec.name);if(R.lead&&R.second) L.push('DIFFERENCE BETWEEN RANK 1 AND RANK 2: '+$$(R.second.npv-R.lead.npv));
  try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'%');}}catch(e){}
- const src=L.join('\n');const b=$('#bAIr')||$('#dAI');if(b){b.disabled=true;b.textContent='Writing…';}
+ const src=ratSrc();const b=$('#bAIr')||$('#dAI');if(b){b.disabled=true;b.textContent='Writing…';}
  try{const j=await CARLAI.ask('claude',RAT_SYS,'SOURCES:\n'+src);const t=String(j.rationale||'').trim();if(!t) throw new Error('Nothing returned');
-  const bad=numCheck(t,src);E.recommend.rationale=t;E.recommend.ai_check=bad.length?'Check these numbers, not found in the analysis: '+bad.join(', '):'';
-  log('Rationale written with AI',bad.length?bad.length+' numbers to check':'all numbers traced');save();render();}
+  E.recommend.rationale=t;E.recommend.sig=recSig();const iss=ratIssues();E.recommend.ai_check=iss.join(' ');
+  log('Rationale written with AI',iss.length?iss.join(' '):'names the recommended alternative; every number traced to the analysis');save();render();}
  catch(err){alert('Failed: '+err.message);if(b) b.disabled=false;if(b) b.textContent='Write rationale with AI';}}
 
 // ---------- Build my AoA: EARL does the heavy lifting, you review and decide ----------
@@ -600,7 +626,7 @@ async function buildAoA(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
   const sqItems=(SQ&&Array.isArray(SQ.items)?SQ.items:[]).filter(x=>CATS[x.cat]&&Number(x.amount)>0).slice(0,6).map((x,i)=>{const q=String(x.quote||'').trim();const qv=q&&hay.includes(norm(q));
    return {id:'s'+(i+1),keep:true,cat:x.cat,label:String(x.label||'').slice(0,90),amount:Math.round(Number(x.amount)),basis:x.basis==='stated'&&qv?'stated':'estimate',quote:q,quoteOk:qv,method:String(x.method||'')||(q&&!qv?'The figure was cited as \u201c'+q+'\u201d, which is not in your record; confirm it.':'No method given; confirm the amount.')};});
   E.build={at:new Date().toISOString(),coas,sq:sqItems,sqErr:SQ&&SQ.err||'',questions:(M.questions||[]).slice(0,5).map((q,i)=>({id:'q'+(i+1),q:String(q.q||''),why:String(q.why||''),a:''})),judge:J&&!J.err?J:{cells:[],scores:[]},judgeErr:J&&J.err||'',applied:false};
-  log('Build my AoA: proposals ready',coas.length+' courses of action, '+E.build.questions.length+' questions');save();st('');vBuild();}
+  log('Build my AoA: proposals ready',coas.length+' courses of action, '+E.build.questions.length+' questions');save();st('');vBuild();const rv=document.getElementById('rvw');if(rv) rv.scrollIntoView({block:'start'});}
  catch(err){st('');alert('Build failed: '+err.message);if(btn) btn.disabled=false;}}
 function needQty(){const n=noraData();return n&&(n.gaps||[]).map(g=>Number(g.qty_need)).find(x=>x>0)||'';}
 function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>c.keep);
@@ -632,14 +658,15 @@ function applyBuild(){const B=E.build;if(!B) return;const kept=B.coas.filter(c=>
  let priced=0;E.alts.forEach(a=>{if(!a.price) return;const r=priceCalc(a);if(r.lines.length){a.costs=a.costs.filter(c=>!c.auto).concat(r.lines.map(l=>({id:uid(),auto:true,...l})));priced++;}});
  const R=results();if(R.lead&&!E.recommend.alt) E.recommend.alt=R.lead.a.id;
  B.applied=true;B.priced=priced;log('Build my AoA: applied',kept.length+' courses of action, '+priced+' priced from the DoD tables');E.build.noraSig=noraSig();save();STEP='done';render();window.scrollTo(0,0);
- if(window.CARLAI&&CARLAI.state().ok&&E.recommend.alt&&!E.recommend.rationale) aiRationale();}
+ if(!E.recommend.by&&window.CARLAI&&CARLAI.state().user) E.recommend.by=CARLAI.state().user;
+ if(window.CARLAI&&CARLAI.state().ok&&E.recommend.alt&&(!E.recommend.rationale||ratIssues().length)) aiRationale(true);}
 function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const signed=window.CARLAI&&CARLAI.state().ok;
  const badge=c=>c.basis==='notes'?'<span class="pill ok">From your notes</span>':c.basis==='standard'?'<span class="pill">Standard alternative</span>':'<span class="pill warn">AI suggestion</span>';
  const reqs=E.reqs.filter(q=>q.must);
  v.innerHTML='<div class="panel"><h2>Build my AoA</h2><p class="lead">EARL reads NORA\u2019s requirements, gaps and notes, has two independent AI planners propose every reasonable course of action on their own, merges them, screens each against the must-have requirements, scores the non-cost factors and prices what the DoD tables cover. You review, answer what only you know, and EARL writes the analysis of alternatives.</p>'+
   '<div class="mentor">'+(n?'NORA: <b>'+esc(n.project.name||'(untitled)')+'</b> \u2013 '+(n.requirements||[]).filter(r=>r.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gap'+((n.gaps||[]).length===1?'':'s')+', '+(n.sessions||[]).length+' session'+((n.sessions||[]).length===1?'':'s')+'.':'No NORA project in this browser; EARL will work from the objective on step 1.')+' Location: '+(E.price&&E.price.loc?esc(E.price.loc.label):(guessLoc_()?esc(siteLabel_(guessLoc_())):'<b>not found</b> \u2013 set it on step 3'))+'. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use this.</b>')+'</div>'+
   '<div class="row"><button class="go" id="bBuild" '+(signed?'':'disabled')+'>'+(B?'Build again':'Build my AoA')+'</button><span class="small" id="bStat"></span></div></div>'+
-  (B?'<div class="panel"><h2>Review the courses of action</h2><p class="lead">Keep or drop each one, fix the facility type or size where EARL guessed, then apply. Labels show where each came from: your own notes (with the words it rests on), the standard DoD list, or an AI suggestion to consider.</p>'+
+  (B?'<div class="panel" id="rvw"><h2>Review the courses of action</h2><p class="lead">Keep or drop each one, fix the facility type or size where EARL guessed, then apply. Labels show where each came from: your own notes (with the words it rests on), the standard DoD list, or an AI suggestion to consider.</p>'+
    (B.judgeErr?'<div class="find warn"><b>Screening and scoring did not run:</b> '+esc(B.judgeErr)+'. You can still apply and screen by hand.</div>':'')+
    B.coas.map((c,i)=>{const g=c.guc!=null?PD_.guc[c.guc]:null;const fails=(B.judge.cells||[]).filter(x=>x.coa===c.id&&x.v==='fail');const mode=PMODE[c.type]||'none';
     return '<div class="card" style="margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px"><label style="font-weight:600"><input type="checkbox" data-i="'+i+'" data-f="keep" '+(c.keep?'checked':'')+' style="width:auto"> '+esc(c.name)+'</label> '+badge(c)+' <span class="small">'+esc(ATYPES[c.type])+(c.from?' \u00b7 proposed by '+(c.from.includes(',')?'both planners':'one planner'):'')+'</span>'+
@@ -742,21 +769,18 @@ function vRec(){const v=$('#view');const R=results();
  v.innerHTML='<div class="panel"><h2>Recommendation</h2><p class="lead">EARL ranks; you recommend. If you recommend something other than the lowest-cost alternative, the rationale must say what the extra cost buys.</p>'+
  '<div class="form"><div><label class="f">Recommended alternative</label><select id="ra">'+'<option value="">Select</option>'+R.ok.map(r=>'<option value="'+r.a.id+'" '+(r.a.id===E.recommend.alt?'selected':'')+'>'+esc(r.rank+'. '+r.a.name+' – '+$k(r.npv))+'</option>').join('')+'</select></div>'+
  '<div><label class="f">Prepared by</label><input id="pb"></div><div><label class="f">Decision authority</label><input id="da"></div>'+
- '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button><button id="bAIr">Write rationale with AI</button></div>'+(E.recommend.ai_check?'<div class="mentor">'+esc(E.recommend.ai_check)+'</div>':'')+
+ '<div class="wide"><label class="f">Rationale</label><textarea id="rr" class="tall" style="min-height:120px"></textarea></div></div><div class="row"><button id="bDr">Draft rationale</button><button id="bAIr">Write rationale with AI</button></div>'+(function(){const iss=E.recommend.rationale?ratIssues():[];return iss.length?'<div class="find warn"><b>Rewrite before you send it.</b> '+esc(iss.join(' '))+'</div>':'';})()+
  '<h3>Decision</h3><div class="form"><div><label class="f">Decision</label><select id="dd">'+opts({'':'Pending',approved:'Approved',returned:'Returned for rework',other:'Other alternative chosen'},E.recommend.decision||'')+'</select></div><div><label class="f">Date</label><input type="date" id="ddt"></div></div></div>'+
- '<div class="panel"><h2>Outputs</h2><p class="lead">The memo supports the decision and the DD 1391; the tables and file are the record. The recommended alternative also passes to PIPER and fills the EARL column of NORA’s traceability matrix.</p><div class="outs">'+
- out('aoa','Analysis of Alternatives (AoA)','The full AoA: executive summary, requirement, assumptions and constraints, every alternative and its origin, life-cycle cost, non-cost factors, risks, sensitivity, comparison, recommendation and appendices with the cost basis, screening detail and sources. Opens in Word.','Download AoA')+
- out('memo','Economic analysis and recommendation memo','Objective, assumptions, alternatives, screening, costs, sensitivity, non-cost factors and recommendation. Opens in Word.','Download Word')+
- out('csv','Cost and results tables','Year-by-year cost streams, discount factors and present values for every alternative.','Download Excel')+'</div></div>'+
+ outsPanel()+
  '<div class="panel"><h2>Record log</h2><div id="lg" class="small"></div></div>';
- const ra=$('#ra'),rr=$('#rr'),pb=$('#pb'),da=$('#da'),dd=$('#dd'),ddt=$('#ddt');rr.value=E.recommend.rationale||'';pb.value=E.recommend.by||'';da.value=E.recommend.authority||'';ddt.value=E.recommend.date||'';
- ra.onchange=()=>{E.recommend.alt=ra.value;log('Recommended alternative set',(E.alts.find(a=>a.id===ra.value)||{}).name||'none');save();renderSteps();};
+ const ra=$('#ra'),rr=$('#rr'),pb=$('#pb'),da=$('#da'),dd=$('#dd'),ddt=$('#ddt');rr.value=E.recommend.rationale||'';pb.value=E.recommend.by||(window.CARLAI&&CARLAI.state().user)||'';da.value=E.recommend.authority||'';ddt.value=E.recommend.date||'';
+ ra.onchange=()=>{E.recommend.alt=ra.value;log('Recommended alternative set',(E.alts.find(a=>a.id===ra.value)||{}).name||'none');save();renderSteps();vRec();};
  rr.oninput=()=>{E.recommend.rationale=rr.value;save();};pb.oninput=()=>{E.recommend.by=pb.value;save();};da.oninput=()=>{E.recommend.authority=da.value;save();};
  dd.onchange=()=>{E.recommend.decision=dd.value;log('Decision recorded',dd.options[dd.selectedIndex].text);save();};ddt.onchange=()=>{E.recommend.date=ddt.value;save();};
  $('#bAIr').onclick=aiRationale;
- $('#bDr').onclick=()=>{if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();save();vRec();};
- v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({aoa:()=>{dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');save();},memo:()=>dl(fname('Economic-Analysis','doc'),memoHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(memoHTML());w.document.close();setTimeout(()=>w.print(),400);},csv:()=>XL.save(fname('EA-Tables','xlsx'),[{name:'Cost and results',rows:tables()}]),json:()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();}})[b.dataset.out]());
- $('#lg').innerHTML=E.log.length?E.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
+ $('#bDr').onclick=()=>{if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();E.recommend.sig=recSig();E.recommend.ai_check='';save();vRec();};
+ bindOuts(v);
+ $('#lg').innerHTML=E.log.length?E.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(lt(l.at))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 function draftRationale(){const R=results();const S=sensitivity();const a=E.alts.find(x=>x.id===E.recommend.alt)||R.lead?.a;if(!a) return '';const r=R.rows.find(x=>x.a===a);const sq=R.rows.find(x=>x.a.type==='status_quo');
  const best=R.ok.slice().sort((x,y)=>y.ws-x.ws)[0];
@@ -768,6 +792,75 @@ function draftRationale(){const R=results();const S=sensitivity();const a=E.alts
  if(S){const ch=S.rows.filter(x=>x.changes);t+=ch.length?'The ranking is sensitive to: '+ch.map(x=>x.lbl).join('; ')+'. ':'No sensitivity case tested changes the lowest-cost alternative. ';if(S.be!=null&&r===R.lead) t+='Its investment cost could rise '+S.be.toFixed(1)+'% before another alternative becomes less costly. ';}
  const out=R.rows.filter(x=>!x.ok);if(out.length) t+='Screened out: '+out.map(x=>x.a.name).join(', ')+'.';
  return t.trim();}
+
+// ---------- Outputs: one panel, three files ----------
+function outsPanel(){return '<div class="panel" id="outP"><h2>Outputs</h2><p class="lead">Send the decision memo with the analysis of alternatives behind it; keep the workbook as the record. To keep a copy of the whole analysis, use <b>Save file</b> at the top.</p><div class="outs">'+
+ oCard('memo','Decision memo','One to two pages for the decision authority: the bottom line, the alternatives compared, how robust the ranking is, the basis, and a decision block to sign.','Download Word')+
+ oCard('aoa','Analysis of alternatives','The full analysis: requirement, assumptions, every alternative and where it came from, life-cycle cost, non-cost factors, risks, sensitivity, recommendation, and appendices with the cost basis and sources.','Download Word')+
+ oCard('xl','Cost workbook','The ranking, the year-by-year cost stream and present value of every alternative, the cost lines and their sources, sensitivity and assumptions, one tab each.','Download Excel')+'</div></div>';}
+function oCard(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}
+function bindOuts(v){v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>preDl(b.dataset.out));}
+function openItems(){const R=results();const I=[];const iss=E.recommend.rationale?ratIssues():['No rationale written yet.'];
+ if(!R.lead) I.push(['costs','No alternative is both eligible and costed yet.']);
+ if(iss.length) I.push(['rat','Rationale: '+iss.join(' ')]);
+ const un=R.rows.filter(r=>r.unpriced);if(un.length) I.push(['costs','Not costed, so not ranked: '+un.map(r=>r.a.name).join(', ')+'.']);
+ const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) I.push(['costs',est.length+' status quo cost estimate'+(est.length>1?'s':'')+' to confirm with CE or finance.']);
+ if(!String(E.recommend.authority||'').trim()) I.push(['auth','Decision authority not named.']);return I;}
+function fixE(k){if(k==='rat'){STEP='done';render();setTimeout(()=>{const e=$('#ratP');if(e) e.scrollIntoView({behavior:'smooth',block:'center'});},60);return;}
+ if(k==='auth'){STEP='rec';render();setTimeout(()=>{const e=$('#da');if(e){e.scrollIntoView({block:'center'});e.focus();}},60);return;}STEP='costs';render();window.scrollTo(0,0);}
+function preDl(k){if(!E.recommend.by&&window.CARLAI&&CARLAI.state().user) E.recommend.by=CARLAI.state().user;
+ const go=()=>{if(k==='memo'){dl(fname('Decision-Memo','doc'),decisionMemoHTML(),'application/msword');log('Decision memo downloaded');}
+  else if(k==='aoa'){dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');}else{XL.save(fname('Cost-Workbook','xlsx'),earlBook());log('Cost workbook downloaded');}save();};
+ const I=k==='xl'?[]:openItems();if(!I.length) return go();
+ const o=document.createElement('div');o.id='pgDlg';o.style.cssText='position:fixed;inset:0;background:rgba(15,30,54,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+ o.innerHTML='<div class="panel" style="max-width:600px;width:92%;max-height:80vh;overflow:auto;margin:0"><h2>'+I.length+' item'+(I.length>1?'s':'')+' to check first</h2><p class="lead">The document will go out as it stands. Fix these now, or download a working draft.</p><table><tbody>'+
+  I.map(([f,t])=>'<tr><td style="width:24px;color:var(--mute)">○</td><td>'+esc(t)+'</td><td class="small"><a href="#" data-fx="'+f+'">Fix it</a></td></tr>').join('')+'</tbody></table><div class="row" style="margin-top:12px"><button class="go" id="pgAny">Download draft anyway</button><button id="pgNo">Fix first</button></div></div>';
+ document.body.appendChild(o);const close=()=>o.remove();o.onmousedown=e=>{if(e.target===o) close();};o.querySelector('#pgNo').onclick=close;o.querySelector('#pgAny').onclick=()=>{close();go();};
+ o.querySelectorAll('[data-fx]').forEach(a=>a.onclick=e=>{e.preventDefault();close();fixE(a.dataset.fx);});}
+// The decision memo: short, in the Corbel look, with a block to sign.
+function decisionMemoHTML(){const R=results();const RI=rangeInfo();const S=sensitivity();const p=E.project;const N=period();const rec=E.alts.find(x=>x.id===E.recommend.alt)||R.lead?.a;const rr=rec&&R.rows.find(x=>x.a===rec);
+ const sq=R.rows.find(x=>x.a.type==='status_quo');const e=x=>esc(x??'');const TBP='<span style="background:#FFF1BF;color:#6B4E00">&nbsp;To be provided&nbsp;</span>';
+ const kv=(k,v)=>cdP('<span style="'+CDK+'">'+esc(k)+'</span>&nbsp;&nbsp;'+(String(v||'').trim()?esc(v):TBP),'margin:0 0 5pt');
+ let bl='';if(rec&&rr&&rr.ok){bl='Recommend <b>'+e(rec.name)+'</b>. Its net present value of cost is '+e($$(rr.npv))+' over '+N+' years at '+rate().toFixed(2)+'%';
+  if(rr.rank===1&&R.second) bl+=', '+e($$(R.second.npv-rr.npv))+' less than the next alternative, '+e(R.second.a.name)+'.';else if(rr.rank>1) bl+=', '+e($$(rr.npv-R.lead.npv))+' more than the lowest-cost alternative, '+e(R.lead.a.name)+'.';else bl+='.';
+  if(sq&&sq.a!==rec) bl+=' Staying as we are would cost '+e($$(sq.npv))+(sq.ok?'':' and '+e(failReasons(sq.a).join('; ').replace(/^Does not/,'does not'))+'.')+(sq.ok?'.':'');}
+ else bl=TBP;
+ const iss=E.recommend.rationale?ratIssues():[];
+ const rows=R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>{const bline=!r.ok&&!r.unpriced&&r.a.type==='status_quo'&&r.a.screen!=='out'&&sqGap();
+  return [r.rank?String(r.rank):'—',e(r.a.name)+(r.a===rec?' <b>(recommended)</b>':''),e(ATYPES[r.a.type]),r.ok||bline?e($k(r.npv)):'—',r.ok?e($r(RI.rg[r.a.id])):'—',r.ws.toFixed(2),e(r.ok?'Eligible':r.unpriced?'Not costed':bline?'Baseline only: '+failReasons(r.a).join('; '):'Screened out: '+failReasons(r.a).join('; '))];});
+ const ch=S?S.rows.filter(x=>x.changes):[];
+ const rob=e(rangeText(RI))+' '+(S?(ch.length?'The lowest-cost alternative changes in '+ch.length+' of '+S.rows.length+' sensitivity cases: '+e(ch.map(x=>x.lbl).join('; '))+'.':'No sensitivity case tested ('+S.rows.length+') changes the lowest-cost alternative.')+(S.be!=null?' The leader stays lowest cost until its investment cost rises about '+S.be.toFixed(0)+'%.':''):'');
+ const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));const un=R.rows.filter(r=>r.unpriced);
+ const open=[].concat(est.length?[est.length+' status quo cost estimate'+(est.length>1?'s':'')+' to confirm with CE or finance']:[],un.length?['Not costed: '+un.map(r=>r.a.name).join(', ')]:[],E.sq_ok?['The status quo was treated as able to meet the need although the requirement record shows a gap']:[]);
+ const body=cdBand('Decision memorandum',p.name||'Economic analysis',[p.installation,p.service].filter(Boolean).join('  ·  '),'Prepared by '+(E.recommend.by||'—')+'  ·  '+today())+
+  cdLead('Economic analysis under DoDI 7041.03 and OMB Circular A-94. EARL ranks the alternatives on life-cycle cost; the decision rests with the decision authority. The full analysis of alternatives is attached.')+
+  cdH('Bottom line')+cdP(bl,'font-size:11pt;line-height:140%')+
+  (E.recommend.rationale?cdP(esc(E.recommend.rationale).replace(/\n\s*\n/g,'</p><p style="'+CDF+'margin:0 0 6pt">').replace(/\n/g,'<br>'),'line-height:140%'):'')+
+  (iss.length?cdP('<span style="background:#FFF1BF;color:#6B4E00">&nbsp;Rationale to be revised: '+e(iss.join(' '))+'&nbsp;</span>','font-size:9.5pt'):'')+
+  cdH('Alternatives compared')+cdTable(['Rank','Alternative','Type','NPV of cost','Likely range','Non-cost score','Status'],rows,['8%','21%','14%','12%','16%','10%','19%'])+
+  cdH('How robust the ranking is')+cdP(rob)+
+  cdH('Basis')+kv('Objective',E.objective)+kv('Period of analysis',N+' years (lead time '+E.lead+', economic life '+E.life+')')+kv('Discount rate',rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+(E.rate_override!==''?' (override)':', '+APPC.edition))+kv('Dollars',E.dollars==='nominal'?'Then-year':'Constant FY'+E.base_fy)+kv('Costs','DoD facilities pricing tables where EARL priced them; your figures where entered; estimates marked in the analysis')+
+  (open.length?cdH('Open items')+open.map(t=>cdP('&#9675;&nbsp; '+e(t),'margin:0 0 3pt')).join(''):'')+
+  cdH('Decision')+cdTable(['Decision authority','Decision','Signature','Date'],[[E.recommend.authority?e(E.recommend.authority):TBP,'&#9744; Approve &nbsp; &#9744; Disapprove &nbsp; &#9744; Other: ________','','']],['28%','40%','18%','14%'])+
+  cdFoot('Prepared with Corbel  ·  '+e(p.name||''));
+ return cdDoc('Decision memorandum',[body]);}
+// The cost workbook: one tab per table, numbers as numbers.
+function earlBook(){const R=results();const RI=rangeInfo();const S=sensitivity();const N=period(),i=rate();const sh=[];const used=new Set();
+ const tab=n=>{let b=String(n).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,28).trim()||'Sheet';let t=b,k=2;while(used.has(t.toLowerCase())){t=b.slice(0,26)+' '+k;k++;}used.add(t.toLowerCase());return t;};
+ const rk=[['Rank','Alternative','Type','From','Eligible','NPV of cost ($)','Likely low ($)','Likely high ($)','Undiscounted cost ($)','Residual value ($)','Non-cost score','Why not eligible']];
+ R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).forEach(r=>{const g=RI.rg[r.a.id];rk.push([r.rank||'',r.a.name,ATYPES[r.a.type],r.a.type==='status_quo'?'Baseline':r.a.origin==='notes'?'Your notes':r.a.origin==='standard'?'Standard':r.a.origin?'AI suggestion':'You',r.ok?'Yes':'No',Math.round(r.npv),g?Math.round(g.lo):'',g?Math.round(g.hi):'',Math.round(r.und),Math.round(r.rv||0),Number(r.ws.toFixed(2)),r.ok?'':r.unpriced?'Not costed':failReasons(r.a).join('; ')]);});
+ sh.push({name:tab('Ranking'),rows:rk});
+ E.alts.forEach(a=>{const st=stream(a);const rows=[['Year','FY','One-time ($)','Recurring ($)','Factor one-time','Factor recurring','Present value ($)']];
+  for(let t=1;t<=N;t++){const f1=factor(t,i,E.convention==='mid'),f2=factor(t,i,E.convention!=='end');rows.push([t,'FY'+(Number(E.base_fy)+t-1),Math.round(st.one[t]),Math.round(st.rec[t]),Number(f1.toFixed(5)),Number(f2.toFixed(5)),Math.round(st.one[t]*f1+st.rec[t]*f2)]);}
+  if(st.res) rows.push(['Residual','FY'+(Number(E.base_fy)+N-1),-Math.round(st.res),'',Number(factor(N,i,false).toFixed(5)),'',-Math.round(st.res*factor(N,i,false))]);
+  rows.push(['NPV','','','','','',Math.round(npv(a).pv)]);sh.push({name:tab(a.name),rows,note:ATYPES[a.type]+(feasible(a)?'':' – not eligible: '+failReasons(a).join('; '))});});
+ const cl=[['Alternative','Category','Item','Amount ($)','From year','To year','Basis']];E.alts.forEach(a=>a.costs.forEach(c=>{const k=rClass(c);cl.push([a.name,(CATS[c.cat]||[c.cat])[0],c.label||'',Math.round(Number(c.amount)||0),Number(c.start)||1,CATS[c.cat]?.[1]?(Number(c.end)||N):(Number(c.end)||Number(c.start)||1),c.auto?'Priced from the DoD tables':k==='est'?'Estimate – confirm':c.sqAuto?'From your record':'Entered']);}));
+ sh.push({name:tab('Cost lines'),rows:cl});
+ if(S){const ok=R.ok.map(r=>r.a);const sr=[['Case','Lowest-cost alternative','Ranking changes'].concat(ok.map(a=>a.name+' ($)'))];S.rows.forEach(x=>sr.push([x.lbl,x.leader,x.changes?'Yes':'No'].concat(ok.map(a=>Math.round(x.npvs[a.id]||0)))));sh.push({name:tab('Sensitivity'),rows:sr,note:S.be!=null?'Break-even: the leader stays lowest cost until its investment cost rises '+S.be.toFixed(1)+'%.':''});}
+ const as=[['Item','Value'],['Project',E.project.name||''],['Installation',E.project.installation||''],['Objective',E.objective||''],['Base fiscal year','FY'+E.base_fy],['Period of analysis',N+' years (lead time '+E.lead+', economic life '+E.life+')'],['Discount rate (%)',Number(i.toFixed(3))],['Rate source',E.rate_override!==''?'Override':APPC.edition],['Dollars',E.dollars==='nominal'?'Then-year':'Constant FY'+E.base_fy],['Convention',{mixed:'Mid-year for recurring, end-of-year for one-time',mid:'Mid-year',end:'End-of-year'}[E.convention]||E.convention],['Recommended',(E.alts.find(a=>a.id===E.recommend.alt)||{}).name||''],['Prepared by',E.recommend.by||''],['Decision authority',E.recommend.authority||'']];
+ String(E.assumptions||'').split('\n').filter(x=>x.trim()).forEach(x=>as.push(['Assumption',x.trim()]));
+ Object.values(RANGE).forEach(x=>as.push(['Likely range',x[2]+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%']));
+ sh.push({name:tab('Assumptions'),rows:as});return sh;}
 const fname=(k,ext)=>((E.project.name||'EARL').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
 function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
@@ -793,7 +886,7 @@ function memoHTML(){const R=results();const S=sensitivity();const p=E.project;co
  '</body></html>';}
 
 $('#bSave').onclick=()=>{dl(fname('EARL','json'),JSON.stringify(E,null,1),'application/json');log('Analysis file saved');save();};
-$('#bNew').onclick=()=>{if(!confirm('Start a new analysis? Save a file of the current one first if you need it.')) return;E=BLANK();log('Analysis created');save();STEP='basis';render();};
+if($('#bNew')) $('#bNew').onclick=()=>{if(!confirm('Start a new analysis? Save a file of the current one first if you need it.')) return;E=BLANK();log('Analysis created');save();STEP='basis';render();};
 $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='earl-1') throw new Error('Not an EARL analysis file');E=Object.assign(BLANK(),j);log('Analysis file opened',f.name);save();STEP='basis';render();}catch(err){alert('Could not open: '+err.message);}});};
 if(!E.log.length) log('Analysis created');
@@ -856,14 +949,16 @@ const XL=(function(){
   '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
   '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-  '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
   '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
   '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
-  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'+
+  '<xf numFmtId="3" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>'+
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
  function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
-  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)) return '<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>';return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)){const ss=(Number.isInteger(v)&&Math.abs(v)>=1000&&(s===2||s===3))?(s===2?5:6):s;return '<c r="'+ref+'" s="'+ss+'"><v>'+v+'</v></c>';}return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
   const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
   const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+

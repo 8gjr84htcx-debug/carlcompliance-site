@@ -592,14 +592,16 @@ const XL=(function(){
   '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
   '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
   '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
-  '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
   '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
   '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
   '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
-  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'+
+  '<xf numFmtId="3" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>'+
   '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
  function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
-  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)) return '<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>';return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)){const ss=(Number.isInteger(v)&&Math.abs(v)>=1000&&(s===2||s===3))?(s===2?5:6):s;return '<c r="'+ref+'" s="'+ss+'"><v>'+v+'</v></c>';}return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
   const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
   const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
   return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
