@@ -434,10 +434,10 @@ function hbars(rows,{fmt=M,colors,w=520,lab=150}={}){const bh=18,gap=12,H=rows.l
   return '<text x="'+(lab-8)+'" y="'+(y+13)+'" text-anchor="end" font-size="12.5" fill="#52514e">'+esc(r.k.length>24?r.k.slice(0,23)+'…':r.k)+'</text><g'+tipA(fmt(r.v)+'\n'+r.k+(r.t?'\n'+r.t:''))+'><rect x="'+lab+'" y="'+(y-4)+'" width="'+(W+60)+'" height="'+(bh+8)+'" fill="transparent"/><path d="'+rbar(lab,y,bw,bh,4,'h')+'" fill="'+c+'"/></g><text x="'+(lab+bw+6)+'" y="'+(y+13)+'" font-size="12.5" fill="#0b0b0b">'+esc(fmt(r.v))+'</text>';}).join('')+'</svg>';}
 function axisY(mx,x0,y0,y1,W,fmt,ticks=4){let s='';for(let i=0;i<=ticks;i++){const v=mx*i/ticks,y=y1-(y1-y0)*i/ticks;s+='<line x1="'+x0+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="'+(i?'var(--grid)':'var(--axis)')+'" stroke-width="1"/><text x="'+(x0-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#898781">'+fmt(v)+'</text>';}return s;}
 function stackCols(cats,series,{W=560,H=240,fmt=v=>v}={}){const x0=34,y0=10,y1=H-38,cw=(W-x0)/cats.length,bw=Math.min(24,cw*.55);const tot=cats.map((c,i)=>series.reduce((s,se)=>s+se.v[i],0));const mx=niceMax(Math.max(...tot,1));
- const tk=mx<=5?Math.max(1,Math.round(mx)):(mx%5===0?5:4);let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">'+axisY(mx,x0,y0,y1,W,v=>Math.round(v),tk);
+ const tk=mx<=5?Math.max(1,Math.round(mx)):(mx%5===0?5:4);let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">'+axisY(mx,x0,y0,y1,W,v=>fmt(Math.round(v)),tk);
  cats.forEach((c,i)=>{const cx=x0+cw*i+cw/2;let y=y1;const nz=series.map((se,k)=>[k,se.v[i]]).filter(z=>z[1]>0);
-  nz.forEach(([k,v],j)=>{const h=v/mx*(y1-y0);const top=j===nz.length-1;const yy=y-h;s+='<g'+tipA(v+' '+series[k].n.toLowerCase()+'\n'+c.full)+'>'+(top?'<path d="'+rbar(cx-bw/2,yy+(j?1:0),bw,h-(j?1:0),4,'v')+'" fill="'+series[k].c+'"/>':'<rect x="'+(cx-bw/2)+'" y="'+(yy+(j?1:0))+'" width="'+bw+'" height="'+Math.max(0,h-(j?2:0)-0)+'" fill="'+series[k].c+'"/>')+'<rect x="'+(cx-cw/2)+'" y="'+yy+'" width="'+cw+'" height="'+h+'" fill="transparent"/></g>';y=yy;});
-  if(tot[i]) s+='<text x="'+cx+'" y="'+(y-5)+'" text-anchor="middle" font-size="11.5" fill="#0b0b0b">'+tot[i]+'</text>';
+  nz.forEach(([k,v],j)=>{const h=v/mx*(y1-y0);const top=j===nz.length-1;const yy=y-h;s+='<g'+tipA(fmt(v)+' '+series[k].n.toLowerCase()+'\n'+c.full)+'>'+(top?'<path d="'+rbar(cx-bw/2,yy+(j?1:0),bw,h-(j?1:0),4,'v')+'" fill="'+series[k].c+'"/>':'<rect x="'+(cx-bw/2)+'" y="'+(yy+(j?1:0))+'" width="'+bw+'" height="'+Math.max(0,h-(j?2:0)-0)+'" fill="'+series[k].c+'"/>')+'<rect x="'+(cx-cw/2)+'" y="'+yy+'" width="'+cw+'" height="'+h+'" fill="transparent"/></g>';y=yy;});
+  if(tot[i]) s+='<text x="'+cx+'" y="'+(y-5)+'" text-anchor="middle" font-size="11.5" fill="#0b0b0b">'+fmt(tot[i])+'</text>';
   s+='<text x="'+cx+'" y="'+(y1+15)+'" text-anchor="middle" font-size="11" fill="#52514e">'+esc(c.k)+'</text>'+(c.k2?'<text x="'+cx+'" y="'+(y1+28)+'" text-anchor="middle" font-size="10" fill="#898781">'+esc(c.k2)+'</text>':'');});
  return s+'</svg>';}
 function lines(xs,series,{W=560,H=240,fmt=M,xfmt=x=>x,ref=null}={}){const x0=50,y0=12,y1=H-28,x1=W-70;const all=series.flatMap(s=>s.v.filter(v=>v!=null)).concat(ref?[ref.v]:[]);const mx=niceMax(Math.max(...all,1));const X=i=>x0+(xs.length>1?(x1-x0)*i/(xs.length-1):0),Y=v=>y1-(v/mx)*(y1-y0);
@@ -453,11 +453,11 @@ function shape(l,x,y,r,tip){const c=LEVEL[l].c;const ring=' stroke="var(--surf)"
  if(l===1){const h=r*1.15;return '<path d="M'+x+','+(y-h)+'L'+(x+h)+','+(y+h*.8)+'L'+(x-h)+','+(y+h*.8)+'Z" fill="'+c+'" fill-opacity=".9"'+ring+'/>';}return '<rect x="'+(x-r*.9)+'" y="'+(y-r*.9)+'" width="'+(r*1.8)+'" height="'+(r*1.8)+'" rx="2" fill="'+c+'" fill-opacity=".85"'+ring+'/>';}
 
 // ---------- nav ----------
-function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
+function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['fund','Funding'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
  nav.innerHTML=items.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k?'on':'')+'"><span class="n">'+(i+1)+'</span>'+esc(t.length>22?t.slice(0,21)+'…':t)+'<span class="c"></span></button>').join('')+
  '<div class="gate">'+P.projects.length+' projects<br>'+(P.projects.some(p=>p.sample)?'<span style="color:var(--warn)">Sample data loaded</span>':'')+'</div>';
  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
-function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,rep:vRep,data:vData})[VIEW]();}
+function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,fund:vFund,rep:vRep,data:vData})[VIEW]();}
 function openP(p,tab){CUR=p;VIEW='one';PTAB=tab||'ov';render();window.scrollTo(0,0);}
 
 // ---------- portfolio ----------
@@ -658,9 +658,11 @@ function vRep(){const v=$('#view');
  out('slides','Status pages','Landscape Word pages for the PMO deck: one for the portfolio and one for each project, with health, progress, money, done, next and concerns.','Download Word')+
  out('prdoc','Prioritization decision paper','Word: bottom line, the ranking with the funding line, projects on the margin, what falls below the line and why, the method and every score with its reason.','Download Word')+
  out('prxl','Prioritization workbook','Excel: the ranking, every score with its reason and source, and the weights and budget used.','Download Excel')+
+ out('fundxl','Funding workbook','Excel: each project’s money by fiscal year and stage, every funding line, and the funding flags with their statutory basis.','Download Excel')+
  out('csv','Data call export','Every field and the computed health for each project, ready to sort, filter or answer a data call.','Download Excel')+'</div></div>';
  bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({briefdoc:()=>preDlP(()=>{dl('PAULA_Leadership_Brief_'+today()+'.doc',briefDoc(),'application/msword');log('Brief downloaded');save();}),slides:()=>preDlP(()=>{dl('PAULA_Status_Pages_'+today()+'.doc',pagesDoc(),'application/msword');log('Status pages downloaded');save();}),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}]),
   prdoc:()=>preDlPr(async()=>{if(!PR().bluf&&window.CARLAI&&CARLAI.state().ok) await prBluf();dl('PAULA_Prioritization_'+(PR().fy?'FY'+PR().fy+'_':'')+today()+'.doc',prDoc(),'application/msword');log('Prioritization paper downloaded');save();if(PR().bluf&&PR().bluf.check) alert('The bottom line was left out of the paper because its figures did not match the ranking ('+PR().bluf.check+'). Write it again from Reports, or add your own in Word.');}),
+  fundxl:()=>XL.save('PAULA_Funding_'+today()+'.xlsx',fundRows()),
   prxl:()=>XL.save('PAULA_Prioritization_'+(PR().fy?'FY'+PR().fy+'_':'')+today()+'.xlsx',prBook())})[b.dataset.out]());
  $('#bAIb').onclick=aiBrief;
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
@@ -741,6 +743,54 @@ function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483
   P.projects.push(p);});
  log('Sample data loaded',defs.length+' projects');save();VIEW='port';render();}
 
+// ================= FUNDING OVER THE FYDP =================
+const STAGES=[['programmed','Programmed','#C9D6DE'],['requested','In the budget request','#9DB4C3'],['authorized','Authorized','#6E8FA5'],['appropriated','Appropriated','#3F6B85'],['obligated','Obligated','#1F4E5F']];
+const SI=k=>STAGES.findIndex(x=>x[0]===k);
+const SOURCES=[['MILCON','Military construction',5],['P&D','Planning and design (MILCON)',5],['FSRM','O&M – sustainment, restoration, modernization',1],['HN','Host nation funded',0],['Other','Other',0]];
+const srcYrs=k=>(SOURCES.find(x=>x[0]===k)||[0,0,0])[2];
+const curFY=()=>{const d=new Date();return d.getMonth()>=9?d.getFullYear()+1:d.getFullYear();};
+function funds(p){if(!p.funds||!p.funds.length){const fy=N(p.fy);const amt=N(p.authorized)||N(p.programmed);if(!fy||!amt) return [];
+  const st=N(p.obligated)||N(p.award)?'obligated':N(p.authorized)?'authorized':'programmed';return [{id:'auto',fy,src:'MILCON',stage:st,amt:st==='obligated'?(N(p.obligated)||N(p.award)):amt,auto:true}];}return p.funds;}
+function fundSum(p,fn){return funds(p).filter(fn||(()=>true)).reduce((a,l)=>a+N(l.amt),0);}
+function fundFlags(p){const F=[];const e=est(p)||value(p),auth=N(p.authorized),cf=curFY();
+ if(auth&&e>auth){const g=e-auth,lim=Math.min(auth*LAW.costPct.v/100,2*LAW.umc.v);if(g>lim) F.push([2,'Cost growth of '+M(g)+' (+'+Math.round(g/auth*100)+'%) over the authorized '+M(auth)+' is more than '+LAW.costPct.cite+' allows without notice to Congress (limit '+M(lim)+').',LAW.costPct.cite]);
+  if(auth>LAW.report.v&&g/auth>=.25) F.push([2,'Over $40M with a 25%+ cost increase: an additional report is due.',LAW.report.cite]);}
+ const ap=fundSum(p,l=>SI(l.stage)>=SI('appropriated'));if(ap&&N(p.phase)>=5&&e-ap>Math.max(ap*.05,1e6)) F.push([e-ap>ap*.1?2:1,'Funding shortfall of '+M(e-ap)+' (+'+Math.round((e-ap)/ap*100)+'%): '+M(ap)+' appropriated or obligated against a '+M(e)+' estimate. Gaps under 5% are left to contingency.','']);
+ funds(p).forEach(l=>{if(l.stage!=='appropriated') return;const yrs=srcYrs(l.src);if(!yrs) return;const last=N(l.fy)+yrs-1;const exp=last+'-09-30';const left=dd(today(),exp);
+  if(left<0) F.push([2,M(N(l.amt))+' of FY'+l.fy+' '+l.src+' funds expired for new obligations on 30 Sep '+last+'.',l.src==='FSRM'?'One-year O&M funds':'MILCON funds are available for obligation for five fiscal years']);
+  else if(left<=365) F.push([1,M(N(l.amt))+' of FY'+l.fy+' '+l.src+' funds must be obligated by 30 Sep '+last+' ('+left+' days).',l.src==='FSRM'?'One-year O&M funds':'MILCON funds are available for obligation for five fiscal years']);});
+ if(e&&e<=LAW.umc.v&&!auth&&N(p.phase)<=4&&!N(p.award)) F.push([0,'At or under the '+M(LAW.umc.v)+' unspecified minor construction ceiling; could go as minor construction rather than a line item.',LAW.umc.cite]);
+ if(N(p.fy)&&N(p.fy)<cf&&!N(p.award)&&!funds(p).some(l=>SI(l.stage)>=SI('authorized'))) F.push([1,'FY'+p.fy+' has passed with no authorization or appropriation recorded.','']);
+ return F;}
+let FX=null;
+function fyWin(L){const cf=curFY();const ys=L.flatMap(p=>funds(p).map(l=>N(l.fy))).filter(Boolean);const a=Math.max(Math.min(cf-2,...ys),cf-4),b=cf+5;const o=[];for(let y=a;y<=b;y++) o.push(y);return o;}
+function vFund(){const v=$('#view');const L=filtered();const ys=fyWin(L);const cf=curFY();
+ const by=(y,st)=>L.reduce((a,p)=>a+fundSum(p,l=>N(l.fy)===y&&l.stage===st),0);
+ const series=STAGES.map(([k,n,c])=>({n,c,v:ys.map(y=>by(y,k))}));const cats=ys.map(y=>({k:'FY'+String(y).slice(-2),k2:y===cf?'current':'',full:'FY'+y}));
+ const FL=L.flatMap(p=>fundFlags(p).map(f=>({p,f}))).sort((a,b)=>b.f[0]-a.f[0]);const apNot=L.reduce((a,p)=>a+fundSum(p,l=>l.stage==='appropriated'),0);
+ const cy=k=>L.reduce((a,p)=>a+fundSum(p,l=>N(l.fy)===cf&&l.stage===k),0);
+ v.innerHTML=filterRow()+'<div class="panel"><h2>Funding</h2><p class="lead">Where each project’s money stands by fiscal year, from programmed through obligated, with the statutory and expiry flags that need action. Lines start from the project’s FY and amounts; open a project below to add the real lines.</p>'+
+  '<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+t('FY'+String(cf).slice(-2)+' programmed',M(cy('programmed')+cy('requested')))+t('FY'+String(cf).slice(-2)+' authorized or appropriated',M(cy('authorized')+cy('appropriated')))+t('Appropriated, not yet obligated',M(apNot))+t('Funding flags',String(FL.filter(x=>x.f[0]>0).length))+'</div>'+
+  '<div class="card2" style="margin-top:12px"><h3>Funding by fiscal year and stage</h3>'+stackCols(cats,series,{W:760,H:280,fmt:M})+legend(STAGES.map(([k,n,c])=>[c,n]))+'</div></div>'+
+  '<div class="panel"><h3 style="margin-top:0">Flags</h3>'+(FL.length?FL.slice(0,30).map(({p,f})=>'<div class="find" style="display:flex;gap:10px;align-items:flex-start;border-left:4px solid '+['#7a8a99','var(--watch)','var(--crit)'][f[0]]+';padding:7px 10px;margin:6px 0"><span style="flex:1"><b>'+esc(p.name)+'</b> – '+esc(f[1])+(f[2]?' <span class="small">('+esc(f[2])+')</span>':'')+'</span><button class="sm" data-ff="'+p.id+'">Open</button></div>').join(''):'<p class="small">No funding flags.</p>')+'</div>'+
+  '<div class="panel"><h3 style="margin-top:0">Projects by fiscal year</h3><div style="overflow-x:auto"><table class="ptable" id="fT"><thead><tr><th>Project</th>'+ys.map(y=>'<th style="text-align:right">FY'+String(y).slice(-2)+'</th>').join('')+'<th style="text-align:right">Total</th></tr></thead><tbody>'+
+  L.filter(p=>funds(p).length||N(p.programmed)).map(p=>{let h='<tr class="clk" data-fp="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc([p.installation,p.service].filter(Boolean).join(' · '))+(funds(p).some(l=>l.auto)?' · <i>from the project’s FY and amounts</i>':'')+'</div></td>'+
+   ys.map(y=>{const ls=funds(p).filter(l=>N(l.fy)===y);if(!ls.length) return '<td></td>';const top=ls.reduce((a,l)=>SI(l.stage)>SI(a.stage)?l:a);return '<td style="text-align:right;white-space:nowrap" title="'+esc(ls.map(l=>l.src+' '+M(N(l.amt))+' – '+STAGES[SI(l.stage)][1]).join('\n'))+'"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+STAGES[SI(top.stage)][2]+';margin-right:4px"></span>'+M(ls.reduce((a,l)=>a+N(l.amt),0))+'</td>';}).join('')+
+   '<td style="text-align:right">'+M(fundSum(p))+'</td></tr>';if(FX===p.id) h+='<tr><td colspan="'+(ys.length+2)+'">'+fEditor(p)+'</td></tr>';return h;}).join('')+'</tbody></table></div>'+legend(STAGES.map(([k,n,c])=>[c,n]))+'</div>';
+ bindFilters();v.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{FX=b.dataset.ff;vFund();const r=document.querySelector('[data-fp="'+FX+'"]');if(r) r.scrollIntoView({block:'center'});});
+ v.querySelectorAll('[data-fp]').forEach(tr=>tr.onclick=()=>{FX=FX===tr.dataset.fp?null:tr.dataset.fp;vFund();});bindFE();
+ function t(l,val){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px">'+val+'</div></div>';}}
+function fEditor(p){const L=funds(p);return '<div style="background:#f6f8f9;border-radius:8px;padding:10px 12px"><table class="ptable" style="margin:0"><tr><th>FY</th><th>Source</th><th>Stage</th><th style="text-align:right">Amount ($)</th><th></th></tr>'+
+ L.map((l,i)=>'<tr><td><input data-fe="'+p.id+'|'+i+'|fy" value="'+esc(String(l.fy))+'" style="width:70px"></td><td><select data-fe="'+p.id+'|'+i+'|src">'+SOURCES.map(([k,n])=>'<option value="'+k+'" '+(l.src===k?'selected':'')+'>'+esc(n)+'</option>').join('')+'</select></td><td><select data-fe="'+p.id+'|'+i+'|stage">'+STAGES.map(([k,n])=>'<option value="'+k+'" '+(l.stage===k?'selected':'')+'>'+n+'</option>').join('')+'</select></td><td><input data-fe="'+p.id+'|'+i+'|amt" value="'+Math.round(N(l.amt))+'" inputmode="numeric" style="width:130px;text-align:right"></td><td><button class="sm" data-fdel="'+p.id+'|'+i+'">Remove</button></td></tr>').join('')+
+ '</table><div class="row" style="margin-top:8px;gap:8px"><button class="sm go" data-fadd="'+p.id+'">Add a line</button><span class="small">Estimate '+M(est(p)||value(p))+(N(p.authorized)?' · authorized '+M(N(p.authorized)):'')+'. A line moves through the stages as the money does; keep one line per FY and source.</span></div></div>';}
+function bindFE(){const own=p=>{if(!p.funds||!p.funds.length) p.funds=funds(p).map(l=>({...l,id:uid(),auto:false}));return p.funds;};const P_=id=>P.projects.find(q=>q.id===id);
+ document.querySelectorAll('[data-fe]').forEach(el=>{el.onclick=e=>e.stopPropagation();el.onchange=()=>{const [id,i,k]=el.dataset.fe.split('|');const p=P_(id);const L=own(p);L[+i][k]=k==='amt'||k==='fy'?N(el.value):el.value;save();vFund();};});
+ document.querySelectorAll('[data-fdel]').forEach(b=>b.onclick=e=>{e.stopPropagation();const [id,i]=b.dataset.fdel.split('|');const p=P_(id);own(p).splice(+i,1);save();vFund();});
+ document.querySelectorAll('[data-fadd]').forEach(b=>b.onclick=e=>{e.stopPropagation();const p=P_(b.dataset.fadd);own(p).push({id:uid(),fy:N(p.fy)||curFY(),src:'MILCON',stage:'programmed',amt:0});save();vFund();});}
+function fundRows(){const L=filtered();const ys=fyWin(L);return [{name:'By fiscal year',rows:[['Project','Installation','Service'].concat(ys.map(y=>'FY'+y)).concat(['Total','Highest stage'])].concat(L.filter(p=>funds(p).length).map(p=>[p.name,p.installation,p.service].concat(ys.map(y=>Math.round(fundSum(p,l=>N(l.fy)===y))||'')).concat([Math.round(fundSum(p)),STAGES[Math.max(...funds(p).map(l=>SI(l.stage)))][1]])))},
+ {name:'Funding lines',rows:[['Project','FY','Source','Stage','Amount','Entered']].concat(L.flatMap(p=>funds(p).map(l=>[p.name,l.fy,(SOURCES.find(x=>x[0]===l.src)||[0,l.src])[1],STAGES[SI(l.stage)][1],Math.round(N(l.amt)),l.auto?'From project FY and amounts':'Entered'])))},
+ {name:'Flags',rows:[['Project','Level','Flag','Basis']].concat(L.flatMap(p=>fundFlags(p).map(f=>[p.name,['Note','Watch','Action'][f[0]],f[1],f[2]])))}];}
+
 // ================= PRIORITIZE: weighted scoring, funding line, rank stability =================
 const CRIT=[['mission','Mission and posture effect','How much the project advances the operational posture or mission it supports.'],
  ['readiness','Readiness risk if not funded','What the force loses, and how soon, if this waits a year.'],
@@ -777,7 +827,7 @@ function vPri(){prSync();save();const v=$('#view');const r=PR();const L=prRank()
  const tot=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;
  v.innerHTML=filterRow()+'<div class="panel"><h2>Prioritize</h2><p class="lead">Rank the projects still to be funded against weighted criteria, set the budget, and see where the funding line falls and which projects sit on the margin.</p>'+
   '<div class="row" style="gap:14px;flex-wrap:wrap;align-items:flex-end"><div><label class="f">Fiscal year</label><select id="prFy"><option value="">All years</option>'+fys.map(y=>'<option '+(String(r.fy)===y?'selected':'')+'>'+y+'</option>').join('')+'</select></div>'+
-  '<div><label class="f">Budget for '+(r.fy?'FY'+String(r.fy).slice(-2):'these projects')+' ($M)</label><input id="prB" inputmode="decimal" style="width:120px" value="'+(B?(B/1e6).toFixed(1):'')+'" placeholder="e.g. 250"></div>'+
+  '<div><label class="f">Budget for '+(r.fy?'FY'+String(r.fy).slice(-2):'these projects')+' ($M)</label><input id="prB" inputmode="decimal" style="width:120px" value="'+(B?(B/1e6).toFixed(1):'')+'" placeholder="e.g. 250">'+(()=>{if(!r.fy) return '';const ap=filtered().reduce((a,p)=>a+fundSum(p,l=>N(l.fy)===N(r.fy)&&SI(l.stage)>=SI('authorized')),0);return ap?' <button class="sm" id="prBap" title="Authorized and appropriated money recorded on the Funding page for this FY">Use FY'+String(r.fy).slice(-2)+' funding ('+M(ap)+')</button>':'';})()+'</div>'+
   '<div style="display:flex;flex-direction:column;gap:4px"><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input style="width:auto;flex:none" type="checkbox" id="prFill" '+(r.fill?'checked':'')+'> Fill leftover money with lower-ranked projects that fit</label><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input style="width:auto;flex:none" type="checkbox" id="prAw" '+(r.awarded?'checked':'')+'> Include awarded projects</label></div></div>'+
   '<div style="margin-top:12px"><label class="f">Weights</label><div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(PRESETS).map(k=>'<button class="sm'+(r.preset===k?' go':'')+'" data-pre="'+esc(k)+'">'+esc(k)+'</button>').join('')+'</div>'+
   '<div class="g2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 18px">'+CRIT.map(([c,n,d])=>'<div title="'+esc(d)+'"><div class="small" style="display:flex;justify-content:space-between"><span>'+esc(n)+'</span><b id="wv_'+c+'">'+Math.round(N(r.w[c])/tot*100)+'%</b></div><input type="range" min="0" max="50" step="1" data-w="'+c+'" value="'+N(r.w[c])+'" style="width:100%"></div>').join('')+'</div></div></div>'+
@@ -790,7 +840,7 @@ function vPri(){prSync();save();const v=$('#view');const r=PR();const L=prRank()
  bindFilters();
  $('#prFy').onchange=e=>{r.fy=e.target.value;r.bluf=null;save();vPri();};
  $('#prB').onchange=e=>{const x=N(e.target.value);r.budget[r.fy||'all']=x?x*1e6:0;r.bluf=null;save();vPri();};
- $('#prAw').onchange=e=>{r.awarded=e.target.checked;save();vPri();};$('#prFill').onchange=e=>{r.fill=e.target.checked;r.bluf=null;save();vPri();};
+ if($('#prBap')) $('#prBap').onclick=()=>{const ap=filtered().reduce((a,p)=>a+fundSum(p,l=>N(l.fy)===N(r.fy)&&SI(l.stage)>=SI('authorized')),0);r.budget[r.fy]=ap;r.bluf=null;save();vPri();};$('#prAw').onchange=e=>{r.awarded=e.target.checked;save();vPri();};$('#prFill').onchange=e=>{r.fill=e.target.checked;r.bluf=null;save();vPri();};
  v.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{r.w={...PRESETS[b.dataset.pre]};r.preset=b.dataset.pre;r.bluf=null;save();vPri();});
  v.querySelectorAll('[data-w]').forEach(el=>{el.oninput=()=>{r.w[el.dataset.w]=N(el.value);r.preset='';const t=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;CRIT.forEach(([c])=>{const o=$('#wv_'+c);if(o) o.textContent=Math.round(N(r.w[c])/t*100)+'%';});$('#prT tbody').innerHTML=prRows(prRank(),{},N(r.budget[r.fy||'all']));bindPrRows();};el.onchange=()=>{r.bluf=null;save();vPri();};});
  if($('#prAI')) $('#prAI').onclick=()=>prAI(!un.length);bindPrRows();
@@ -910,6 +960,7 @@ function briefDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));const
  b+=cdP('Health: on track / watch / critical.','margin:0 0 6pt;font-size:8pt;color:'+CD.mute);
  if(P.ai_brief&&P.ai_brief.key===briefKey()) b+=cdH('Summary')+cdP(esc(P.ai_brief.text));
  b+=cdH('Needs attention')+(att.length?cdTable(['Health','Project','Value','Why'],att.map(x=>[hlD(x.h.overall),esc(x.p.name)+'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc(x.p.installation||'')+'  ·  Phase '+x.p.phase+'</span>',M(value(x.p)),x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')+(x.h.override?'<br>Override: '+esc(x.p.override.reason):'')])):cdP('All projects on track.'));
+ {const FL=L.flatMap(p=>fundFlags(p).filter(f=>f[0]>0).map(f=>({p,f}))).sort((a,c)=>c.f[0]-a.f[0]);if(FL.length) b+=cdH('Funding actions')+cdTable(['Project','Action needed','Basis'],FL.slice(0,8).map(({p,f})=>[esc(p.name),(f[0]===2?'<b style="color:#9B2C2C">■</b> ':'<b style="color:#8A6100">▲</b> ')+esc(f[1]),esc(f[2]||'–')]));}
  if(P.prio&&N(PR().budget[PR().fy||'all'])){const r=PR(),Lr=prRank(),st=prStable(),B=N(r.budget[r.fy||'all']);const ab=Lr.filter(x=>x.above),be=Lr.filter(x=>x.above===false),mg=Lr.filter(x=>!x.must&&!x.fill&&st[x.p.id]>.1&&st[x.p.id]<.9);
   b+=cdH('Funding priority'+(r.fy?' – FY'+r.fy:''))+cdP('Against a '+M(B)+' budget, '+ab.length+' project'+(ab.length===1?'':'s')+' ('+M(ab.reduce((a,x)=>a+x.c,0))+') are funded and '+be.length+' ('+M(be.reduce((a,x)=>a+x.c,0))+') fall below the line'+(mg.length?'; '+mg.length+' sit on the margin and turn on how priorities are weighted':'')+'.')+
   cdTable(['#','Project','Cost','Standing'],Lr.filter(x=>x.above||mg.includes(x)).concat(be.filter(x=>!mg.includes(x)).slice(0,3)).sort((a,c)=>a.rank-c.rank).map(x=>[String(x.rank),esc(x.p.name),M(x.c),x.must?'Must fund':x.fill?'Funded – fills the gap':mg.includes(x)?(x.above?'Funded – on the margin':'Below – on the margin'):x.above?'Funded':'Below the line']));}
