@@ -70,6 +70,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
  <a class="home" href="/corbel/">Corbel</a>
  <h1>SCOTT <span style="font-weight:400;font-size:15px;opacity:.75">Scope Content Organizer and Trigger Tracer</span></h1>
  <div class="sp"></div>
+ <span id="msbar" style="display:flex;align-items:center;margin-right:10px"></span>
  <button id="bSettings">AI settings</button>
 </header>
 <main>
@@ -779,12 +780,15 @@ const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 function engineList(){const e=[{id:'offline',name:'Keywords',desc:'Built-in, works offline'}];SET.slots.forEach((s,i)=>{if(s.enabled&&s.model&&s.role!=='arbiter') e.push({id:'ai'+(i+1),name:s.label||('AI '+(i+1)),desc:(PROVIDERS[s.provider]||'').split(' (')[0]+' · '+s.model,slot:s});});return e;}
 function arbiter(){const i=SET.slots.findIndex(s=>s.enabled&&s.model&&s.role==='arbiter');return i<0?null:{id:'ai'+(i+1),name:SET.slots[i].label||'Arbiter',slot:SET.slots[i],desc:(PROVIDERS[SET.slots[i].provider]||'').split(' (')[0]+' · '+SET.slots[i].model};}
-function renderEngines(status={}){const box=$('#engines');box.innerHTML='';
+function renderEngines(status={}){const box=$('#engines');box.innerHTML='';const rows=document.createElement('div');
  [...engineList(),...(arbiter()?[{...arbiter(),name:arbiter().name+' (arbiter)'}]:[])].forEach(e=>{const st=status[e.id]||{};const d=document.createElement('div');d.className='eng';
-  d.innerHTML='<span class="dot '+(st.state||'')+'"></span><span class="nm">'+esc(e.name)+'</span><span class="st">'+esc(st.msg||e.desc)+'</span>';box.appendChild(d);});
+  d.innerHTML='<span class="dot '+(st.state||'')+'"></span><span class="nm">'+esc(e.name)+'</span><span class="st">'+esc(st.msg||(e.slot?'AI reader':'Built-in, works offline'))+'</span>';rows.appendChild(d);});
+ {const L=[...engineList(),...(arbiter()?[arbiter()]:[])];const S2=L.map(e=>status[e.id]||{});const run=S2.some(x=>x.state==='run'),err=S2.filter(x=>x.state==='err').length,done=S2.filter(x=>x.state==='ok').length;
+  const nAI=L.filter(e=>e.slot).length;const sum=document.createElement('div');sum.className='eng';sum.innerHTML='<span class="dot '+(run?'run':err?'err':done?'ok':'')+'"></span><span class="nm">Readers</span><span class="st">'+esc((nAI?'Keywords, two AI readers and an arbiter':'Keywords only (sign in to CARL for the AI readers)')+(run?': reading…':done?': done'+(err?', '+err+' failed':''):''))+'</span>';box.appendChild(sum);
+  const dt=document.createElement('details');dt.innerHTML='<summary class="small" style="cursor:pointer">Details</summary>';dt.appendChild(rows);box.appendChild(dt);}
  if(SET.slots.every(s=>!s.enabled)) box.insertAdjacentHTML('beforeend','<div class="small">AI is off. Sign in to CARL (carl.carlcompliance.com) to use it.</div>');
  const ai=[...engineList().filter(e=>e.slot),...(arbiter()?[arbiter()]:[])];const w=$('#dataWarn');
- if(ai.length){w.hidden=false;w.innerHTML='Parsing will send the scope text to: <b>'+ai.map(e=>esc(e.name)+' ('+esc(e.slot.base||defaultBase(e.slot.provider))+')').join(', ')+'</b>. Send CUI only to an AI approved for CUI.';}else w.hidden=true;}
+ if(ai.length&&!w.dataset.keep){w.hidden=false;w.innerHTML='Sanitized, unclassified information only. Parsing sends the scope text to commercial AI through CARL.';}else if(!ai.length&&!w.dataset.keep) w.hidden=true;}
 function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?'generativelanguage.googleapis.com':'api.openai.com';}
 
 async function parse(){
@@ -850,15 +854,31 @@ function guessBasics(){const S=STATE;const pick=(f)=>{const c=S.items.filter(i=>
  if(b.country) b.location=LOCATION_OF[b.country]||'host_nation';
  if(!b.design_agent){const sv=S.items.filter(i=>i.field==='service'&&i.use).map(i=>i.value);if(sv.some(s=>s==='navy'||s==='usmc')) b.design_agent='navfac';else if(sv.includes('army')) b.design_agent='usace';else if(sv.includes('af')) b.design_agent='afcec';}
  return b;}
-function renderBasics(){const box=$('#basics');const b=STATE.basics||(STATE.basics=guessBasics());box.innerHTML='';
- ['location','country','design_agent','funding','delivery','solicitation','contract_type','set_aside','level','value','duration_days'].forEach(f=>{const q=Q[f];if(!q) return;const w=document.createElement('div');const l=document.createElement('label');l.textContent=q.label;w.appendChild(l);
-  if(q.type==='number'){const i=document.createElement('input');i.type='number';i.value=b[f]??'';i.oninput=()=>{b[f]=i.value===''?undefined:Number(i.value);};w.appendChild(i);}
-  else{const s=document.createElement('select');s.innerHTML='<option value="">(not stated)</option>'+q.options.map(o=>'<option value="'+o+'">'+esc(lab(o))+'</option>').join('');s.value=b[f]??'';s.onchange=()=>{b[f]=s.value||undefined;if(f==='country'&&s.value){b.location=LOCATION_OF[s.value]||'host_nation';renderBasics();}};w.appendChild(s);}
+// What the project record already knows, for questions SCOTT and CORA would otherwise ask again.
+// Each answer carries where it came from, so the form can say so.
+function recBasics(){const o={};const put=(k,v,src)=>{if(v!==undefined&&v!==null&&v!=='') o[k]={v,src};};
+ const J=k=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}};
+ const st=J('milcon_store');const pr=st&&st.projects&&st.projects[st.active];const core=(pr&&(pr.core||pr))||{};
+ const rec=J('milcon_record')||{};const pp=J('piper_project');const nn=J('nora_project');const ee=J('earl_project');
+ const inst=String(core.installation||(rec.project&&rec.project.installation)||(nn&&nn.project&&nn.project.installation)||'');
+ const CM=[[/guam|andersen|apra|camp blaz|naval base guam|finegayan|barrigada/i,'guam'],[/hawai|pearl harbor|hickam|schofield|kaneohe|oahu|wheeler|pohakuloa|barking sands/i,'us_hawaii'],[/alaska|elmendorf|richardson|wainwright|eielson|clear sfs|greely/i,'us_alaska'],[/saipan|tinian|cnmi|northern mariana/i,'cnmi'],[/american samoa|pago/i,'american_samoa'],[/\bwake\b/i,'wake'],[/japan|okinawa|misawa|yokota|kadena|iwakuni|sasebo|yokosuka|zama|atsugi|futenma|schwab|hansen|kinser|foster|courtney/i,'japan'],[/korea|osan|humphreys|kunsan|daegu|camp walker/i,'korea'],[/philippin|subic|clark|luzon|palawan/i,'philippines'],[/australia|darwin|tindal|robertson barracks/i,'australia'],[/palau/i,'palau'],[/micronesia|\bfsm\b|yap|pohnpei|chuuk|kosrae/i,'fsm'],[/marshall|kwajalein|reagan test site/i,'marshall_islands'],[/papua/i,'papua_new_guinea'],[/singapore/i,'singapore']];
+ const c=(CM.find(([re])=>re.test(inst))||[])[1];if(c){put('country',c,'installation');put('location',['us_hawaii','us_alaska'].includes(c)?'us_state':['guam','cnmi','american_samoa','wake'].includes(c)?'us_territory':'host_nation','installation');}
+ const SV={'air force':'af','space force':'ussf','navy':'navy','marine corps':'usmc','usmc':'usmc','army':'army','dha':'dha','defense health agency':'dha'};const sv=SV[String(core.service||'').toLowerCase()]||(nn&&nn.project&&({af:'af',ussf:'ussf',navy:'navy',usmc:'usmc',army:'army',dha:'dha'})[nn.project.service]);if(sv) put('service',[sv],'project record');
+ if(rec.piper&&(rec.piper.rounded||rec.piper.contract)){put('funding','milcon','PIPER DD 1391');put('level','permanent','MILCON 1391; check');if(rec.piper.contract) put('value',Math.round(rec.piper.contract),'PIPER estimated contract cost');}
+ const acq=String(pp&&pp.s12&&pp.s12.acq||'');if(/bid[\s-]*build|\bdbb\b/i.test(acq)) put('delivery','dbb','PIPER block 12');else if(/design[\s-]*build/i.test(acq)) put('delivery','db','PIPER block 12');else if(/task order|idiq|macc|satoc|joc/i.test(acq)) put('delivery','idiq_task_order','PIPER block 12');
+ const r=ee&&ee.alts&&ee.alts.find(a=>a.id===(ee.recommend&&ee.recommend.alt));const WT={renovate:'alteration',convert:'alteration',new:'new',addition:'addition'};if(r&&WT[r.type]) put('work_type',[WT[r.type]],'EARL recommendation');
+ return o;}
+
+function renderBasics(){const box=$('#basics');if(!STATE.basics){const g=guessBasics(),r=recBasics();STATE.bsrc={};Object.entries(r).forEach(([k,x])=>{if(g[k]===undefined&&!Array.isArray(x.v)){g[k]=x.v;STATE.bsrc[k]=x.src;}});if(g.design_agent&&!STATE.items.some(i=>i.field==='design_agent'&&i.status!=='unverified')) STATE.bsrc.design_agent='guessed from the Service; check';STATE.basics=g;STATE.rec=r;}const b=STATE.basics;box.innerHTML='';
+ ['location','country','design_agent','funding','delivery','solicitation','contract_type','set_aside','level','value','duration_days'].forEach(f=>{const q=Q[f];if(!q) return;const w=document.createElement('div');const l=document.createElement('label');l.textContent=q.label;if(STATE.bsrc&&STATE.bsrc[f]){const t=document.createElement('span');t.className='small';t.style.cssText='font-weight:400;margin-left:6px;color:#2e6b3e';t.textContent='from '+STATE.bsrc[f];l.appendChild(t);}w.appendChild(l);
+  if(q.type==='number'){const i=document.createElement('input');i.type='number';i.value=b[f]??'';i.oninput=()=>{b[f]=i.value===''?undefined:Number(i.value);if(STATE.bsrc) delete STATE.bsrc[f];};w.appendChild(i);}
+  else{const s=document.createElement('select');s.innerHTML='<option value="">(not stated)</option>'+q.options.map(o=>'<option value="'+o+'">'+esc(lab(o))+'</option>').join('');s.value=b[f]??'';s.onchange=()=>{b[f]=s.value||undefined;if(STATE.bsrc) delete STATE.bsrc[f];if(f==='country'&&s.value){b.location=LOCATION_OF[s.value]||'host_nation';renderBasics();}};w.appendChild(s);}
   box.appendChild(w);});}
 function project(){const P={};const S=STATE;
  MULTI.forEach(f=>P[f]=[...new Set(S.items.filter(i=>i.field===f&&i.use).map(i=>i.value))]);
  ['seismic','historic','arctic','cui'].forEach(f=>{if(S.items.some(i=>i.field===f&&i.use)) P[f]=true;});
  Object.assign(P,Object.fromEntries(Object.entries(S.basics||{}).filter(([k,v])=>v!==undefined)));
+ const RB=S.rec||recBasics();P._src=Object.assign({},S.bsrc||{});['service','work_type'].forEach(f=>{if((!P[f]||!P[f].length)&&RB[f]){P[f]=RB[f].v;P._src[f]=RB[f].src;}});
  if(!P.work_type.length) delete P.work_type;
  return P;}
 function send(){const P=project();if(!P.work_type&&!confirm('No work type (new, repair, alteration…) was selected. The selector will default to New construction. Continue?')) return;try{localStorage.setItem('ccs_project',JSON.stringify(P));localStorage.setItem('ccs_import',JSON.stringify({at:Date.now(),items:STATE.items.filter(i=>i.use).length}));}catch(e){download();alert('This browser blocked local storage. A project file was downloaded instead; open it in the selector with Open….');return;}
@@ -890,7 +910,8 @@ $('#fFile').onchange=e=>{const f=e.target.files[0];if(f) f.text().then(t=>{$('#s
 function wc(){const n=$('#scope').value.trim().split(/\s+/).filter(Boolean).length;$('#wc').textContent=n?n+' words':'';}
 $('#scope').addEventListener('input',wc);
 renderEngines();
-try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.text){localStorage.removeItem('sophie_to_scott');$('#scope').value=j.text;wc();const w=$('#dataWarn');w.hidden=false;w.textContent='Loaded the statement of work from SOPHIE'+(j.title?' ('+j.title+')':'')+'. Parse it, then send the triggers to CORA.';}}catch(e){}
+try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.text){localStorage.removeItem('sophie_to_scott');$('#scope').value=j.text;wc();const w=$('#dataWarn');w.hidden=false;w.dataset.keep='1';w.textContent='Loaded the statement of work from SOPHIE'+(j.title?' ('+j.title+')':'')+'. Parsing it now; check the findings, then send them to CORA.';
+  window.addEventListener('load',()=>{const go=()=>{try{parse();}catch(e){}};if(window.CARLAI&&CARLAI.ready) CARLAI.ready(()=>setTimeout(go,50));else setTimeout(go,50);});}}catch(e){}
 </script>
 <script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
    through CARL's server, on CARL's keys, for anyone signed in to
