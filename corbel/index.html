@@ -476,10 +476,10 @@
     .tool-status.ready { color: var(--green-status); }
     @media (max-width: 900px) { .lifecycle { padding: 40px 24px 32px; } .phases { grid-template-columns: repeat(2, 1fr); } }
 
-    .pfbar { max-width: 760px; margin: 0 auto 8px; padding: 14px 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-family: 'Lora', Georgia, serif; font-size: 14px; color: var(--ink-soft); border: 0.5px solid var(--cream-divider); }
+    .pfbar { max-width: 760px; box-sizing: border-box; margin: 0 auto 8px; padding: 14px 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-family: 'Lora', Georgia, serif; font-size: 14px; color: var(--ink-soft); border: 0.5px solid var(--cream-divider); }
     .pfbar label { font-family: 'Bodoni Moda', serif; font-size: 15px; color: var(--ink); }
     .pfbar select, .pfbar button { font: inherit; font-size: 14px; padding: 6px 10px; background: transparent; color: var(--ink); border: 0.5px solid var(--taupe-warm); border-radius: 0; cursor: pointer; }
-    .pfbar .pfnote { flex: 1 1 260px; font-size: 13px; color: var(--taupe-warm); }
+    .pfbar .pfnote { flex: 1 1 260px; min-width: 0; font-size: 13px; color: var(--taupe-warm); }
     .pfbar.test { border-color: #C9A227; background: rgba(201,162,39,.08); }
   </style>
 </head>
@@ -534,6 +534,36 @@
    sel.onchange=function(){var v=sel.value;nt.textContent='Switching…';PF.use(v).then(function(){location.reload();}).catch(function(e){nt.textContent='Could not load the test portfolio: '+e.message;sel.value=PF.cur();});};
    rs.onclick=function(){if(!confirm('Put the test portfolio back to the original sample data? Changes you made in it are lost. Your real projects are not touched.')) return;nt.textContent='Resetting…';PF.reset('test').then(function(){location.reload();});};
    show();})();
+  </script>
+  <section style="padding:0 24px 24px">
+    <div class="pfbar" id="pjbar" style="flex-direction:column;align-items:stretch">
+      <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap;min-width:0;max-width:100%"><label for="pjsel">Project</label><select id="pjsel" style="flex:1 1 220px;min-width:0;width:100%;max-width:100%"></select><a class="btn btn-primary" id="pjnext" style="display:none"></a></div>
+      <div class="pfnote" id="pjnote" style="flex:none;min-width:0"></div>
+    </div>
+  </section>
+  <script>
+  (function(){var sel=document.getElementById('pjsel'),nt=document.getElementById('pjnote'),nx=document.getElementById('pjnext');
+   function J(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+   function M(n){n=+n||0;var a=Math.abs(n);return a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(1)+'M':a>=1e3?'$'+Math.round(a/1e3)+'K':'$'+Math.round(a);}
+   var st=J('milcon_store')||{projects:{}},ids=Object.keys(st.projects||{});
+   if(!ids.length){sel.innerHTML='<option>No projects yet</option>';sel.disabled=true;nt.textContent='Start a project in Nora; every tool then shares it.';nx.style.display='';nx.textContent='Start in Nora';nx.href='/corbel/nora.html';return;}
+   sel.innerHTML=ids.map(function(id){var c=st.projects[id].core||{};return '<option value="'+id+'"'+(id===st.active?' selected':'')+'>'+(c.name||'(untitled)').replace(/</g,'&lt;')+(c.installation?' – '+c.installation.replace(/</g,'&lt;'):'')+'</option>';}).join('');
+   function status(id){var p=st.projects[id],c=p.core||{},T=p.tools||{},rc=T.record||{},ev=c.events||{},o={};
+    var n=T.nora;o.nora=ev['Requirement validated']?'✓ Requirement validated':n?((n.requirements||[]).length+' requirements, not yet validated'):'Not started';
+    o.earl=rc.earl&&rc.earl.recommended?'✓ Recommends '+rc.earl.recommended.name:T.earl?'Analysis in progress':'Not started';
+    o.piper=rc.piper&&(rc.piper.rounded||rc.piper.total)?'✓ 1391 at '+M(rc.piper.rounded||rc.piper.total)+(ev['1391 validated']?', validated':''):T.piper?'Estimate in progress':'Not started';
+    var ss=(rc.sophie&&rc.sophie.sections)||[];o.sophie=ev['SOW final']?'✓ SOW final':ss.length?ss.filter(function(x){return x.status==='reviewed'||x.status==='final';}).length+' of '+ss.length+' SOW sections reviewed':'Not started';
+    var to=String(c.to||'').toLowerCase();var ir=J('irma_project');if(ir&&to){var it=(ir.items||[]).filter(function(x){return String(x.to||'').toLowerCase()===to;});o.irma=it.length?it.filter(function(x){return x.status!=='closed';}).length+' open of '+it.length+(it.length===1?' RFI or submittal':' RFIs and submittals'):'No RFIs or submittals yet';}else o.irma=to?'No RFIs or submittals yet':'Linked once the project has a task order';
+    var q=J('quinn_project');if(q&&to){var bl=(q.registry||[]).filter(function(r){return String(r.to||'').toLowerCase()===to;}).map(function(r){return r.building;});var rs=(q.records||[]).filter(function(r){return bl.indexOf(r.building)>=0;}),od=(q.issues||[]).filter(function(i){return bl.indexOf(i.building)>=0&&i.status!=='closed';});o.quinn=rs.length?rs.length+' inspection reports, '+od.length+' open deficienc'+(od.length===1?'y':'ies'):'No inspection reports yet';}else o.quinn=to?'No inspection reports yet':'Linked once the project has a task order';
+    o.paula=c.priority?'Priority: '+c.priority:'Tracked in the portfolio';
+    var next=!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
+    return {o:o,next:next,c:c};}
+   function show(){var id=sel.value,s=status(id);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
+    nt.textContent=[s.c.service,s.c.fy?'FY'+s.c.fy:'',s.c.programmed?M(s.c.programmed)+' programmed':'',s.c.to?'Task order '+s.c.to:''].filter(Boolean).join('  ·  ')||'Every tool opens this project.';
+    ['nora','earl','piper','sophie','irma','quinn','paula'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
+     d.textContent=s.o[t];d.style.fontWeight=s.next[0]===t?'700':'400';});}
+   sel.onchange=function(){st=J('milcon_store')||st;st.active=sel.value;try{localStorage.setItem('milcon_store',JSON.stringify(st));}catch(e){}show();};
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',show);else show();})();
   </script>
 
   <!-- LIFECYCLE -->
