@@ -220,7 +220,8 @@ function projects(){let pa=null,st=null;try{pa=JSON.parse(localStorage.getItem('
  Object.values(st&&st.projects||{}).forEach(r=>{const c=r.core||{};if(!c.name||L.some(p=>p.id===r.id)) return;L.push({id:r.id,name:c.name,installation:c.installation,service:c.service,fy:c.fy,number:c.number,posture:c.posture,forecast_finish:c.forecast_finish,baseline_finish:c.baseline_finish,award:c.award,programmed:c.programmed,authorized:c.authorized,_src:'Shared record'});});
  return L;}
 // When a project will deliver: its forecast, else its baseline, else an estimate from its fiscal year (an assumption, set in Data and settings).
-function pDate(p){const f=String(p.forecast_finish||'').slice(0,7),b=String(p.baseline_finish||'').slice(0,7);
+function pDate(p){if(p.seq&&p.seq.slip>0&&/^\d{4}-\d{2}/.test(p.seq.finish||'')) return {ym:p.seq.finish.slice(0,7),how:'PAULA projected completion, '+Math.round(p.seq.slip/30.4)+' months past its forecast: '+p.seq.chain,est:false};
+ const f=String(p.forecast_finish||'').slice(0,7),b=String(p.baseline_finish||'').slice(0,7);
  if(/^\d{4}-\d{2}$/.test(f)) return {ym:f,how:'PAULA forecast completion',est:false};if(/^\d{4}-\d{2}$/.test(b)) return {ym:b,how:'PAULA baseline completion',est:false};
  const fy=N(p.fy);if(fy>2000){const now=today().slice(0,7);const late=!N(p.award)&&mo(fy+'-09')<mo(now);const st=late?now:fy+'-09';return {ym:ymAdd(st,N(A.t.build)),how:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+N(A.t.build)+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+N(A.t.build)+' months to build (assumption)',est:true};}return null;}
 function evalReq(r,P){const PL=P||projects();const L=(r.links||[]).map(l=>({...l,p:PL.find(p=>p.id===l.pid)})).filter(l=>l.p);const req=L.filter(l=>l.role!=='supports');
