@@ -266,6 +266,7 @@ function recBasics(){const o={};const put=(k,v,src)=>{if(v!==undefined&&v!==null
  const c=(CM.find(([re])=>re.test(inst))||[])[1];if(c){put('country',c,'installation');put('location',['us_hawaii','us_alaska'].includes(c)?'us_state':['guam','cnmi','american_samoa','wake'].includes(c)?'us_territory':'host_nation','installation');}
  const SV={'air force':'af','space force':'ussf','navy':'navy','marine corps':'usmc','usmc':'usmc','army':'army','dha':'dha','defense health agency':'dha'};const sv=SV[String(core.service||'').toLowerCase()]||(nn&&nn.project&&({af:'af',ussf:'ussf',navy:'navy',usmc:'usmc',army:'army',dha:'dha'})[nn.project.service]);if(sv) put('service',[sv],'project record');
  if(rec.piper&&(rec.piper.rounded||rec.piper.contract)){put('funding','milcon','PIPER DD 1391');put('level','permanent','MILCON 1391; check');if(rec.piper.contract) put('value',Math.round(rec.piper.contract),'PIPER estimated contract cost');}
+ {const fl=(core.funds||[]).find(l=>l&&l.src);if(fl){const k=String(fl.src);put('funding',/^(MCON|MILCON|PD|P&D|UMC|ERCIP|FHC)/.test(k)?'milcon':/^(OM|FSRM)$/.test(k)?'om_frsm':/^HN/.test(k)?'host_nation_funded':'other','project record funding line');}else if(core.appropriation) put('funding',core.appropriation,'project record');}
  const acq=String(pp&&pp.s12&&pp.s12.acq||'');if(/bid[\s-]*build|\bdbb\b/i.test(acq)) put('delivery','dbb','PIPER block 12');else if(/design[\s-]*build/i.test(acq)) put('delivery','db','PIPER block 12');else if(/task order|idiq|macc|satoc|joc/i.test(acq)) put('delivery','idiq_task_order','PIPER block 12');
  const r=ee&&ee.alts&&ee.alts.find(a=>a.id===(ee.recommend&&ee.recommend.alt));const WT={renovate:'alteration',convert:'alteration',new:'new',addition:'addition'};if(r&&WT[r.type]) put('work_type',[WT[r.type]],'EARL recommendation');
  const s12=pp&&pp.s12||{};const ym=x=>{const m=String(x||'').match(/^(\d{4})-(\d{2})/);return m?Number(m[1])*12+Number(m[2])-1:null;};const a1=ym(s12.start),a2=ym(s12.complete);if(a1!=null&&a2!=null&&a2>a1) put('duration_days',Math.round((a2-a1)*30.44),'PIPER block 12 construction dates');
@@ -604,5 +605,9 @@ const DX=(function(){
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
  return {conv,save,hook};})();
 </script>
+<script id="cora-rec">/* CORA's appropriation writes back to the shared project record */
+(function(){const si=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){si.call(this,k,v);if(this!==localStorage||k!=='ccs_project') return;
+ try{const j=JSON.parse(v);if(!j||!j.funding) return;const st=JSON.parse(localStorage.getItem('milcon_store')||'null');if(!st||!st.active||!st.projects||!st.projects[st.active]) return;const c=st.projects[st.active].core=st.projects[st.active].core||{};
+  if(c.appropriation!==j.funding){c.appropriation=j.funding;c.appropriation_src='CORA';si.call(localStorage,'milcon_store',JSON.stringify(st));}}catch(e){}};})();</script>
 </body>
 </html>
