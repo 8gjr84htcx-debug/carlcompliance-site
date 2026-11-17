@@ -238,6 +238,7 @@ function recBasics(){const o={};const put=(k,v,src)=>{if(v!==undefined&&v!==null
  if(rec.piper&&(rec.piper.rounded||rec.piper.contract)){put('funding','milcon','PIPER DD 1391');put('level','permanent','MILCON 1391; check');if(rec.piper.contract) put('value',Math.round(rec.piper.contract),'PIPER estimated contract cost');}
  const acq=String(pp&&pp.s12&&pp.s12.acq||'');if(/bid[\s-]*build|\bdbb\b/i.test(acq)) put('delivery','dbb','PIPER block 12');else if(/design[\s-]*build/i.test(acq)) put('delivery','db','PIPER block 12');else if(/task order|idiq|macc|satoc|joc/i.test(acq)) put('delivery','idiq_task_order','PIPER block 12');
  const r=ee&&ee.alts&&ee.alts.find(a=>a.id===(ee.recommend&&ee.recommend.alt));const WT={renovate:'alteration',convert:'alteration',new:'new',addition:'addition'};if(r&&WT[r.type]) put('work_type',[WT[r.type]],'EARL recommendation');
+ const s12=pp&&pp.s12||{};const ym=x=>{const m=String(x||'').match(/^(\d{4})-(\d{2})/);return m?Number(m[1])*12+Number(m[2])-1:null;};const a1=ym(s12.start),a2=ym(s12.complete);if(a1!=null&&a2!=null&&a2>a1) put('duration_days',Math.round((a2-a1)*30.44),'PIPER block 12 construction dates');
  return o;}
 
 // ---------- Filled from the project record; defaults are named, not hidden ----------
@@ -251,12 +252,12 @@ function projFile(k,ext){let n='';try{const st=JSON.parse(localStorage.getItem('
 const _renderForm=renderForm;renderForm=function(){_renderForm();const known=new Set(P._known||[]);const ids=[];GROUPS.forEach(([g,list])=>list.forEach(id=>{if(Q[id]) ids.push(id);}));
  const qs=[...document.querySelectorAll('#form fieldset .q')];ids.forEach((id,i)=>{const w=qs[i];if(!w) return;w.dataset.q=id;const lb=w.querySelector('label');
   const tag=document.createElement('span');tag.style.cssText='font-weight:400;font-size:11px;margin-left:6px';
-  if(P._src&&P._src[id]){tag.textContent='from '+P._src[id];tag.style.color='#2e6b3e';lb&&lb.appendChild(tag);}
+  if(P._src&&P._src[id]){tag.textContent=(/^guessed/.test(P._src[id])?'':'from ')+P._src[id];tag.style.color='#2e6b3e';lb&&lb.appendChild(tag);}
   else if(KEYQ.includes(id)&&!known.has(id)){tag.textContent='default – check';tag.style.cssText+=';background:#FFF1BF;color:#6B4E00;padding:0 5px;border-radius:3px';lb&&lb.appendChild(tag);}
   const mark=()=>{const k=new Set(P._known||[]);k.add(id);P._known=[...k];if(P._src) delete P._src[id];tag.remove();persist();dfltBanner();};w.addEventListener('change',mark);w.addEventListener('input',mark);});dfltBanner();};
 function dfltBanner(){let b=document.getElementById('dfltB');const known=new Set(P._known||[]);const D2=KEYQ.filter(id=>Q[id]&&!known.has(id));
  if(!D2.length){if(b) b.remove();return;}if(!b){b=document.createElement('div');b.id='dfltB';b.className='disc';b.style.margin='16px 16px 0';b.style.background='#FFF6DA';b.style.borderColor='#ecd59a';document.querySelector('main').before(b);}
- b.innerHTML='<b>Still on defaults:</b> '+D2.map(id=>esc(Q[id].label.replace(/\s*\(.*\)$/,''))+(id==='value'?' ($'+Number(P.value||0).toLocaleString()+')':'')).join(', ')+'. Check them on the left'+(D2.includes('value')?'; the contract value decides which FAR thresholds and clauses apply':'')+'.';}
+ b.innerHTML='<b>Still on defaults:</b> '+D2.map(id=>esc(Q[id].label.replace(/\s*\(.*\)$/,''))+(id==='value'?' ($'+Number(P.value||0).toLocaleString()+')':'')).join(', ')+'. Check '+(D2.length>1?'them':'it')+' on the left'+(D2.includes('value')?'; the contract value decides which FAR thresholds and clauses apply':'')+'.';}
 // The criteria list for the SOW and the contract file, as a Word document.
 function criteriaDoc(){const sel=selected();const grp={};sel.forEach(({mod,x})=>{(grp[mod]=grp[mod]||[]).push(x);});let n='';try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];n=String((pr&&(pr.core||pr).name)||'');}catch(e){}
  const e=t=>esc(t??'');const rows=m=>(grp[m]||[]).map(x=>{const r=x.r;return [e((r.reg?r.reg+' ':'')+(r.number||'')),e(r.title||''),e(({ok:'Applies',sel:'Selected',rev:'Needs ruling',off:'Added'})[x.st]||''),e(x.why||''),e(r.date?String(r.date).slice(0,7):'')];});
