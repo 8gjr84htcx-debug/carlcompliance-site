@@ -718,7 +718,9 @@ async function pdfLib(){if(PDFJS) return PDFJS;
  PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
 async function pdfRead(file,say){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const pages=[];let scans=0;
  for(let i=1;i<=doc.numPages;i++){if(say&&(i===1||i%10===0)) say('Reading '+file.name+': page '+i+' of '+doc.numPages);const pg=await doc.getPage(i);const vp=pg.getViewport({scale:1});const tc=await pg.getTextContent();
-  const items=tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str.trim(),x:it.transform[4],y:vp.height-it.transform[5]}));
+  const items=[];tc.items.forEach(it=>{if(!it.str||!it.str.trim()) return;const cw=it.width/Math.max(1,it.str.length);let m;const re=/\S(?:\S|\s{1,2}(?=\S))*/g;while((m=re.exec(it.str))) items.push({s:m[0],x:it.transform[4]+m.index*cw,y:vp.height-it.transform[5],w:m[0].length*cw});});
+  // Join runs the PDF split mid-word ("$121,9" + "06").
+  items.sort((a,b)=>Math.abs(a.y-b.y)>2?a.y-b.y:a.x-b.x);for(let k=items.length-1;k>0;k--){const a=items[k-1],b=items[k];if(Math.abs(a.y-b.y)<=2&&b.x-(a.x+a.w)<1.5&&b.x>=a.x){a.s+=b.s;a.w=b.x+b.w-a.x;items.splice(k,1);}}
   const srt=items.slice().sort((a,b)=>Math.abs(a.y-b.y)>2?a.y-b.y:a.x-b.x);let t='',ly=null;srt.forEach(it=>{if(ly!==null&&Math.abs(it.y-ly)>2) t+='\n';else if(t) t+=' ';t+=it.s;ly=it.y;});
   t=t.replace(/[ \t]+/g,' ').trim();
   if(t.length<40&&aiOn()&&scans<40){scans++;if(say) say('Reading scanned page '+i+' of '+file.name);try{const v2=pg.getViewport({scale:1.4});const c=document.createElement('canvas');c.width=v2.width;c.height=v2.height;await pg.render({canvasContext:c.getContext('2d'),viewport:v2}).promise;
@@ -726,14 +728,21 @@ async function pdfRead(file,say){const lib=await pdfLib();const doc=await lib.ge
   pages.push({n:i,t,items});}
  return pages;}
 // ---- the layout reader ----
-const LB=[['component',/^1\.\s*COMPONENT\b\s*/i],['date',/^2\.\s*DATE\b\s*/i],['installation',/^3\.\s*INSTALLATION(\s+AND\s+LOCATION)?\b\s*/i],['title',/^4\.\s*PROJECT\s+TITLE\b\s*/i],['pe',/^5\.\s*PROGRAM\s+ELEMENT\b\s*/i],['catcode',/^6\.\s*CATEGORY\s+CODE\b\s*/i],['number',/^7\.\s*PROJECT\s+NUMBER\b\s*/i],['cost',/^8\.\s*PROJECT\s+COST(\s*\(\$000\))?\s*/i]];
+const LB=[['component',/^1\.\s*COMPONENT\b\s*/i],['date',/^2\.\s*DATE\b\s*/i],['installation',/^3\.\s*INSTALLATION(\s*\(SA\))?\s*(&|AND)?\s*(LOCATION)?(\s*\/\s*UIC)?\s*:?\s*([A-Z]\d{5}(\([A-Z]+\))?)?\s*/i],['title',/^4\.\s*PROJECT\s+TITLE\b\s*/i],['pe',/^5\.\s*PROGRAM\s+ELEMENT\b\s*/i],['catcode',/^6\.\s*CATEGORY\s+CODE\b\s*/i],['number',/^7\.\s*PROJECT\s+NUMBER\b\s*/i],['cost',/^8\.\s*PROJECT\s+COST(\s*\(\$000\))?\s*/i]];
 const IMF=[['title','Project title'],['number','Project number'],['installation','Installation and location'],['component','Component'],['fy','Fiscal year'],['pe','Program element'],['catcode','Category code'],['cost','Project cost ($000)'],['dpct','Design percent complete'],['d35','35% design date'],['dc','Design complete date']];
 const IMKEY=['title','number','installation','fy','cost'];
 const is1391=pg=>/PROJECT\s+NUMBER/i.test(pg.t)&&/PROJECT\s+COST/i.test(pg.t)&&/INSTALLATION/i.test(pg.t);
-function hdrPos(pg){const o={};const it=pg.items||[];const labs=[];it.forEach(x=>LB.forEach(([k,re])=>{if(re.test(x.s)) labs.push({k,x});}));
- labs.forEach(({k,x})=>{const re=LB.find(l=>l[0]===k)[1];const tail=x.s.replace(re,'').trim();if(tail){o[k]=tail;return;}
-  const right=Math.min(1e9,...labs.filter(l=>l.x!==x&&Math.abs(l.x.y-x.y)<6&&l.x.x>x.x+5).map(l=>l.x.x));const below=Math.min(x.y+34,...labs.filter(l=>l.x.y>x.y+4).map(l=>l.x.y-1));
-  const v=it.filter(z=>z!==x&&!labs.some(l=>l.x===z)&&z.y>x.y+1&&z.y<=below&&z.x>=x.x-6&&z.x<right-2).sort((a,b)=>Math.abs(a.y-b.y)>2?a.y-b.y:a.x-b.x).map(z=>z.s).join(' ').trim();if(v) o[k]=v;});
+// Lines of text with the x position of every label on them, so labels printed as one run ("5. Program Element 6. Category Code 7. Project Number …") still split into columns.
+const LBX=/\b([1-8])\.\s*(Component|Date|Installation|Project\s+Title|Program\s+Element|Category\s+Code|Project\s+Number|Project\s+Cost)/gi;
+const LBK={1:'component',2:'date',3:'installation',4:'title',5:'pe',6:'catcode',7:'number',8:'cost'};
+function hdrPos(pg){const o={};const it=(pg.items||[]).slice().sort((a,b)=>a.y-b.y||a.x-b.x);if(!it.length) return o;const L=[];
+ it.forEach(z=>{const l=L.find(l=>Math.abs(l.y-z.y)<=2.5);if(l) l.it.push(z);else L.push({y:z.y,it:[z]});});L.sort((a,b)=>a.y-b.y);
+ L.forEach(l=>{l.it.sort((a,b)=>a.x-b.x);let str='';const xs=[];l.it.forEach(z=>{if(str){str+=' ';xs.push(z.x-1);}const cw=(z.w||z.s.length*5)/Math.max(1,z.s.length);for(let c=0;c<z.s.length;c++){str+=z.s[c];xs.push(z.x+c*cw);}});l.t=str;l.lab=[];{let m;LBX.lastIndex=0;while((m=LBX.exec(str))){const k=LBK[m[1]];const nm=m[2].toLowerCase().replace(/\s+/g,' ');const ok={component:'component',date:'date',installation:'installation',title:'project title',pe:'program element',catcode:'category code',number:'project number',cost:'project cost'}[k]===nm;if(ok) l.lab.push({k,x:xs[m.index]});}}});
+ const stop=l=>l.lab.length||/^\s*(9|10|11|12)\.|COST\s+ESTIMATES|^Item\b|DESCRIPTION/i.test(l.t);
+ L.forEach((l,i)=>{if(!l.lab.length) return;const labs=l.lab.slice().sort((a,b)=>a.x-b.x);const col={};
+  const maxN=labs.some(lb=>['pe','catcode','number','cost'].includes(lb.k))?1:labs.some(lb=>lb.k==='installation'||lb.k==='title')?5:2;let py=l.y;
+  for(let j=i+1,n=0;j<L.length&&n<maxN;j++,n++){const v=L[j];if(stop(v)||v.y-py>26) break;py=v.y;v.it.forEach(z=>{let c=0;labs.forEach((lb,q)=>{if(z.x>=lb.x-30) c=q;});const k=labs[c].k;(col[k]=col[k]||[]).push(z.s);});}
+  labs.forEach(lb=>{let v=(col[lb.k]||[]).join(' ').replace(/FY\s*\d{4}\s+MILITARY\s+CONSTRUCTION\s+(PROGRAM|PROJECT\s+DATA)/ig,'').replace(/\s+/g,' ').trim();if(v&&!o[lb.k]) o[lb.k]=v;});});
  return o;}
 function hdrText(t){const o={};const q=[];const lab=s=>LB.find(([,re])=>new RegExp(re.source.replace(/^\^/,''),'i').test(s));
  for(const s of t.split('\n').flatMap(l=>l.split(/\s{3,}|\t/)).map(x=>x.trim())){if(!s) continue;if(/^(9|10|11|12)\.\s/.test(s)) break;const L=lab(s);
@@ -744,20 +753,21 @@ function hdrText(t){const o={};const q=[];const lab=s=>LB.find(([,re])=>new RegE
 const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
 function ymOf(s){s=String(s||'');let m=s.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/);if(m&&MON[m[2].toLowerCase()]) return m[3]+'-'+String(MON[m[2].toLowerCase()]).padStart(2,'0');
  m=s.match(/([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/);if(m&&MON[m[1].toLowerCase()]) return m[2]+'-'+String(MON[m[1].toLowerCase()]).padStart(2,'0');m=s.match(/(\d{1,2})\/(?:\d{1,2}\/)?(\d{4})/);if(m) return m[2]+'-'+m[1].padStart(2,'0');m=s.match(/(\d{4})-(\d{2})/);return m?m[1]+'-'+m[2]:'';}
-function blk12(t){const o={};let m=t.match(/Percent\s+Complete\s+as\s+of[\s\S]{0,120}?(\d{1,3}(?:\.\d+)?)\s*%/i);if(m&&+m[1]<=100) o.dpct=String(Math.round(+m[1]));
- const dt=re=>{const x=t.match(re);return x?ymOf(x[1]):'';};o.d35=dt(/35\s*%\s*Design[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);o.dc=dt(/Date\s+Design\s+Complete[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);
+function blk12(t){const o={};const ms=[...t.matchAll(/Percent\s+complet(?:e|ed)\s+as\s+of[\s\S]{0,120}?(\d{1,3}(?:\.\d+)?)\s*%/gi)];const m=ms[ms.length-1];if(m&&+m[1]<=100) o.dpct=String(Math.round(+m[1]));
+ const dt=re=>{const x=t.match(re);return x?ymOf(x[1]):'';};o.d35=dt(/35\s*%\s*Design[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);o.dc=dt(/Date\s+Design\s+Complet(?:e|ed)[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);
  Object.keys(o).forEach(k=>{if(!o[k]) delete o[k];});return o;}
-const SVCN=s=>{const t=String(s||'').toLowerCase();return /marine/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space/.test(t)?'Space Force':/air\s*force|^af$|usaf/.test(t)?'Air Force':/health|dha/.test(t)?'DHA':/defense|dod|dla|socom|mda|wide/.test(t)?'Defense-Wide':String(s||'').trim();};
+const SVCN=s=>{const t=String(s||'').toLowerCase().trim();return /^don$|department of the navy/.test(t)?'Navy':/marine/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space/.test(t)?'Space Force':/air\s*force|^af$|usaf/.test(t)?'Air Force':/health|dha/.test(t)?'DHA':/defense|dod|dla|socom|mda|wide/.test(t)?'Defense-Wide':String(s||'').trim();};
 const nzI=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
 const numI=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 const digI=s=>String(s||'').replace(/[^\d.]/g,'').replace(/\.0+$/,'');
 function normF(k,v){return k==='number'?numI(v):['cost','fy','dpct'].includes(k)?digI(v):['d35','dc'].includes(k)?ymOf(v)||String(v||''):nzI(k==='component'?SVCN(v):v);}
 const onPage=(v,t)=>{const d=String(v||'').replace(/[,$\s]/g,'');if(!d) return false;return String(t).replace(/[,$\s]/g,'').toLowerCase().includes(d.toLowerCase());};
+function costTok(c){const t=String(c).replace(/\$/g,'').trim().split(/\s+/).filter(x=>/\d/.test(x));if(!t.length) return '';const ok=x=>/^\d{1,3}(,\d{3})+(\.\d+)?$|^\d+(\.\d+)?$/.test(x);if(t[1]&&!/,/.test(t[0])&&/^\d{1,3}$/.test(t[0])&&/^\d{1,2},\d{3}/.test(t[1])&&ok(t[0]+t[1])) return digI(t[0]+t[1]);return digI((t[0].match(/\d[\d,]*(\.\d+)?/)||[''])[0]);}
 function readerA(grp){const first=grp.pages[0];let h=hdrPos(first);if(Object.keys(h).length<4) h={...hdrText(first.t),...h};
  const all=grp.pages.map(p=>p.t).join('\n');const o={},pg={};const set=(k,v,n)=>{if(v){o[k]=String(v).trim();pg[k]=n;}};
- ['title','number','installation','pe','catcode'].forEach(k=>set(k,h[k],first.n));set('component',h.component&&SVCN(h.component),first.n);set('cost',h.cost&&digI(h.cost),first.n);
+ ['title','number','installation','pe','catcode'].forEach(k=>set(k,h[k],first.n));set('component',h.component&&SVCN(h.component),first.n);set('cost',h.cost&&costTok(h.cost),first.n);
  const fy=(first.t.match(/FY\s*(20\d\d)\s+MILITARY\s+CONSTRUCTION/i)||first.t.match(/\bFY\s*(20\d\d)\b/i)||[])[1];set('fy',fy,first.n);
- const b=blk12(all);Object.entries(b).forEach(([k,v])=>{const p=grp.pages.find(x=>k==='dpct'?/Percent\s+Complete/i.test(x.t):k==='d35'?/35\s*%\s*Design/i.test(x.t):/Design\s+Complete/i.test(x.t));set(k,v,p?p.n:first.n);});
+ const b=blk12(all);Object.entries(b).forEach(([k,v])=>{const p=grp.pages.find(x=>k==='dpct'?/Percent\s+Complet/i.test(x.t):k==='d35'?/35\s*%\s*Design/i.test(x.t):/Design\s+Complet/i.test(x.t));set(k,v,p?p.n:first.n);});
  return {o,pg};}
 // Group the 1391 pages of a book by project number; continuation pages carry the same header.
 function groups(pages,file){const out=[];let cur=null;
@@ -789,6 +799,7 @@ async function settle(grp,A,B,say){const F={};const all=grp.pages.map(p=>p.t).jo
   else if(a&&bOk){let r=null;if(aiOn()){if(say) say('Settling '+(grp.no||grp.ti)+': '+k);try{r=await arbitrate(grp,k,a,b);}catch(e){}}
    if(r){f.v=r.v;f.how='arb';f.page=r.page;f.quote=r.quote;}else{f.v=a;f.how='dispute';f.page=A.pg[k];}}
   else{f.v='';f.how='';}
+  if(/^(N\/?A|NONE|TBD|-+)$/i.test(String(f.v||'').trim())){f.v='';f.how='';}
   F[k]=f;}
  return F;}
 function matchOf(it){const no=numI(it.F.number.v),ins=nzI(it.F.installation.v),ti=nzI(it.F.title.v);const insHit=p=>{const a=nzI(p.installation);if(!a||!ins) return false;const w=a.split(' ').filter(x=>x.length>3);return w.some(x=>ins.includes(x));};
@@ -803,6 +814,7 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
  const c=N(v('cost'))*(it.unit==='millions'?1e6:1e3);if(c&&c<=LAW.umc.v) R.push(['info','At '+M(c)+' it is at or under the '+M(LAW.umc.v)+' minor construction ceiling; it could go as unspecified minor construction instead of a line item.',LAW.umc.cite]);
  const m=it.match&&P.projects.find(p=>p.id===it.match);if(m){const was=N(m.authorized)||N(m.programmed);if(c&&was&&Math.abs(c-was)/was>.05) R.push(['warn','The document shows '+M(c)+'; PAULA has '+M(was)+' ('+(c>was?'+':'')+Math.round((c-was)/was*100)+'%).',src]);
   if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);}
+ if(it.prog) R.push(['info','A program line (design or minor construction), not a single project – left unticked.',src]);
  if(it.dupe) R.push(['warn','The same project number and installation appear more than once in this import.',src]);
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
  return R;}
@@ -812,7 +824,8 @@ async function impFiles(files,pasted){const say=t=>{const e=$('#imSt');if(e) e.t
    const url=f.pasted?'':URL.createObjectURL(f);IMP.files.push({name:f.name,url,n:pages.length});
    const G=groups(pages,f.name);const pdi=/Pacific\s+Deterrence\s+Initiative/i.test(pages.slice(0,6).map(p=>p.t).join(' '));
    if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){}}
-     const F=await settle(g,A,B,say);IMP.items.push({id:uid(),kind:'1391',file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi,two:!!B,unit:'thousands',sel:true});}}
+     const F=await settle(g,A,B,say);const prog=/^VARIOUS$/i.test(String(F.number.v||'').trim())||/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(String(F.title.v||'').trim());
+     IMP.items.push({id:uid(),kind:'1391',file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!B,unit:'thousands',sel:!prog,prog});}}
    else{if(!aiOn()){IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
     const cand=pages.filter(p=>/\d{1,3}(,\d{3})+|\d{4,}/.test(p.t)).slice(0,40);for(let s=0;s<cand.length;s+=4){const ch=cand.slice(s,s+4);say('Reading the table in '+f.name+' with two readers: pages '+ch[0].n+'–'+ch[ch.length-1].n);
      const src=ch.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n');let A,B;try{[A,B]=await Promise.all([CARLAI.ask('claude',RTAB_SYS,src,null,{fresh:true}),CARLAI.ask('gemini',RTAB_SYS,src,null,{fresh:true})]);}catch(e){IMP.notes=(IMP.notes||[]).concat([f.name+': the table could not be read ('+e.message+').']);continue;}
@@ -891,7 +904,7 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
    FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
     return '<tr'+(it.done?' style="opacity:.6"':'')+' style="border-bottom:none"><td><input type="checkbox" data-isel="'+it.id+'" style="width:auto"'+(it.sel?' checked':'')+(it.done?' disabled':'')+'></td>'+cell(it,'title',200)+cell(it,'number',70)+cell(it,'installation',160)+cell(it,'fy',52)+cell(it,'cost',80)+cell(it,'dpct',44)+
      '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+'</td>'+
-     '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page '+it.pages.join(', ')+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
+     '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page'+(it.pages.length>1?'s '+it.pages[0]+'–'+it.pages[it.pages.length-1]:' '+it.pages[0])+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
    '<div class="row"><button class="go" id="imGo">Add or update the ticked projects</button></div></div>':'');
  const go=fs=>{if(!fs.length) return;impFiles(fs);};
  $('#imPick').onclick=()=>$('#imF').click();$('#imF').onchange=e=>{const fs=[...e.target.files];e.target.value='';go(fs);};
