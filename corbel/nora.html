@@ -134,7 +134,8 @@ button.sm{font-size:12.5px;padding:3px 9px}
 button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
 header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
 .wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
-@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.wrap>*{min-width:0}.panel{overflow-x:auto}.grid4{grid-template-columns:1fr 1fr}}
+.chips{display:flex;flex-wrap:wrap;gap:6px}.chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:13px;cursor:pointer;background:#fff}.chip input{width:auto;margin:0}
 nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
 nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
 nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
@@ -729,7 +730,7 @@ function needRecord(){const p=P.project,L=[];L.push('PROJECT: '+[p.name,p.instal
  P.requirements.filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT ('+(PRIOR[r.priority]||r.priority)+'): '+r.text));
  P.gaps.forEach(g=>L.push('GAP: '+g.area+'; today: '+(g.current||'')+(g.qty_have!==''?' ('+g.qty_have+' '+(g.unit||'')+')':'')+'; needed: '+(g.required||'')+(g.qty_need!==''?' ('+g.qty_need+' '+(g.unit||'')+')':'')+'; impact: '+(g.impact||'')));
  P.constraints.forEach(c=>L.push('CONSTRAINT: '+c.text));return L.join('\n');}
-function numCheck(text,src){const S=String(src).replace(/,/g,'');return [...new Set((String(text).match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
+function numCheck(text,src){const S=String(src).replace(/,/g,'');return [...new Set((String(text).replace(/\b\d+(?:st|nd|rd|th)\b/gi,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
 async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return;}
  const b=$('#bAINeed');if(b){b.disabled=true;b.textContent='Writing…';}const rec=needRecord();
  try{const j=await CARLAI.ask('claude',NEED_SYS,'RECORD:\n'+rec,null,{fresh:true});const t=String(j.need||'').trim();if(!t) throw new Error('Nothing returned');
@@ -786,13 +787,19 @@ function confPanel(){const G=confGroups();const n=G.reduce((a,g)=>a+g.rs.length,
  if(!n) return P.requirements.some(r=>r.status==='confirmed')?'<div class="panel"><h2>Confirm with your sources</h2><p class="lead">Every requirement is confirmed by its source.</p></div>':'';
  return '<div class="panel" id="confP"><h2>Confirm with your sources</h2><p class="lead">'+n+' requirement'+(n>1?'s are':' is')+' still Draft. Send each person their sheet or walk through it with them, then record what they confirmed. Untick anything they changed and fix it under Adjust details → Requirements.</p>'+
   '<div class="row"><button id="cAll">Download all sheets</button><label class="btn" style="cursor:pointer"><input type="file" id="retF" accept=".pdf,.docx,.txt,.eml,image/*" hidden><span style="border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-block">Read a returned sheet</span></label><span class="small" id="retStat">PDF, Word, or a photo of the marked-up sheet</span></div>'+
-  G.map((g,i)=>'<div class="card" style="margin:8px 0;padding:10px 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="flex:1">'+esc(g.who?g.who.name+(g.who.title?', '+g.who.title:''):'No named source')+'</b><span class="small">'+g.rs.length+' draft</span><button data-sh="'+i+'">Sheet</button><button class="go" data-cf="'+i+'">Record confirmation</button></div>'+
+  '<datalist id="shl2">'+P.stakeholders.map(s=>'<option value="'+esc(s.name+(s.title?', '+s.title:''))+'">').join('')+'</datalist>'+
+  G.map((g,i)=>!g.who?'<div class="card" style="margin:8px 0;padding:10px 14px;border-left:3px solid var(--warn)"><b>Who said these?</b> <span class="small">'+g.rs.length+' requirement'+(g.rs.length>1?'s':'')+' with no person named. Name who said them so their sheet goes to the right person.</span>'+
+   g.rs.map(r=>'<div class="small" style="margin:3px 0"><b>'+esc(r.id)+'</b> '+esc(r.text)+(r.evidence?' <q class="ev">'+esc(r.evidence)+'</q>':'')+'</div>').join('')+
+   '<div class="row" style="margin-top:6px"><input data-asg="'+i+'" list="shl2" placeholder="Name, title" style="max-width:320px"><button class="go" data-asgb="'+i+'">Assign</button></div></div>':
+  '<div class="card" style="margin:8px 0;padding:10px 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="flex:1">'+esc(g.who.name+(g.who.title?', '+g.who.title:''))+'</b><span class="small">'+g.rs.length+' draft</span><button data-sh="'+i+'">Sheet</button><button class="go" data-cf="'+i+'">Record confirmation</button></div>'+
    '<div data-cform="'+i+'" hidden style="margin-top:8px">'+g.rs.map(r=>'<label style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><input type="checkbox" data-r="'+r.id+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(r.id)+'</b> '+esc(r.text)+'</span></label>').join('')+
    '<div class="form" style="margin-top:6px"><div><label class="f">Confirmed by</label><input data-by value="'+esc(g.who?g.who.name:'')+'" placeholder="Name"></div><div><label class="f">Date</label><input data-dt type="date" value="'+today()+'"></div><div><label class="f">How</label><select data-hw>'+opts(HOW,'person')+'</select></div></div>'+
    '<div class="row"><button class="go" data-save="'+i+'">Mark ticked ones Confirmed</button></div></div></div>').join('')+'</div>';}
 function bindConf(root,again){const G=confGroups();const rf=root.querySelector('#retF');if(rf) rf.onchange=()=>{const f=rf.files[0];rf.value='';if(f) readSheet(f);};const bm=root.querySelector('#bMeas');if(bm) bm.onclick=()=>aiMeasures(false);bindRet(root);
  const a=root.querySelector('#cAll');if(a) a.onclick=()=>{dl(fname('Confirmation-Sheets','doc'),sheetHTML(G),'application/msword');log('Confirmation sheets downloaded',G.length+' people');save();};
  root.querySelectorAll('[data-sh]').forEach(b=>b.onclick=()=>{const g=G[b.dataset.sh];dl(fname('Confirm-'+(g.who?g.who.name:'unnamed').replace(/\W+/g,'-'),'doc'),sheetHTML([g]),'application/msword');});
+ root.querySelectorAll('[data-asgb]').forEach(b=>b.onclick=()=>{const g=G[b.dataset.asgb];const v=root.querySelector('[data-asg="'+b.dataset.asgb+'"]').value.trim();if(!v){alert('Enter who said them.');return;}
+  const id=addPerson(v);g.rs.forEach(r=>{r.sources=[id];});log('Source named',g.rs.map(r=>r.id).join(', ')+' → '+(P.stakeholders.find(s=>s.id===id)||{}).name);save();if(again) again();renderSteps();});
  root.querySelectorAll('[data-cf]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.cf+'"]');f.hidden=!f.hidden;});
  root.querySelectorAll('[data-save]').forEach(b=>b.onclick=()=>{const f=root.querySelector('[data-cform="'+b.dataset.save+'"]');const by=f.querySelector('[data-by]').value.trim();if(!by){alert('Enter who confirmed them.');return;}
   const dt=f.querySelector('[data-dt]').value||today(),hw=f.querySelector('[data-hw]').value;const ids=[...f.querySelectorAll('[data-r]:checked')].map(x=>x.dataset.r);if(!ids.length) return;
@@ -854,10 +861,10 @@ function needStale(){return !!(String(P.need_statement||'').trim()&&P.need_sig&&
 // ---------- What NORA needs: coverage, interview kits, reading kits back ----------
 const KR={cmd:'Commander or decision authority',user:'End user / operator',pw:'Installation public works (DPW, BCE, PWD)',pm:'Sponsor / requirement owner'};
 const KRL={cmd:'Commander / decision authority',user:'End user / operator',pw:'Installation public works',pm:'Project lead (you)'};
-function covData(){const B=P.build&&!P.build.applied?P.build.items:null;const k=c=>B?B[c].filter(x=>x.keep):[];const pj=f=>!pBlank(f)?'rec':k('project').some(x=>x.field===f)?'new':'';
+function covData(){const B=P.build&&!P.build.applied?P.build.items:null;const k=c=>B?B[c].filter(x=>x.keep):[];const pj=f=>!pBlank(f)?'rec':(B&&k('project').some(x=>x.field===f))?'new':'';
  const sh=P.stakeholders.concat(k('stakeholders'));const role=r=>sh.some(s=>s.role===r);
  const gaps=P.gaps.concat(k('gaps'));const reqs=P.requirements.filter(r=>r.status!=='withdrawn').length+k('requirements').length;
- const st=(rec,nw)=>rec?'rec':nw?'new':'';
+ const st=(rec,nw)=>rec?'rec':(B&&nw)?'new':'';
  return [
   ['title','Project title, installation and Service','pm',st(!pBlank('name')&&!pBlank('installation')&&!pBlank('service'),pj('name')&&pj('installation')&&pj('service'))],
   ['mission','Mission and requiring unit','cmd',st(!pBlank('mission')&&!pBlank('unit'),pj('mission')&&pj('unit'))],
@@ -1026,13 +1033,13 @@ function vReqs(){const v=$('#view');
    d.innerHTML='<div class="hd"><span class="id">'+r.id+'</span><select data-k="status" style="width:auto">'+opts(RSTAT,r.status)+'</select><select data-k="type" style="width:auto">'+opts(RTYPES,r.type)+'</select><select data-k="priority" style="width:auto">'+opts(PRIOR,r.priority)+'</select><span class="small">'+esc(r.origin||'')+'</span></div>'+
    '<textarea data-k="text" style="min-height:48px" placeholder="The facility shall…"></textarea><div class="flags" data-fl></div>'+
    '<div class="grid4" style="margin-top:8px"><div><label class="f">How it will be verified</label><input data-k="measure" placeholder="Measure, test, or acceptance criterion"></div><div><label class="f">Rationale</label><input data-k="rationale" placeholder="Why it is needed"></div>'+
-   '<div><label class="f">Source stakeholders</label><select data-src multiple size="2">'+P.stakeholders.map(x=>'<option value="'+x.id+'" '+((r.sources||[]).includes(x.id)?'selected':'')+'>'+esc(x.name||'(unnamed)')+'</option>').join('')+'</select>'+((r.source_names||[]).length?'<div class="small">Former: '+esc(r.source_names.join(', '))+'</div>':'')+'</div>'+
+   '<div><label class="f">Source stakeholders</label><div class="chips" data-srcbox>'+P.stakeholders.map(x=>'<label class="chip"><input type="checkbox" value="'+x.id+'" '+((r.sources||[]).includes(x.id)?'checked':'')+'>'+esc(x.name||'(unnamed)')+'</label>').join('')+'</div><input data-addp list="shl3'+r.id+'" placeholder="Add a person (name, title)" style="margin-top:4px"><datalist id="shl3'+r.id+'">'+P.stakeholders.filter(x=>!(r.sources||[]).includes(x.id)).map(x=>'<option value="'+esc(x.name+(x.title?', '+x.title:''))+'">').join('')+'</datalist>'+((r.source_names||[]).length?'<div class="small">Former: '+esc(r.source_names.join(', '))+'</div>':'')+'</div>'+
    '<div><label class="f">Source session</label><select data-sess>'+'<option value="">—</option>'+P.sessions.map(x=>'<option value="'+x.id+'" '+(x.id===r.session?'selected':'')+'>'+esc((SESSION_TYPES[x.type]||'')+' '+x.date+' '+(x.title||''))+'</option>').join('')+'</select></div></div>'+
    (r.evidence?'<div class="small" style="margin-top:6px">Source words: <q class="ev" title="Show in source">'+esc(r.evidence)+'</q></div>':'')+(r.confirmed&&r.status!=='draft'?'<div class="small">Confirmed by '+esc(r.confirmed.by)+', '+esc(r.confirmed.date)+' ('+esc(HOW[r.confirmed.how]||r.confirmed.how)+')</div>':'')+
    (r.status==='withdrawn'?'<div style="margin-top:6px"><label class="f">Reason withdrawn</label><input data-k="withdrawn_reason"></div>':'');
    const fl=()=>d.querySelector('[data-fl]').innerHTML=quality(r).map(([c,t])=>'<span class="pill '+c+'">'+esc(t)+'</span>').join('');
    bindAll(d,r,k=>{fl();if(k==='status'){log('Requirement status changed',r.id+' → '+RSTAT[r.status]);vReqs();renderSteps();}});
-   d.querySelector('[data-src]').onchange=e=>{r.sources=[...e.target.selectedOptions].map(o=>o.value);save();fl();};
+   d.querySelectorAll('[data-srcbox] input').forEach(c=>c.onchange=()=>{r.sources=[...d.querySelectorAll('[data-srcbox] input:checked')].map(o=>o.value);save();fl();renderSteps();});const ap=d.querySelector('[data-addp]');ap.onchange=()=>{const v=ap.value.trim();if(!v) return;const id=addPerson(v);r.sources=[...new Set((r.sources||[]).concat(id))];log('Source added',r.id+' → '+v);save();vReqs();renderSteps();};
    d.querySelector('[data-sess]').onchange=e=>{r.session=e.target.value;save();fl();};
    fl();box.appendChild(d);});}}
 
@@ -1049,10 +1056,10 @@ function vGap(){const v=$('#view');
   '<div class="cols2"><div><label class="f">What exists today</label><textarea data-k="current"></textarea></div><div><label class="f">What the mission requires</label><textarea data-k="required"></textarea></div></div>'+
   '<div class="grid4" style="margin-top:8px"><div><label class="f">Quantity today</label><input type="number" data-k="qty_have"></div><div><label class="f">Quantity required</label><input type="number" data-k="qty_need"></div><div><label class="f">Unit</label><input data-k="unit" placeholder="SF, bays, beds, kW"></div><div><label class="f">Gap</label><div data-gap style="padding:6px 0;font-weight:600"></div></div></div>'+
   '<div style="margin-top:8px"><label class="f">Impact on the mission if the gap is not closed</label><textarea data-k="impact"></textarea></div>'+
-  '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><select data-r multiple size="3">'+act.map(r=>'<option value="'+r.id+'" '+(g.reqs.includes(r.id)?'selected':'')+'>'+esc(r.id+' '+r.text.slice(0,90))+'</option>').join('')+'</select></div>';
+  '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><div class="chips" data-rbox>'+act.map(r=>'<label class="chip" title="'+esc(r.text)+'"><input type="checkbox" value="'+r.id+'" '+(g.reqs.includes(r.id)?'checked':'')+'>'+esc(r.id+' '+r.text.slice(0,60)+(r.text.length>60?'…':''))+'</label>').join('')+'</div></div>';
   const gp=()=>{const h=Number(g.qty_have),n=Number(g.qty_need);d.querySelector('[data-gap]').textContent=(g.qty_need!==''&&!isNaN(n))?((n-(isNaN(h)?0:h)).toLocaleString()+' '+(g.unit||'')):'—';};
   bindAll(d,g,gp);gp();
-  d.querySelector('[data-r]').onchange=e=>{g.reqs=[...e.target.selectedOptions].map(o=>o.value);save();};
+  d.querySelectorAll('[data-rbox] input').forEach(c=>c.onchange=()=>{g.reqs=[...d.querySelectorAll('[data-rbox] input:checked')].map(o=>o.value);save();});
   d.querySelector('[data-del]').onclick=()=>{P.gaps=P.gaps.filter(x=>x!==g);log('Gap removed',g.area);save();vGap();renderSteps();};
   box.appendChild(d);});}
 
@@ -1101,7 +1108,7 @@ function draftNeed(){const p=P.project;const loc=LOCS[p.location]||'';const act=
  return t.replace(/\s+/g,' ').trim();}
 function vOut(){const v=$('#view');const gi=gateItems();
  v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks',P.risks.length],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
- '<p class="small">Change anything under Adjust details. Requirements stay Draft until their source confirms them; mark each one Confirmed on the Requirements step after you check it with that person.</p></div>'+
+ '<p class="small">Change anything under Adjust details. Requirements stay Draft until the person who stated them confirms them: use Confirm with your sources below.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
  '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(needStale()?'<div class="find warn"><b>The record has changed since this was written.</b> Requirements, gaps or the project details were edited. Rewrite it so it matches.</div>':'')+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
  '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement. '+gi.filter(g=>g[1]).length+' of '+gi.length+' done.</p>'+checkHTML()+
