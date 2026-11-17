@@ -219,6 +219,8 @@ td.num input{text-align:right}
 .kpis .card{margin:0}
 .kpis .small{display:block}
 .find.warn{background:var(--warnbg);border:1px solid #ecd59a;border-left:3px solid var(--warn);color:var(--ink,#1b2b33);padding:9px 12px;border-radius:4px;margin:0 0 12px;font-size:13.5px}
+
+@media(max-width:900px){.wrap>*{min-width:0}.panel{overflow-x:auto}.kpis{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -317,12 +319,12 @@ function vDone(){const v=$('#view');{const R0=results();if(E.recommend.alt&&!R0.
  if(!E.recommend.by&&window.CARLAI&&CARLAI.state().user){E.recommend.by=CARLAI.state().user;save();}
  const RI=rangeInfo();const R=RI.R;const rec=E.alts.find(x=>x.id===E.recommend.alt)||(R.lead&&R.lead.a);const rr=rec&&R.rows.find(x=>x.a===rec);
  const org=a=>a.type==='status_quo'?'<span class="pill">Baseline</span>':a.origin==='notes'?'<span class="pill ok">Your notes</span>':a.origin==='standard'?'<span class="pill">Standard</span>':a.origin?'<span class="pill warn">AI suggestion</span>':'<span class="pill">You</span>';
- const todo=[];const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) todo.push(est.length+' status quo cost estimate'+(est.length>1?'s':'')+' (confirmed when you applied; reconfirm with CE or finance)');
+ const todo=[];if(0){const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) todo.push(est.length+' status quo cost estimate'+(est.length>1?'s':'')+' (confirmed when you applied; reconfirm with CE or finance)');
  const un=R.rows.filter(r=>r.unpriced);if(un.length) todo.push('Not costed, so not ranked: '+un.map(r=>r.a.name).join(', ')+'. Add their costs under Adjust details → Life-cycle costs.');
  const ai=Object.keys(E.cellWhy||{}).length;if(ai) todo.push(ai+' screening calls proposed by AI. Review them under Adjust details → Alternatives and screening.');
  if(RI.drv.length&&RI.holds===false) todo.push('Firm up first: '+RI.drv.map(d=>(d.c.label||'').split(/ – |: /)[0]+' ('+$k(d.sw)+' swing)').join('; ')+'.');
- if(E.sq_ok) todo.push('You marked the status quo as able to meet the need, although NORA shows a gap. The memo will say so.');
- if(!E.recommend.rationale) todo.push('No rationale yet. Write it with AI below or by hand under Adjust details → Recommendation.');
+ }
+
  const stale=E.build&&E.build.noraSig&&noraSig()&&E.build.noraSig!==noraSig();
  v.innerHTML=(stale?'<div class="panel"><div class="find warn"><b>NORA has changed since this AoA was built.</b> Requirements, gaps or constraints were added or edited. Build again to bring the courses of action, screening and costs up to date; your earlier answers are kept in the assumptions.</div><div class="row"><button class="go" id="dRe">Build again</button><button id="dKeep">Keep as is</button></div></div>':'')+'<div class="panel"><h2>Your analysis of alternatives</h2>'+
   (rec&&rr&&rr.ok?'<div class="kpis"><div class="card"><span class="small">Recommended</span><span class="big">'+esc(rec.name)+'</span><span class="small">'+esc(ATYPES[rec.type])+'</span></div><div class="card"><span class="small">NPV of cost, '+period()+' years</span><span class="big">'+$k(rr.npv)+'</span><span class="small">Likely '+$r(RI.rg[rec.id])+'</span></div><div class="card"><span class="small">Ranking</span><span class="big">'+(RI.holds===null?'—':RI.holds?'Holds':'Close')+'</span><span class="small">'+(RI.holds===false?'depends on estimates':'across estimate ranges')+'</span></div></div>'+
@@ -331,7 +333,7 @@ function vDone(){const v=$('#view');{const R0=results();if(E.recommend.alt&&!R0.
   '<div class="panel"><h2>Ranking</h2><table><thead><tr><th>Rank</th><th>Alternative</th><th>From</th><th class="num">NPV of cost</th><th class="num">Likely range</th><th class="num">Non-cost score</th></tr></thead><tbody>'+
   R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>{const bl=!r.ok&&!r.unpriced&&r.a.type==='status_quo'&&r.a.screen!=='out'&&sqGap();return '<tr class="'+(r===R.lead?'lead-alt':r.ok?'':'out-alt')+'"><td>'+(r.rank||'—')+'</td><td>'+esc(r.a.name)+(r.ok?'':'<br><span class="small">'+esc(r.unpriced?'Not costed':bl?'Baseline, shown for comparison. '+failReasons(r.a).join('; ')+', so it cannot be recommended.':'Screened out: '+failReasons(r.a).join('; '))+'</span>'+(bl?' <a href="#" id="sqOk" class="small">It can meet the need</a>':''))+(r.ok&&r.a.type==='status_quo'&&E.sq_ok?'<br><span class="small">You marked it as able to meet the need. <a href="#" id="sqNo">Undo</a></span>':'')+'</td><td>'+org(r.a)+'</td><td class="num">'+(r.ok||bl?$k(r.npv):'—')+'</td><td class="num">'+(r.ok?$r(RI.rg[r.a.id]):'—')+'</td><td class="num">'+r.ws.toFixed(2)+'</td></tr>';}).join('')+'</tbody></table>'+
   '<p class="small">Likely range: '+Object.values(RANGE).map(x=>x[2]+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs you entered are taken as given.</p></div>'+
-  (todo.length?'<div class="panel"><h2>Check before you send it</h2><ul>'+todo.map(t=>'<li>'+esc(t)+'</li>').join('')+'</ul></div>':'')+
+  (function(){const I=openItems();return I.length?'<div class="panel"><h2>Check before you send it</h2><table><tbody>'+I.map(([f,t])=>'<tr><td style="width:24px;color:var(--mute)">○</td><td>'+esc(t)+'</td><td class="small" style="white-space:nowrap"><a href="#" data-fx="'+f+'">Fix it</a></td></tr>').join('')+'</tbody></table></div>':'';})()+
   (function(){const iss=E.recommend.rationale?ratIssues():[];return '<div class="panel" id="ratP"><h2>Rationale</h2>'+(E.recommend.rationale?'<p>'+esc(E.recommend.rationale).replace(/\n/g,'<br>')+'</p>':'<p class="small">Not written yet.</p>')+
    (iss.length?'<div class="find warn"><b>Rewrite before you send it.</b> '+esc(iss.join(' '))+'</div>':E.recommend.rationale?'<div class="mentor">Names the recommended alternative; every number matches the analysis.</div>':'')+
    '<div class="row"><button class="'+(iss.length||!E.recommend.rationale?'go':'')+'" id="dAI">'+(E.recommend.rationale?'Rewrite with AI':'Write with AI')+'</button><button id="dDr">'+(E.recommend.rationale?'Redraft from the analysis (no AI)':'Draft from the analysis (no AI)')+'</button></div></div>';})()+
@@ -341,7 +343,7 @@ function vDone(){const v=$('#view');{const R0=results();if(E.recommend.alt&&!R0.
  $('#dDr').onclick=()=>{if(!E.recommend.alt&&rec) E.recommend.alt=rec.id;if(E.recommend.rationale&&!confirm('Replace the rationale with a fresh draft?')) return;E.recommend.rationale=draftRationale();E.recommend.sig=recSig();E.recommend.ai_check='';log('Rationale drafted from the analysis');save();vDone();};
  const so=$('#sqOk');if(so) so.onclick=e=>{e.preventDefault();if(!confirm('Treat the status quo as able to meet the need, although NORA shows a gap? It will be ranked and can be recommended.')) return;E.sq_ok=true;log('Status quo marked as able to meet the need');save();vDone();renderSteps();};
  const sn=$('#sqNo');if(sn) sn.onclick=e=>{e.preventDefault();E.sq_ok=false;log('Status quo override removed');save();vDone();renderSteps();};
- bindOuts(v);}
+ bindOuts(v);v.querySelectorAll('[data-fx]').forEach(a=>a.onclick=e=>{e.preventDefault();fixE(a.dataset.fx);});}
 
 // ---------- steps ----------
 const STEPS=[['build','Build my AoA',()=>E.build&&E.build.applied?'✓':''],['done','Your AoA',()=>E.recommend.alt?'✓':''],['basis','Objective and basis',()=>E.objective?'✓':''],['alts','Alternatives and screening',()=>E.alts.length],['costs','Life-cycle costs',()=>E.alts.reduce((s,a)=>s+a.costs.length,0)||''],['bens','Non-cost factors',()=>E.criteria.length],['res','Results and sensitivity',()=>''],['rec','Recommendation and outputs',()=>E.recommend.alt?'✓':'']];
@@ -389,7 +391,7 @@ function vAlts(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Alternatives</h2><p class="lead">List every reasonable way to meet the objective, including ones you expect to reject. Alternatives screened out stay in the analysis with the reason, as DoDI 7041.03 requires.</p>'+
  '<div class="mentor">Reviewers look for: status quo, renovation, conversion of an existing facility, new construction, lease, and use of another installation or joint use. Overseas, add host-nation funded construction where an agreement allows it.</div>'+
  '<table><thead><tr><th>Alternative</th><th>Type</th><th>Description</th><th>Screen</th><th></th></tr></thead><tbody id="ab"></tbody></table><div class="row"><button class="go" id="bAddA">Add alternative</button><button id="bAIdesc">Write empty descriptions with AI</button></div></div>'+
- '<div class="panel"><h2>Screening</h2><p class="lead">Test each alternative against the Must-have requirements and hard constraints. One “Fails” removes an alternative from the cost comparison.</p>'+
+ '<div class="panel"><h2>Screening</h2><p class="lead">Test each alternative against the Must-have requirements and hard constraints. One “Fails” removes an alternative from the cost comparison.</p>'+(Object.keys(E.cellWhy||{}).length?(E.screen_reviewed?'<p class="small">AI screening calls reviewed.</p>':'<div class="row"><span class="small" style="flex:1">Calls tagged AI were proposed from NORA’s record; hover one to see why.</span><button class="go" id="scrRev">Mark AI screening reviewed</button></div>'):'')+''+
  '<div id="mx"></div><div class="row"><input id="nq" placeholder="Add a screening criterion" style="width:380px"><button id="bAddQ">Add</button></div></div>';
  const tb=$('#ab');
  E.alts.forEach(a=>{const tr=document.createElement('tr');const sq=a.type==='status_quo';
@@ -402,9 +404,11 @@ function vAlts(){const v=$('#view');
  $('#bAddQ').onclick=()=>{const t=$('#nq').value.trim();if(!t) return;E.reqs.push({id:uid(),src:'manual',text:t,must:true});save();vAlts();};
  const mx=$('#mx');if(!E.reqs.length){mx.innerHTML='<div class="empty">No screening criteria. Import Must-have requirements from NORA on step 1, or add criteria below.</div>';return;}
  mx.innerHTML='<table class="matrix"><thead><tr><th>Criterion</th>'+E.alts.map(a=>'<th>'+esc(a.name||'(unnamed)')+'</th>').join('')+'<th></th></tr></thead><tbody>'+
-  E.reqs.map(q=>'<tr><td>'+(q.src&&q.src!=='manual'&&!q.src.startsWith('C:')?'<span class="pill">'+esc(q.src)+'</span> ':'')+esc(q.text)+'</td>'+E.alts.map(a=>'<td><select data-c="'+a.id+'|'+q.id+'">'+opts({'':'—',pass:'Meets',partial:'Partly',fail:'Fails'},E.cells[a.id+'|'+q.id]||'')+'</select></td>').join('')+'<td><button class="sm" data-dq="'+q.id+'">Remove</button></td></tr>').join('')+
-  '</tbody><tfoot><tr><th>Result</th>'+E.alts.map(a=>'<th>'+(feasible(a)?'<span class="pill ok">Carried forward</span>':'<span class="pill bad">Screened out</span>')+'</th>').join('')+'<th></th></tr></tfoot></table>';
+  E.reqs.map(q=>'<tr><td>'+(q.src&&q.src!=='manual'&&!q.src.startsWith('C:')?'<span class="pill">'+esc(q.src)+'</span> ':'')+esc(q.text)+'</td>'+E.alts.map(a=>(function(){const w=(E.cellWhy||{})[a.id+'|'+q.id];return '<td><select data-c="'+a.id+'|'+q.id+'"'+(w?' title="'+esc(w)+'"':'')+'>'+opts({'':'—',pass:'Meets',partial:'Partly',fail:'Fails'},E.cells[a.id+'|'+q.id]||'')+'</select>'+(w&&!E.screen_reviewed?' <span class="pill warn" title="'+esc(w)+'" style="font-size:10px">AI</span>':'')+'</td>';})()).join('')+'<td><button class="sm" data-dq="'+q.id+'">Remove</button></td></tr>').join('')+
+  '</tbody><tfoot><tr><th>Result</th>'+E.alts.map(a=>{const bl=a.type==='status_quo'&&a.screen!=='out'&&sqGap();return '<th>'+(feasible(a)?'<span class="pill ok">Carried forward</span>':bl?'<span class="pill warn">Baseline only</span>':'<span class="pill bad">Screened out</span>')+'</th>';}).join('')+'<th></th></tr></tfoot></table>'+(E.alts.some(a=>a.type==='status_quo'&&a.screen!=='out')&&sqGap()?'<p class="small" style="margin-top:8px"><b>Status quo: baseline only.</b> '+esc(sqGapText(sqGap()))+' in NORA, so it cannot be recommended; it stays in as the baseline. <a href="#" data-sqok2>It can meet the need</a></p>':'');
  mx.querySelectorAll('[data-c]').forEach(s=>s.onchange=()=>{E.cells[s.dataset.c]=s.value;save();vAlts();renderSteps();});
+ {const sr=document.getElementById('scrRev');if(sr) sr.onclick=()=>{E.screen_reviewed=true;log('AI screening calls reviewed');save();vAlts();};}
+ mx.querySelectorAll('[data-sqok2]').forEach(a=>a.onclick=e=>{e.preventDefault();if(!confirm('Treat the status quo as able to meet the need, although NORA shows a gap? It will be ranked and can be recommended.')) return;E.sq_ok=true;log('Status quo marked as able to meet the need');save();vAlts();renderSteps();});
  mx.querySelectorAll('[data-dq]').forEach(b=>b.onclick=()=>{E.reqs=E.reqs.filter(q=>q.id!==b.dataset.dq);save();vAlts();});}
 
 // ---------- 3 costs ----------
@@ -412,7 +416,7 @@ let CA=null;
 function vCosts(){const v=$('#view');if(!CA||!E.alts.find(a=>a.id===CA)) CA=E.alts[0].id;const a=E.alts.find(x=>x.id===CA);const N=period();
  v.innerHTML='<div class="panel"><h2>Life-cycle costs</h2><p class="lead">Enter each alternative’s costs in '+(E.dollars==='nominal'?'then-year':'constant FY'+E.base_fy)+' dollars, by analysis year. Year 1 is FY'+E.base_fy+'; occupancy is year '+((Number(E.lead)||0)+1)+'. Leave out sunk costs and costs identical in every alternative.</p>'+
  '<div class="row" style="margin-top:0">'+E.alts.map(x=>'<button class="'+(x.id===CA?'go':'')+'" data-a="'+x.id+'">'+esc(x.name||'(unnamed)')+(feasible(x)?'':' ✕')+'</button>').join('')+'</div>'+
- (!feasible(a)?'<div class="mentor">This alternative is screened out. Its costs are kept for the record but not ranked.</div>':'')+'<div id="pricer"></div>'+
+ (!feasible(a)?'<div class="mentor">'+(a.type==='status_quo'&&a.screen!=='out'&&sqGap()?'The status quo is the baseline every other alternative is measured against. '+esc(sqGapText(sqGap()))+' in NORA, so it cannot be recommended; its costs still count in the comparison.':'This alternative is screened out. Its costs are kept for the record but not ranked.')+'</div>':'')+'<div id="pricer"></div>'+
  '<table style="margin-top:12px"><thead><tr><th>Category</th><th>Description</th><th class="num">Amount per year ($)</th><th class="num">From year</th><th class="num">To year</th><th class="num">Undiscounted</th><th></th></tr></thead><tbody id="cb"></tbody></table>'+
  '<div class="row"><select id="nc" style="width:auto">'+opts(CATS,'construction')+'</select><button class="go" id="bAddC">Add cost</button><button id="bQuick">Add typical lines</button></div>'+
  '<h3>Residual value</h3><div class="row" style="margin-top:0"><label class="small"><input type="checkbox" id="rvOn" style="width:auto"> Credit residual value at the end of the period</label><label class="small">Physical life of new investment (years) <input type="number" id="rvL" style="width:80px"></label><span class="small" id="rvT"></span></div>'+
@@ -561,9 +565,9 @@ function ratSrc(){const R=results();const rec=E.alts.find(a=>a.id===E.recommend.
  try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'% ('+S.be.toFixed(1)+'%)');}}catch(e){}
  return L.join('\n');}
 function nameIn(t,name){const w=String(name).toLowerCase().match(/[a-z0-9]{3,}/g)||[];if(!w.length) return true;const T=String(t).toLowerCase();return w.filter(x=>T.includes(x)).length/w.length>=0.6;}
-function ratNums(t,src){const S=String(src).replace(/,/g,'');const ok=new Set();(S.match(/\d[\d.]*/g)||[]).forEach(x=>{ok.add(x);const n=Number(x);if(n>=1000){[(n/1e6).toFixed(2),(n/1e6).toFixed(1),(n/1e6).toFixed(0),(n/1e3).toFixed(0),(n/1e9).toFixed(2)].forEach(v=>ok.add(v));}if(/\./.test(x)){ok.add(String(Number(x)));ok.add(Number(x).toFixed(1));ok.add(Number(x).toFixed(0));}});
+function ratNums(t,src){const S=String(src).replace(/,/g,'');const ok=new Set();const mok=new Set();(S.match(/\$\s?\d[\d.]*/g)||[]).forEach(x=>{const n=Number(x.replace(/^\$\s?/,''));if(!isFinite(n)) return;mok.add(String(n));mok.add(String(Math.round(n)));[(n/1e6).toFixed(2),(n/1e6).toFixed(1),(n/1e6).toFixed(0),(n/1e3).toFixed(0),(n/1e9).toFixed(2),(n/1e9).toFixed(1)].forEach(v=>mok.add(v));});(S.match(/\d[\d.]*/g)||[]).forEach(x=>{ok.add(x);const n=Number(x);if(n>=1000){[(n/1e6).toFixed(2),(n/1e6).toFixed(1),(n/1e6).toFixed(0),(n/1e3).toFixed(0),(n/1e9).toFixed(2)].forEach(v=>ok.add(v));}if(/\./.test(x)){ok.add(String(Number(x)));ok.add(Number(x).toFixed(1));ok.add(Number(x).toFixed(0));}});
  const T=String(t).replace(/\{[A-Z]+-\d+\}/g,'').replace(/\bDoDI \d{4}\.\d{2}\b/g,'').replace(/\b\d+(?:st|nd|rd|th)\b/gi,'').replace(/\bFY\s?\d{2,4}\b/g,'').replace(/,/g,'');const bad=[];
- (T.match(/\$\s?\d[\d.]*|\d[\d.]*/g)||[]).forEach(m=>{const d=m.replace(/^\$\s?/,'').replace(/\.$/,'');const money=/^\$/.test(m);if(!money&&d.length<2) return;if(ok.has(d)||S.includes(d)) return;bad.push((money?'$':'')+d);});return [...new Set(bad)];}
+ (T.match(/\$\s?\d[\d.]*|\d[\d.]*/g)||[]).forEach(m=>{const d=m.replace(/^\$\s?/,'').replace(/\.$/,'');const money=/^\$/.test(m);if(money){if(mok.has(d)||mok.has(String(Number(d)))) return;bad.push('$'+d);return;}if(d.length<2) return;if(ok.has(d)||S.includes(d)) return;bad.push(d);});return [...new Set(bad)];}
 function ratIssues(){const t=String(E.recommend.rationale||'').trim();const rec=E.alts.find(a=>a.id===E.recommend.alt);const I=[];if(!t) return ['No rationale written yet.'];
  const sents=t.split(/(?<=[.!?])\s+/).filter(x=>/recommend/i.test(x));if(rec&&(!nameIn(t,rec.name)||(sents.length&&!sents.some(x=>nameIn(x,rec.name))))) I.push('It does not say that '+rec.name+' is the recommended alternative.');
  if(E.recommend.sig&&E.recommend.sig!==recSig()) I.push('The ranking or costs changed after it was written.');
@@ -579,7 +583,10 @@ async function aiRationale(quiet){if(!aiReady()) return;const R=results();const 
  try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'%');}}catch(e){}
  const src=ratSrc();const b=$('#bAIr')||$('#dAI');if(b){b.disabled=true;b.textContent='Writing…';}
  try{const j=await CARLAI.ask('claude',RAT_SYS,'SOURCES:\n'+src);const t=String(j.rationale||'').trim();if(!t) throw new Error('Nothing returned');
-  E.recommend.rationale=t;E.recommend.sig=recSig();const iss=ratIssues();E.recommend.ai_check=iss.join(' ');
+  E.recommend.rationale=t;E.recommend.sig=recSig();let iss=ratIssues();
+  if(iss.length){if(b) b.textContent='Checking and correcting…';try{const j2=await CARLAI.ask('claude',RAT_SYS,'SOURCES:\n'+src+'\n\nYOUR DRAFT:\n'+t+'\n\nPROBLEMS FOUND BY THE CHECK:\n'+iss.join('\n')+'\n\nRewrite the rationale so it fixes every problem. The recommended alternative is '+rec.name+'; say so in the first sentence. Use only numbers that appear in SOURCES.',null,{fresh:true});
+   const t2=String(j2.rationale||'').trim();if(t2){const keep=E.recommend.rationale;E.recommend.rationale=t2;const i2=ratIssues();if(i2.length<=iss.length){iss=i2;log('Rationale corrected with AI',i2.length?'still: '+i2.join(' '):'second draft passes the check');}else E.recommend.rationale=keep;}}catch(e){}}
+  E.recommend.ai_check=iss.join(' ');
   log('Rationale written with AI',iss.length?iss.join(' '):'names the recommended alternative; every number traced to the analysis');save();render();}
  catch(err){alert('Failed: '+err.message);if(b) b.disabled=false;if(b) b.textContent='Write rationale with AI';}}
 
@@ -805,9 +812,13 @@ function openItems(){const R=results();const I=[];const iss=E.recommend.rational
  if(iss.length) I.push(['rat','Rationale: '+iss.join(' ')]);
  const un=R.rows.filter(r=>r.unpriced);if(un.length) I.push(['costs','Not costed, so not ranked: '+un.map(r=>r.a.name).join(', ')+'.']);
  const est=E.alts.flatMap(a=>a.costs.filter(c=>rClass(c)==='est'));if(est.length) I.push(['costs',est.length+' status quo cost estimate'+(est.length>1?'s':'')+' to confirm with CE or finance.']);
+ const ai=Object.keys(E.cellWhy||{}).length;if(ai&&!E.screen_reviewed) I.push(['alts',ai+' screening calls were proposed by AI. Check them, then mark them reviewed.']);
+ if(RI_drv().length) I.push(['costs','Firm up first: '+RI_drv().join('; ')+'.']);
+ if(E.sq_ok) I.push(['alts','You treated the status quo as able to meet the need although NORA shows a gap. The memo says so.']);
  if(!String(E.recommend.authority||'').trim()) I.push(['auth','Decision authority not named.']);return I;}
+function RI_drv(){try{const RI=rangeInfo();return RI.holds===false?RI.drv.map(d=>(d.c.label||'').split(/ – |: /)[0]+' ('+$k(d.sw)+' swing)'):[];}catch(e){return [];}}
 function fixE(k){if(k==='rat'){STEP='done';render();setTimeout(()=>{const e=$('#ratP');if(e) e.scrollIntoView({behavior:'smooth',block:'center'});},60);return;}
- if(k==='auth'){STEP='rec';render();setTimeout(()=>{const e=$('#da');if(e){e.scrollIntoView({block:'center'});e.focus();}},60);return;}STEP='costs';render();window.scrollTo(0,0);}
+ if(k==='auth'){STEP='rec';render();setTimeout(()=>{const e=$('#da');if(e){e.scrollIntoView({block:'center'});e.focus();}},60);return;}if(k==='alts'){STEP='alts';render();window.scrollTo(0,0);return;}STEP='costs';render();window.scrollTo(0,0);}
 function preDl(k){if(!E.recommend.by&&window.CARLAI&&CARLAI.state().user) E.recommend.by=CARLAI.state().user;
  const go=()=>{if(k==='memo'){dl(fname('Decision-Memo','doc'),decisionMemoHTML(),'application/msword');log('Decision memo downloaded');}
   else if(k==='aoa'){dl(fname('AoA','doc'),aoaHTML(),'application/msword');log('AoA downloaded');}else{XL.save(fname('Cost-Workbook','xlsx'),earlBook());log('Cost workbook downloaded');}save();};
