@@ -503,12 +503,12 @@ function vDone(){const v=$('#view');const C=calc();const F=findings();const bad=
  v.innerHTML='<div class="panel"><h2>'+esc(P.b.title||'Your 1391')+'</h2><p class="lead">'+esc([P.b.installation,P.b.component,P.b.fy&&'FY'+P.b.fy,P.b.catcode&&'category code '+P.b.catcode].filter(Boolean).join(' · '))+(P.mode==='review'?' · <b>Review of '+esc(P.review.src?.file||'a submitted 1391')+'</b>':'')+'</p>'+
   '<div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Block 8 ($000)',C.rounded?k$(C.rounded):'—'],['Primary facility',C.qty?C.qty.toLocaleString()+' '+(P.pf.um||'SF'):'—'],['Supporting lines',P.sup.length],['Must fix',bad.length],['Check',warn.length]].map(([l,n])=>'<div style="flex:1;min-width:120px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
   (P.mode==='review'&&P.review.ext_total?'<p class="small">Submitted block 8: $'+N(P.review.ext_total).toLocaleString()+'K. PIPER’s rebuild: $'+k$(C.rounded)+'K.</p>':'')+
-  '<div class="row"><button class="go" data-o="doc">Download 1391 (.doc)</button><button data-o="print">Print or PDF</button><button data-o="backup">Estimate backup</button><button data-o="jb">Justification text</button></div></div>'+
+  '<div class="row"><button class="go" data-o="doc">Download 1391 (Word)</button><button data-o="backup">Estimate backup (Excel)</button><button data-o="jb">Justification (Word)</button></div></div>'+
   confirmHTML()+
   '<div class="panel"><h2>Red team</h2>'+(stale?'<div class="find warn"><b>The 1391 changed since the AI review.</b> Run it again.</div>':'')+
   fixHTML()+(F.length?F.map((x,i)=>'<div class="find '+x.s+'" style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><b>'+esc(x.t)+'</b> <span>'+esc(x.d)+'</span></div>'+(aiOn()?'<button class="sm" data-fix="'+i+'">Fix with AI</button>':'')+'</div>').join(''):'<div class="small">No findings.</div>')+
   '<div class="row"><button id="bRev">'+(P.ai_rev_at?'Run the AI review again':'Run the AI review')+'</button><span class="small">Rule checks run as you type; the AI reviewer reads the narrative against block 9, NORA and EARL.</span></div></div>';
- v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>dl(fname('Estimate-Backup','csv'),csv(backup()),'text/csv'),jb:()=>dl(fname('Justification','txt'),jb(),'text/plain')})[b.dataset.o]());
+ v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>XL.save(fname('Estimate-Backup','xlsx'),[{name:'Estimate backup',rows:backup()}]),jb:()=>dl(fname('Justification','doc'),cdDoc('Justification text',[cdBand('Justification text',P.b.title||'DD Form 1391',[P.b.installation,P.b.fy&&('FY'+P.b.fy)].filter(Boolean).join('  \u00b7  '),'')+jb().split(/\n{2,}/).map(t=>cdP(esc(t).replace(/\n/g,'<br>'),'font-size:11pt;line-height:140%')).join('')]),'application/msword')})[b.dataset.o]());
  $('#bRev').onclick=()=>aiReview(false);v.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>aiFix(Number(b.dataset.fix)));bindFix();bindConfirm();}
 
 // ---------- Fix a finding with AI ----------
@@ -812,13 +812,11 @@ function vEx(){const v=$('#view');const x=P.ex;
 // ---------- 9 outputs ----------
 function vOut(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Outputs</h2><p class="lead">The 1391 content goes into the Service’s official 1391 system; PIPER does not replace it. Keep the estimate backup and the project file with every version.</p><div class="outs">'+
- out('doc','DD Form 1391 content','Blocks 1–12 in the form layout, ready to transfer to the official system. Opens in Word.','Download .doc')+
- out('print','Print or save as PDF','The same, formatted for printing.','Open printable')+
- out('backup','Estimate backup','Every factor, source and line, as the cost engineer will ask to see it.','Download .csv')+
- out('jb','Justification-book text','Block 10 and 11 text in plain paragraphs for briefings and question responses.','Download .txt')+
- out('json','Project file','Everything, including versions, questions and the log.','Download .json')+'</div></div>'+
+ out('doc','DD Form 1391 content','Blocks 1–12 in the form layout, ready to transfer to the official system. Opens in Word.','Download Word')+
+ out('backup','Estimate backup','Every factor, source and line, as the cost engineer will ask to see it.','Download Excel')+
+ out('jb','Justification-book text','Block 10 and 11 text in plain paragraphs, for briefings and answers to reviewers.','Download Word')+'</div></div>'+
  '<div class="panel"><h2>Record log</h2><div id="lg" class="small"></div></div>';
- v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>dl(fname('Estimate-Backup','csv'),csv(backup()),'text/csv'),jb:()=>dl(fname('Justification','txt'),jb(),'text/plain'),json:saveFile})[b.dataset.out]());
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({doc:()=>dl(fname('DD1391','doc'),formHTML(),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>XL.save(fname('Estimate-Backup','xlsx'),[{name:'Estimate backup',rows:backup()}]),jb:()=>dl(fname('Justification','doc'),cdDoc('Justification text',[cdBand('Justification text',P.b.title||'DD Form 1391',[P.b.installation,P.b.fy&&('FY'+P.b.fy)].filter(Boolean).join('  \u00b7  '),'')+jb().split(/\n{2,}/).map(t=>cdP(esc(t).replace(/\n/g,'<br>'),'font-size:11pt;line-height:140%')).join('')]),'application/msword'),json:saveFile})[b.dataset.out]());
  $('#lg').innerHTML=P.log.length?P.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 const fname=(k,ext)=>((P.b.project_no||P.b.title||'PIPER').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
@@ -851,6 +849,90 @@ $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='piper-1') throw new Error('Not a PIPER project file');P=Object.assign(BLANK(),j);log('Project file opened',f.name);save();STEP='blocks';render();}catch(err){alert('Could not open: '+err.message);}});};
 if(!P.log.length) log('Project created');
 render();save();
+</script>
+<script id="corbel-lib">
+// ---------- Corbel Word forms: one look for every printed sheet ----------
+// Word reads this HTML as a document. Georgia stands in for the site's serif; colors are the site's.
+// Styles are written inline so Word and other word processors render them the same way.
+const CD={navy:'#1B2F4E',deep:'#0F1E36',gold:'#E8D5A8',taupe:'#8B6F3D',taupe2:'#5C4A33',rule:'#C9B998',ink:'#1A1410',tint:'#F6F1E7',tint2:'#FBF8F2',mute:'#7A7065'};
+const CDF='font-family:Georgia,\'Times New Roman\',serif;';
+const CDK=CDF+'font-size:7.5pt;letter-spacing:2pt;text-transform:uppercase;color:'+CD.taupe+';';
+function cdDoc(title,pages,landscape){const sz=landscape?'11.0in 8.5in;mso-page-orientation:landscape':'8.5in 11.0in';
+ return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+ '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+ '<style>@page Section1{size:'+sz+';margin:0.6in 0.7in 0.6in 0.7in}div.Section1{page:Section1}body{'+CDF+'font-size:10.5pt;color:'+CD.ink+'}p{margin:0 0 6pt}table{border-collapse:collapse}td{vertical-align:top}</style></head>'+
+ '<body style="'+CDF+'font-size:10.5pt;color:'+CD.ink+'"><div class="Section1">'+pages.join('<br clear="all" style="page-break-before:always;mso-break-type:page-break">')+'</div></body></html>';}
+function cdP(t,st){return '<p style="'+CDF+'margin:0 0 6pt;'+(st||'')+'">'+t+'</p>';}
+// Writing lines: a small table of underlined rows works in every word processor.
+function cdLines(n,bg){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+Array(n).fill('<tr><td height="24" style="height:18pt;border-bottom:0.75pt solid '+CD.rule+(bg?';background:'+bg:'')+'"'+(bg?' bgcolor="'+bg+'"':'')+'>&nbsp;</td></tr>').join('')+'</table>';}
+// The navy band at the top of each page.
+function cdBand(kind,title,sub,chip){return '<table width="100%" cellpadding="14" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.navy+'" style="background:'+CD.navy+';padding:14pt 16pt">'+
+ cdP('CORBEL &nbsp;&middot;&nbsp; '+esc(kind).toUpperCase(),'margin:0 0 6pt;font-size:7.5pt;letter-spacing:2.5pt;color:'+CD.gold)+
+ cdP(esc(title),'margin:0;font-size:20pt;line-height:120%;color:#FFFFFF')+(sub?cdP(esc(sub),'margin:5pt 0 0;font-size:9.5pt;font-style:italic;color:'+CD.gold):'')+'</td></tr></table>'+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td height="4" bgcolor="'+CD.gold+'" style="height:3pt;background:'+CD.gold+';font-size:2pt;line-height:2pt">&nbsp;</td></tr></table>'+
+ (chip?'<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-top:8pt"><tr><td bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:3pt 8pt">'+cdP(esc(chip).toUpperCase(),'margin:0;font-size:8pt;letter-spacing:1.5pt;color:'+CD.navy)+'</td></tr></table>':'');}
+// Name / title / date boxes.
+function cdWho(fields){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:10pt"><tr>'+fields.map((f,i)=>'<td width="'+Math.floor(100/fields.length)+'%" style="padding:0 '+(i<fields.length-1?'14pt':'0')+' 0 0">'+cdP(esc(f).toUpperCase(),CDK+'margin:0 0 4pt')+cdLines(1)+'</td>').join('')+'</tr></table>';}
+function cdLead(t){return cdP(t,'margin:12pt 0 4pt;font-style:italic;color:'+CD.taupe2);}
+function cdH(t){return cdP(esc(t),'margin:16pt 0 2pt;font-size:13pt;color:'+CD.navy)+'<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:8pt"><tr><td height="2" style="height:1pt;border-top:0.75pt solid '+CD.gold+';font-size:1pt">&nbsp;</td></tr></table>';}
+// "What we have so far": tinted rows with tick boxes.
+function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows.map(([a,b],i)=>{const bg=i%2?CD.tint2:CD.tint;const td=(w,c)=>'<td'+(w?' width="'+w+'"':'')+' bgcolor="'+bg+'" style="background:'+bg+';padding:6pt 8pt;border-bottom:0.5pt solid '+CD.rule+'">'+c+'</td>';
+  return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
+// One question: number and question, then a ruled answer box with a gold edge.
+function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q)+(code?' <span style="font-size:7pt;color:'+CD.mute+';letter-spacing:1pt">['+esc(code)+']</span>':''),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
+// A data table with a navy header row and tinted stripes.
+function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
+ '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
+ rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
+function cdFoot(t){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+
+// ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
+// Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
+const XL=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const col=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+ const STY='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="3"><font><sz val="10"/><color rgb="FF1A1410"/><name val="Georgia"/></font><font><b/><sz val="9"/><color rgb="FFE8D5A8"/><name val="Georgia"/></font><font><sz val="9"/><i/><color rgb="FF7A7065"/><name val="Georgia"/></font></fonts>'+
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)) return '<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>';return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
+  const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+   '<sheetViews><sheetView workbookViewId="0"'+(sh.zoom?' zoomScale="'+sh.zoom+'"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+
+   '<cols>'+Array.from({length:nc},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(W[i]||16)+'" customWidth="1"/>').join('')+'</cols>'+
+   '<sheetData>'+rows+note+'</sheetData>'+(R.length>1?'<autoFilter ref="A1:'+col(nc-1)+R.length+'"/>':'')+'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';}
+ function book(sheets){const names=sheets.map((s,i)=>String(s.name||('Sheet'+(i+1))).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31));
+  const F=[['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
+    '<definedNames>'+sheets.map((s,i)=>s.rows.length>1?'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+x(names[i])+'\'!$A$1:$'+col(Math.max(...s.rows.map(r=>r.length))-1)+'$'+s.rows.length+'</definedName>':'').join('')+'</definedNames></workbook>'],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',STY]].concat(sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(s)]));
+  return zip(F);}
+ // Column widths from the content: header and the longest cell, capped.
+ function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
+ function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ return {save,book,fit};})();
 </script>
 <script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
    through CARL's server, on CARL's keys, for anyone signed in to

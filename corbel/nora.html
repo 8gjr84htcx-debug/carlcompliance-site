@@ -497,6 +497,52 @@ function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" c
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
 function cdFoot(t){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 
+// ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
+// Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
+const XL=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const col=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+ const STY='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="3"><font><sz val="10"/><color rgb="FF1A1410"/><name val="Georgia"/></font><font><b/><sz val="9"/><color rgb="FFE8D5A8"/><name val="Georgia"/></font><font><sz val="9"/><i/><color rgb="FF7A7065"/><name val="Georgia"/></font></fonts>'+
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="5"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)) return '<c r="'+ref+'" s="'+s+'"><v>'+v+'</v></c>';return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
+  const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+   '<sheetViews><sheetView workbookViewId="0"'+(sh.zoom?' zoomScale="'+sh.zoom+'"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+
+   '<cols>'+Array.from({length:nc},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(W[i]||16)+'" customWidth="1"/>').join('')+'</cols>'+
+   '<sheetData>'+rows+note+'</sheetData>'+(R.length>1?'<autoFilter ref="A1:'+col(nc-1)+R.length+'"/>':'')+'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';}
+ function book(sheets){const names=sheets.map((s,i)=>String(s.name||('Sheet'+(i+1))).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31));
+  const F=[['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
+    '<definedNames>'+sheets.map((s,i)=>s.rows.length>1?'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+x(names[i])+'\'!$A$1:$'+col(Math.max(...s.rows.map(r=>r.length))-1)+'$'+s.rows.length+'</definedName>':'').join('')+'</definedNames></workbook>'],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',STY]].concat(sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(s)]));
+  return zip(F);}
+ // Column widths from the content: header and the longest cell, capped.
+ function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
+ function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ return {save,book,fit};})();
+
 // ---------- Build my requirement: documents in, a full requirement record out ----------
 // Reading files: PDF (text, and scanned pages read by AI), Word .docx, email .eml, text.
 let PDFJS=null;
@@ -876,6 +922,39 @@ function needsPanel(){const C=covData();const done=C.filter(x=>x[3]).length;cons
 function bindNeeds(v){v.querySelectorAll('[data-kit]').forEach(b=>b.onclick=()=>{const r=b.dataset.kit;const roles=r==='all'?Object.keys(KR):[r];dl(fname('Interview-Kit'+(r==='all'?'':'-'+KRL[r].replace(/\W+/g,'-')),'doc'),kitHTML(roles),'application/msword');log('Interview kit downloaded',roles.map(x=>KRL[x]).join(', '));save();});
  const kf=v.querySelector('#kFiles');if(kf) kf.onchange=()=>{const f=[...kf.files];kf.value='';if(f.length) readKits(f);};}
 
+// ---------- Outputs: the package in Word, the working tables in Excel ----------
+function rtmFull(){const R=rtmRows();try{const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');const o=rec.rtm;if(!Array.isArray(o)||!o.length) return R;const h=o[0],ri=h.indexOf('Req ID');
+  R.slice(1).forEach(row=>{const m=o.find(x=>x[ri]===row[0]);if(!m) return;R[0].forEach((c,ci)=>{const k=h.indexOf(c);if(k>=0&&!String(row[ci]||'').trim()&&String(m[k]||'').trim()) row[ci]=m[k];});});}catch(e){}return R;}
+function pkgCorbel(){const p=P.project;const act=P.requirements.filter(r=>r.status!=='withdrawn');const pname=p.name&&!pBlank('name')?p.name:'Requirement package';
+ const kv=(k,v)=>cdP('<span style="'+CDK+'">'+esc(k)+'</span>&nbsp;&nbsp;'+esc(v||'—'),'margin:0 0 5pt');const e=x=>esc(x??'');
+ const conf=r=>r.confirmed&&r.status!=='draft'?' – '+r.confirmed.by+', '+r.confirmed.date:'';const gi=gateItems();
+ const body=cdBand('Requirement package',pname,[p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('  ·  '),'Prepared by '+(p.prepared_by||'—')+'  ·  '+today())+
+  cdLead('Prepared with Corbel. These are recommendations; validation authority rests with the installation and the Service. Every requirement traces to the person who stated it and the words they used.')+
+  cdH('1   Need statement')+cdP(e(P.need_statement||'(not yet written)'),'font-size:11pt;line-height:140%')+
+  cdH('2   Mission and driver')+kv('Mission',p.mission)+kv('Driver',(DRIVERS[p.driver]||{}).t)+kv('Why now',p.driver_detail)+kv('Needed by',p.need_date)+
+  cdH('3   Stakeholders')+cdTable(['Name','Title / office','Organization','Role','Authority'],P.stakeholders.map(s=>[e(s.name),e(s.title),e(s.org),e(s.role),e(AUTH[s.authority]||'')]),['20%','20%','18%','27%','15%'])+
+  cdH('4   Requirements')+cdTable(['ID','Requirement','Priority','Why it is needed','Verification','Source','Status'],act.map(r=>[e(r.id),e(r.text),e(PRIOR[r.priority]),e(r.rationale||''),e(r.measure),e(srcNames(r)||(SS(r.session)?.title||'')),e(RSTAT[r.status]+conf(r))]),['7%','24%','10%','17%','15%','12%','15%'])+
+  cdH('5   Gap analysis')+cdTable(['Capability','Today','Required','Gap','Impact if not closed'],P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [e(g.area),e(g.current+(g.qty_have!==''?' ('+g.qty_have+' '+g.unit+')':'')),e(g.required+(g.qty_need!==''?' ('+g.qty_need+' '+g.unit+')':'')),g.qty_need!==''?e((n-(isNaN(h)?0:h)).toLocaleString()+' '+g.unit):'',e(g.impact)];}),['18%','20%','20%','12%','30%'])+
+  cdH('6   Constraints')+cdTable(['Constraint','Basis'],P.constraints.map(c=>[e(c.text),e(c.basis)]),['55%','45%'])+
+  cdH('7   Assumptions')+cdTable(['Assumption','To be confirmed by','Confirmed'],P.assumptions.map(c=>[e(c.text),e(c.owner),c.confirmed==='yes'?'Yes':'No']),['60%','25%','15%'])+
+  cdH('8   Risks')+cdTable(['Risk','Likelihood','Impact','Score','Response','Owner'],P.risks.map(c=>[e(c.text),e(c.l),e(c.i),String((Number(c.l)||3)*(Number(c.i)||3)),e(c.response),e(c.owner)]),['32%','9%','8%','7%','28%','16%'])+
+  cdH('9   Success measures')+cdTable(['Measure','Target','How measured'],P.measures.map(c=>[e(c.text),e(c.target),e(c.how)]),['40%','25%','35%'])+
+  cdH('10   Readiness and validation')+cdTable(['Gate 1 check','Status'],gi.map(([t,ok])=>[e(t),ok?'<span style="color:#2E6B3E">&#10003; Met</span>':'<span style="color:#8A2B1E">&#9675; Open</span>']),['80%','20%'])+
+  cdTable(['Validating office','Name','Date'],[['Installation',e(P.validation.installation),e(P.validation.installation_date)],['Service',e(P.validation.service),e(P.validation.service_date)]],['30%','45%','25%']);
+ const appA=cdBand('Appendix A','Stakeholder register',pname,'')+cdTable(['Name','Title / office','Organization','Role','Authority','Contact','Requirements sourced'],regRows().slice(1).map(r=>[e(r[0]),e(r[1]),e(r[2]),e(r[3]),e(r[4]),e(r[8]),e(r[9])]),['16%','15%','13%','18%','10%','16%','12%']);
+ const T=rtmFull();const h=T[0];const ix=n=>h.indexOf(n);const later=['EARL alternative','1391 paragraph (PIPER)','Criteria (CORA)','SOW paragraph (SOPHIE)','QA verification (QUINN)'];
+ const appB=cdBand('Appendix B','Traceability summary',pname,'')+cdLead('Where each requirement came from and, as the project moves on, where it is met. The full matrix is in the requirements workbook.')+
+  cdTable(['ID','Requirement','Stated by','Confirmed','Where it is met'],T.slice(1).filter(r=>!/^Withdrawn/.test(r[ix('Status')])).map(r=>[e(r[0]),e(r[1]),e(r[ix('Source stakeholder(s)')]),e([r[ix('Confirmed by')],r[ix('Confirmed date')]].filter(Boolean).join(', ')||'Not yet'),e(later.map(c=>String(r[ix(c)]||'').trim()?c.replace(/ \(.*\)/,'')+': '+r[ix(c)]:'').filter(Boolean).join('; ')||'Later tools fill this in')]),['7%','33%','17%','17%','26%']);
+ return cdDoc('Requirement package',[body,appA,appB]);}
+function noraBook(){const T=rtmFull();const sh=[{name:'Traceability matrix',rows:T,max:45,note:'Columns from “EARL alternative” on fill in as the project moves through EARL, PIPER, CORA, SOPHIE and QUINN.'},
+ {name:'Stakeholder register',rows:regRows(),max:40},
+ {name:'Gaps',rows:[['Capability','Today','Have','Required','Need','Unit','Gap','Impact if not closed']].concat(P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [g.area,g.current,g.qty_have===''?'':(isNaN(h)?g.qty_have:h),g.required,g.qty_need===''?'':(isNaN(n)?g.qty_need:n),g.unit,g.qty_need!==''&&!isNaN(n)?n-(isNaN(h)?0:h):'',g.impact];})),max:45},
+ {name:'Risks',rows:[['Risk','Likelihood (1-5)','Impact (1-5)','Score','Response','Owner']].concat(P.risks.map(c=>[c.text,Number(c.l)||'',Number(c.i)||'',(Number(c.l)||3)*(Number(c.i)||3),c.response,c.owner])),max:50},
+ {name:'Assumptions',rows:[['Assumption','To be confirmed by','Confirmed']].concat(P.assumptions.map(c=>[c.text,c.owner,c.confirmed==='yes'?'Yes':'No'])),max:60},
+ {name:'Constraints',rows:[['Constraint','Basis']].concat(P.constraints.map(c=>[c.text,c.basis])),max:60},
+ {name:'Success measures',rows:[['Measure','Target','How measured']].concat(P.measures.map(c=>[c.text,c.target,c.how])),max:50}];
+ XL.save(fname('Requirements-Workbook','xlsx'),sh);log('Requirements workbook downloaded');save();}
+
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
 function quality(r){const f=[];const t=r.text||'';const lt=' '+t.toLowerCase()+' ';
@@ -987,12 +1066,9 @@ function vOut(){const v=$('#view');const gi=gateItems();
  '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(needStale()?'<div class="find warn"><b>The record has changed since this was written.</b> Requirements, gaps or the project details were edited. Rewrite it so it matches.</div>':'')+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
  '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
  '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
- '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package for validation; keep the rest for the record. The RTM and the requirements also pass to EARL, PIPER and SOPHIE through the shared project record in this browser.</p><div class="outs">'+
- out('pkg','Requirement package','Need statement, stakeholders, requirements, gap analysis, constraints and risks, readiness. Opens in Word.','Download .doc')+
- out('print','Print or save as PDF','The same package, formatted for printing.','Open printable')+
- out('rtm','Requirements traceability matrix','Seeded RTM with columns for every later tool. Opens in Excel.','Download .csv')+
- out('reg','Stakeholder register','Roles, authority, engagement and contact.','Download .csv')+
- out('json','Project record','Everything, including the decision and AI log. Reopen with Open….','Download .json')+
+ '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package; keep the workbook current. The requirements also pass to EARL, PIPER and SOPHIE automatically. To keep a copy of the whole project, use <b>Save file</b> at the top.</p><div class="outs">'+
+ out('pkg','Requirement package','The document you submit for Gate 1 validation: need statement, mission, stakeholders, requirements, gaps, constraints, assumptions, risks, success measures and readiness, with the stakeholder register and a traceability summary as appendices.','Download Word')+
+ out('book','Requirements workbook','For whoever keeps the record current: the full traceability matrix, stakeholder register, gaps, risks, assumptions, constraints and success measures, one tab each, ready to sort and filter.','Download Excel')+
  '</div></div>'+
  '<div class="panel"><h2>Record log</h2><p class="lead">Append-only history of what was added, accepted, rejected and changed.</p><div id="lg" class="small"></div></div>';
  const n=$('#need');n.value=P.need_statement||'';const wc=()=>$('#nwc').textContent=(n.value.trim().split(/\s+/).filter(Boolean).length||0)+' words';wc();
@@ -1000,8 +1076,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  bindConf(v,vOut);$('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
  $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();P.need_check='';P.need_sig=needSig();log('Need statement drafted from record');save();vOut();renderSteps();};
  v.querySelectorAll('[data-v]').forEach(el=>{el.value=P.validation[el.dataset.v]||'';el.onchange=()=>{P.validation[el.dataset.v]=el.value;log('Validation recorded',el.dataset.v+': '+el.value);save();};});
- v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>dl(fname('Requirement-Package','doc'),wordWrap(pkgHTML()),'application/msword'),print:()=>{const w=window.open('','_blank');w.document.write(pkgHTML(true));w.document.close();setTimeout(()=>w.print(),400);},
-  rtm:()=>dl(fname('RTM','csv'),csv(rtmRows()),'text/csv'),reg:()=>dl(fname('Stakeholder-Register','csv'),csv(regRows()),'text/csv'),json:()=>saveFile()})[b.dataset.out]());
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>{dl(fname('Requirement-Package','doc'),pkgCorbel(),'application/msword');log('Requirement package downloaded');save();},book:noraBook})[b.dataset.out]());
  $('#lg').innerHTML=P.log.length?P.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 const fname=(k,ext)=>((P.project.name||'NORA').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
