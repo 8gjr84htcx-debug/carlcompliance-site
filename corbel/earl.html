@@ -829,13 +829,13 @@ function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="
   return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
 // One question: number and question, then a ruled answer box with a gold edge.
 function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
- cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q)+(code?' <span style="font-size:7pt;color:'+CD.mute+';letter-spacing:1pt">['+esc(code)+']</span>':''),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
  '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
 // A data table with a navy header row and tinted stripes.
 function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
  '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
-function cdFoot(t){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
@@ -882,6 +882,225 @@ const XL=(function(){
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
  function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
+
+// ---------- Corbel Word documents: a real .docx, built in the page ----------
+// Every tool lays its documents out as simple styled HTML (docstyle.js). DX turns that
+// layout into WordprocessingML: paragraphs, runs, tables, shading, borders, page breaks.
+const DX=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ // Lengths to points.
+ function pt(v,base){if(v==null||v==='') return null;v=String(v).trim();const m=v.match(/^(-?[\d.]+)\s*(pt|px|in|cm|mm|em|%)?$/);if(!m) return null;const n=parseFloat(m[1]);
+  switch(m[2]){case 'px':return n*0.75;case 'in':return n*72;case 'cm':return n*28.35;case 'mm':return n*2.835;case 'em':return n*(base||10.5);case '%':return null;default:return m[2]==='pt'?n:n*0.75;}}
+ function hex(c){if(!c) return null;c=String(c).trim().toLowerCase();if(c==='transparent'||c==='none'||c==='inherit') return null;
+  const N={white:'FFFFFF',black:'000000',red:'C00000',green:'2E7D32',gray:'808080',grey:'808080',navy:'1B2F4E'};if(N[c]) return N[c];
+  let m=c.match(/^#([0-9a-f]{3})$/);if(m) return m[1].split('').map(h=>h+h).join('').toUpperCase();m=c.match(/^#([0-9a-f]{6})$/);if(m) return m[1].toUpperCase();
+  m=c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);if(m) return [m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('').toUpperCase();return null;}
+ function css(s){const o={};String(s||'').split(';').forEach(d=>{const i=d.indexOf(':');if(i<0) return;const k=d.slice(0,i).trim().toLowerCase(),v=d.slice(i+1).trim();if(k) o[k]=v;});
+  // Expand shorthands we use.
+  const box=(k)=>{if(o[k]==null) return;const p=o[k].split(/\s+/);const [t,r,b,l]=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;
+   ['top','right','bottom','left'].forEach((s,i)=>{if(o[k+'-'+s]==null) o[k+'-'+s]=[t,r,b,l][i];});};box('margin');box('padding');
+  if(o.border!=null) ['top','right','bottom','left'].forEach(s=>{if(o['border-'+s]==null) o['border-'+s]=o.border;});
+  if(o.background&&!o['background-color']) o['background-color']=o.background.split(/\s+/)[0];
+  if(o.font){const m=o.font.match(/^(.*?)([\d.]+(?:pt|px|em|%))(?:\/[\d.]+\S*)?\s+(.+)$/);if(m){if(!o['font-size']) o['font-size']=m[2];if(!o['font-family']) o['font-family']=m[3];if(/bold|[6-9]00/.test(m[1])&&!o['font-weight']) o['font-weight']='bold';if(/italic/.test(m[1])&&!o['font-style']) o['font-style']='italic';}}
+  return o;}
+ function border(v){if(!v) return null;v=String(v).trim();if(/^(none|0)$/.test(v)) return {none:true};const w=v.match(/([\d.]+)(pt|px)/),c=v.match(/(#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|\b[a-z]+\b(?=\s*$))/);
+  const style=/dashed/.test(v)?'dashed':/dotted/.test(v)?'dotted':/double/.test(v)?'double':'single';
+  const wpt=w?(w[2]==='px'?parseFloat(w[1])*0.75:parseFloat(w[1])):0.75;return {sz:Math.max(2,Math.min(96,Math.round(wpt*8))),color:hex(c&&c[1])||'000000',style};}
+ const BLOCK=new Set(['P','DIV','H1','H2','H3','H4','H5','H6','TABLE','UL','OL','LI','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','CENTER','HR','PRE','DL','DT','DD','FORM','FIELDSET','NAV','MAIN','ASIDE','FIGURE']);
+ // Web fonts become the first family in the list that Word installs; the Corbel serif falls back to Georgia.
+ function wordFont(list){const F=list.split(',').map(f=>f.replace(/['"]/g,'').trim()).filter(Boolean);const ok=['Georgia','Calibri','Arial','Cambria','Times New Roman','Corbel','Consolas','Segoe UI','Verdana','Tahoma','Garamond','Book Antiqua','Palatino Linotype','Courier New'];
+  return F.find(f=>ok.includes(f))||(F.some(f=>/serif/i.test(f)&&!/sans/i.test(f))?'Georgia':F.some(f=>/sans/i.test(f))?'Calibri':F[0]);}
+ const HSZ={H1:20,H2:15,H3:13,H4:11.5,H5:10.5,H6:9.5};
+ // Inherited run style.
+ function runCtx(base,el,st){const r=Object.assign({},base);const t=el.tagName;
+  if(t==='B'||t==='STRONG'||t==='TH'||/^H\d$/.test(t)) r.b=true;if(t==='I'||t==='EM'||t==='CITE') r.i=true;if(t==='U') r.u=true;if(t==='S'||t==='DEL'||t==='STRIKE') r.strike=true;
+  if(t==='SUP') r.va='superscript';if(t==='SUB') r.va='subscript';if(t==='SMALL') r.sz=(r.sz||10.5)*0.85;if(HSZ[t]&&!st['font-size']) r.sz=HSZ[t];
+  if(t==='CODE'||t==='TT'||t==='KBD') r.font='Consolas';if(t==='A') {r.color=r.color||'1B2F4E';}
+  if(t==='FONT'){if(el.getAttribute('color')) r.color=hex(el.getAttribute('color'))||r.color;if(el.getAttribute('face')) r.font=el.getAttribute('face').split(',')[0].replace(/['"]/g,'').trim();}
+  if(st['font-size']){const v=st['font-size'];const p=/%$/.test(v)?(r.sz||10.5)*parseFloat(v)/100:/em$/.test(v)?(r.sz||10.5)*parseFloat(v):pt(v);if(p) r.sz=p;}
+  if(st.color) r.color=hex(st.color)||r.color;if(st['font-weight']) r.b=/bold|[6-9]00/.test(st['font-weight']);if(st['font-style']) r.i=/italic|oblique/.test(st['font-style']);
+  if(st['text-decoration']) {r.u=/underline/.test(st['text-decoration']);r.strike=/line-through/.test(st['text-decoration']);}
+  if(st['text-transform']) r.caps=/uppercase/.test(st['text-transform']);if(st['letter-spacing']) r.ls=pt(st['letter-spacing'])||0;
+  if(st['font-family']) r.font=wordFont(st['font-family']);if(st['vertical-align']&&/super|sub/.test(st['vertical-align'])) r.va=/super/.test(st['vertical-align'])?'superscript':'subscript';
+  if(st['background-color']&&el.tagName!=='TD'&&el.tagName!=='TH'&&!BLOCK.has(t)) r.hl=hex(st['background-color']);
+  if(st.display==='none'||st.visibility==='hidden') r.hide=true;return r;}
+ function rPr(r){let s='';if(r.font) s+='<w:rFonts w:ascii="'+x(r.font)+'" w:hAnsi="'+x(r.font)+'" w:cs="'+x(r.font)+'"/>';if(r.b) s+='<w:b/>';if(r.i) s+='<w:i/>';if(r.caps) s+='<w:caps/>';if(r.strike) s+='<w:strike/>';
+  if(r.color) s+='<w:color w:val="'+r.color+'"/>';if(r.ls) s+='<w:spacing w:val="'+Math.round(r.ls*20)+'"/>';if(r.sz) s+='<w:sz w:val="'+Math.max(2,Math.round(r.sz*2))+'"/><w:szCs w:val="'+Math.max(2,Math.round(r.sz*2))+'"/>';
+  if(r.hl) s+='<w:shd w:val="clear" w:color="auto" w:fill="'+r.hl+'"/>';if(r.u) s+='<w:u w:val="single"/>';if(r.va) s+='<w:vertAlign w:val="'+r.va+'"/>';return s?'<w:rPr>'+s+'</w:rPr>':'';}
+ function run(text,r){if(r.hide||text==='') return '';return '<w:r>'+rPr(r)+'<w:t xml:space="preserve">'+x(text)+'</w:t></w:r>';}
+ function conv(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const styleText=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  // Simple tag rules from the <style> block (p{...}, td{...}, body{...}).
+  const RULES={};styleText.replace(/@page[^{]*\{[^}]*\}/g,'').replace(/([a-z0-9,\s.]+)\{([^}]*)\}/gi,(m,sel,body)=>{sel.split(',').forEach(s=>{s=s.trim().toUpperCase();if(/^[A-Z0-9]+$/.test(s)) RULES[s]=Object.assign(RULES[s]||{},css(body));});return m;});
+  const st=el=>Object.assign({},RULES[el.tagName]||{},css(el.getAttribute&&el.getAttribute('style')));
+  const land=/landscape/i.test(styleText)||/size:\s*11(\.0)?in\s+8\.5in/i.test(styleText);
+  const pm=styleText.match(/@page[^{]*\{[^}]*margin:\s*([^;}]+)/i);let mg=[0.75,0.75,0.75,0.75].map(v=>v*72);
+  if(pm){const p=pm[1].trim().split(/\s+/).map(v=>pt(v));const q=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;if(q.every(v=>v!=null)) mg=q;}
+  const pageW=land?792:612,pageH=land?612:792,textW=pageW-mg[1]-mg[3];
+  const body=doc.body;const bst=st(body);const R0=runCtx({},body,bst);
+  // ---- paragraph assembly ----
+  function pPr(s,extra){let o='';extra=extra||{};if(extra.style) o+='<w:pStyle w:val="'+extra.style+'"/>';if(extra.keep) o+='<w:keepNext/>';if(extra.pb) o+='<w:pageBreakBefore/>';
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return b&&!b.none?'<w:'+k+' w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="2" w:color="'+b.color+'"/>':'';}).join('');if(bd) o+='<w:pBdr>'+bd+'</w:pBdr>';
+   const bg=hex(s['background-color']);if(bg&&!extra.inCell) o+='<w:shd w:val="clear" w:color="auto" w:fill="'+bg+'"/>';
+   const before=pt(s['margin-top']),after=pt(s['margin-bottom']);const lh=s['line-height'];let line='';
+   if(lh){if(/%$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh)/100)+'" w:lineRule="auto"';else if(/^[\d.]+$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh))+'" w:lineRule="auto"';else {const p=pt(lh);if(p) line=' w:line="'+Math.round(p*20)+'" w:lineRule="exact"';}}
+   o+='<w:spacing w:before="'+Math.round((before||0)*20)+'" w:after="'+Math.round((after||0)*20)+'"'+line+'/>';
+   const il=(pt(s['margin-left'])||0)+(pt(s['padding-left'])||0)+(extra.indent||0);if(il||extra.hang) o+='<w:ind w:left="'+Math.round(il*20)+'"'+(extra.hang?' w:hanging="'+Math.round(extra.hang*20)+'"':'')+'/>';
+   const ta=s['text-align'];if(ta) o+='<w:jc w:val="'+(ta==='center'?'center':ta==='right'?'right':ta==='justify'?'both':'left')+'"/>';
+   if(extra.mark) o+='<w:rPr>'+rPr(extra.mark).replace(/^<w:rPr>|<\/w:rPr>$/g,'')+'</w:rPr>';
+   return '<w:pPr>'+o+'</w:pPr>';}
+  // Inline content to runs. Leading/trailing whitespace is trimmed per paragraph, as a browser would.
+  function inl(node,r,acc){
+   if(node.nodeType===3){let t=node.nodeValue.replace(/[\t\n\r ]+/g,' ');acc.push({t,r});return;}
+   if(node.nodeType!==1) return;const t=node.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='TITLE'||t==='HEAD') return;
+   if(t==='BR'){acc.push({br:true,r});return;}
+   if(t==='INPUT'){const ty=(node.getAttribute('type')||'').toLowerCase();if(ty==='checkbox'||ty==='radio') acc.push({t:node.checked||node.hasAttribute('checked')?'☒ ':'☐ ',r});else acc.push({t:node.value||node.getAttribute('value')||'',r});return;}
+   if(t==='IMG'){if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
+   const s=st(node);const rr=runCtx(r,node,s);for(const c of node.childNodes) inl(c,rr,acc);}
+  function para(acc,s,extra){// acc: [{t,r}|{br}]
+   let i=0;while(i<acc.length&&!acc[i].br&&acc[i].t!=null&&!acc[i].t.trim()){i++;}let j=acc.length-1;while(j>=i&&!acc[j].br&&acc[j].t!=null&&!acc[j].t.trim()) j--;
+   const items=acc.slice(i,j+1);if(items.length){items[0]=Object.assign({},items[0],{t:items[0].t!=null?items[0].t.replace(/^ +/,''):items[0].t});const L=items.length-1;items[L]=Object.assign({},items[L],{t:items[L].t!=null?items[L].t.replace(/ +$/,''):items[L].t});}
+   // In a narrow table cell, spaced capitals (column headings) shrink their spacing, then their size, so no word breaks mid-word.
+   if(extra&&extra.fitW){const fw=extra.fitW;items.forEach((it,k)=>{if(it.br||!it.t) return;const r0=it.r;const up=/[A-Z]/.test(it.t)&&it.t===it.t.toUpperCase();if(!(r0.caps||r0.ls)) return;const r=Object.assign({},r0,{caps:r0.caps||up});const sz=r.sz||10.5;const longest=Math.max(0,...it.t.split(/\s+/).map(w=>w.length));if(!longest) return;
+     const wid=(ls,z)=>longest*(z*(r.caps?0.8:0.6)+ls);if(wid(r.ls||0,sz)<=fw) return;const nr=Object.assign({},r0);
+     nr.ls=Math.max(0,(fw/longest)-sz*(r.caps?0.8:0.6));if(wid(nr.ls,sz)>fw||nr.ls<0.2){nr.ls=0;nr.sz=Math.max(5.5,fw/(longest*(r.caps?0.8:0.6)));}items[k]=Object.assign({},it,{r:nr});});}
+   const mark=(acc[0]&&acc[0].r)||extra&&extra.r0;
+   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else rs+=run(it.t,it.r);}
+   return '<w:p>'+pPr(s,Object.assign({},extra,{mark}))+rs+'</w:p>';}
+  // Is this element's content purely inline?
+  function hasBlock(el){for(const c of el.children){if(BLOCK.has(c.tagName)) return true;if(c.tagName==='BR'&&/page-break-before/.test(c.getAttribute('style')||'')) return true;if(!BLOCK.has(c.tagName)&&hasBlock(c)) return true;}return false;}
+  const isPB=el=>el.tagName==='BR'&&/page-break-before\s*:\s*always|mso-break-type\s*:\s*page-break/i.test(el.getAttribute('style')||'');
+  // Block walker: returns an array of body-level XML strings.
+  function blocks(el,r,ps,ctx){const out=[];let acc=[];let pendPB=false;
+   const flush=()=>{if(acc.some(a=>a.br||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
+   for(const c of el.childNodes){
+    if(c.nodeType===3){acc.push({t:c.nodeValue.replace(/[\t\n\r ]+/g,' '),r});continue;}
+    if(c.nodeType!==1) continue;const t=c.tagName;
+    if(isPB(c)){flush();pendPB=true;continue;}
+    if(t==='SCRIPT'||t==='STYLE'||t==='HEAD'||t==='TITLE') continue;
+    if(!BLOCK.has(t)&&!hasBlock(c)){inl(c,r,acc);continue;}
+    flush();const s=st(c);const rr=runCtx(r,c,s);if(rr.hide) continue;
+    if(t==='TABLE'){if(c.hasAttribute('data-keepprev')){for(let q=out.length-1;q>=0&&q>=out.length-3;q--){out[q]=out[q].replace(/<w:pPr>(?!<w:keepNext\/>)/g,'<w:pPr><w:keepNext/>');if(/^<w:tbl>/.test(out[q])) break;}}
+     out.push(...table(c,rr,ctx,pendPB));pendPB=false;continue;}
+    if(t==='HR'){out.push('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="C9B998"/></w:pBdr><w:spacing w:before="60" w:after="60"/></w:pPr></w:p>');continue;}
+    if(t==='UL'||t==='OL'){let n=0;for(const li of c.children){if(li.tagName!=='LI') continue;n++;const ls=Object.assign({},s,st(li));const lr=runCtx(rr,li,ls);const a=[{t:(t==='OL'?n+'.':'•')+'\t',r:lr}];
+      if(hasBlock(li)){const sub=blocks(li,lr,ls,ctx);out.push(...sub);}else{for(const k of li.childNodes) inl(k,lr,a);out.push(para(a,Object.assign({'margin-bottom':'3pt'},ls),{indent:(ctx.depth||0)*14+18,hang:14,inCell:ctx.inCell}));}}continue;}
+    // Boxed div (background or border): render as a one-cell table so the box survives.
+    if((t==='DIV'||t==='BLOCKQUOTE')&&(hex(s['background-color'])||['top','right','bottom','left'].some(k=>{const b=border(s['border-'+k]);return b&&!b.none;}))&&!ctx.noBox){
+     out.push(...boxTable(c,rr,s,ctx,pendPB));pendPB=false;continue;}
+    if(hasBlock(c)){const sub=blocks(c,rr,s,ctx);if(pendPB&&sub.length){sub[0]=sub[0].replace('<w:pPr>','<w:pPr><w:pageBreakBefore/>');pendPB=false;}out.push(...sub);}
+    else{const a=[];for(const k of c.childNodes) inl(k,rr,a);const ex={pb:pendPB,inCell:ctx.inCell,r0:rr,keep:/^H\d$/.test(t),fitW:ctx.inCell?ctx.width:0};
+     if(/^H\d$/.test(t)&&!s['margin-top']) s['margin-top']='10pt';if(/^H\d$/.test(t)&&!s['margin-bottom']) s['margin-bottom']='4pt';
+     if(!a.some(q=>q.br||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
+     else out.push(para(a,s,ex));pendPB=false;}
+   }
+   flush();return out;}
+  function shd(fill){return fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+fill+'"/>':'';}
+  function boxTable(el,r,s,ctx,pb){const w=ctx.width||textW;const pad=k=>Math.round((pt(s['padding-'+k])||4)*20);
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return '<w:'+k+' '+(b&&!b.none?'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"':'w:val="nil"')+'/>';}).join('');
+   const inner=blocks(el,r,Object.assign({},s,{'margin-top':'0','margin-bottom':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:w-12,noBox:true}));
+   const pre=pb?['<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>']:[];
+   const sp=pt(s['margin-bottom']);
+   return pre.concat(['<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="'+pad('top')+'" w:type="dxa"/><w:left w:w="'+pad('left')+'" w:type="dxa"/><w:bottom w:w="'+pad('bottom')+'" w:type="dxa"/><w:right w:w="'+pad('right')+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="'+Math.round(w*20)+'"/></w:tblGrid>'+
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tcBorders>'+bd+'</w:tcBorders>'+shd(hex(s['background-color']))+'</w:tcPr>'+(inner.length&&/<w:p>|<w:p /.test(inner[inner.length-1])?inner.join(''):inner.join('')+'<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>')+'</w:tc></w:tr></w:tbl>',
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="'+Math.round((sp||4)*20)+'" w:line="20" w:lineRule="exact"/></w:pPr></w:p>']);}
+  function table(tb,r,ctx,pb){const ts=st(tb);const avail=ctx.width||textW;
+   const rows=[];const collect=(e)=>{for(const c of e.children){if(c.tagName==='TR') rows.push(c);else if(/^(THEAD|TBODY|TFOOT)$/.test(c.tagName)) collect(c);}};collect(tb);if(!rows.length) return [];
+   const wAttr=tb.getAttribute('width')||ts.width;let W;if(wAttr&&/%$/.test(wAttr)) W=avail*parseFloat(wAttr)/100;else if(wAttr&&pt(wAttr)) W=Math.min(avail,pt(/^\d+$/.test(wAttr)?wAttr+'px':wAttr));else W=null;
+   const cp=tb.getAttribute('cellpadding');const cpad=cp!=null?parseFloat(cp)*0.75:1.5;
+   const keep=/page-break-inside\s*:\s*avoid/.test(tb.getAttribute('style')||'');
+   // Grid: widest row decides the column count; widths from the first row that states them.
+   const cells=rows.map(tr=>[...tr.children].filter(c=>c.tagName==='TD'||c.tagName==='TH'));
+   const ncol=Math.max(1,...cells.map(rc=>rc.reduce((a,c)=>a+(parseInt(c.getAttribute('colspan'))||1),0)));
+   const tw=W||avail;const cw=Array(ncol).fill(null);
+   for(const rc of cells){let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;const cs=css(c.getAttribute('style'));const a=c.getAttribute('width')||cs.width;
+     if(span===1&&a&&cw[k]==null){if(/%$/.test(a)) cw[k]=tw*parseFloat(a)/100;else{const p=pt(/^\d+$/.test(a)?a+'px':a);if(p) cw[k]=p;}}k+=span;}}
+   const known=cw.filter(v=>v!=null).reduce((a,b)=>a+b,0),unk=cw.filter(v=>v==null).length;
+   let grid;if(unk){const rest=Math.max(tw-known,unk*24);
+    // Columns without a stated width share the rest by content, the way a browser's auto layout does:
+    // the longest word must fit (caps and letter-spacing count extra), then longer text gets more room.
+    const need=Array(ncol).fill(0),want=Array(ncol).fill(1);
+    cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1&&cw[k]==null){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+      const hd=c.tagName==='TH'||/text-transform\s*:\s*uppercase|letter-spacing/.test(c.innerHTML);const f=hd?1.45:1;
+      const lw=Math.max(0,...t.split(' ').map(w=>w.length))*f;need[k]=Math.max(need[k],lw);want[k]=Math.max(want[k],Math.min(t.length*f,60));}k+=span;}});
+    const ix=cw.map((v,i)=>v==null?i:-1).filter(i=>i>=0);const chr=5.2;// points per character at body size
+    let base=ix.map(i=>Math.max(24,need[i]*chr+8));const bsum=base.reduce((a,b)=>a+b,0);
+    if(bsum>=rest){grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]*rest/bsum);}
+    else{const extra=rest-bsum;const ww=ix.map(i=>Math.max(1,want[i]*chr+8-(need[i]*chr+8)));const wsum=ww.reduce((a,b)=>a+b,0);grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]+extra*ww[j]/wsum);}}
+   else grid=cw.slice();
+   // Like a browser, never make a column narrower than its longest word (headings in capitals shrink instead, below).
+   {const minW=Array(ncol).fill(0);cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+     if(t&&t===t.toUpperCase()&&/[A-Z]{3}/.test(t)){const lw=Math.max(0,...t.split(' ').map(w=>w.length));minW[k]=Math.max(minW[k],lw*6.5*0.78+12);}
+     else if(t){const fs=pt((c.querySelector('[style*="font-size"]')||c).style.fontSize)||9.5;const lw=Math.max(0,...t.split(' ').map(w=>w.length));const pd=(pt(css(c.getAttribute('style'))['padding-left'])??cpad)+(pt(css(c.getAttribute('style'))['padding-right'])??cpad);
+      minW[k]=Math.max(minW[k],lw*fs*0.68+pd+2);}}k+=span;}});
+    const tot0=grid.reduce((a,b)=>a+b,0);let short=0;grid=grid.map((g,i)=>{if(g<minW[i]){short+=minW[i]-g;return minW[i];}return g;});
+    if(short>0){const slack=grid.map((g,i)=>Math.max(0,g-minW[i]));const sl=slack.reduce((a,b)=>a+b,0);if(sl>0){const take=Math.min(short,sl);grid=grid.map((g,i)=>g-take*slack[i]/sl);}}
+    if(W) {const t=grid.reduce((a,b)=>a+b,0);if(t>tot0+0.5) grid=grid.map(g=>g*tot0/t);}}
+   const sum=grid.reduce((a,b)=>a+b,0);const scale=W||sum>avail?(W||avail)/sum:1;grid=grid.map(v=>v*scale);const tot=grid.reduce((a,b)=>a+b,0);
+   const tblBd=tb.getAttribute('border')&&tb.getAttribute('border')!=='0';
+   let o='<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(tot*20)+'" w:type="dxa"/>'+(ts['margin-left']==='auto'||tb.getAttribute('align')==='center'?'<w:jc w:val="center"/>':'')+'<w:tblLayout w:type="fixed"/>'+
+    (tblBd?'<w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(k=>'<w:'+k+' w:val="single" w:sz="4" w:space="0" w:color="C9B998"/>').join('')+'</w:tblBorders>':'')+
+    '<w:tblCellMar><w:top w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:left w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:bottom w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:right w:w="'+Math.round(cpad*20)+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'+grid.map(g=>'<w:gridCol w:w="'+Math.round(g*20)+'"/>').join('')+'</w:tblGrid>';
+   const vm={};// rowspan carry: col -> remaining
+   rows.forEach((tr,ri)=>{const trs=st(tr);const trBg=hex(tr.getAttribute('bgcolor'))||hex(trs['background-color']);let hRow=0;let k=0;let tcs='';const rc=cells[ri];let ci=0;
+    const emitMerge=()=>{while(vm[k]&&vm[k].n>0){const m=vm[k];tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(m.w*20)+'" w:type="dxa"/>'+(m.span>1?'<w:gridSpan w:val="'+m.span+'"/>':'')+'<w:vMerge/>'+m.pr+'</w:tcPr><w:p/></w:tc>';m.n--;k+=m.span;}};
+    emitMerge();
+    for(const c of rc){emitMerge();const span=parseInt(c.getAttribute('colspan'))||1;const rs=parseInt(c.getAttribute('rowspan'))||1;const cs=st(c);const w=grid.slice(k,k+span).reduce((a,b)=>a+b,0);
+     const fill=hex(c.getAttribute('bgcolor'))||hex(cs['background-color'])||trBg;
+     const bd=['top','left','bottom','right'].map(s=>{const b=border(cs['border-'+s]);return b?'<w:'+s+' '+(b.none?'w:val="nil"':'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"')+'/>':'';}).join('');
+     const mar=['top','left','bottom','right'].map(s=>{const p=pt(cs['padding-'+s]);return p!=null?'<w:'+s+' w:w="'+Math.round(p*20)+'" w:type="dxa"/>':'';}).join('');
+     const va=cs['vertical-align']||c.getAttribute('valign');const h=pt(cs.height)||(c.getAttribute('height')?parseFloat(c.getAttribute('height'))*0.75:0);if(h>hRow) hRow=h;
+     const pr=(bd?'<w:tcBorders>'+bd+'</w:tcBorders>':'')+shd(fill)+(mar?'<w:tcMar>'+mar+'</w:tcMar>':'')+(va==='middle'?'<w:vAlign w:val="center"/>':va==='bottom'?'<w:vAlign w:val="bottom"/>':'');
+     const cr=runCtx(r,c,cs);const padL=pt(cs['padding-left']),padR=pt(cs['padding-right']);const inner=blocks(c,cr,Object.assign({},cs,{'padding-left':'0','margin-left':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:Math.max(24,w-(padL!=null?padL:cpad)-(padR!=null?padR:cpad)),depth:(ctx.depth||0)}));
+     let body=inner.join('');if(!inner.length||/<\/w:tbl>$/.test(inner[inner.length-1])) body+='<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'+(cr.sz&&cr.sz<6?'<w:rPr><w:sz w:val="'+Math.max(2,Math.round(cr.sz*2))+'"/></w:rPr>':'')+'</w:pPr></w:p>';
+     tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(span>1?'<w:gridSpan w:val="'+span+'"/>':'')+(rs>1?'<w:vMerge w:val="restart"/>':'')+pr+'</w:tcPr>'+body+'</w:tc>';
+     if(rs>1) vm[k]={n:rs-1,span,w,pr};k+=span;ci++;}
+    emitMerge();
+    if(k<ncol){const w=grid.slice(k).reduce((a,b)=>a+b,0);tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(ncol-k>1?'<w:gridSpan w:val="'+(ncol-k)+'"/>':'')+'</w:tcPr><w:p/></w:tc>';}
+    const trPr=(hRow?'<w:trHeight w:val="'+Math.round(hRow*20)+'" w:hRule="'+(hRow<=6?'exact':'atLeast')+'"/>':'')+(keep||rows.length<=3?'<w:cantSplit/>':'')+(ri===0&&rc.some(c=>c.tagName==='TH')?'<w:tblHeader/>':'');
+    o+='<w:tr>'+(trPr?'<w:trPr>'+trPr+'</w:trPr>':'')+tcs+'</w:tr>';});
+   o+='</w:tbl>';
+   const out=[];if(pb) out.push('<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>');
+   const mt=pt(ts['margin-top']);if(mt) out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round(mt*20))+'" w:lineRule="exact"/></w:pPr></w:p>');
+   out.push(o);
+   // Word needs a paragraph between two tables or they merge; a hairline one keeps the gap as small as the HTML's.
+   const mb=pt(ts['margin-bottom']);out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round((mb||0)*20))+'" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>');
+   if(keep) out[out.length-2]=out[out.length-2].replace(/<w:p>((?:(?!<\/w:p>).)*)<\/w:p>/g,(m,b)=>'<w:p>'+b.replace('<w:pPr>','<w:pPr><w:keepNext/>')+'</w:p>');
+   return out;}
+  let parts=blocks(body,R0,bst,{depth:0});
+  // Drop trailing spacer paragraphs at the very end of the document.
+  while(parts.length>1&&/w:line="20" w:lineRule="exact"/.test(parts[parts.length-1])) parts.pop();
+  const twip=v=>Math.round(v*20);
+  const sect='<w:sectPr><w:pgSz w:w="'+twip(pageW)+'" w:h="'+twip(pageH)+'"'+(land?' w:orient="landscape"':'')+'/><w:pgMar w:top="'+twip(mg[0])+'" w:right="'+twip(mg[1])+'" w:bottom="'+twip(mg[2])+'" w:left="'+twip(mg[3])+'" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>';
+  const title=(doc.title||'').trim();
+  const font=(R0.font||'Georgia');const sz=Math.round((R0.sz||10.5)*2);const color=R0.color||'1A1410';
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const files=[
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>'],
+   ['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+x(title)+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>'],
+   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>'],
+   ['word/settings.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings '+W+'><w:zoom w:percent="100"/><w:defaultTabStop w:val="360"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>'],
+   ['word/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+x(font)+'" w:hAnsi="'+x(font)+'" w:eastAsia="'+x(font)+'" w:cs="'+x(font)+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'+
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'+
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
+   ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
+  return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
+ function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
+ function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
+ return {conv,save,hook};})();
 </script>
 <script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
    through CARL's server, on CARL's keys, for anyone signed in to

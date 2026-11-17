@@ -211,7 +211,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
  <h1>NORA <span style="font-weight:400;font-size:15px;opacity:.75">Needs, Options, and Requirements Analyst</span></h1>
  <div class="sp"></div>
  <span class="saved" id="saved"></span>
- <button id="bNew">New project</button>
+
  <button id="bOpen">Open…</button>
  <input type="file" id="fOpen" accept=".json" hidden>
  <button id="bSave">Save file</button>
@@ -489,13 +489,13 @@ function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="
   return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
 // One question: number and question, then a ruled answer box with a gold edge.
 function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
- cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q)+(code?' <span style="font-size:7pt;color:'+CD.mute+';letter-spacing:1pt">['+esc(code)+']</span>':''),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
  '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
 // A data table with a navy header row and tinted stripes.
 function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
  '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
-function cdFoot(t){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
@@ -610,7 +610,9 @@ Rules:
 - Requirements state the need, never a solution the source did not ask for ("covered space for two aircraft", not "a new hangar"). One need each. Include stated and clearly implied needs.
 - Never invent a number, date, name or quantity. Leave a field empty when the sources do not give it.
 - Assumptions, risks and success measures that no source states but a planner would expect may be proposed with "quote":"" so the analyst can decide. Everything else needs a quote.
-- A requirement's "measure": copy it when stated ("stated"); otherwise propose how a reviewer would verify it ("proposed").`;
+- A requirement's "measure": copy it when stated ("stated"); otherwise propose how a reviewer would verify it ("proposed").
+- "speaker" is the person the requirement came from: the sender of an email, the person interviewed in interview notes (unless the notes name someone else), the person who filled in a returned kit, or the named speaker in workshop notes. Use the name as written. Leave it empty only when no person can be tied to the words.
+- Project "name": if no source gives a project title, propose a short working title in DoD facility style that names the facility and the installation (for example "Consolidated Wing Administrative Facility, Andersen AFB"), with "quote":"" so the analyst can decide. Never invent any other project field.`;
 const KEYF={project:'field',stakeholders:'name',requirements:'statement',gaps:'area',constraints:'text',assumptions:'text',risks:'text',measures:'text'};
 const QUOTEF=k=>k==='requirements'?'evidence':'quote';
 function srcText(){return P.sessions.filter(s=>(s.notes||'').trim()).map((s,i)=>'[S'+(i+1)+'] '+(s.title||SESSION_TYPES[s.type]||'Source')+' ('+(SESSION_TYPES[s.type]||s.type)+', '+(s.date||'')+')\n'+s.notes.trim()).join('\n\n').slice(0,150000);}
@@ -629,7 +631,7 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
  Object.keys(KEYF).forEach(cat=>{const pool=[];const kf=KEYF[cat],qf=QUOTEF(cat);
   runs.forEach(([j,who,ch])=>(Array.isArray(j[cat])?j[cat]:[]).forEach(raw=>{if(!raw||!String(raw[kf]||'').trim()) return;const it={...raw};
    it.ok=verified(all,it[qf]);
-   if(!it.ok){const soft=['assumptions','risks','measures'].includes(cat)&&!String(it[qf]||'').trim();if(!soft){rejected++;log('AI item rejected (quote not in your documents)',who+' · '+cat+': '+String(it[kf]).slice(0,80));return;}it[qf]='';}
+   if(!it.ok){const soft=(['assumptions','risks','measures'].includes(cat)||(cat==='project'&&it.field==='name'))&&!String(it[qf]||'').trim();if(!soft){rejected++;log('AI item rejected (quote not in your documents)',who+' · '+cat+': '+String(it[kf]).slice(0,80));return;}it[qf]='';}
    if(cat==='gaps') numsOk(it,all);
    const m=pool.find(p=>cat==='project'?p.field===it.field:cat==='stakeholders'?norm(p.name)===norm(it.name):sim(p[kf],it[kf])>=.6);
    if(m){if(!m.by.includes(who)) m.by.push(who);if(!m.ok&&it.ok) Object.assign(m,it,{by:m.by,id:m.id,keep:m.keep});else Object.keys(it).forEach(f=>{if((m[f]===''||m[f]==null)&&it[f]) m[f]=it[f];});}
@@ -652,7 +654,7 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
  ['gaps','constraints','assumptions','risks','measures'].forEach(c=>out[c]=out[c].filter(k=>!P[c].some(x=>sim(x.text||x.area||'',k[KEYF[c]])>=.85)));
  P.build={at:new Date().toISOString(),items:out,ans:{},engines:readers,rejected,parts:CH.length,skipped,applied:false};
  log('Build my requirement: read',all.length+' characters from '+P.sessions.length+' sources'+(CH.length>1?' in '+CH.length+' parts':'')+(skipped?' ('+skipped+' more parts not read: too long)':'')+'; '+Object.entries(out).map(([k,v])=>v.length+' '+k).join(', ')+(rejected?'; '+rejected+' rejected for quotes not found':''));
- save();b.disabled=false;say('');vBuild();renderSteps();}
+ save();b.disabled=false;say('');vBuild();renderSteps();const rv=document.getElementById('rvw');if(rv) rv.scrollIntoView({block:'start'});}
 
 // What the documents did not answer, asked as plain questions.
 function pBlank(f){const v=String(P.project[f]||'').trim();return !v||(f==='name'&&/^new project$/i.test(v));}
@@ -674,10 +676,10 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
  const PF={name:'Title',installation:'Installation',service:'Service',location:'Location',unit:'Requiring unit',driver:'Mission driver',driver_detail:'Why now',mission:'Mission',need_date:'Needed by'};
  const show=(c,x)=>c==='project'?'<b>'+esc(PF[x.field]||x.field)+':</b> '+esc(x.field==='service'?SERVICES[x.value]||x.value:x.field==='location'?LOCS[x.value]||x.value:x.field==='driver'?(DRIVERS[x.value]||{}).t||x.value:x.value)
   :c==='stakeholders'?'<b>'+esc(x.name)+'</b>'+(x.title?', '+esc(x.title):'')+(x.org?', '+esc(x.org):'')+' <span class="small">'+esc(x.role||'')+(x.authority?' · '+esc(AUTH[x.authority]||x.authority):'')+'</span>'
-  :c==='requirements'?'<textarea data-c="requirements" data-id="'+x.id+'" data-f="statement" style="min-height:40px">'+esc(x.statement)+'</textarea><div class="row" style="margin-top:4px"><select data-c="requirements" data-id="'+x.id+'" data-f="type" style="width:auto">'+opts(RTYPES,RTYPES[x.type]?x.type:'functional')+'</select><select data-c="requirements" data-id="'+x.id+'" data-f="priority" style="width:auto">'+opts(PRIOR,PRIOR[x.priority]?x.priority:'should')+'</select></div>'+(x.speaker?'<div class="small">Said by: '+esc(x.speaker)+'</div>':'')+(x.measure?'<div class="small">Verified by: '+esc(x.measure)+(x.measure_basis==='proposed'?' <span class="pill warn">proposed</span>':'')+'</div>':'')
+  :c==='requirements'?'<textarea data-c="requirements" data-id="'+x.id+'" data-f="statement" style="min-height:40px">'+esc(x.statement)+'</textarea><div class="row" style="margin-top:4px"><select data-c="requirements" data-id="'+x.id+'" data-f="type" style="width:auto">'+opts(RTYPES,RTYPES[x.type]?x.type:'functional')+'</select><select data-c="requirements" data-id="'+x.id+'" data-f="priority" style="width:auto">'+opts(PRIOR,PRIOR[x.priority]?x.priority:'should')+'</select></div>'+(x.speaker&&!x.speaker_typed?'<div class="small">Said by: '+esc(x.speaker)+'</div>':'<div class="row" style="margin-top:4px"><input data-c="requirements" data-id="'+x.id+'" data-f="speaker" data-typed="1" list="shl" placeholder="Who said this? (name, title)" value="'+esc(x.speaker||'')+'" style="max-width:340px"></div>')+(x.measure?'<div class="small">Verified by: '+esc(x.measure)+(x.measure_basis==='proposed'?' <span class="pill warn">proposed</span>':'')+'</div>':'')
   :c==='gaps'?'<b>'+esc(x.area)+'</b> – today '+esc(x.current||'?')+'; needed '+esc(x.required||'?')+((x.qty_have||x.qty_need)?' <span class="small">('+esc(x.qty_have||'?')+' of '+esc(x.qty_need||'?')+' '+esc(x.unit||'')+')</span>':'')+(x.impact?'<div class="small">Impact: '+esc(x.impact)+'</div>':'')+(x.numsCleared?'<div class="small">A number not found in your documents was removed.</div>':'')
   :c==='risks'?esc(x.text)+' <span class="small">(likelihood '+esc(x.l||3)+', impact '+esc(x.i||3)+')</span>':esc(x.text)+(x.target?' <span class="small">– target '+esc(x.target)+'</span>':'')+(x.basis?' <span class="small">– '+esc(x.basis)+'</span>':'')+(x.owner?' <span class="small">– confirm with '+esc(x.owner)+'</span>':'');
- v.innerHTML=needsPanel()+'<div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: returned interview kits, interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two independent AI readers read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
+ v.innerHTML='<datalist id="shl">'+P.stakeholders.concat(B?B.items.stakeholders.filter(x=>x.keep):[]).map(s=>'<option value="'+esc(s.name+(s.title?', '+s.title:''))+'">').join('')+'</datalist><div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: returned interview kits, interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two independent AI readers read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
   '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> You can still add documents now.')+'</div>'+
   '<label id="drop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;margin:10px 0"><b>Drop files here or click to choose</b><br><span class="small">PDF, Word (.docx), email (.eml), text. Scanned PDF pages are read by AI.</span><input type="file" id="dFiles" multiple accept=".pdf,.docx,.eml,.txt,.md,.csv,.htm,.html" hidden></label>'+
   '<details><summary class="small" style="cursor:pointer">Or paste text</summary><input id="pTitle" placeholder="What it is (e.g. Interview with the squadron commander, 12 Nov)" style="margin:6px 0"><textarea id="pText" class="tall" placeholder="Paste notes, an email or a document"></textarea><div class="row"><button id="bPaste">Add</button></div></details>'+
@@ -685,20 +687,22 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
   (docs.length?'<h3>Sources ('+docs.length+')</h3><ul class="small">'+docs.map(s=>'<li>'+esc(s.title||SESSION_TYPES[s.type])+' – '+((s.notes.match(/\S+/g)||[]).length).toLocaleString()+' words'+(s.file&&s.file.note?' · '+esc(s.file.note):'')+' <a href="#" data-rm="'+s.id+'">remove</a></li>').join('')+'</ul>':'')+
   (function(){const ch=srcChunks().length,w=(allText().match(/\S+/g)||[]).length;return ch>1?'<p class="small">'+w.toLocaleString()+' words. NORA reads '+(ch>MAXCH?'the first '+MAXCH+' of '+ch+' parts (about 120,000 words); remove or split the longest documents to read the rest.':'them in '+ch+' parts; this takes a few minutes.')+'</p>':'';})()+
   '<div class="row"><button class="go" id="bBuild" '+(signed&&docs.length?'':'disabled')+'>'+(B?'Build again':'Build my requirement')+'</button><span class="small" id="bStat"></span></div></div>'+
-  (B&&!B.applied?'<div class="panel"><h2>Review what NORA found</h2><p class="lead">Untick anything wrong. Labels show who found it: both readers, one reader, the arbiter, or a planner’s suggestion with no source (assumptions, risks and measures only).'+(B.rejected?' '+B.rejected+' item'+(B.rejected>1?'s were':' was')+' thrown out because the quote was not in your documents.':'')+(B.skipped?' <b>'+B.skipped+' part'+(B.skipped>1?'s':'')+' of your documents were too long to read.</b>':'')+' Click any quote to see it in its source.</p>'+
+  (B&&!B.applied?'<div class="panel" id="rvw"><h2>Review what NORA found</h2><p class="lead">Untick anything wrong. Labels show who found it: both readers, one reader, the arbiter, or a planner’s suggestion with no source (assumptions, risks and measures only).'+(B.rejected?' '+B.rejected+' item'+(B.rejected>1?'s were':' was')+' thrown out because the quote was not in your documents.':'')+(B.skipped?' <b>'+B.skipped+' part'+(B.skipped>1?'s':'')+' of your documents were too long to read.</b>':'')+' Click any quote to see it in its source.</p>'+
    Object.keys(LBL).map(c=>B.items[c].length?'<h3>'+LBL[c]+' ('+B.items[c].filter(x=>x.keep).length+' of '+B.items[c].length+')</h3>'+B.items[c].map(x=>'<div class="card" style="margin:6px 0;padding:8px 12px"><label style="display:flex;gap:8px;align-items:flex-start"><input type="checkbox" data-k2="'+c+'" data-id="'+x.id+'" '+(x.keep?'checked':'')+' style="width:auto;margin-top:4px"><span style="flex:1">'+show(c,x)+'<div class="flags">'+pill(x)+(x[QUOTEF(c)]?' <q class="ev">'+esc(x[QUOTEF(c)])+'</q>':'')+'</div></span></label></div>').join(''):'').join('')+
    (function(){const Q=buildQs();return Q.length?'<h3>Only you can answer these</h3><p class="small">Your documents did not say. Leave blank if you do not know yet.</p><div class="form">'+Q.map(([k,l,t])=>'<div class="wide"><label class="f">'+esc(l)+'</label>'+(t==='svc'?'<select data-a="'+k+'">'+opts(SERVICES,B.ans[k]||'','Select')+'</select>':t==='drv'?'<select data-a="'+k+'">'+opts(Object.fromEntries(Object.entries(DRIVERS).map(([a,x])=>[a,x.t])),B.ans[k]||'','Select')+'</select>':'<input data-a="'+k+'" type="'+(t==='date'?'date':'text')+'" value="'+esc(B.ans[k]||'')+'">')+'</div>').join('')+'</div>':'';})()+
    '<div class="row"><button class="go" id="bApply">Apply and write the need statement</button><span class="small">Requirements go in as Draft until their source confirms them.</span></div></div>':'')+
-  (B&&B.applied?'<div class="panel"><h2>Applied</h2><p class="lead">'+esc(B.summary||'')+'</p><div class="row"><button class="go" id="bGoOut">See your requirement</button></div><p class="small">Add more documents and build again; NORA leaves out what the record already holds.</p></div>':'');
+  (B&&B.applied?'<div class="panel"><h2>Applied</h2><p class="lead">'+esc(B.summary||'')+'</p><div class="row"><button class="go" id="bGoOut">See your requirement</button></div><p class="small">Add more documents and build again; NORA leaves out what the record already holds.</p></div>':'')+needsPanel();
  bindNeeds(v);const fi=$('#dFiles'),dr=$('#drop');fi.onchange=()=>{const f=[...fi.files];fi.value='';if(f.length) addDocs(f);};
  dr.ondragover=e=>{e.preventDefault();dr.style.background='#f1f6f7';};dr.ondragleave=()=>dr.style.background='';dr.ondrop=e=>{e.preventDefault();dr.style.background='';addDocs([...e.dataTransfer.files]);};
  $('#bPaste').onclick=()=>{const t=$('#pText').value.trim();if(t.length<20) return;P.sessions.unshift({id:uid(),type:'document',date:today(),title:$('#pTitle').value.trim()||'Pasted text',participants:[],notes:t,candidates:[]});log('Text added',$('#pTitle').value.trim()||'Pasted text');save();vBuild();renderSteps();};
  v.querySelectorAll('[data-rm]').forEach(a=>a.onclick=e=>{e.preventDefault();const s=P.sessions.find(x=>x.id===a.dataset.rm);if(!s) return;if(P.requirements.some(r=>r.session===s.id)&&!confirm('Requirements trace to this source. Remove it anyway? Their quotes are kept.')) return;P.sessions=P.sessions.filter(x=>x!==s);log('Source removed',s.title||'');save();vBuild();renderSteps();});
  $('#bBuild').onclick=buildReq;
  v.querySelectorAll('[data-k2]').forEach(el=>el.onchange=()=>{const x=B.items[el.dataset.k2].find(y=>y.id===el.dataset.id);x.keep=el.checked;save();if(['project','stakeholders'].includes(el.dataset.k2)) vBuild();});
- v.querySelectorAll('[data-c]').forEach(el=>el.onchange=el.oninput=()=>{const x=B.items[el.dataset.c].find(y=>y.id===el.dataset.id);x[el.dataset.f]=el.value;save();});
+ v.querySelectorAll('[data-c]').forEach(el=>el.onchange=el.oninput=()=>{const x=B.items[el.dataset.c].find(y=>y.id===el.dataset.id);x[el.dataset.f]=el.value;if(el.dataset.typed) x.speaker_typed=true;save();});
  v.querySelectorAll('[data-a]').forEach(el=>el.onchange=el.oninput=()=>{B.ans[el.dataset.a]=el.value;save();});
  const ap=$('#bApply');if(ap) ap.onclick=applyReq;const go=$('#bGoOut');if(go) go.onclick=()=>{STEP='out';render();window.scrollTo(0,0);};}
+function addPerson(v,ss){const [name,...t]=String(v).split(',');const nm=name.trim();if(!nm) return '';const m=P.stakeholders.find(s=>norm(s.name)===norm(nm));if(m) return m.id;
+ const s={id:uid(),name:nm,title:t.join(',').trim(),org:'',role:'Other',authority:'consulted',influence:'',interest:'',contact:'',origin:'Your answer'};P.stakeholders.push(s);if(ss&&!ss.participants.includes(s.id)) ss.participants.push(s.id);return s.id;}
 function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);const n={};
  kept('project').forEach(x=>{if(pBlank(x.field)){P.project[x.field]=x.value;n.project=(n.project||0)+1;}});
  Object.entries(B.ans).forEach(([k,v])=>{v=String(v||'').trim();if(!v) return;if(k in P.project){if(pBlank(k)){P.project[k]=v;n.project=(n.project||0)+1;}return;}
@@ -706,7 +710,7 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
   P.stakeholders.push({id:uid(),name:name.trim(),title:t.join(',').trim(),org:'',role,authority:k==='decider'?'decides':'consulted',influence:k==='decider'?'H':'',interest:'H',contact:'',origin:'Your answer'});n.stakeholders=(n.stakeholders||0)+1;});
  const byName={};kept('stakeholders').forEach(x=>{const s={id:uid(),name:x.name,title:x.title||'',org:x.org||'',role:ROLES.includes(x.role)?x.role:'Other',authority:AUTH[x.authority]?x.authority:'',influence:x.influence==='H'?'H':x.influence==='L'?'L':'',interest:x.interest==='H'?'H':x.interest==='L'?'L':'',contact:x.contact||'',origin:'From '+(srcSession(x.quote)?.title||'your documents')};P.stakeholders.push(s);byName[norm(x.name)]=s.id;n.stakeholders=(n.stakeholders||0)+1;
   const ss=srcSession(x.quote);if(ss&&!ss.participants.includes(s.id)) ss.participants.push(s.id);});
- kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);const who=personFor(x.speaker,ss,x.evidence);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',rationale:x.rationale||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
+ kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);let who=personFor(x.speaker,ss,x.evidence);if(!who&&String(x.speaker||'').trim()) who=addPerson(x.speaker,ss);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',rationale:x.rationale||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
  kept('gaps').forEach(x=>{P.gaps.push({id:uid(),area:x.area,current:x.current||'',required:x.required||'',qty_have:String(x.qty_have??''),qty_need:String(x.qty_need??''),unit:x.unit||'',impact:x.impact||'',reqs:[],origin:x.ok?'From your documents':'Suggestion'});n.gaps=(n.gaps||0)+1;});
  kept('constraints').forEach(x=>{P.constraints.push({id:uid(),text:x.text,basis:x.basis||(x.ok?'“'+x.quote+'”':'')});n.constraints=(n.constraints||0)+1;});
  kept('assumptions').forEach(x=>{P.assumptions.push({id:uid(),text:x.text,owner:x.owner||'',confirmed:'no'});n.assumptions=(n.assumptions||0)+1;});
@@ -776,11 +780,11 @@ function sheetHTML(groups){const p=P.project;const pname=p.name&&!pBlank('name')
     cdP('<span style="font-size:9pt;letter-spacing:1pt;color:'+CD.taupe+'">'+esc(r.id)+'</span>&nbsp;&nbsp;'+esc(r.text),'margin:0 0 3pt;font-size:11pt;color:'+CD.navy)+
     (r.evidence?cdP('Your words: “'+esc(r.evidence)+'”','margin:0 0 3pt;font-size:9pt;font-style:italic;color:'+CD.taupe2):'')+(r.measure?cdP('Verified by: '+esc(r.measure),'margin:0 0 3pt;font-size:9pt;color:'+CD.mute):'')+
     '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:4pt 10pt 8pt 10pt">'+cdP('&#9744; Correct &nbsp;&nbsp;&nbsp; &#9744; Change:','margin:0 0 2pt;font-size:10pt;color:'+CD.taupe2)+cdLines(2,CD.tint2)+'</td></tr></table></td></tr></table>').join('')+
-   cdH('Anything missing?')+cdLines(2)+cdWho(['Name','Signature','Date'])+cdFoot('Return to: ______________________________ &nbsp;by&nbsp; ______________ &nbsp;&nbsp;&middot;&nbsp;&nbsp; '+esc(pname));}));}
+   cdH('Anything missing?')+cdLines(2)+cdWho(['Name','Signature','Date'])+cdFoot(retTo()+' &nbsp;&nbsp;&middot;&nbsp;&nbsp; '+esc(pname));}));}
 function measPanel(){const m=P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must'&&!String(r.measure||'').trim());return m.length?'<div class="panel"><h2>Verification measures</h2><p class="lead">'+m.length+' must-have requirement'+(m.length>1?'s have':' has')+' no measure yet ('+m.map(r=>r.id).join(', ')+'). Gate 1 needs one for each.</p><div class="row"><button class="go" id="bMeas">Propose measures with AI</button><span class="small">Review them under Adjust details \u2192 Requirements.</span></div></div>':'';}
 function confPanel(){const G=confGroups();const n=G.reduce((a,g)=>a+g.rs.length,0);
  if(!n) return P.requirements.some(r=>r.status==='confirmed')?'<div class="panel"><h2>Confirm with your sources</h2><p class="lead">Every requirement is confirmed by its source.</p></div>':'';
- return '<div class="panel"><h2>Confirm with your sources</h2><p class="lead">'+n+' requirement'+(n>1?'s are':' is')+' still Draft. Send each person their sheet or walk through it with them, then record what they confirmed. Untick anything they changed and fix it under Adjust details → Requirements.</p>'+
+ return '<div class="panel" id="confP"><h2>Confirm with your sources</h2><p class="lead">'+n+' requirement'+(n>1?'s are':' is')+' still Draft. Send each person their sheet or walk through it with them, then record what they confirmed. Untick anything they changed and fix it under Adjust details → Requirements.</p>'+
   '<div class="row"><button id="cAll">Download all sheets</button><label class="btn" style="cursor:pointer"><input type="file" id="retF" accept=".pdf,.docx,.txt,.eml,image/*" hidden><span style="border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-block">Read a returned sheet</span></label><span class="small" id="retStat">PDF, Word, or a photo of the marked-up sheet</span></div>'+
   G.map((g,i)=>'<div class="card" style="margin:8px 0;padding:10px 14px"><div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap"><b style="flex:1">'+esc(g.who?g.who.name+(g.who.title?', '+g.who.title:''):'No named source')+'</b><span class="small">'+g.rs.length+' draft</span><button data-sh="'+i+'">Sheet</button><button class="go" data-cf="'+i+'">Record confirmation</button></div>'+
    '<div data-cform="'+i+'" hidden style="margin-top:8px">'+g.rs.map(r=>'<label style="display:flex;gap:8px;align-items:flex-start;margin:3px 0"><input type="checkbox" data-r="'+r.id+'" checked style="width:auto;margin-top:3px"><span><b>'+esc(r.id)+'</b> '+esc(r.text)+'</span></label>').join('')+
@@ -881,8 +885,11 @@ const KQ={
 function cdGrid(n,g){const head=g.cols.map((c,i)=>'<td bgcolor="'+CD.tint+'" width="'+g.w[i]+'" style="background:'+CD.tint+';padding:4pt 6pt;border-bottom:0.75pt solid '+CD.gold+'">'+cdP(esc(c).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1pt;color:'+CD.taupe)+'</td>').join('');
  const row='<tr>'+g.cols.map((c,i)=>'<td height="30" bgcolor="'+CD.tint2+'" width="'+g.w[i]+'" style="height:22pt;background:'+CD.tint2+';padding:3pt 6pt;border-bottom:0.75pt solid '+CD.rule+';border-right:0.5pt solid '+CD.tint+'">'+(g.mid&&i===1?cdP(g.mid,'margin:0;font-size:8.5pt;color:'+CD.taupe2):'&nbsp;')+'</td>').join('')+'</tr>';
  return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
-  cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(g.q)+' <span style="font-size:7pt;color:'+CD.mute+';letter-spacing:1pt">['+esc(g.grid)+']</span>','margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+  cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(g.q),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
   '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;border-left:2.25pt solid '+CD.gold+'"><tr>'+head+'</tr>'+Array(g.rows).fill(row).join('')+'</table></td></tr></table>';}
+function retTo(){const who=String(P.project.prepared_by||(window.CARLAI&&CARLAI.state().user)||'').trim();const d=new Date(Date.now()+7*864e5);
+ const due=d.getDate()+' '+['January','February','March','April','May','June','July','August','September','October','November','December'][d.getMonth()]+' '+d.getFullYear();
+ return 'Please return to '+(who?'<b>'+esc(who)+'</b>':'______________________________')+' by <b>'+due+'</b>';}
 function kitHTML(roles){const p=P.project;const C=Object.fromEntries(covData().map(x=>[x[0],x]));const pname=p.name&&!pBlank('name')?p.name:'New requirement';const place=[p.installation,SERVICES[p.service]].filter(Boolean).join('  ·  ');
  const known=[['Project title',p.name&&!pBlank('name')?p.name:''],['Installation',p.installation],['Service',SERVICES[p.service]],['Requiring unit',p.unit],['Mission',p.mission],['Driver',(DRIVERS[p.driver]||{}).t],['Why now',p.driver_detail],['Needed by',p.need_date]].filter(x=>x[1]);
  return cdDoc('Interview kit',roles.map(r=>{const qs=(KQ[r]||[]).slice();if(r==='cmd'&&DRIVERS[p.driver]) DRIVERS[p.driver].q.forEach(q=>qs.splice(2,0,['driver',q]));
@@ -890,7 +897,7 @@ function kitHTML(roles){const p=P.project;const C=Object.fromEntries(covData().m
   return cdBand('Interview kit',pname,place,KR[r])+cdWho(['Name','Title / office','Organization'])+cdWho(['Phone or email','Date'])+cdP('YOUR PART IN DECISIONS ON THIS PROJECT &nbsp;&nbsp; &#9744; Decide &nbsp; &#9744; Approve &nbsp; &#9744; Validate &nbsp; &#9744; Advise',CDK+'margin:10pt 0 0;font-size:7.5pt')+
    cdLead('We are documenting the requirement for this project, and your knowledge is part of it. This takes about ten minutes. Answer in your own words and give numbers wherever you can; what you write is recorded with your name.')+
    (known.length?cdH('What we have so far')+cdKnown(known):'')+cdH('Questions')+asked.map((x,i)=>Array.isArray(x)?cdQ(i+1,x[1],x[0],4):cdGrid(i+1,x)).join('')+cdQ(asked.length+1,'Anything else we should know?','',3)+
-   cdFoot('Return to: ______________________________ &nbsp;by&nbsp; ______________ &nbsp;&nbsp;·&nbsp;&nbsp; '+esc(pname));}));}
+   cdFoot(retTo()+' &nbsp;&nbsp;&middot;&nbsp;&nbsp; '+esc(pname));}));}
 const KIT_SYS=`You read a returned NORA interview kit for a DoD construction requirement. It may be typed, handwritten, marked up, scanned or photographed. Transcribe every answer exactly as written; write [illegible] where you cannot read it. Never fill in an answer that is not there.
 For a table, give each filled row as one line, cells in column order separated by " | ". A ticked box counts only if clearly marked.
 Return ONLY JSON: {"respondent":{"name":"","title":"","org":"","contact":"phone or email","part":"decide|approve|validate|advise|"},"role":"the role printed on the kit","date":"YYYY-MM-DD or empty","corrections":[{"item":"","correction":"exactly as written"}],"answers":[{"code":"the code in brackets beside the question","question":"","answer":"exactly as written"}],"other":"anything written under Anything else"}`;
@@ -913,35 +920,55 @@ function aiOn2(){return !!(window.CARLAI&&CARLAI.state().ok);}
 function nz2(s){return String(s||'').toLowerCase();}
 async function pdfImagesN(file,max){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const out=[];for(let i=1;i<=Math.min(doc.numPages,max);i++){const p=await doc.getPage(i);const vp=p.getViewport({scale:1.6});const c=document.createElement('canvas');c.width=vp.width;c.height=vp.height;await p.render({canvasContext:c.getContext('2d'),viewport:vp}).promise;out.push(c.toDataURL('image/jpeg',.8).split(',')[1]);}return out;}
 function imgB64N(file){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1]);};im.onerror=()=>no(new Error('Could not open the image'));im.src=URL.createObjectURL(file);});}
-function needsPanel(){const C=covData();const done=C.filter(x=>x[3]).length;const miss=C.filter(x=>!x[3]);const byRole={};miss.forEach(x=>(byRole[x[2]]=byRole[x[2]]||[]).push(x[1]));
- return '<div class="panel"><h2>What NORA needs</h2><p class="lead">Everything the requirement package and Gate 1 call for, and who usually knows it. '+done+' of '+C.length+' covered'+(P.build&&!P.build.applied?' (counting what is waiting for your review below)':'')+'.</p>'+
-  '<table><tbody>'+C.map(([k,l,r,s])=>'<tr><td style="width:28px;color:'+(s==='rec'?'var(--ok)':s==='new'?'var(--warn)':'var(--mute)')+'">'+(s==='rec'?'✓':s==='new'?'◐':'○')+'</td><td>'+esc(l)+'</td><td class="small">'+(s==='rec'?'On record':s==='new'?'Found, waiting for your review':'Ask: '+esc(KRL[r]))+'</td></tr>').join('')+'</tbody></table>'+
-  '<h3>Interview kits</h3><p class="small">One sheet per person. Each asks only what is still missing, shows what is already on record for them to confirm, and leaves room to answer. Send it, or take it to the meeting.</p>'+
+// One checklist: what the package and Gate 1 need. The build page and the Gate 1 panel show the same list.
+const FIX={title:['project','name','name'],mission:['project','mission'],driver:['project','driver_detail','driver_detail'],date:['project','need_date','need_date'],decide:['stake',null,'decider'],user:['stake',null,'user'],pw:['stake',null,'pw'],
+ reqs:['reqs'],gap:['gap'],impact:['gap'],site:['cars'],measure:['cars'],risk:['cars'],source:['reqs'],verify:['out','bMeas'],confirm:['out','confP'],need:['out','need']};
+function checklist(){const C=covData();const act=P.requirements.filter(r=>r.status!=='withdrawn');const s=b=>b?'rec':'';
+ return C.map(([k,l,r,st])=>[k,l,st,r]).concat([
+  ['source','Every requirement traces to the person who said it',s(act.length&&act.every(r=>(r.sources||[]).some(id=>P.stakeholders.some(x=>x.id===id))||(r.source_names||[]).length)),'pm'],
+  ['verify','Every must-have requirement has a verification measure',s(act.some(r=>r.priority==='must')&&act.filter(r=>r.priority==='must').every(r=>String(r.measure||'').trim())),'pm'],
+  ['confirm','Every requirement confirmed by its source',s(act.length&&act.every(r=>r.status==='confirmed'||r.status==='validated')),'pm'],
+  ['need','Need statement written, with no gaps left in it',s(String(P.need_statement||'').trim().length>80&&!/\[NEEDED/.test(P.need_statement||'')),'pm']]);}
+function checkHTML(){const L=checklist();const pend=P.build&&!P.build.applied;
+ return '<table><tbody>'+L.map(([k,l,s,r])=>'<tr><td style="width:28px;color:'+(s==='rec'?'var(--ok)':s==='new'?'var(--warn)':'var(--mute)')+'">'+(s==='rec'?'✓':s==='new'?'◐':'○')+'</td><td>'+esc(l)+'</td><td class="small" style="white-space:nowrap">'+
+  (s==='rec'?'Done':s==='new'?'Found, waiting for your review':(['source','verify','confirm','need'].includes(k)?'':'Ask: '+esc(KRL[r])+' &nbsp; ')+(pend&&!FIX[k][2]&&FIX[k][0]!=='out'?'':'<a href="#" data-fix="'+k+'">Fix it</a>'))+'</td></tr>').join('')+'</tbody></table>';}
+function fixGo(k){const f=FIX[k]||['out'];const pend=P.build&&!P.build.applied;let sel=null;
+ if(pend&&f[2]&&document.querySelector('[data-a="'+f[2]+'"]')){STEP='build';sel='[data-a="'+f[2]+'"]';}
+ else{STEP=f[0];if(f[1]) sel='#'+f[1]+',[data-k="'+f[1]+'"]';}
+ if(!sel||!document.querySelector(sel)||STEP!=='build') render();
+ setTimeout(()=>{const el=sel&&document.querySelector(sel);if(!el){window.scrollTo(0,0);return;}el.scrollIntoView({behavior:'smooth',block:'center'});try{el.focus({preventScroll:true});}catch(e){}
+  el.style.outline='2px solid var(--warn)';el.style.outlineOffset='2px';setTimeout(()=>el.style.outline='',2500);},60);}
+function bindFix(root){root.querySelectorAll('[data-fix]').forEach(a=>a.onclick=e=>{e.preventDefault();fixGo(a.dataset.fix);});}
+function needsPanel(){const C=covData();const L=checklist();const done=L.filter(x=>x[2]==='rec').length;const miss=C.filter(x=>!x[3]);const byRole={};miss.forEach(x=>(byRole[x[2]]=byRole[x[2]]||[]).push(x[1]));
+ return '<div class="panel"><h2>What NORA needs</h2><p class="lead">The Gate 1 checklist: everything the requirement package calls for, and who usually knows it. '+done+' of '+L.length+' done'+(P.build&&!P.build.applied?' (◐ is waiting for your review above)':'')+'.</p>'+checkHTML()+
+  '<h3>No documents yet? Send interview kits</h3><p class="small">One sheet per person. Each asks only what is still missing, shows what is already on record for them to confirm, and leaves room to answer. Send it, or take it to the meeting.</p>'+
   '<div class="row">'+Object.keys(KR).map(r=>'<button data-kit="'+r+'">'+esc(KRL[r])+(byRole[r]?' ('+byRole[r].length+' open)':'')+'</button>').join('')+'<button class="go" data-kit="all">All four</button></div>'+
   '<div class="row"><label style="cursor:pointer"><input type="file" id="kFiles" multiple accept=".pdf,.docx,.txt,image/*" hidden><span style="border:1px solid var(--line);border-radius:6px;padding:7px 12px;display:inline-block">Read returned kits</span></label><span class="small" id="kStat">Typed, handwritten or photographed. NORA adds each as an interview with the person’s name, then builds again.</span></div></div>';}
-function bindNeeds(v){v.querySelectorAll('[data-kit]').forEach(b=>b.onclick=()=>{const r=b.dataset.kit;const roles=r==='all'?Object.keys(KR):[r];dl(fname('Interview-Kit'+(r==='all'?'':'-'+KRL[r].replace(/\W+/g,'-')),'doc'),kitHTML(roles),'application/msword');log('Interview kit downloaded',roles.map(x=>KRL[x]).join(', '));save();});
+function bindNeeds(v){bindFix(v);v.querySelectorAll('[data-kit]').forEach(b=>b.onclick=()=>{const r=b.dataset.kit;const roles=r==='all'?Object.keys(KR):[r];dl(fname('Interview-Kit'+(r==='all'?'':'-'+KRL[r].replace(/\W+/g,'-')),'doc'),kitHTML(roles),'application/msword');log('Interview kit downloaded',roles.map(x=>KRL[x]).join(', '));save();});
  const kf=v.querySelector('#kFiles');if(kf) kf.onchange=()=>{const f=[...kf.files];kf.value='';if(f.length) readKits(f);};}
 
 // ---------- Outputs: the package in Word, the working tables in Excel ----------
 function rtmFull(){const R=rtmRows();try{const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');const o=rec.rtm;if(!Array.isArray(o)||!o.length) return R;const h=o[0],ri=h.indexOf('Req ID');
   R.slice(1).forEach(row=>{const m=o.find(x=>x[ri]===row[0]);if(!m) return;R[0].forEach((c,ci)=>{const k=h.indexOf(c);if(k>=0&&!String(row[ci]||'').trim()&&String(m[k]||'').trim()) row[ci]=m[k];});});}catch(e){}return R;}
 function pkgCorbel(){const p=P.project;const act=P.requirements.filter(r=>r.status!=='withdrawn');const pname=p.name&&!pBlank('name')?p.name:'Requirement package';
- const kv=(k,v)=>cdP('<span style="'+CDK+'">'+esc(k)+'</span>&nbsp;&nbsp;'+esc(v||'—'),'margin:0 0 5pt');const e=x=>esc(x??'');
+ const TBP='<span style="background:#FFF1BF;color:#6B4E00">&nbsp;To be provided&nbsp;</span>';const hiN=t=>t.replace(/\[NEEDED:?[^\]]*\]/g,m=>'<span style="background:#FFF1BF;color:#6B4E00">'+m+'</span>');
+ const kv=(k,v)=>cdP('<span style="'+CDK+'">'+esc(k)+'</span>&nbsp;&nbsp;'+(String(v||'').trim()?esc(v):TBP),'margin:0 0 5pt');const e=x=>esc(x??'');
+ const cdTable0=cdTable;const cdTableT=(h,rows,w)=>cdTable0(h,rows.length?rows:[[TBP].concat(Array(h.length-1).fill(''))],w);
  const conf=r=>r.confirmed&&r.status!=='draft'?' – '+r.confirmed.by+', '+r.confirmed.date:'';const gi=gateItems();
- const body=cdBand('Requirement package',pname,[p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('  ·  '),'Prepared by '+(p.prepared_by||'—')+'  ·  '+today())+
+ const body=cdBand('Requirement package',pname,[p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('  ·  '),'Prepared by '+(p.prepared_by||(window.CARLAI&&CARLAI.state().user)||'—')+'  ·  '+today())+
   cdLead('Prepared with Corbel. These are recommendations; validation authority rests with the installation and the Service. Every requirement traces to the person who stated it and the words they used.')+
-  cdH('1   Need statement')+cdP(e(P.need_statement||'(not yet written)'),'font-size:11pt;line-height:140%')+
+  cdH('1   Need statement')+cdP(String(P.need_statement||'').trim()?hiN(e(P.need_statement)):TBP,'font-size:11pt;line-height:140%')+
   cdH('2   Mission and driver')+kv('Mission',p.mission)+kv('Driver',(DRIVERS[p.driver]||{}).t)+kv('Why now',p.driver_detail)+kv('Needed by',p.need_date)+
-  cdH('3   Stakeholders')+cdTable(['Name','Title / office','Organization','Role','Authority'],P.stakeholders.map(s=>[e(s.name),e(s.title),e(s.org),e(s.role),e(AUTH[s.authority]||'')]),['20%','20%','18%','27%','15%'])+
-  cdH('4   Requirements')+cdTable(['ID','Requirement','Priority','Why it is needed','Verification','Source','Status'],act.map(r=>[e(r.id),e(r.text),e(PRIOR[r.priority]),e(r.rationale||''),e(r.measure),e(srcNames(r)||(SS(r.session)?.title||'')),e(RSTAT[r.status]+conf(r))]),['7%','24%','10%','17%','15%','12%','15%'])+
-  cdH('5   Gap analysis')+cdTable(['Capability','Today','Required','Gap','Impact if not closed'],P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [e(g.area),e(g.current+(g.qty_have!==''?' ('+g.qty_have+' '+g.unit+')':'')),e(g.required+(g.qty_need!==''?' ('+g.qty_need+' '+g.unit+')':'')),g.qty_need!==''?e((n-(isNaN(h)?0:h)).toLocaleString()+' '+g.unit):'',e(g.impact)];}),['18%','20%','20%','12%','30%'])+
-  cdH('6   Constraints')+cdTable(['Constraint','Basis'],P.constraints.map(c=>[e(c.text),e(c.basis)]),['55%','45%'])+
-  cdH('7   Assumptions')+cdTable(['Assumption','To be confirmed by','Confirmed'],P.assumptions.map(c=>[e(c.text),e(c.owner),c.confirmed==='yes'?'Yes':'No']),['60%','25%','15%'])+
-  cdH('8   Risks')+cdTable(['Risk','Likelihood','Impact','Score','Response','Owner'],P.risks.map(c=>[e(c.text),e(c.l),e(c.i),String((Number(c.l)||3)*(Number(c.i)||3)),e(c.response),e(c.owner)]),['32%','9%','8%','7%','28%','16%'])+
-  cdH('9   Success measures')+cdTable(['Measure','Target','How measured'],P.measures.map(c=>[e(c.text),e(c.target),e(c.how)]),['40%','25%','35%'])+
-  cdH('10   Readiness and validation')+cdTable(['Gate 1 check','Status'],gi.map(([t,ok])=>[e(t),ok?'<span style="color:#2E6B3E">&#10003; Met</span>':'<span style="color:#8A2B1E">&#9675; Open</span>']),['80%','20%'])+
-  cdTable(['Validating office','Name','Date'],[['Installation',e(P.validation.installation),e(P.validation.installation_date)],['Service',e(P.validation.service),e(P.validation.service_date)]],['30%','45%','25%']);
- const appA=cdBand('Appendix A','Stakeholder register',pname,'')+cdTable(['Name','Title / office','Organization','Role','Authority','Contact','Requirements sourced'],regRows().slice(1).map(r=>[e(r[0]),e(r[1]),e(r[2]),e(r[3]),e(r[4]),e(r[8]),e(r[9])]),['16%','15%','13%','18%','10%','16%','12%']);
+  cdH('3   Stakeholders')+cdTableT(['Name','Title / office','Organization','Role','Authority'],P.stakeholders.map(s=>[e(s.name),e(s.title),e(s.org),e(s.role),e(AUTH[s.authority]||'')]),['20%','20%','18%','27%','15%'])+
+  cdH('4   Requirements')+cdTableT(['ID','Requirement','Priority','Why it is needed','Verification','Source','Status'],act.map(r=>[e(r.id),e(r.text),e(PRIOR[r.priority]),e(r.rationale||''),e(r.measure),e(srcNames(r)||(SS(r.session)?.title||'')),e(RSTAT[r.status]+conf(r))]),['7%','24%','10%','17%','15%','12%','15%'])+
+  cdH('5   Gap analysis')+cdTableT(['Capability','Today','Required','Gap','Impact if not closed'],P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [e(g.area),e(g.current+(g.qty_have!==''?' ('+g.qty_have+' '+g.unit+')':'')),e(g.required+(g.qty_need!==''?' ('+g.qty_need+' '+g.unit+')':'')),g.qty_need!==''?e((n-(isNaN(h)?0:h)).toLocaleString()+' '+g.unit):'',e(g.impact)];}),['18%','20%','20%','12%','30%'])+
+  cdH('6   Constraints')+cdTableT(['Constraint','Basis'],P.constraints.map(c=>[e(c.text),e(c.basis)]),['55%','45%'])+
+  cdH('7   Assumptions')+cdTableT(['Assumption','To be confirmed by','Confirmed'],P.assumptions.map(c=>[e(c.text),e(c.owner),c.confirmed==='yes'?'Yes':'No']),['60%','25%','15%'])+
+  cdH('8   Risks')+cdTableT(['Risk','Likelihood','Impact','Score','Response','Owner'],P.risks.map(c=>[e(c.text),e(c.l),e(c.i),String((Number(c.l)||3)*(Number(c.i)||3)),e(c.response),e(c.owner)]),['27%','14%','9%','9%','26%','15%'])+
+  cdH('9   Success measures')+cdTableT(['Measure','Target','How measured'],P.measures.map(c=>[e(c.text),e(c.target),e(c.how)]),['40%','25%','35%'])+
+  cdH('10   Readiness and validation')+cdTableT(['Gate 1 check','Status'],gi.map(([t,ok])=>[e(t),ok?'<span style="color:#2E6B3E">&#10003; Met</span>':'<span style="color:#8A2B1E">&#9675; Open</span>']),['80%','20%'])+
+  cdTable0(['Validating office','Name','Date'],[['Installation',e(P.validation.installation),e(P.validation.installation_date)],['Service',e(P.validation.service),e(P.validation.service_date)]],['30%','45%','25%']);
+ const appA=cdBand('Appendix A','Stakeholder register',pname,'')+cdTable(['Name','Title / office','Organization','Role','Authority','Contact','Requirements sourced'],regRows().slice(1).map(r=>[e(r[0]),e(r[1]),e(r[2]),e(r[3]),e(r[4]),e(r[8]),e(r[9])]),['15%','14%','12%','17%','12%','16%','14%']);
  const T=rtmFull();const h=T[0];const ix=n=>h.indexOf(n);const later=['EARL alternative','1391 paragraph (PIPER)','Criteria (CORA)','SOW paragraph (SOPHIE)','QA verification (QUINN)'];
  const appB=cdBand('Appendix B','Traceability summary',pname,'')+cdLead('Where each requirement came from and, as the project moves on, where it is met. The full matrix is in the requirements workbook.')+
   cdTable(['ID','Requirement','Stated by','Confirmed','Where it is met'],T.slice(1).filter(r=>!/^Withdrawn/.test(r[ix('Status')])).map(r=>[e(r[0]),e(r[1]),e(r[ix('Source stakeholder(s)')]),e([r[ix('Confirmed by')],r[ix('Confirmed date')]].filter(Boolean).join(', ')||'Not yet'),e(later.map(c=>String(r[ix(c)]||'').trim()?c.replace(/ \(.*\)/,'')+': '+r[ix(c)]:'').filter(Boolean).join('; ')||'Later tools fill this in')]),['7%','33%','17%','17%','26%']);
@@ -954,6 +981,18 @@ function noraBook(){const T=rtmFull();const sh=[{name:'Traceability matrix',rows
  {name:'Constraints',rows:[['Constraint','Basis']].concat(P.constraints.map(c=>[c.text,c.basis])),max:60},
  {name:'Success measures',rows:[['Measure','Target','How measured']].concat(P.measures.map(c=>[c.text,c.target,c.how])),max:50}];
  XL.save(fname('Requirements-Workbook','xlsx'),sh);log('Requirements workbook downloaded');save();}
+
+// Before the package downloads: list what is still open, with a way to fix each, or download anyway.
+function pkgGo(){const open=checklist().filter(x=>x[2]!=='rec');const go=()=>{dl(fname('Requirement-Package','doc'),pkgCorbel(),'application/msword');log('Requirement package downloaded',open.length?open.length+' items still open':'complete');save();};
+ if(!open.length) return go();
+ const o=document.createElement('div');o.id='pgDlg';o.style.cssText='position:fixed;inset:0;background:rgba(15,30,54,.45);z-index:9999;display:flex;align-items:center;justify-content:center';
+ o.innerHTML='<div class="panel" style="max-width:560px;width:92%;max-height:80vh;overflow:auto;margin:0"><h2>'+open.length+' item'+(open.length>1?'s are':' is')+' still open</h2><p class="lead">The package will show these as <span style="background:#FFF1BF;padding:0 4px">To be provided</span>. Fix them now, or download a working draft.</p><table><tbody>'+
+  open.map(([k,l])=>'<tr><td style="width:24px;color:var(--mute)">○</td><td>'+esc(l)+'</td><td class="small"><a href="#" data-fix="'+k+'">Fix it</a></td></tr>').join('')+'</tbody></table><div class="row" style="margin-top:12px"><button class="go" id="pgAny">Download draft anyway</button><button id="pgNo">Fix first</button></div></div>';
+ document.body.appendChild(o);const close=()=>o.remove();o.onmousedown=e=>{if(e.target===o) close();};o.querySelector('#pgNo').onclick=close;o.querySelector('#pgAny').onclick=()=>{close();go();};
+ o.querySelectorAll('[data-fix]').forEach(a=>a.onclick=e=>{e.preventDefault();close();fixGo(a.dataset.fix);});}
+function lt(iso){const d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+// When the CARL sign-in check finishes after the page draws, redraw the build step so it says the right thing.
+window.addEventListener('load',()=>{if(window.CARLAI&&CARLAI.ready) CARLAI.ready(()=>{const a=document.activeElement;if(STEP==='build'&&!(a&&a.matches&&a.matches('input,textarea,select'))) vBuild();});});
 
 // ---------- 4 requirements ----------
 const VAGUE=['adequate','sufficient','appropriate','as needed','as required','as necessary','user-friendly','user friendly','modern','state-of-the-art','state of the art','efficient','flexible','robust','minimal','maximize','minimize','optimize','etc','and/or','tbd','approximately','various','normal','reasonable','easy','quick','fast','large','small','enough','best','world-class','if possible','where feasible','support'];
@@ -1035,7 +1074,8 @@ function vCars(){const v=$('#view');
  v.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const k=b.dataset.add;P[k].push(k==='risks'?{id:uid(),text:'',l:'3',i:'3',response:'',owner:''}:{id:uid()});save();vCars();renderSteps();});}
 
 // ---------- 7 outputs ----------
-function gateItems(){const act=P.requirements.filter(r=>r.status!=='withdrawn');
+function gateItems(){return checklist().map(x=>[x[1],x[2]==='rec',x[0]]);}
+function gateItemsOld(){const act=P.requirements.filter(r=>r.status!=='withdrawn');
  return [['Project title, installation and Service recorded',!!(P.project.name&&P.project.installation&&P.project.service)],
  ['Mission driver stated with supporting detail',!!(P.project.driver&&(P.project.driver_detail||'').trim().length>20)],
  ['A stakeholder with decision authority is identified',P.stakeholders.some(s=>s.authority==='decides')],
@@ -1064,7 +1104,7 @@ function vOut(){const v=$('#view');const gi=gateItems();
  '<p class="small">Change anything under Adjust details. Requirements stay Draft until their source confirms them; mark each one Confirmed on the Requirements step after you check it with that person.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+
  '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(needStale()?'<div class="find warn"><b>The record has changed since this was written.</b> Requirements, gaps or the project details were edited. Rewrite it so it matches.</div>':'')+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
- '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement.</p><ul class="check">'+gi.map(([t,ok])=>'<li class="'+(ok?'y':'n')+'">'+esc(t)+'</li>').join('')+'</ul>'+
+ '<div class="panel"><h2>Gate 1 readiness</h2><p class="lead">What the installation and Service will look for before they validate the requirement. '+gi.filter(g=>g[1]).length+' of '+gi.length+' done.</p>'+checkHTML()+
  '<h3>Validation</h3><div class="form"><div><label class="f">Validated by (installation)</label><input data-v="installation"></div><div><label class="f">Date</label><input type="date" data-v="installation_date"></div><div><label class="f">Validated by (Service)</label><input data-v="service"></div><div><label class="f">Date</label><input type="date" data-v="service_date"></div></div></div>'+
  '<div class="panel"><h2>Outputs</h2><p class="lead">Submit the package; keep the workbook current. The requirements also pass to EARL, PIPER and SOPHIE automatically. To keep a copy of the whole project, use <b>Save file</b> at the top.</p><div class="outs">'+
  out('pkg','Requirement package','The document you submit for Gate 1 validation: need statement, mission, stakeholders, requirements, gaps, constraints, assumptions, risks, success measures and readiness, with the stakeholder register and a traceability summary as appendices.','Download Word')+
@@ -1073,11 +1113,11 @@ function vOut(){const v=$('#view');const gi=gateItems();
  '<div class="panel"><h2>Record log</h2><p class="lead">Append-only history of what was added, accepted, rejected and changed.</p><div id="lg" class="small"></div></div>';
  const n=$('#need');n.value=P.need_statement||'';const wc=()=>$('#nwc').textContent=(n.value.trim().split(/\s+/).filter(Boolean).length||0)+' words';wc();
  n.oninput=()=>{P.need_statement=n.value;P.need_check='';P.need_sig=needSig();save();wc();renderSteps();};
- bindConf(v,vOut);$('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
+ bindConf(v,vOut);bindFix(v);$('#bAINeed').onclick=()=>{if((P.need_statement||'').trim()&&!confirm('Replace the current need statement?')) return;aiNeed();};
  $('#bDraft').onclick=()=>{if(P.need_statement&&!confirm('Replace the current need statement with a fresh draft?')) return;P.need_statement=draftNeed();P.need_check='';P.need_sig=needSig();log('Need statement drafted from record');save();vOut();renderSteps();};
  v.querySelectorAll('[data-v]').forEach(el=>{el.value=P.validation[el.dataset.v]||'';el.onchange=()=>{P.validation[el.dataset.v]=el.value;log('Validation recorded',el.dataset.v+': '+el.value);save();};});
- v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:()=>{dl(fname('Requirement-Package','doc'),pkgCorbel(),'application/msword');log('Requirement package downloaded');save();},book:noraBook})[b.dataset.out]());
- $('#lg').innerHTML=P.log.length?P.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
+ v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({pkg:pkgGo,book:noraBook})[b.dataset.out]());
+ $('#lg').innerHTML=P.log.length?P.log.slice().reverse().slice(0,200).map(l=>'<div>'+esc(lt(l.at))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join(''):'Nothing logged yet.';
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 const fname=(k,ext)=>((P.project.name||'NORA').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+today()+'.'+ext;
 function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
@@ -1106,7 +1146,7 @@ function saveFile(){dl(fname('NORA','json'),JSON.stringify(P,null,1),'applicatio
 
 // header actions
 $('#bSave').onclick=saveFile;
-$('#bNew').onclick=()=>{if(!confirm('Start a new project? Save a file of the current one first if you need it.')) return;P=BLANK();log('Project created');save();STEP='project';render();};
+if($('#bNew')) $('#bNew').onclick=()=>{if(!confirm('Start a new project? Save a file of the current one first if you need it.')) return;P=BLANK();log('Project created');save();STEP='project';render();};
 $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='nora-1') throw new Error('Not a NORA project file');P=Object.assign(BLANK(),j);log('Project file opened',f.name);save();STEP='project';render();}catch(err){alert('Could not open: '+err.message);}});};
 
@@ -1129,6 +1169,226 @@ $('#bSaveSet').onclick=()=>{SET.remember=$('#rememberKeys').checked;saveSettings
 
 if(!P.log.length) log('Project created');
 render();save();
+</script>
+<script id="corbel-lib">
+// ---------- Corbel Word documents: a real .docx, built in the page ----------
+// Every tool lays its documents out as simple styled HTML (docstyle.js). DX turns that
+// layout into WordprocessingML: paragraphs, runs, tables, shading, borders, page breaks.
+const DX=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ // Lengths to points.
+ function pt(v,base){if(v==null||v==='') return null;v=String(v).trim();const m=v.match(/^(-?[\d.]+)\s*(pt|px|in|cm|mm|em|%)?$/);if(!m) return null;const n=parseFloat(m[1]);
+  switch(m[2]){case 'px':return n*0.75;case 'in':return n*72;case 'cm':return n*28.35;case 'mm':return n*2.835;case 'em':return n*(base||10.5);case '%':return null;default:return m[2]==='pt'?n:n*0.75;}}
+ function hex(c){if(!c) return null;c=String(c).trim().toLowerCase();if(c==='transparent'||c==='none'||c==='inherit') return null;
+  const N={white:'FFFFFF',black:'000000',red:'C00000',green:'2E7D32',gray:'808080',grey:'808080',navy:'1B2F4E'};if(N[c]) return N[c];
+  let m=c.match(/^#([0-9a-f]{3})$/);if(m) return m[1].split('').map(h=>h+h).join('').toUpperCase();m=c.match(/^#([0-9a-f]{6})$/);if(m) return m[1].toUpperCase();
+  m=c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);if(m) return [m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('').toUpperCase();return null;}
+ function css(s){const o={};String(s||'').split(';').forEach(d=>{const i=d.indexOf(':');if(i<0) return;const k=d.slice(0,i).trim().toLowerCase(),v=d.slice(i+1).trim();if(k) o[k]=v;});
+  // Expand shorthands we use.
+  const box=(k)=>{if(o[k]==null) return;const p=o[k].split(/\s+/);const [t,r,b,l]=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;
+   ['top','right','bottom','left'].forEach((s,i)=>{if(o[k+'-'+s]==null) o[k+'-'+s]=[t,r,b,l][i];});};box('margin');box('padding');
+  if(o.border!=null) ['top','right','bottom','left'].forEach(s=>{if(o['border-'+s]==null) o['border-'+s]=o.border;});
+  if(o.background&&!o['background-color']) o['background-color']=o.background.split(/\s+/)[0];
+  if(o.font){const m=o.font.match(/^(.*?)([\d.]+(?:pt|px|em|%))(?:\/[\d.]+\S*)?\s+(.+)$/);if(m){if(!o['font-size']) o['font-size']=m[2];if(!o['font-family']) o['font-family']=m[3];if(/bold|[6-9]00/.test(m[1])&&!o['font-weight']) o['font-weight']='bold';if(/italic/.test(m[1])&&!o['font-style']) o['font-style']='italic';}}
+  return o;}
+ function border(v){if(!v) return null;v=String(v).trim();if(/^(none|0)$/.test(v)) return {none:true};const w=v.match(/([\d.]+)(pt|px)/),c=v.match(/(#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|\b[a-z]+\b(?=\s*$))/);
+  const style=/dashed/.test(v)?'dashed':/dotted/.test(v)?'dotted':/double/.test(v)?'double':'single';
+  const wpt=w?(w[2]==='px'?parseFloat(w[1])*0.75:parseFloat(w[1])):0.75;return {sz:Math.max(2,Math.min(96,Math.round(wpt*8))),color:hex(c&&c[1])||'000000',style};}
+ const BLOCK=new Set(['P','DIV','H1','H2','H3','H4','H5','H6','TABLE','UL','OL','LI','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','CENTER','HR','PRE','DL','DT','DD','FORM','FIELDSET','NAV','MAIN','ASIDE','FIGURE']);
+ // Web fonts become the first family in the list that Word installs; the Corbel serif falls back to Georgia.
+ function wordFont(list){const F=list.split(',').map(f=>f.replace(/['"]/g,'').trim()).filter(Boolean);const ok=['Georgia','Calibri','Arial','Cambria','Times New Roman','Corbel','Consolas','Segoe UI','Verdana','Tahoma','Garamond','Book Antiqua','Palatino Linotype','Courier New'];
+  return F.find(f=>ok.includes(f))||(F.some(f=>/serif/i.test(f)&&!/sans/i.test(f))?'Georgia':F.some(f=>/sans/i.test(f))?'Calibri':F[0]);}
+ const HSZ={H1:20,H2:15,H3:13,H4:11.5,H5:10.5,H6:9.5};
+ // Inherited run style.
+ function runCtx(base,el,st){const r=Object.assign({},base);const t=el.tagName;
+  if(t==='B'||t==='STRONG'||t==='TH'||/^H\d$/.test(t)) r.b=true;if(t==='I'||t==='EM'||t==='CITE') r.i=true;if(t==='U') r.u=true;if(t==='S'||t==='DEL'||t==='STRIKE') r.strike=true;
+  if(t==='SUP') r.va='superscript';if(t==='SUB') r.va='subscript';if(t==='SMALL') r.sz=(r.sz||10.5)*0.85;if(HSZ[t]&&!st['font-size']) r.sz=HSZ[t];
+  if(t==='CODE'||t==='TT'||t==='KBD') r.font='Consolas';if(t==='A') {r.color=r.color||'1B2F4E';}
+  if(t==='FONT'){if(el.getAttribute('color')) r.color=hex(el.getAttribute('color'))||r.color;if(el.getAttribute('face')) r.font=el.getAttribute('face').split(',')[0].replace(/['"]/g,'').trim();}
+  if(st['font-size']){const v=st['font-size'];const p=/%$/.test(v)?(r.sz||10.5)*parseFloat(v)/100:/em$/.test(v)?(r.sz||10.5)*parseFloat(v):pt(v);if(p) r.sz=p;}
+  if(st.color) r.color=hex(st.color)||r.color;if(st['font-weight']) r.b=/bold|[6-9]00/.test(st['font-weight']);if(st['font-style']) r.i=/italic|oblique/.test(st['font-style']);
+  if(st['text-decoration']) {r.u=/underline/.test(st['text-decoration']);r.strike=/line-through/.test(st['text-decoration']);}
+  if(st['text-transform']) r.caps=/uppercase/.test(st['text-transform']);if(st['letter-spacing']) r.ls=pt(st['letter-spacing'])||0;
+  if(st['font-family']) r.font=wordFont(st['font-family']);if(st['vertical-align']&&/super|sub/.test(st['vertical-align'])) r.va=/super/.test(st['vertical-align'])?'superscript':'subscript';
+  if(st['background-color']&&el.tagName!=='TD'&&el.tagName!=='TH'&&!BLOCK.has(t)) r.hl=hex(st['background-color']);
+  if(st.display==='none'||st.visibility==='hidden') r.hide=true;return r;}
+ function rPr(r){let s='';if(r.font) s+='<w:rFonts w:ascii="'+x(r.font)+'" w:hAnsi="'+x(r.font)+'" w:cs="'+x(r.font)+'"/>';if(r.b) s+='<w:b/>';if(r.i) s+='<w:i/>';if(r.caps) s+='<w:caps/>';if(r.strike) s+='<w:strike/>';
+  if(r.color) s+='<w:color w:val="'+r.color+'"/>';if(r.ls) s+='<w:spacing w:val="'+Math.round(r.ls*20)+'"/>';if(r.sz) s+='<w:sz w:val="'+Math.max(2,Math.round(r.sz*2))+'"/><w:szCs w:val="'+Math.max(2,Math.round(r.sz*2))+'"/>';
+  if(r.hl) s+='<w:shd w:val="clear" w:color="auto" w:fill="'+r.hl+'"/>';if(r.u) s+='<w:u w:val="single"/>';if(r.va) s+='<w:vertAlign w:val="'+r.va+'"/>';return s?'<w:rPr>'+s+'</w:rPr>':'';}
+ function run(text,r){if(r.hide||text==='') return '';return '<w:r>'+rPr(r)+'<w:t xml:space="preserve">'+x(text)+'</w:t></w:r>';}
+ function conv(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const styleText=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  // Simple tag rules from the <style> block (p{...}, td{...}, body{...}).
+  const RULES={};styleText.replace(/@page[^{]*\{[^}]*\}/g,'').replace(/([a-z0-9,\s.]+)\{([^}]*)\}/gi,(m,sel,body)=>{sel.split(',').forEach(s=>{s=s.trim().toUpperCase();if(/^[A-Z0-9]+$/.test(s)) RULES[s]=Object.assign(RULES[s]||{},css(body));});return m;});
+  const st=el=>Object.assign({},RULES[el.tagName]||{},css(el.getAttribute&&el.getAttribute('style')));
+  const land=/landscape/i.test(styleText)||/size:\s*11(\.0)?in\s+8\.5in/i.test(styleText);
+  const pm=styleText.match(/@page[^{]*\{[^}]*margin:\s*([^;}]+)/i);let mg=[0.75,0.75,0.75,0.75].map(v=>v*72);
+  if(pm){const p=pm[1].trim().split(/\s+/).map(v=>pt(v));const q=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;if(q.every(v=>v!=null)) mg=q;}
+  const pageW=land?792:612,pageH=land?612:792,textW=pageW-mg[1]-mg[3];
+  const body=doc.body;const bst=st(body);const R0=runCtx({},body,bst);
+  // ---- paragraph assembly ----
+  function pPr(s,extra){let o='';extra=extra||{};if(extra.style) o+='<w:pStyle w:val="'+extra.style+'"/>';if(extra.keep) o+='<w:keepNext/>';if(extra.pb) o+='<w:pageBreakBefore/>';
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return b&&!b.none?'<w:'+k+' w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="2" w:color="'+b.color+'"/>':'';}).join('');if(bd) o+='<w:pBdr>'+bd+'</w:pBdr>';
+   const bg=hex(s['background-color']);if(bg&&!extra.inCell) o+='<w:shd w:val="clear" w:color="auto" w:fill="'+bg+'"/>';
+   const before=pt(s['margin-top']),after=pt(s['margin-bottom']);const lh=s['line-height'];let line='';
+   if(lh){if(/%$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh)/100)+'" w:lineRule="auto"';else if(/^[\d.]+$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh))+'" w:lineRule="auto"';else {const p=pt(lh);if(p) line=' w:line="'+Math.round(p*20)+'" w:lineRule="exact"';}}
+   o+='<w:spacing w:before="'+Math.round((before||0)*20)+'" w:after="'+Math.round((after||0)*20)+'"'+line+'/>';
+   const il=(pt(s['margin-left'])||0)+(pt(s['padding-left'])||0)+(extra.indent||0);if(il||extra.hang) o+='<w:ind w:left="'+Math.round(il*20)+'"'+(extra.hang?' w:hanging="'+Math.round(extra.hang*20)+'"':'')+'/>';
+   const ta=s['text-align'];if(ta) o+='<w:jc w:val="'+(ta==='center'?'center':ta==='right'?'right':ta==='justify'?'both':'left')+'"/>';
+   if(extra.mark) o+='<w:rPr>'+rPr(extra.mark).replace(/^<w:rPr>|<\/w:rPr>$/g,'')+'</w:rPr>';
+   return '<w:pPr>'+o+'</w:pPr>';}
+  // Inline content to runs. Leading/trailing whitespace is trimmed per paragraph, as a browser would.
+  function inl(node,r,acc){
+   if(node.nodeType===3){let t=node.nodeValue.replace(/[\t\n\r ]+/g,' ');acc.push({t,r});return;}
+   if(node.nodeType!==1) return;const t=node.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='TITLE'||t==='HEAD') return;
+   if(t==='BR'){acc.push({br:true,r});return;}
+   if(t==='INPUT'){const ty=(node.getAttribute('type')||'').toLowerCase();if(ty==='checkbox'||ty==='radio') acc.push({t:node.checked||node.hasAttribute('checked')?'☒ ':'☐ ',r});else acc.push({t:node.value||node.getAttribute('value')||'',r});return;}
+   if(t==='IMG'){if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
+   const s=st(node);const rr=runCtx(r,node,s);for(const c of node.childNodes) inl(c,rr,acc);}
+  function para(acc,s,extra){// acc: [{t,r}|{br}]
+   let i=0;while(i<acc.length&&!acc[i].br&&acc[i].t!=null&&!acc[i].t.trim()){i++;}let j=acc.length-1;while(j>=i&&!acc[j].br&&acc[j].t!=null&&!acc[j].t.trim()) j--;
+   const items=acc.slice(i,j+1);if(items.length){items[0]=Object.assign({},items[0],{t:items[0].t!=null?items[0].t.replace(/^ +/,''):items[0].t});const L=items.length-1;items[L]=Object.assign({},items[L],{t:items[L].t!=null?items[L].t.replace(/ +$/,''):items[L].t});}
+   // In a narrow table cell, spaced capitals (column headings) shrink their spacing, then their size, so no word breaks mid-word.
+   if(extra&&extra.fitW){const fw=extra.fitW;items.forEach((it,k)=>{if(it.br||!it.t) return;const r0=it.r;const up=/[A-Z]/.test(it.t)&&it.t===it.t.toUpperCase();if(!(r0.caps||r0.ls)) return;const r=Object.assign({},r0,{caps:r0.caps||up});const sz=r.sz||10.5;const longest=Math.max(0,...it.t.split(/\s+/).map(w=>w.length));if(!longest) return;
+     const wid=(ls,z)=>longest*(z*(r.caps?0.8:0.6)+ls);if(wid(r.ls||0,sz)<=fw) return;const nr=Object.assign({},r0);
+     nr.ls=Math.max(0,(fw/longest)-sz*(r.caps?0.8:0.6));if(wid(nr.ls,sz)>fw||nr.ls<0.2){nr.ls=0;nr.sz=Math.max(5.5,fw/(longest*(r.caps?0.8:0.6)));}items[k]=Object.assign({},it,{r:nr});});}
+   const mark=(acc[0]&&acc[0].r)||extra&&extra.r0;
+   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else rs+=run(it.t,it.r);}
+   return '<w:p>'+pPr(s,Object.assign({},extra,{mark}))+rs+'</w:p>';}
+  // Is this element's content purely inline?
+  function hasBlock(el){for(const c of el.children){if(BLOCK.has(c.tagName)) return true;if(c.tagName==='BR'&&/page-break-before/.test(c.getAttribute('style')||'')) return true;if(!BLOCK.has(c.tagName)&&hasBlock(c)) return true;}return false;}
+  const isPB=el=>el.tagName==='BR'&&/page-break-before\s*:\s*always|mso-break-type\s*:\s*page-break/i.test(el.getAttribute('style')||'');
+  // Block walker: returns an array of body-level XML strings.
+  function blocks(el,r,ps,ctx){const out=[];let acc=[];let pendPB=false;
+   const flush=()=>{if(acc.some(a=>a.br||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
+   for(const c of el.childNodes){
+    if(c.nodeType===3){acc.push({t:c.nodeValue.replace(/[\t\n\r ]+/g,' '),r});continue;}
+    if(c.nodeType!==1) continue;const t=c.tagName;
+    if(isPB(c)){flush();pendPB=true;continue;}
+    if(t==='SCRIPT'||t==='STYLE'||t==='HEAD'||t==='TITLE') continue;
+    if(!BLOCK.has(t)&&!hasBlock(c)){inl(c,r,acc);continue;}
+    flush();const s=st(c);const rr=runCtx(r,c,s);if(rr.hide) continue;
+    if(t==='TABLE'){if(c.hasAttribute('data-keepprev')){for(let q=out.length-1;q>=0&&q>=out.length-3;q--){out[q]=out[q].replace(/<w:pPr>(?!<w:keepNext\/>)/g,'<w:pPr><w:keepNext/>');if(/^<w:tbl>/.test(out[q])) break;}}
+     out.push(...table(c,rr,ctx,pendPB));pendPB=false;continue;}
+    if(t==='HR'){out.push('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="C9B998"/></w:pBdr><w:spacing w:before="60" w:after="60"/></w:pPr></w:p>');continue;}
+    if(t==='UL'||t==='OL'){let n=0;for(const li of c.children){if(li.tagName!=='LI') continue;n++;const ls=Object.assign({},s,st(li));const lr=runCtx(rr,li,ls);const a=[{t:(t==='OL'?n+'.':'•')+'\t',r:lr}];
+      if(hasBlock(li)){const sub=blocks(li,lr,ls,ctx);out.push(...sub);}else{for(const k of li.childNodes) inl(k,lr,a);out.push(para(a,Object.assign({'margin-bottom':'3pt'},ls),{indent:(ctx.depth||0)*14+18,hang:14,inCell:ctx.inCell}));}}continue;}
+    // Boxed div (background or border): render as a one-cell table so the box survives.
+    if((t==='DIV'||t==='BLOCKQUOTE')&&(hex(s['background-color'])||['top','right','bottom','left'].some(k=>{const b=border(s['border-'+k]);return b&&!b.none;}))&&!ctx.noBox){
+     out.push(...boxTable(c,rr,s,ctx,pendPB));pendPB=false;continue;}
+    if(hasBlock(c)){const sub=blocks(c,rr,s,ctx);if(pendPB&&sub.length){sub[0]=sub[0].replace('<w:pPr>','<w:pPr><w:pageBreakBefore/>');pendPB=false;}out.push(...sub);}
+    else{const a=[];for(const k of c.childNodes) inl(k,rr,a);const ex={pb:pendPB,inCell:ctx.inCell,r0:rr,keep:/^H\d$/.test(t),fitW:ctx.inCell?ctx.width:0};
+     if(/^H\d$/.test(t)&&!s['margin-top']) s['margin-top']='10pt';if(/^H\d$/.test(t)&&!s['margin-bottom']) s['margin-bottom']='4pt';
+     if(!a.some(q=>q.br||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
+     else out.push(para(a,s,ex));pendPB=false;}
+   }
+   flush();return out;}
+  function shd(fill){return fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+fill+'"/>':'';}
+  function boxTable(el,r,s,ctx,pb){const w=ctx.width||textW;const pad=k=>Math.round((pt(s['padding-'+k])||4)*20);
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return '<w:'+k+' '+(b&&!b.none?'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"':'w:val="nil"')+'/>';}).join('');
+   const inner=blocks(el,r,Object.assign({},s,{'margin-top':'0','margin-bottom':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:w-12,noBox:true}));
+   const pre=pb?['<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>']:[];
+   const sp=pt(s['margin-bottom']);
+   return pre.concat(['<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="'+pad('top')+'" w:type="dxa"/><w:left w:w="'+pad('left')+'" w:type="dxa"/><w:bottom w:w="'+pad('bottom')+'" w:type="dxa"/><w:right w:w="'+pad('right')+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="'+Math.round(w*20)+'"/></w:tblGrid>'+
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tcBorders>'+bd+'</w:tcBorders>'+shd(hex(s['background-color']))+'</w:tcPr>'+(inner.length&&/<w:p>|<w:p /.test(inner[inner.length-1])?inner.join(''):inner.join('')+'<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>')+'</w:tc></w:tr></w:tbl>',
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="'+Math.round((sp||4)*20)+'" w:line="20" w:lineRule="exact"/></w:pPr></w:p>']);}
+  function table(tb,r,ctx,pb){const ts=st(tb);const avail=ctx.width||textW;
+   const rows=[];const collect=(e)=>{for(const c of e.children){if(c.tagName==='TR') rows.push(c);else if(/^(THEAD|TBODY|TFOOT)$/.test(c.tagName)) collect(c);}};collect(tb);if(!rows.length) return [];
+   const wAttr=tb.getAttribute('width')||ts.width;let W;if(wAttr&&/%$/.test(wAttr)) W=avail*parseFloat(wAttr)/100;else if(wAttr&&pt(wAttr)) W=Math.min(avail,pt(/^\d+$/.test(wAttr)?wAttr+'px':wAttr));else W=null;
+   const cp=tb.getAttribute('cellpadding');const cpad=cp!=null?parseFloat(cp)*0.75:1.5;
+   const keep=/page-break-inside\s*:\s*avoid/.test(tb.getAttribute('style')||'');
+   // Grid: widest row decides the column count; widths from the first row that states them.
+   const cells=rows.map(tr=>[...tr.children].filter(c=>c.tagName==='TD'||c.tagName==='TH'));
+   const ncol=Math.max(1,...cells.map(rc=>rc.reduce((a,c)=>a+(parseInt(c.getAttribute('colspan'))||1),0)));
+   const tw=W||avail;const cw=Array(ncol).fill(null);
+   for(const rc of cells){let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;const cs=css(c.getAttribute('style'));const a=c.getAttribute('width')||cs.width;
+     if(span===1&&a&&cw[k]==null){if(/%$/.test(a)) cw[k]=tw*parseFloat(a)/100;else{const p=pt(/^\d+$/.test(a)?a+'px':a);if(p) cw[k]=p;}}k+=span;}}
+   const known=cw.filter(v=>v!=null).reduce((a,b)=>a+b,0),unk=cw.filter(v=>v==null).length;
+   let grid;if(unk){const rest=Math.max(tw-known,unk*24);
+    // Columns without a stated width share the rest by content, the way a browser's auto layout does:
+    // the longest word must fit (caps and letter-spacing count extra), then longer text gets more room.
+    const need=Array(ncol).fill(0),want=Array(ncol).fill(1);
+    cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1&&cw[k]==null){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+      const hd=c.tagName==='TH'||/text-transform\s*:\s*uppercase|letter-spacing/.test(c.innerHTML);const f=hd?1.45:1;
+      const lw=Math.max(0,...t.split(' ').map(w=>w.length))*f;need[k]=Math.max(need[k],lw);want[k]=Math.max(want[k],Math.min(t.length*f,60));}k+=span;}});
+    const ix=cw.map((v,i)=>v==null?i:-1).filter(i=>i>=0);const chr=5.2;// points per character at body size
+    let base=ix.map(i=>Math.max(24,need[i]*chr+8));const bsum=base.reduce((a,b)=>a+b,0);
+    if(bsum>=rest){grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]*rest/bsum);}
+    else{const extra=rest-bsum;const ww=ix.map(i=>Math.max(1,want[i]*chr+8-(need[i]*chr+8)));const wsum=ww.reduce((a,b)=>a+b,0);grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]+extra*ww[j]/wsum);}}
+   else grid=cw.slice();
+   // Like a browser, never make a column narrower than its longest word (headings in capitals shrink instead, below).
+   {const minW=Array(ncol).fill(0);cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+     if(t&&t===t.toUpperCase()&&/[A-Z]{3}/.test(t)){const lw=Math.max(0,...t.split(' ').map(w=>w.length));minW[k]=Math.max(minW[k],lw*6.5*0.78+12);}
+     else if(t){const fs=pt((c.querySelector('[style*="font-size"]')||c).style.fontSize)||9.5;const lw=Math.max(0,...t.split(' ').map(w=>w.length));const pd=(pt(css(c.getAttribute('style'))['padding-left'])??cpad)+(pt(css(c.getAttribute('style'))['padding-right'])??cpad);
+      minW[k]=Math.max(minW[k],lw*fs*0.68+pd+2);}}k+=span;}});
+    const tot0=grid.reduce((a,b)=>a+b,0);let short=0;grid=grid.map((g,i)=>{if(g<minW[i]){short+=minW[i]-g;return minW[i];}return g;});
+    if(short>0){const slack=grid.map((g,i)=>Math.max(0,g-minW[i]));const sl=slack.reduce((a,b)=>a+b,0);if(sl>0){const take=Math.min(short,sl);grid=grid.map((g,i)=>g-take*slack[i]/sl);}}
+    if(W) {const t=grid.reduce((a,b)=>a+b,0);if(t>tot0+0.5) grid=grid.map(g=>g*tot0/t);}}
+   const sum=grid.reduce((a,b)=>a+b,0);const scale=W||sum>avail?(W||avail)/sum:1;grid=grid.map(v=>v*scale);const tot=grid.reduce((a,b)=>a+b,0);
+   const tblBd=tb.getAttribute('border')&&tb.getAttribute('border')!=='0';
+   let o='<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(tot*20)+'" w:type="dxa"/>'+(ts['margin-left']==='auto'||tb.getAttribute('align')==='center'?'<w:jc w:val="center"/>':'')+'<w:tblLayout w:type="fixed"/>'+
+    (tblBd?'<w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(k=>'<w:'+k+' w:val="single" w:sz="4" w:space="0" w:color="C9B998"/>').join('')+'</w:tblBorders>':'')+
+    '<w:tblCellMar><w:top w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:left w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:bottom w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:right w:w="'+Math.round(cpad*20)+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'+grid.map(g=>'<w:gridCol w:w="'+Math.round(g*20)+'"/>').join('')+'</w:tblGrid>';
+   const vm={};// rowspan carry: col -> remaining
+   rows.forEach((tr,ri)=>{const trs=st(tr);const trBg=hex(tr.getAttribute('bgcolor'))||hex(trs['background-color']);let hRow=0;let k=0;let tcs='';const rc=cells[ri];let ci=0;
+    const emitMerge=()=>{while(vm[k]&&vm[k].n>0){const m=vm[k];tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(m.w*20)+'" w:type="dxa"/>'+(m.span>1?'<w:gridSpan w:val="'+m.span+'"/>':'')+'<w:vMerge/>'+m.pr+'</w:tcPr><w:p/></w:tc>';m.n--;k+=m.span;}};
+    emitMerge();
+    for(const c of rc){emitMerge();const span=parseInt(c.getAttribute('colspan'))||1;const rs=parseInt(c.getAttribute('rowspan'))||1;const cs=st(c);const w=grid.slice(k,k+span).reduce((a,b)=>a+b,0);
+     const fill=hex(c.getAttribute('bgcolor'))||hex(cs['background-color'])||trBg;
+     const bd=['top','left','bottom','right'].map(s=>{const b=border(cs['border-'+s]);return b?'<w:'+s+' '+(b.none?'w:val="nil"':'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"')+'/>':'';}).join('');
+     const mar=['top','left','bottom','right'].map(s=>{const p=pt(cs['padding-'+s]);return p!=null?'<w:'+s+' w:w="'+Math.round(p*20)+'" w:type="dxa"/>':'';}).join('');
+     const va=cs['vertical-align']||c.getAttribute('valign');const h=pt(cs.height)||(c.getAttribute('height')?parseFloat(c.getAttribute('height'))*0.75:0);if(h>hRow) hRow=h;
+     const pr=(bd?'<w:tcBorders>'+bd+'</w:tcBorders>':'')+shd(fill)+(mar?'<w:tcMar>'+mar+'</w:tcMar>':'')+(va==='middle'?'<w:vAlign w:val="center"/>':va==='bottom'?'<w:vAlign w:val="bottom"/>':'');
+     const cr=runCtx(r,c,cs);const padL=pt(cs['padding-left']),padR=pt(cs['padding-right']);const inner=blocks(c,cr,Object.assign({},cs,{'padding-left':'0','margin-left':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:Math.max(24,w-(padL!=null?padL:cpad)-(padR!=null?padR:cpad)),depth:(ctx.depth||0)}));
+     let body=inner.join('');if(!inner.length||/<\/w:tbl>$/.test(inner[inner.length-1])) body+='<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'+(cr.sz&&cr.sz<6?'<w:rPr><w:sz w:val="'+Math.max(2,Math.round(cr.sz*2))+'"/></w:rPr>':'')+'</w:pPr></w:p>';
+     tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(span>1?'<w:gridSpan w:val="'+span+'"/>':'')+(rs>1?'<w:vMerge w:val="restart"/>':'')+pr+'</w:tcPr>'+body+'</w:tc>';
+     if(rs>1) vm[k]={n:rs-1,span,w,pr};k+=span;ci++;}
+    emitMerge();
+    if(k<ncol){const w=grid.slice(k).reduce((a,b)=>a+b,0);tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(ncol-k>1?'<w:gridSpan w:val="'+(ncol-k)+'"/>':'')+'</w:tcPr><w:p/></w:tc>';}
+    const trPr=(hRow?'<w:trHeight w:val="'+Math.round(hRow*20)+'" w:hRule="'+(hRow<=6?'exact':'atLeast')+'"/>':'')+(keep||rows.length<=3?'<w:cantSplit/>':'')+(ri===0&&rc.some(c=>c.tagName==='TH')?'<w:tblHeader/>':'');
+    o+='<w:tr>'+(trPr?'<w:trPr>'+trPr+'</w:trPr>':'')+tcs+'</w:tr>';});
+   o+='</w:tbl>';
+   const out=[];if(pb) out.push('<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>');
+   const mt=pt(ts['margin-top']);if(mt) out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round(mt*20))+'" w:lineRule="exact"/></w:pPr></w:p>');
+   out.push(o);
+   // Word needs a paragraph between two tables or they merge; a hairline one keeps the gap as small as the HTML's.
+   const mb=pt(ts['margin-bottom']);out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round((mb||0)*20))+'" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>');
+   if(keep) out[out.length-2]=out[out.length-2].replace(/<w:p>((?:(?!<\/w:p>).)*)<\/w:p>/g,(m,b)=>'<w:p>'+b.replace('<w:pPr>','<w:pPr><w:keepNext/>')+'</w:p>');
+   return out;}
+  let parts=blocks(body,R0,bst,{depth:0});
+  // Drop trailing spacer paragraphs at the very end of the document.
+  while(parts.length>1&&/w:line="20" w:lineRule="exact"/.test(parts[parts.length-1])) parts.pop();
+  const twip=v=>Math.round(v*20);
+  const sect='<w:sectPr><w:pgSz w:w="'+twip(pageW)+'" w:h="'+twip(pageH)+'"'+(land?' w:orient="landscape"':'')+'/><w:pgMar w:top="'+twip(mg[0])+'" w:right="'+twip(mg[1])+'" w:bottom="'+twip(mg[2])+'" w:left="'+twip(mg[3])+'" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>';
+  const title=(doc.title||'').trim();
+  const font=(R0.font||'Georgia');const sz=Math.round((R0.sz||10.5)*2);const color=R0.color||'1A1410';
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const files=[
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>'],
+   ['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+x(title)+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>'],
+   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>'],
+   ['word/settings.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings '+W+'><w:zoom w:percent="100"/><w:defaultTabStop w:val="360"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>'],
+   ['word/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+x(font)+'" w:hAnsi="'+x(font)+'" w:eastAsia="'+x(font)+'" w:cs="'+x(font)+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'+
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'+
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
+   ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
+  return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
+ function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
+ function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
+ return {conv,save,hook};})();
 </script>
 <script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
    through CARL's server, on CARL's keys, for anyone signed in to
