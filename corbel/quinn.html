@@ -216,6 +216,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
 .cal{display:grid;grid-template-columns:repeat(31,1fr);gap:2px;margin-top:4px}
 .cal span{height:14px;border-radius:2px;background:#e3e9e8}.cal span.y{background:var(--ok)}.cal span.w{background:#f3f3f3}
 .scope{display:flex;gap:6px;flex-wrap:wrap}
+@media(max-width:900px){.wrap>*{min-width:0}.panel{overflow-x:auto}header{flex-wrap:wrap}}
 .scope button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
 </style>
 </head>
@@ -257,6 +258,19 @@ function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setIt
  rec.quinn={updated:new Date().toISOString(),records:Q.records.length,buildings:[...new Set(Q.records.map(r=>r.building).filter(Boolean))].length,open_issues:Q.issues.filter(i=>i.status!=='closed').length};localStorage.setItem('milcon_record',JSON.stringify(rec));
  $('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},300);}
 function log(w,d){Q.log.push({at:new Date().toISOString(),what:w,detail:d||''});}
+function dmy(d){if(!d) return '';const x=new Date(d+'T00:00');return isNaN(x)?d:x.getDate()+' '+MON[x.getMonth()].slice(0,3)+' '+x.getFullYear();}
+// Fill task order and project from the shared Corbel project record (buildings named in SOPHIE, task order, project name), then from the 1477 contract field.
+function linkRecord(){let n=0;let P=[];try{const st=JSON.parse(localStorage.getItem('milcon_store')||'{}');P=Object.values(st.projects||{}).map(p=>p.core||{}).filter(c=>c.to||c.name);}catch(e){}
+ const bnum=b=>String(b).replace(/^B/i,'');
+ Q.registry.forEach(r=>{if(r.to&&r.project) return;const re=new RegExp('(^|[^0-9])(B|Bldg\\.?\\s*|Building\\s*)?'+bnum(r.building)+'(?![0-9])','i');
+  const c=P.find(c=>c.buildings&&re.test(String(c.buildings)))||P.find(c=>c.name&&re.test(String(c.name)));
+  const recC=Q.records.filter(x=>x.building===r.building).map(x=>String(x.contract||'').trim()).find(Boolean);
+  const c2=c||(recC&&P.find(c=>c.to&&(recC.includes(c.to)||String(c.to).includes(recC))));
+  if(c2){if(!r.to&&c2.to){r.to=c2.to;r.src='project record';n++;}if(!r.project&&c2.name){r.project=c2.name;r.src='project record';}}
+  else if(!r.to&&recC){r.to=recC;r.src='1477 contract field';n++;}});
+ Q.records.forEach(x=>{if(String(x.inspector||'').trim()) return;const o=Q.records.filter(y=>y!==x&&y.building===x.building&&String(y.inspector||'').trim()&&!y.inspGuess).map(y=>y.inspector);
+  if(o.length){const f={};o.forEach(v=>f[v]=(f[v]||0)+1);x.inspector=Object.keys(f).sort((a,b)=>f[b]-f[a])[0];x.inspGuess=true;}});
+ return n;}
 function to(b){const r=Q.registry.find(x=>x.building===b);return r?r.to:'';}
 function proj(b){const r=Q.registry.find(x=>x.building===b);return r?r.project:'';}
 
@@ -303,7 +317,8 @@ async function ingest(files){const pdfs=files.filter(f=>/\.pdf$/i.test(f.name));
    const building=bldgFrom(pick(r.fields,/building|facility|bldg/i,'building'),B,f.name,A,t.slice(0,600));
    const rec={id:uid(),file:f.name,path:f.webkitRelativePath||f.name,hash:r.hash,date,building,project:A||pick(r.fields,/project/i,'project'),contract:pick(r.fields,/contract/i,'contract'),inspector:pick(r.fields,/inspector|signature of|prepared by|name/i,'inspector'),signed:r.signed,pages:r.pages,fieldsFound:Object.keys(r.fields).length,secs:S,raw:t.slice(0,20000),added:today()};
    Q.records.push(rec);if(building&&!Q.registry.some(x=>x.building===building)) Q.registry.push({building,to:'',project:A.slice(0,80)});harvestIssues(rec);added++;}catch(e){fail++;console.warn(f.name,e);}}
- MSG.load=added+' added'+(dup?', '+dup+' duplicates skipped (same file already loaded)':'')+(fail?', '+fail+' could not be read':'')+'.';log('Reports loaded',MSG.load);save();render();}
+ const lk=added?linkRecord():0;MSG.load=added+' added'+(dup?', '+dup+' duplicates skipped (same file already loaded)':'')+(fail?', '+fail+' could not be read':'')+'.';log('Reports loaded',MSG.load);save();
+ if(added){R={scope:'portfolio',key:'',from:'',to:'',boiler:true,src:true};STEP='rep';render();if(window.CARLAI&&CARLAI.state().ok) writeSummary(true);}else render();}
 
 // ---------- issues ----------
 const TAG=/\[(NEW|CONT|CLOSED)\]/i;
@@ -342,7 +357,7 @@ function vRecs(){const v=$('#view');const months=[...new Set(Q.records.map(r=>(r
  '<div class="panel"><h2>Records</h2><div class="row" style="margin-top:0"><input id="rq" placeholder="Filter" style="width:200px"><select id="rm" style="width:auto">'+opts(Object.fromEntries(months.map(m=>[m,m])),RQ.m,'All months')+'</select><select id="rb2" style="width:auto">'+opts(Object.fromEntries(bl.map(b=>[b,b])),RQ.b,'All buildings')+'</select><button id="bCsv">Export extracted data (Excel)</button></div>'+
  '<table class="recs" style="margin-top:10px"><thead><tr><th>Date</th><th>Building</th><th>File</th><th>Inspector</th><th>Signed</th><th>Sections</th><th></th></tr></thead><tbody id="rt"></tbody></table></div>';
  const rb=$('#regb');Q.registry.slice().sort((a,b)=>a.building.localeCompare(b.building)).forEach(r=>{const n=Q.records.filter(x=>x.building===r.building);const last=n.map(x=>x.date).filter(Boolean).sort().pop()||'';
-  const tr=document.createElement('tr');tr.innerHTML='<td><b>'+esc(r.building)+'</b></td><td><input data-k="to" value="'+esc(r.to)+'" placeholder="F0147"></td><td><input data-k="project" value="'+esc(r.project)+'"></td><td class="num">'+n.length+'</td><td>'+esc(last)+'</td><td><button class="sm" data-del>Remove</button></td>';
+  const tr=document.createElement('tr');tr.innerHTML='<td><b>'+esc(r.building)+'</b></td><td><input data-k="to" value="'+esc(r.to)+'" placeholder="needed"'+(r.to?'':' class="bad"')+'>'+(r.src?'<div class="small">from '+esc(r.src)+'</div>':'')+'</td><td><input data-k="project" value="'+esc(r.project)+'"></td><td class="num">'+n.length+'</td><td>'+esc(last)+'</td><td><button class="sm" data-del>Remove</button></td>';
   tr.querySelectorAll('[data-k]').forEach(i=>i.oninput=()=>{r[i.dataset.k]=i.value;save();});tr.querySelector('[data-del]').onclick=()=>{if(n.length&&!confirm(r.building+' has '+n.length+' records. Remove it from the list anyway? The records stay.')) return;Q.registry=Q.registry.filter(x=>x!==r);save();vRecs();};rb.appendChild(tr);});
  $('#bAddB').onclick=()=>{const b=bldgFrom($('#nb').value)||$('#nb').value.trim().toUpperCase();if(b&&!Q.registry.some(x=>x.building===b)){Q.registry.push({building:b,to:'',project:''});save();vRecs();}};
  $('#bImpR').onclick=()=>$('#fR').click();$('#fR').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{let k=0;t.split(/\r?\n/).forEach(l=>{const c=l.split(',').map(x=>x.trim().replace(/^"|"$/g,''));const b=bldgFrom(c[0])||(c[0]||'').toUpperCase();if(!b||/building/i.test(c[0])) return;let r=Q.registry.find(x=>x.building===b);if(!r){r={building:b,to:'',project:''};Q.registry.push(r);}if(c[1]) r.to=c[1];if(c[2]) r.project=c[2];k++;});log('Building list imported',k+' rows');save();vRecs();});};
@@ -351,7 +366,7 @@ function vRecs(){const v=$('#view');const months=[...new Set(Q.records.map(r=>(r
  rows();
  function rows(){const t=RQ.q.toLowerCase();const L=Q.records.filter(r=>(!RQ.m||(r.date||'').startsWith(RQ.m))&&(!RQ.b||r.building===RQ.b)&&(!t||(r.file+' '+r.building+' '+r.inspector+' '+r.raw).toLowerCase().includes(t))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const tb=$('#rt');tb.innerHTML='';L.slice(0,500).forEach(r=>{const tr=document.createElement('tr');
-   tr.innerHTML='<td><input type="date" value="'+esc(r.date)+'" style="width:140px" '+(r.date?'':'class="bad"')+'></td><td><input value="'+esc(r.building)+'" style="width:90px" placeholder="needed"></td><td title="'+esc(r.path)+'">'+esc(r.file)+'</td><td>'+esc(String(r.inspector).slice(0,40))+'</td><td>'+(r.signed?'<span class="pill ok">Signature field</span>':'<span class="pill warn">Unsigned</span>')+'</td><td class="small">'+Object.keys(r.secs).filter(k=>k!=='_pre').join(' ')+'</td><td><button class="sm" data-v>View</button> <button class="sm" data-x>Remove</button></td>';
+   tr.innerHTML='<td><input type="date" value="'+esc(r.date)+'" style="width:140px" '+(r.date?'':'class="bad"')+'></td><td><input value="'+esc(r.building)+'" style="width:90px" placeholder="needed"></td><td title="'+esc(r.path)+'">'+esc(r.file)+'</td><td>'+(String(r.inspector||'').trim()?esc(String(r.inspector).slice(0,40))+(r.inspGuess?' <span class="pill warn" title="Not on the form. Guessed from other '+esc(r.building)+' records.">guess</span>':''):'<span class="pill warn">Not on form</span>')+'</td><td>'+(r.signed?'<span class="pill ok">Signature field</span>':'<span class="pill warn">Unsigned</span>')+'</td><td class="small">'+Object.keys(r.secs).filter(k=>k!=='_pre').join(' ')+'</td><td><button class="sm" data-v>View</button> <button class="sm" data-x>Remove</button></td>';
    const [di,bi]=tr.querySelectorAll('input');di.onchange=()=>{r.date=di.value;save();renderSteps();};bi.onchange=()=>{r.building=bldgFrom(bi.value)||bi.value.trim().toUpperCase();if(r.building&&!Q.registry.some(x=>x.building===r.building)) Q.registry.push({building:r.building,to:'',project:''});save();renderSteps();};
    tr.querySelector('[data-x]').onclick=()=>{Q.records=Q.records.filter(x=>x!==r);save();rows();renderSteps();};
    tr.querySelector('[data-v]').onclick=()=>{const nx=tr.nextElementSibling;if(nx&&nx.classList.contains('det')){nx.remove();return;}const d=document.createElement('tr');d.className='det';d.innerHTML='<td colspan="7"><div class="preview" style="max-height:340px">'+Object.entries(r.secs).map(([k,a])=>'<h4>'+(SEC_NAME[k]?k+'. '+esc(SEC_NAME[k]):'Before section A')+'</h4>'+a.map(x=>'<p>'+esc(x)+'</p>').join('')).join('')+'</div></td>';tr.after(d);};
@@ -374,7 +389,7 @@ function vIss(){const v=$('#view');const bl=[...new Set(Q.issues.map(i=>i.buildi
 function daysOpen(i,asOf){const end=i.status==='closed'&&i.closed?i.closed:(asOf||today());return i.first?Math.max(0,Math.round((new Date(end)-new Date(i.first))/864e5)):'';}
 
 // ---------- 4 report ----------
-let R={scope:'building',key:'',from:'',to:'',boiler:true,src:true};
+let R={scope:'portfolio',key:'',from:'',to:'',boiler:true,src:true};
 function periodDefault(){const ds=Q.records.map(r=>r.date).filter(Boolean).sort();const last=ds.pop()||today();const m=last.slice(0,7);R.from=R.from||m+'-01';const d=new Date(+m.slice(0,4),+m.slice(5,7),0);R.to=R.to||m+'-'+String(d.getDate()).padStart(2,'0');}
 function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.registry.map(r=>r.building).concat(Q.records.map(r=>r.building)).filter(Boolean))].sort();const tos=[...new Set(Q.registry.map(r=>r.to).filter(Boolean))].sort();
  const keys=R.scope==='building'?bl:R.scope==='to'?tos:['Portfolio'];if(!keys.includes(R.key)) R.key=keys[0]||'';
@@ -384,14 +399,14 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  '<label class="small">From</label><input type="date" id="rf" style="width:150px"><label class="small">To</label><input type="date" id="rt2" style="width:150px"><select id="rmo" style="width:auto"><option value="">Pick a month</option>'+[...new Set(Q.records.map(r=>(r.date||'').slice(0,7)).filter(Boolean))].sort().reverse().map(m=>'<option>'+m+'</option>').join('')+'</select></div>'+
  '<div class="row"><label class="small"><input type="checkbox" id="rbp" style="width:auto"> Leave out boilerplate</label><label class="small"><input type="checkbox" id="rsrc" style="width:auto"> Show report dates on each line</label>'+(R.scope!=='building'?'<button id="bAll">Download one report per building</button>':'')+'</div>'+
  '<div class="row"><button id="bSum">Write the summary with AI</button><span class="small" id="sumMsg">'+(sumGet()?(sumGet().check?'<b style="color:#9b2c2c">'+esc(sumGet().check)+'</b> ':'')+'Summary included below. Write again to refresh it.':'Two or three paragraphs for the COR or PM, from this report only, through CARL. Every number is checked against the report.')+'</span></div>'+
- '<div class="row"><button class="go" id="bDoc">Download Word</button><button id="bPrint">Print or save as PDF</button></div><div class="preview" id="pv" style="margin-top:12px"></div></div>';
+ '<div class="row"><button class="go" id="bDoc">Download Word</button></div><div class="preview" id="pv" style="margin-top:12px"></div></div>';
  v.querySelectorAll('[data-sc]').forEach(b=>b.onclick=()=>{R.scope=b.dataset.sc;R.key='';vRep();});
  if($('#rk')) $('#rk').onchange=e=>{R.key=e.target.value;pv();};
  $('#rf').value=R.from;$('#rt2').value=R.to;$('#rf').onchange=e=>{R.from=e.target.value;pv();};$('#rt2').onchange=e=>{R.to=e.target.value;pv();};
  $('#rmo').onchange=e=>{const m=e.target.value;if(!m) return;R.from=m+'-01';R.to=m+'-'+String(new Date(+m.slice(0,4),+m.slice(5,7),0).getDate()).padStart(2,'0');$('#rf').value=R.from;$('#rt2').value=R.to;pv();};
  $('#rbp').checked=R.boiler;$('#rsrc').checked=R.src;$('#rbp').onchange=e=>{R.boiler=e.target.checked;pv();};$('#rsrc').onchange=e=>{R.src=e.target.checked;pv();};
- $('#bDoc').onclick=()=>dl(fn('doc'),wrap(report()),'application/msword');$('#bPrint').onclick=()=>{const w=window.open('','_blank');w.document.write(wrap(report()));w.document.close();setTimeout(()=>w.print(),400);};
- if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('QUINN_'+b+'_'+R.from+'_to_'+R.to+'.doc',wrap(reportFor('building',b)),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
+ $('#bDoc').onclick=()=>preDl(()=>{dl(fn('doc'),reportDoc(R.scope,R.key),'application/msword');log('Report downloaded',sumKey());save();});
+ if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('QUINN_'+b+'_'+R.from+'_to_'+R.to+'.doc',reportDoc('building',b),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
  $('#bSum').onclick=writeSummary;
  pv();function pv(){$('#pv').innerHTML=report();}}
 // ---------- AI summary of the consolidated report ----------
@@ -399,15 +414,24 @@ function sumKey(scope=R.scope,key=R.key){return scope+'|'+key+'|'+R.from+'|'+R.t
 function sumGet(scope,key){return (Q.summaries||{})[sumKey(scope,key)]||null;}
 const SUM_SYS=`You summarize a consolidated construction inspection report (AF IMT 1477 records) for a Government COR or program manager. Write two or three short paragraphs in plain, factual language: coverage and gaps in inspection days, the open deficiencies that matter most and how long they have been open, what was corrected, and anything that needs the reader's attention. Use ONLY facts in the REPORT. Do not add causes, recommendations of contract action, or anything the report does not say. No references to AI.
 Return ONLY JSON: {"summary":"the paragraphs, separated by a blank line"}`;
-async function writeSummary(){if(!window.CARLAI||!CARLAI.state().ok){alert('Sign in to CARL (carl.carlcompliance.com) to write the summary with AI, then reload this page.');return;}
+async function writeSummary(quiet){if(!window.CARLAI||!CARLAI.state().ok){if(quiet) return;alert('Sign in to CARL (carl.carlcompliance.com) to write the summary with AI, then reload this page.');return;}
  const prev=(Q.summaries||{})[sumKey()];if(prev) delete Q.summaries[sumKey()];
  const tmp=document.createElement('div');tmp.innerHTML=reportFor(R.scope,R.key).replace(/<\/(p|h3|h4|tr)>/g,'\n').replace(/<\/t[dh]>/g,' | ');const txt=tmp.textContent.replace(/\n{3,}/g,'\n\n').slice(0,120000);
- const b=$('#bSum');b.disabled=true;b.textContent='Writing…';
- try{const j=await CARLAI.ask('claude',SUM_SYS,'REPORT:\n'+txt);const out=String(j.summary||'').trim();if(!out) throw new Error('No summary returned');
-  const S=txt.replace(/,/g,'');const bad=[...new Set((out.match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>!S.includes(x)))];
-  Q.summaries=Q.summaries||{};Q.summaries[sumKey()]={text:out,at:new Date().toISOString(),check:bad.length?'Check these numbers, not found in the report: '+bad.join(', '):''};
-  log('Summary written with AI',sumKey()+(bad.length?' – '+bad.length+' numbers to check':''));save();vRep();if(bad.length) alert(Q.summaries[sumKey()].check);}
- catch(err){if(prev) Q.summaries[sumKey()]=prev;alert('Summary failed: '+err.message);b.disabled=false;b.textContent='Write the summary with AI';}}
+ const b=$('#bSum')||{};b.disabled=true;b.textContent='Writing…';const mm=$('#sumMsg');if(mm) mm.textContent='Writing the summary and checking every number against the report…';
+ try{let j=await CARLAI.ask('claude',SUM_SYS,'REPORT:\n'+txt);let out=String(j.summary||'').trim();if(!out) throw new Error('No summary returned');
+  let bad=sumCheck(out,txt);if(bad.length){j=await CARLAI.ask('claude',SUM_SYS,'REPORT:\n'+txt+'\n\nYOUR DRAFT:\n'+out+'\n\nCORRECTIONS (fix these, keep everything else):\n- '+bad.join('\n- '));const o2=String(j.summary||'').trim();if(o2){out=o2;bad=sumCheck(out,txt);}}
+  Q.summaries=Q.summaries||{};Q.summaries[sumKey()]={text:out,at:new Date().toISOString(),check:bad.length?'Check the summary: '+bad.join('; '):''};
+  log('Summary written with AI',sumKey()+(bad.length?' – '+bad.length+' numbers to check':''));save();if(STEP==='rep') vRep();}
+ catch(err){if(prev) Q.summaries[sumKey()]=prev;if(!quiet) alert('Summary failed: '+err.message);if(STEP==='rep') vRep();}}
+const NW={zero:0,no:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+function sumCheck(out,txt){const bad=[];const nums=new Set((txt.replace(/,/g,'').match(/\d+(\.\d+)?/g)||[]));
+ (out.replace(/,/g,'').match(/\d+(\.\d+)?/g)||[]).forEach(x=>{if(!nums.has(x)&&!bad.includes(x+' is not in the report')) bad.push(x+' is not in the report');});
+ const bs=buildingsIn();const op=Q.issues.filter(i=>bs.includes(i.building)&&i.status!=='closed').length;
+ const m=out.toLowerCase().match(/\b(\d+|zero|no|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(open\s+)?(deficienc|nonconformanc|item)\w*\s+(remain|are|is|stay)\w*\s+open|\b(\d+|zero|no|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+open\s+(deficienc|nonconformanc|item)/);
+ if(m){const w=m[1]||m[5];const n=/\d/.test(w)?+w:NW[w];if(n!==op) bad.push('it says '+w+' open deficienc'+(n===1?'y':'ies')+'; the report has '+op);}
+ const rc=bs.flatMap(recsFor).length;const m2=out.toLowerCase().match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(inspection\s+)?(reports|records)\b/);
+ if(m2){const n=/\d/.test(m2[1])?+m2[1]:NW[m2[1]];if(n!==rc) bad.push('it says '+m2[1]+' reports; the report has '+rc);}
+ return bad;}
 function fn(ext){return 'QUINN_'+(R.scope==='portfolio'?'Portfolio':R.key.replace(/[^\w\-]+/g,''))+'_'+R.from+'_to_'+R.to+'.'+ext;}
 function buildingsIn(scope=R.scope,key=R.key){const all=[...new Set(Q.registry.map(r=>r.building).concat(Q.records.map(r=>r.building)).filter(Boolean))].sort();return scope==='building'?[key]:scope==='to'?all.filter(b=>to(b)===key):all;}
 function recsFor(b){return Q.records.filter(r=>r.building===b&&r.date&&r.date>=R.from&&r.date<=R.to).sort((a,c)=>a.date.localeCompare(c.date));}
@@ -421,7 +445,7 @@ function sectionHTML(recs,sec){const L=merged(recs,sec);if(!L.length) return '';
 function coverageHTML(bs){const wd=workdays();return '<table style="border-collapse:collapse;width:100%"><tr><th>Building</th><th>Task order</th><th>Reports</th><th>Workdays covered</th><th>Unsigned</th><th>Open deficiencies</th></tr>'+bs.map(b=>{const rs=recsFor(b);const days=new Set(rs.map(r=>r.date));const op=Q.issues.filter(i=>i.building===b&&i.status!=='closed').length;
  return '<tr><td>'+esc(b)+'</td><td>'+esc(to(b))+'</td><td style="text-align:right">'+rs.length+'</td><td style="text-align:right'+(rs.length?'':';color:#9b2c2c;font-weight:bold')+'">'+days.size+' of '+wd+'</td><td style="text-align:right">'+rs.filter(r=>!r.signed).length+'</td><td style="text-align:right">'+op+'</td></tr>';}).join('')+'</table>';}
 function issuesHTML(bs){const I=Q.issues.filter(i=>bs.includes(i.building)&&((i.first||'')<=R.to)&&(i.status!=='closed'||(i.closed||'')>=R.from));if(!I.length) return '<p>No deficiencies open or closed in the period.</p>';
- return '<table style="border-collapse:collapse;width:100%"><tr><th>Building</th><th>Type</th><th>Deficiency</th><th>First seen</th><th>Status</th><th>Corrective action</th></tr>'+I.map(i=>'<tr><td>'+esc(i.building)+'</td><td>'+esc(i.kind)+'</td><td>'+esc(i.text)+'</td><td>'+esc(i.first)+'</td><td>'+(i.status==='closed'?'Closed '+esc(i.closed):'Open, '+daysOpen(i,R.to<today()?R.to:today())+' days at '+(R.to<today()?'period end':'today'))+'</td><td>'+esc(i.action)+'</td></tr>').join('')+'</table>';}
+ return '<table style="border-collapse:collapse;width:100%"><tr><th>Building</th><th>Type</th><th>Deficiency</th><th>First seen</th><th>Status</th><th>Corrective action</th></tr>'+I.map(i=>'<tr><td>'+esc(i.building)+'</td><td>'+esc(i.kind)+'</td><td>'+esc(i.text)+'</td><td>'+esc(dmy(i.first))+'</td><td>'+(i.status==='closed'?'Closed '+esc(dmy(i.closed)):'Open, '+daysOpen(i,R.to<today()?R.to:today())+' days at '+(R.to<today()?'period end':'today'))+'</td><td>'+esc(i.action)+'</td></tr>').join('')+'</table>';}
 function reportFor(scope,key){const bs=buildingsIn(scope,key);const title=scope==='portfolio'?'Portfolio':scope==='to'?'Task order '+key:key+(proj(key)?' – '+proj(key):'');
  const f=d=>{const x=new Date(d+'T00:00');return x.getDate()+' '+MON[x.getMonth()]+' '+x.getFullYear();};
  let h='<h3 style="text-align:center">CONSTRUCTION INSPECTION SUMMARY</h3><p style="text-align:center"><b>'+esc(title)+'</b><br>'+f(R.from)+' – '+f(R.to)+'</p>';
@@ -432,6 +456,34 @@ function reportFor(scope,key){const bs=buildingsIn(scope,key);const title=scope=
  bs.forEach(b=>{const rs=recsFor(b);if(!rs.length) return;h+=(bs.length>1?'<h3>'+esc(b)+(proj(b)?' – '+esc(proj(b)):'')+'</h3>':'<h3>Inspection detail</h3>')+'<p style="color:#666">'+rs.length+(rs.length===1?' report':' reports')+'; inspectors: '+esc([...new Set(rs.map(r=>String(r.inspector||'').trim()).filter(Boolean))].join(', ')||'not recorded')+'</p>'+SEC_ORDER.map(s=>sectionHTML(rs,s)).join('');});
  return h;}
 function report(){return reportFor(R.scope,R.key);}
+// Word report in the Corbel look
+function reportDoc(scope,key){const bs=buildingsIn(scope,key);const f=d=>{const x=new Date(d+'T00:00');return x.getDate()+' '+MON[x.getMonth()]+' '+x.getFullYear();};
+ const title=scope==='portfolio'?'Portfolio':scope==='to'?'Task order '+key:key;const sub=(scope==='building'&&proj(key)?proj(key)+'  ·  ':'')+(scope==='building'&&to(key)?to(key)+'  ·  ':'')+f(R.from)+' – '+f(R.to);
+ const allRecs=bs.flatMap(recsFor);const sm=sumGet(scope,key);const wd=workdays();
+ let b=cdBand('Inspection summary',title,sub,'Derived working product  ·  '+dmy(today()));
+ b+=cdLead('Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(bs.length>1?' across '+bs.length+' buildings':'')+'. The signed records remain the official copy.');
+ if(sm) b+=cdH('Summary')+sm.text.split(/\n\s*\n/).map(p=>cdP(esc(p.trim()))).join('');
+ b+=cdH('Coverage')+cdTable(['Building','Task order','Reports','Workdays covered','Unsigned','Open deficiencies'],bs.map(x=>{const rs=recsFor(x);const days=new Set(rs.map(r=>r.date)).size;return [esc(x),esc(to(x)||'–'),String(rs.length),(rs.length?'':'<b style="color:#9b2c2c">')+days+' of '+wd+(rs.length?'':'</b>'),String(rs.filter(r=>!r.signed).length),String(Q.issues.filter(i=>i.building===x&&i.status!=='closed').length)];}));
+ const zero=bs.filter(x=>!recsFor(x).length);if(zero.length) b+=cdP('<b>No inspection records in the period:</b> '+zero.map(esc).join(', ')+'.');
+ const asOf=R.to<today()?R.to:today();const I=Q.issues.filter(i=>bs.includes(i.building)&&((i.first||'')<=R.to)&&(i.status!=='closed'||(i.closed||'')>=R.from));
+ b+=cdH('Deficiencies and nonconformances')+(I.length?cdTable(['Building','Type','Deficiency','First seen','Status','Corrective action'],I.map(i=>[esc(i.building),esc(i.kind),esc(i.text),esc(dmy(i.first)),i.status==='closed'?'Closed '+esc(dmy(i.closed)):'Open, '+daysOpen(i,asOf)+' days at '+(R.to<today()?'period end':'today'),esc(i.action)||'–'])):cdP('No deficiencies open or closed in the period.'));
+ bs.forEach(x=>{const rs=recsFor(x);if(!rs.length) return;b+=cdH(bs.length>1?x+(proj(x)?' – '+proj(x):''):'Inspection detail')+cdP(rs.length+(rs.length===1?' report':' reports')+'; inspectors: '+esc([...new Set(rs.map(r=>String(r.inspector||'').trim()).filter(Boolean))].join(', ')||'not recorded'),'font-style:italic;color:'+CD.mute);
+  SEC_ORDER.forEach(sec=>{const L=merged(rs,sec);if(!L.length) return;b+=cdP('<b>'+esc(SEC_NAME[sec])+'</b>','margin:8pt 0 3pt;color:'+CD.navy)+L.map(m=>cdP('– '+esc(m.text.replace(/\s*—\s*/g,' – '))+(R.src?' <span style="color:'+CD.mute+'">('+fmtDates(m.dates)+')</span>':''),'margin:0 0 3pt')).join('');});});
+ b+=cdFoot('Prepared with Corbel QUINN  ·  '+dmy(today())+'  ·  The signed AF IMT 1477 records are the official copy.');
+ return cdDoc('QUINN '+title,[b.replace(/—/g,'–')]);}
+// Open items before download
+function openItems(){const bs=buildingsIn();const rs=bs.flatMap(recsFor);const L=[];
+ const noTo=bs.filter(b=>!to(b));if(noTo.length) L.push(['No task order for '+noTo.join(', '),'recs']);
+ const noIn=rs.filter(r=>!String(r.inspector||'').trim());if(noIn.length) L.push([noIn.length+' record'+(noIn.length>1?'s':'')+' with no inspector on the form','recs']);
+ const gs=rs.filter(r=>r.inspGuess);if(gs.length) L.push([gs.length+' inspector name'+(gs.length>1?'s':'')+' guessed from other records','recs']);
+ const un=rs.filter(r=>!r.signed);if(un.length) L.push([un.length+' unsigned record'+(un.length>1?'s':'')+' (shown in Coverage)','']);
+ const na=Q.issues.filter(i=>bs.includes(i.building)&&i.status!=='closed'&&!String(i.action||'').trim());if(na.length) L.push([na.length+' open deficienc'+(na.length>1?'ies':'y')+' with no corrective action','iss']);
+ const sm=sumGet();if(!sm) L.push(['No summary yet','sum']);else if(sm.check) L.push([sm.check,'sum']);return L;}
+function preDl(go){const L=openItems();if(!L.length) return go();const d=document.createElement('dialog');d.id='pgDlg';d.style.cssText='border:none;border-radius:12px;padding:20px 22px;max-width:560px;width:94vw;font:14px Segoe UI,system-ui,sans-serif';
+ d.innerHTML='<h3 style="margin:0 0 8px">Before you download</h3><p class="small" style="margin:0 0 10px">These are open in this report:</p>'+L.map(([t,k],i)=>'<div class="find warn" style="display:flex;gap:8px;align-items:center"><span style="flex:1">'+esc(t)+'</span>'+(k?'<button class="sm" data-fx="'+i+'">'+(k==='sum'?'Write it':'Fix it')+'</button>':'')+'</div>').join('')+'<div class="row" style="margin-top:14px"><button class="go" id="pgAny">Download draft anyway</button><button id="pgNo">Fix first</button></div>';
+ document.body.appendChild(d);d.showModal();const close=()=>{d.close();d.remove();};
+ d.querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{const k=L[+b.dataset.fx][1];close();if(k==='sum') writeSummary();else{STEP=k;render();}});
+ d.querySelector('#pgAny').onclick=()=>{close();go();};d.querySelector('#pgNo').onclick=close;}
 function wrap(body){return '<!DOCTYPE html><html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word"><head><meta charset="utf-8"><title>QUINN report</title><style>body{font:11pt Calibri,Arial,sans-serif;text-align:justify;max-width:7in;margin:0 auto}h3{font-size:13pt;margin:14pt 0 4pt}h4{font-size:11pt;margin:10pt 0 3pt}p{margin:0 0 4pt}table td,table th{border:1px solid #999;padding:2pt 5pt;font-size:10pt;text-align:left}</style></head><body>'+body.replace(/—/g,'–')+'</body></html>';}
 
 // ---------- 5 settings ----------
@@ -447,7 +499,7 @@ const csv=rows=>'﻿'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]
 $('#bSave').onclick=()=>{dl('QUINN_'+today()+'.json',JSON.stringify(Q,null,1),'application/json');log('File saved');save();};
 $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='quinn-1') throw new Error('Not a QUINN file');Q=Object.assign(BLANK(),j);log('File opened',f.name);save();STEP='load';render();}catch(err){alert('Could not open: '+err.message);}});};
-render();save();
+linkRecord();render();save();
 </script>
 <script id="corbel-lib">
 // ---------- Corbel Word forms: one look for every printed sheet ----------
