@@ -68,7 +68,10 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
  for(const [id,p] of Object.entries(S.projects)){let pp=pa.projects.find(x=>x.id===id);if(!pp){pp={id,phase:1,risks:[],milestones:[],updates:[],override:{level:'',reason:''}};pa.projects.push(pp);ch=true;}
   PAULA_F.forEach(f=>{if(has(p.core[f])&&String(pp[f]??'')!==String(p.core[f])){pp[f]=p.core[f];ch=true;}});
   const ph={'Requirement validated':2,'Economic analysis approved':3,'1391 validated':4,'SOW final':6};
-  for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]){pp.phase=ph[n];ch=true;}}}
+  const T=p.tools||{},rc=T.record||{};const lv=[[1,'NORA',!!T.nora],[3,'EARL recommendation',!!(rc.earl&&rc.earl.recommended)],[3,'PIPER 1391',!!(rc.piper&&(rc.piper.rounded||rc.piper.contract))],[5,'SOPHIE SOW',!!(T.sophie&&(T.sophie.sections||[]).length)]].filter(x=>x[2]);
+  lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
+  if(rc.piper&&rc.piper.contract&&!has(pp.cwe)){pp.cwe=rc.piper.contract;ch=true;}
+  for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]&&!pp.phase_manual){pp.phase=ph[n];pp.phase_src=n;ch=true;}}}
  if(ch) raw('paula_project',JSON.stringify(pa));}
 function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sample) return;let p=St.projects[pp.id];if(!p){if(!has(pp.name)) return;p=St.projects[pp.id]={id:pp.id,core:{},tools:{},created:today()};ch=true;}
   const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o)) ch=true;});if(ch) saveStore(St);}
@@ -242,6 +245,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
 .meter b{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:5px}
 .tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs2 button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
 .samp{background:#fff3d6;border:1px solid #ecd59a;color:#7a5600;border-radius:8px;padding:6px 10px;font-size:12.5px;margin-bottom:12px}
+@media(max-width:900px){.wrap>*{min-width:0}.panel,.card2{overflow-x:auto}header{flex-wrap:wrap}.g-kpi{grid-template-columns:1fr 1fr}.filters{flex-wrap:wrap}.filters select,.filters input{flex:1 1 140px;max-width:100%;min-width:0}main,#view{min-width:0;max-width:100%;overflow-x:hidden}svg{max-width:100%;height:auto}}
 @media print{.filters,nav.steps,header,.noprint{display:none!important}.wrap{display:block}}
 </style>
 </head>
@@ -364,7 +368,7 @@ async function aiExplain(p){if(!aiOk()) return;const h=health(p);const src=projF
  try{const j=await CARLAI.ask('claude',EXPLAIN_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
   p.ai_note={text:t,at:new Date().toISOString(),check:bad.length?'Check these numbers, not found in the project data: '+bad.join(', '):''};save();vOne();}
  catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Explain with AI';}}
-const BRIEF_SYS=`You write the opening summary of a MILCON portfolio leadership brief. One paragraph of four to six sentences: overall portfolio health, the projects that most need leadership attention and why, and the decisions needed. Use ONLY facts in SOURCES and state figures exactly as given. No references to AI.
+const BRIEF_SYS=`You write the opening summary of a military construction portfolio leadership brief. One paragraph of four to six sentences: overall portfolio health, the projects that most need leadership attention and why, and the decisions needed. Use ONLY facts in SOURCES and state figures exactly as given. No references to AI.
 Return ONLY JSON: {"text":"the paragraph"}`;
 function briefKey(){return [F.svc,F.ctry,F.phase,F.pm].join('|')+'|'+today();}
 async function aiBrief(){if(!aiOk()) return;const L=filtered();if(!L.length){alert('No projects in the current filter.');return;}
@@ -373,7 +377,7 @@ async function aiBrief(){if(!aiOk()) return;const L=filtered();if(!L.length){ale
   .concat(L.filter(p=>p.decisions).map(p=>'DECISION: '+p.name+': '+p.decisions)).join('\n');
  const b=document.getElementById('bAIb');if(b){b.disabled=true;b.textContent='Writing…';}
  try{const j=await CARLAI.ask('claude',BRIEF_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
-  P.ai_brief={key:briefKey(),text:t,check:bad.length?'Check these numbers, not found in the data: '+bad.join(', '):''};save();vRep();if(bad.length) alert(P.ai_brief.check);}
+  P.ai_brief={key:briefKey(),text:t,check:bad.length?'Check these numbers, not found in the data: '+bad.join(', '):''};save();vRep();}
  catch(err){alert('Failed: '+err.message);if(b){b.disabled=false;b.textContent='Write the summary with AI';}}}
 function chip(l,extra){const L=LEVEL[l];return '<span class="chip '+L.k+'">'+L.i+' '+L.n+(extra||'')+'</span>';}
 
@@ -401,7 +405,7 @@ function hbars(rows,{fmt=M,colors,w=520,lab=150}={}){const bh=18,gap=12,H=rows.l
   return '<text x="'+(lab-8)+'" y="'+(y+13)+'" text-anchor="end" font-size="12.5" fill="#52514e">'+esc(r.k.length>24?r.k.slice(0,23)+'…':r.k)+'</text><g'+tipA(fmt(r.v)+'\n'+r.k+(r.t?'\n'+r.t:''))+'><rect x="'+lab+'" y="'+(y-4)+'" width="'+(W+60)+'" height="'+(bh+8)+'" fill="transparent"/><path d="'+rbar(lab,y,bw,bh,4,'h')+'" fill="'+c+'"/></g><text x="'+(lab+bw+6)+'" y="'+(y+13)+'" font-size="12.5" fill="#0b0b0b">'+esc(fmt(r.v))+'</text>';}).join('')+'</svg>';}
 function axisY(mx,x0,y0,y1,W,fmt,ticks=4){let s='';for(let i=0;i<=ticks;i++){const v=mx*i/ticks,y=y1-(y1-y0)*i/ticks;s+='<line x1="'+x0+'" x2="'+W+'" y1="'+y+'" y2="'+y+'" stroke="'+(i?'var(--grid)':'var(--axis)')+'" stroke-width="1"/><text x="'+(x0-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" fill="#898781">'+fmt(v)+'</text>';}return s;}
 function stackCols(cats,series,{W=560,H=240,fmt=v=>v}={}){const x0=34,y0=10,y1=H-38,cw=(W-x0)/cats.length,bw=Math.min(24,cw*.55);const tot=cats.map((c,i)=>series.reduce((s,se)=>s+se.v[i],0));const mx=niceMax(Math.max(...tot,1));
- let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">'+axisY(mx,x0,y0,y1,W,v=>Math.round(v),4);
+ const tk=mx<=5?Math.max(1,Math.round(mx)):(mx%5===0?5:4);let s='<svg viewBox="0 0 '+W+' '+H+'" role="img">'+axisY(mx,x0,y0,y1,W,v=>Math.round(v),tk);
  cats.forEach((c,i)=>{const cx=x0+cw*i+cw/2;let y=y1;const nz=series.map((se,k)=>[k,se.v[i]]).filter(z=>z[1]>0);
   nz.forEach(([k,v],j)=>{const h=v/mx*(y1-y0);const top=j===nz.length-1;const yy=y-h;s+='<g'+tipA(v+' '+series[k].n.toLowerCase()+'\n'+c.full)+'>'+(top?'<path d="'+rbar(cx-bw/2,yy+(j?1:0),bw,h-(j?1:0),4,'v')+'" fill="'+series[k].c+'"/>':'<rect x="'+(cx-bw/2)+'" y="'+(yy+(j?1:0))+'" width="'+bw+'" height="'+Math.max(0,h-(j?2:0)-0)+'" fill="'+series[k].c+'"/>')+'<rect x="'+(cx-cw/2)+'" y="'+yy+'" width="'+cw+'" height="'+h+'" fill="transparent"/></g>';y=yy;});
   if(tot[i]) s+='<text x="'+cx+'" y="'+(y-5)+'" text-anchor="middle" font-size="11.5" fill="#0b0b0b">'+tot[i]+'</text>';
@@ -579,14 +583,14 @@ function pHist(p){const t=$('#pt');const U=p.updates.slice().sort((a,b)=>b.date.
 let UPD=null;
 function vUpd(){const v=$('#view');const ps=P.projects.slice().sort((a,b)=>(a.name||'').localeCompare(b.name||''));if(!UPD&&ps[0]) UPD=ps[0].id;const p=P.projects.find(x=>x.id===UPD);
  if(!p){v.innerHTML='<div class="panel"><h2>Status update</h2><div class="empty">Add a project first.</div></div>';return;}const lu=lastUpd(p)||{};
- v.innerHTML='<div class="panel"><h2>Status update</h2><p class="lead">A few minutes per project every two weeks keeps the whole dashboard current. Numbers you enter here also update the project. Each update is kept, so the trend charts build themselves.</p>'+
+ v.innerHTML='<div class="panel"><h2>Status update</h2><p class="lead">Each project’s update is drafted from the suite: phase and estimate from the record, inspections and deficiencies from QUINN, RFIs and submittals from IRMA, and the health engine. Check it, add what the tools can’t know, and save. Each update is kept, so the trend charts build themselves.</p>'+
  '<div class="row" style="margin-top:0"><select id="up" style="width:auto">'+ps.map(x=>'<option value="'+x.id+'" '+(x.id===UPD?'selected':'')+'>'+esc(x.name||'(untitled)')+(lastUpd(x)?' – last '+lastUpd(x).date:' – no updates')+'</option>').join('')+'</select><span>'+chip(health(p).overall)+'</span></div>'+
- '<div class="form" style="margin-top:12px"><div><label class="f">Status date</label><input type="date" id="u_date" value="'+today()+'"></div><div><label class="f">Physical percent complete</label><input id="u_pct" value="'+esc(p.pct)+'"></div><div><label class="f">Current working estimate $</label><input id="u_cwe" value="'+esc(p.cwe)+'"></div><div><label class="f">Obligated $</label><input id="u_ob" value="'+esc(p.obligated)+'"></div><div><label class="f">Expended $</label><input id="u_ex" value="'+esc(p.expended)+'"></div><div><label class="f">Forecast completion</label><input type="date" id="u_ff" value="'+esc(p.forecast_finish)+'"></div><div><label class="f">Phase</label><select id="u_ph">'+[1,2,3,4,5,6,7,8].map(n=>'<option value="'+n+'" '+(N(p.phase)===n?'selected':'')+'>'+n+'. '+PHASES[n]+'</option>').join('')+'</select></div>'+
- '<div class="wide"><label class="f">Done this period</label><textarea id="u_done"></textarea></div><div class="wide"><label class="f">Next period</label><textarea id="u_next"></textarea></div><div class="wide"><label class="f">Concerns, issues and help needed</label><textarea id="u_con"></textarea></div><div class="wide"><label class="f">Decisions needed from leadership</label><textarea id="u_dec">'+esc(p.decisions)+'</textarea></div></div>'+
+ '<div class="form" style="margin-top:12px"><div><label class="f">Status date</label><input type="date" id="u_date" value="'+today()+'"></div><div><label class="f">Physical percent complete</label><input id="u_pct" value="'+esc(p.pct)+'"></div><div><label class="f">Current working estimate $</label><input id="u_cwe" value="'+esc(p.cwe)+'"></div><div><label class="f">Obligated $</label><input id="u_ob" value="'+esc(p.obligated)+'"></div><div><label class="f">Expended $</label><input id="u_ex" value="'+esc(p.expended)+'"></div><div><label class="f">Forecast completion</label><input type="date" id="u_ff" value="'+esc(p.forecast_finish)+'"></div><div><label class="f">Phase</label><select id="u_ph">'+[1,2,3,4,5,6,7,8].map(n=>'<option value="'+n+'" '+(N(p.phase)===n?'selected':'')+'>'+n+'. '+PHASES[n]+'</option>').join('')+'</select>'+(p.phase_src&&!p.phase_manual?'<div class="small">from '+esc(p.phase_src)+'</div>':'')+'</div>'+
+ '<div class="wide"><label class="f">Done this period</label><textarea id="u_done"></textarea></div><div class="wide"><label class="f">Next period</label><textarea id="u_next"></textarea></div><div class="wide"><label class="f">Concerns, issues and help needed</label><textarea id="u_con"></textarea></div><div class="wide"><div class="find" id="u_src" style="font-size:12.5px"></div></div><div class="wide"><label class="f">Decisions needed from leadership</label><textarea id="u_dec">'+esc(p.decisions)+'</textarea></div></div>'+
  '<div class="row"><button class="go" id="bSaveU">Save update</button><button id="bSaveN">Save and next project</button><span class="small" id="um"></span></div>'+(lu.date?'<details style="margin-top:10px"><summary>Last update ('+esc(lu.date)+')</summary>'+latest(lu)+'</details>':'')+'</div>';
- $('#up').onchange=e=>{UPD=e.target.value;vUpd();};
- const go=next=>{const u={id:uid(),date:$('#u_date').value||today(),pct:$('#u_pct').value,cwe:$('#u_cwe').value,obligated:$('#u_ob').value,expended:$('#u_ex').value,forecast:$('#u_ff').value,done:$('#u_done').value,next:$('#u_next').value,concerns:$('#u_con').value,by:P.me||''};
-  Object.assign(p,{pct:u.pct,cwe:u.cwe,obligated:u.obligated,expended:u.expended,forecast_finish:u.forecast,phase:N($('#u_ph').value),decisions:$('#u_dec').value});u.health=health(p,u.date).overall;p.updates.push(u);log('Status update',p.name+' '+u.date);save();
+ $('#up').onchange=e=>{UPD=e.target.value;vUpd();};fillDraft(p);
+ const ph0=p.phase;const go=next=>{const u={_ph0:ph0,id:uid(),date:$('#u_date').value||today(),pct:$('#u_pct').value,cwe:$('#u_cwe').value,obligated:$('#u_ob').value,expended:$('#u_ex').value,forecast:$('#u_ff').value,done:$('#u_done').value,next:$('#u_next').value,concerns:$('#u_con').value,by:P.me||''};
+  Object.assign(p,{pct:u.pct,cwe:u.cwe,obligated:u.obligated,expended:u.expended,forecast_finish:u.forecast,phase:N($('#u_ph').value),decisions:$('#u_dec').value});if(N($('#u_ph').value)!==N(u._ph0)) p.phase_manual=true;p.draft=null;delete u._ph0;u.health=health(p,u.date).overall;p.updates.push(u);log('Status update',p.name+' '+u.date);save();
   if(next){const i=ps.indexOf(p);UPD=ps[(i+1)%ps.length].id;vUpd();window.scrollTo(0,0);}else{$('#um').textContent='Saved. Health: '+LEVEL[u.health].n+'.';renderSteps();}};
  $('#bSaveU').onclick=()=>go(false);$('#bSaveN').onclick=()=>go(true);}
 
@@ -594,11 +598,10 @@ function vUpd(){const v=$('#view');const ps=P.projects.slice().sort((a,b)=>(a.na
 function vRep(){const v=$('#view');
  v.innerHTML=filterRow()+'<div class="panel"><h2>Reports</h2><p class="lead">Every report uses the filters above, so the same buttons produce a portfolio brief, a Service brief or one PM’s projects.</p><div class="outs">'+
  '<div class="card"><h4>Summary paragraph</h4><p>'+(P.ai_brief&&P.ai_brief.key===briefKey()?esc(P.ai_brief.text)+(P.ai_brief.check?'<br><b style="color:var(--crit)">'+esc(P.ai_brief.check)+'</b>':''):'Opens the leadership brief: health, who needs attention and why, decisions needed. Written from the filtered data only, through CARL.')+'</p><button class="sm" id="bAIb">Write the summary with AI</button></div>'+
- out('brief','Leadership brief','One to two pages: headline numbers, health, the projects that need attention and why, decisions needed, the next 30 days, top risks.','Open brief')+
- out('briefdoc','Leadership brief in Word','The same brief as a Word file.','Download Word')+
- out('slides','Status slides','A 16:9 page for the portfolio and one for each project: health, progress, money, done, next, concerns. Print to PDF for the PMO deck.','Open slides')+
+ out('briefdoc','Leadership brief','One to two pages in Word: headline numbers, health, the projects that need attention and why, decisions needed, the next 30 days, top risks.','Download Word')+
+ out('slides','Status pages','Landscape Word pages for the PMO deck: one for the portfolio and one for each project, with health, progress, money, done, next and concerns.','Download Word')+
  out('csv','Data call export','Every field and the computed health for each project, ready to sort, filter or answer a data call.','Download Excel')+'</div></div>';
- bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({brief:()=>win(briefHTML()),briefdoc:()=>dl('PAULA_Leadership_Brief_'+today()+'.doc',briefHTML(),'application/msword'),slides:()=>win(slidesHTML()),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}])})[b.dataset.out]());
+ bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({briefdoc:()=>preDlP(()=>{dl('PAULA_Leadership_Brief_'+today()+'.doc',briefDoc(),'application/msword');log('Brief downloaded');save();}),slides:()=>preDlP(()=>{dl('PAULA_Status_Pages_'+today()+'.doc',pagesDoc(),'application/msword');log('Status pages downloaded');save();}),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}])})[b.dataset.out]());
  $('#bAIb').onclick=aiBrief;
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 function win(html){const w=window.open('','_blank');w.document.write(html);w.document.close();}
@@ -678,12 +681,88 @@ function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483
   P.projects.push(p);});
  log('Sample data loaded',defs.length+' projects');save();VIEW='port';render();}
 
+// ---------- status update drafted from the suite ----------
+const fd=d=>{if(!d) return '';const x=new Date(d+'T00:00');return isNaN(x)?d:x.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()]+' '+x.getFullYear();};
+function suiteFacts(p){const since=(lastUpd(p)||{}).date||addD(today(),-14);const F2={done:[],next:[],con:[],src:new Set()};
+ p.milestones.forEach(m=>{if(m.actual&&m.actual>since){F2.done.push(m.name+' completed '+fd(m.actual)+'.');F2.src.add('milestones');}const d=m.forecast||m.baseline;if(!m.actual&&d&&d>=today()&&d<=addD(today(),30)){F2.next.push(m.name+' due '+fd(d)+(m.baseline&&m.forecast&&m.forecast>m.baseline?' (forecast late)':'')+'.');F2.src.add('milestones');}});
+ try{const Q=JSON.parse(localStorage.getItem('quinn_project')||'null');if(Q&&p.to){const bl=Q.registry.filter(r=>String(r.to||'').toLowerCase()===String(p.to).toLowerCase()).map(r=>r.building);
+  if(bl.length){const rs=Q.records.filter(r=>bl.includes(r.building)&&r.date>since);if(rs.length){F2.done.push(rs.length+' inspection report'+(rs.length>1?'s':'')+' filed for '+bl.join(', ')+'.');F2.src.add('QUINN');}
+   const cl=Q.issues.filter(i=>bl.includes(i.building)&&i.status==='closed'&&i.closed>since);if(cl.length){F2.done.push(cl.length+' deficienc'+(cl.length>1?'ies':'y')+' closed.');F2.src.add('QUINN');}}}}catch(e){}
+ const q=quinnFor(p);if(q&&q.open){F2.con.push(q.open+' open deficienc'+(q.open>1?'ies':'y')+(q.aged?', '+q.aged+' open over 30 days':'')+'.');F2.src.add('QUINN');}
+ const ir=irmaFor(p);if(ir&&ir.open){F2.con.push(ir.open+' open RFI'+(ir.open>1?'s and submittals':' or submittal')+(ir.overdue?', '+ir.overdue+' past suspense':'')+'.');F2.src.add('IRMA');}
+ const h=health(p);h.parts.filter(z=>z.l>0).forEach(z=>{F2.con.push(z.dim+': '+z.r+'.');F2.src.add('health engine');});
+ p.risks.filter(r=>r.status!=='closed'&&N(r.l)*N(r.i)>=P.t.riskWatch).forEach(r=>{F2.con.push('Risk: '+r.text+(r.response?' ('+r.response+')':'')+'.');F2.src.add('risks');});
+ return F2;}
+const UPD_SYS=`You draft a construction project's biweekly status update for a program manager. Three short fields in plain language, one to three sentences each: what was done this period, what is next, and concerns or help needed. Use ONLY facts in FACTS and state figures exactly as given. If a field has no facts, write "Nothing reported." No references to AI.
+Return ONLY JSON: {"done":"…","next":"…","concerns":"…"}`;
+function fillDraft(p){const F2=suiteFacts(p);const src=[...F2.src];const d=p.draft&&p.draft.date===today()?p.draft:{done:F2.done.join(' '),next:F2.next.join(' '),concerns:F2.con.join(' '),ai:false};
+ [['u_done','done'],['u_next','next'],['u_con','concerns']].forEach(([id,k])=>{const el=$('#'+id);if(el&&!el.value) el.value=d[k]||'';});
+ const box=$('#u_src');if(!box) return;
+ box.innerHTML=(src.length?'Drafted from '+esc(src.join(', '))+(d.ai?', worded with AI':'')+'. Check it, add what the tools can’t know, then save.':'Nothing in the suite for this period yet. Write the update, or link the task order so QUINN and IRMA feed it.')+(d.check?' <b style="color:var(--crit)">'+esc(d.check)+'</b>':'')+
+  (src.length&&window.CARLAI&&CARLAI.state().ok?' <button class="sm" id="bUAI">'+(d.ai?'Reword with AI':'Word it with AI')+'</button>':'');
+ if($('#bUAI')) $('#bUAI').onclick=()=>aiDraft(p,F2,true);
+ if(src.length&&!d.ai&&!(p.draft&&p.draft.date===today())&&window.CARLAI&&CARLAI.state().ok) aiDraft(p,F2,false);}
+async function aiDraft(p,F2,force){const facts=['DONE: '+(F2.done.join(' ')||'none'),'NEXT: '+(F2.next.join(' ')||'none'),'CONCERNS: '+(F2.con.join(' ')||'none')].join('\n');
+ const box=$('#u_src');if(box) box.textContent='Wording the draft with AI from the suite facts…';
+ try{let j=await CARLAI.ask('claude',UPD_SYS,'PROJECT: '+(p.name||'')+'\nFACTS:\n'+facts);let bad=numBadW([j.done,j.next,j.concerns].join(' '),facts);if(bad.length){const j2=await CARLAI.ask('claude',UPD_SYS,'PROJECT: '+(p.name||'')+'\nFACTS:\n'+facts+'\n\nYOUR DRAFT:\n'+JSON.stringify(j)+'\n\nCORRECTIONS: these numbers are not in FACTS: '+bad.join(', ')+'. Fix them, keep everything else.');if(j2&&(j2.done||j2.concerns)){j=j2;bad=numBadW([j.done,j.next,j.concerns].join(' '),facts);}}
+  p.draft={date:today(),done:String(j.done||''),next:String(j.next||''),concerns:String(j.concerns||''),ai:true,check:bad.length?'Check these numbers, not in the suite data: '+bad.join(', '):''};save();
+  if(UPD===p.id&&VIEW==='upd'){[['u_done','done'],['u_next','next'],['u_con','concerns']].forEach(([id,k])=>{const el=$('#'+id);if(el&&(force||!el.dataset.typed)) el.value=p.draft[k];});fillDraft(p);}}
+ catch(e){p.draft={date:today(),done:F2.done.join(' '),next:F2.next.join(' '),concerns:F2.con.join(' '),ai:false};if(UPD===p.id&&VIEW==='upd') fillDraft(p);}}
+document.addEventListener('input',e=>{if(e.target&&/^u_(done|next|con)$/.test(e.target.id)) e.target.dataset.typed='1';});
+
+const NWD={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+function numBadW(t,src){const toks=s=>String(s).toLowerCase().replace(/,/g,'').match(/\b(\d+(\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g)||[];const num=w=>NWD[w]!=null?String(NWD[w]):w;
+ const have=new Set(toks(src).map(num));return [...new Set(toks(t).filter(w=>!have.has(num(w))))];}
+// ---------- Word outputs in the Corbel look ----------
+function kTiles(T){const w=Math.floor(100/T.length);return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:10pt 0 4pt"><tr>'+T.map(([l,v,c],i)=>'<td width="'+w+'%" bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:7pt 9pt">'+cdP(esc(l).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1.5pt;color:'+CD.mute)+cdP(v,'margin:2pt 0 0;font-size:17pt;color:'+(c||CD.navy))+'</td>'+(i<T.length-1?'<td width="6" style="width:5pt">&nbsp;</td>':'')).join('')+'</tr></table>';}
+const HC=['#1E6B33','#8A6100','#9B2C2C'];
+const hlD=l=>'<span style="color:'+HC[l]+'">'+LEVEL[l].i+' '+LEVEL[l].n+'</span>';
+function scopeText(){return [F.svc,F.ctry,F.phase?'Phase '+F.phase:'',F.pm].filter(Boolean).join('  ·  ')||'All projects';}
+function briefDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));const cnt=[0,1,2].map(l=>H.filter(x=>x.h.overall===l).length);const tv=L.reduce((s,p)=>s+value(p),0),aw=L.reduce((s,p)=>s+N(p.award),0),ex=L.reduce((s,p)=>s+N(p.expended),0);
+ const att=H.filter(x=>x.h.overall>0).sort((a,b)=>b.h.overall-a.h.overall||value(b.p)-value(a.p));const dec=L.filter(p=>p.decisions);
+ const ms=[];L.forEach(p=>p.milestones.forEach(m=>{const d=m.forecast||m.baseline;if(!m.actual&&d&&d>=today()&&d<=addD(today(),30)) ms.push([d,p.name,m.name,m.baseline&&m.forecast&&m.forecast>m.baseline]);}));ms.sort();
+ const rk=[];L.forEach(p=>p.risks.filter(r=>r.status!=='closed').forEach(r=>rk.push([N(r.l)*N(r.i),p.name,r.text,r.response])));rk.sort((a,b)=>b[0]-a[0]);
+ let b=cdBand('Leadership brief','Portfolio Leadership Brief',scopeText()+'  ·  as of '+fd(today())+(P.me?'  ·  '+P.me:''));
+ b+=kTiles([['Portfolio value',M(tv)],['Projects',String(L.length)],['Awarded',M(aw)],['Expended',aw?pct(ex/aw):'–'],['Health','<span style="color:'+HC[0]+'">'+cnt[0]+'</span> / <span style="color:'+HC[1]+'">'+cnt[1]+'</span> / <span style="color:'+HC[2]+'">'+cnt[2]+'</span>']]);
+ b+=cdP('Health: on track / watch / critical.','margin:0 0 6pt;font-size:8pt;color:'+CD.mute);
+ if(P.ai_brief&&P.ai_brief.key===briefKey()) b+=cdH('Summary')+cdP(esc(P.ai_brief.text));
+ b+=cdH('Needs attention')+(att.length?cdTable(['Health','Project','Value','Why'],att.map(x=>[hlD(x.h.overall),esc(x.p.name)+'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc(x.p.installation||'')+'  ·  Phase '+x.p.phase+'</span>',M(value(x.p)),x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')+(x.h.override?'<br>Override: '+esc(x.p.override.reason):'')])):cdP('All projects on track.'));
+ b+=cdH('Decisions needed')+(dec.length?cdTable(['Project','Decision'],dec.map(p=>[esc(p.name),esc(p.decisions)])):cdP('None.'));
+ b+=cdH('Next 30 days')+(ms.length?cdTable(['Date','Project','Milestone'],ms.map(m=>[fd(m[0]),esc(m[1]),esc(m[2])+(m[3]?' <span style="color:'+HC[1]+'">(forecast late)</span>':'')])):cdP('No milestones in the next 30 days.'));
+ b+=cdH('Top risks')+(rk.length?cdTable(['Score','Project','Risk','Response'],rk.slice(0,8).map(r=>[String(r[0]),esc(r[1]),esc(r[2]),esc(r[3]||'')])):cdP('No open risks recorded.'));
+ b+=cdH('All projects')+cdTable(['Project','Location','Phase','Value','Health'],H.slice().sort((a,c)=>c.h.overall-a.h.overall).map(x=>[esc(x.p.name),esc(x.p.installation||'–'),String(x.p.phase),M(value(x.p)),hlD(x.h.overall)]));
+ b+=cdFoot('Prepared with Corbel PAULA  ·  '+fd(today())+'  ·  Health is computed from cost growth, schedule, risk and open actions using the thresholds in the tool; overrides are noted.');
+ return cdDoc('Portfolio Leadership Brief',[b]);}
+function pagesDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)})).sort((a,b)=>b.h.overall-a.h.overall||value(b.p)-value(a.p));const cnt=[0,1,2].map(l=>H.filter(x=>x.h.overall===l).length);const tv=L.reduce((s,p)=>s+value(p),0);
+ const pages=[];let b=cdBand('Status pages','Portfolio Status',scopeText()+'  ·  '+fd(today())+'  ·  '+L.length+' projects  ·  '+M(tv));
+ b+=kTiles([['On track','✓ '+cnt[0],HC[0]],['Watch','▲ '+cnt[1],HC[1]],['Critical','■ '+cnt[2],HC[2]],['Awarded',M(L.reduce((s,p)=>s+N(p.award),0))],['Value',M(tv)]]);
+ const att=H.filter(x=>x.h.overall>0);b+=cdH('Needs attention')+(att.length?cdTable(['Health','Project','Why'],att.slice(0,10).map(x=>[hlD(x.h.overall),esc(x.p.name),x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')])):cdP('Nothing on watch or critical.'));
+ pages.push(b+cdFoot('Prepared with Corbel PAULA  ·  page 1'));
+ H.forEach((x,i)=>{const p=x.p,u=lastUpd(p)||{};const aw=N(p.award);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;
+  let c=cdBand('Project status',LEVEL[x.h.overall].i+' '+(p.name||'(untitled)'),[p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.contractor].filter(Boolean).join('  ·  '));
+  c+=kTiles([['Health',hlD(x.h.overall)],['Estimate',M(est(p))+(base(p)?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+pct((est(p)-base(p))/base(p),1)+' vs authorized</span>':'')],['Complete',p.pct!==''?Math.round(N(p.pct))+'%':'–'],['Forecast completion',p.forecast_finish?fd(p.forecast_finish)+(sl!=null?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+(sl>0?sl+' days late':'on or ahead of baseline')+'</span>':''):'–'],['Expended',aw?pct(N(p.expended)/aw):'–']]);
+  c+=cdTable(['Done this period','Next period','Concerns'],[[esc(u.done||'–'),esc(u.next||'–'),esc(u.concerns||'–')]],['34%','33%','33%']);
+  c+=cdH('Health')+cdTable(['Measure','Rating','Reason'],x.h.parts.filter(z=>z.l>=0).map(z=>[esc(z.dim),hlD(z.l),esc(z.r)]));
+  if(p.decisions) c+=cdH('Decision needed')+cdP(esc(p.decisions));
+  pages.push(c+cdFoot('Status as of '+(u.date?fd(u.date):'– (no update yet)')+'  ·  Prepared with Corbel PAULA  ·  page '+(i+2)));});
+ return cdDoc('Portfolio Status',pages,true);}
+// ---------- open items before download ----------
+function preDlP(go){const L=filtered();const I=[];const st=L.filter(p=>{const u=lastUpd(p);return !u||dd(u.date,today())>P.t.stale;});if(st.length) I.push([st.length+' project'+(st.length>1?'s':'')+' with no status update in '+P.t.stale+' days: '+st.slice(0,4).map(p=>p.name).join(', ')+(st.length>4?'…':''),()=>{UPD=st[0].id;VIEW='upd';render();}]);
+ const nd=L.filter(p=>N(p.award)&&(!p.baseline_finish||!p.forecast_finish));if(nd.length) I.push([nd.length+' awarded project'+(nd.length>1?'s':'')+' missing baseline or forecast completion',()=>openP(nd[0],'edit')]);
+ const nl=L.filter(p=>!p.installation);if(nl.length) I.push([nl.length+' project'+(nl.length>1?'s':'')+' with no installation',()=>openP(nl[0],'edit')]);
+ if(!(P.ai_brief&&P.ai_brief.key===briefKey())) I.push(['No summary paragraph for this filter yet',()=>aiBrief()]);else if(P.ai_brief.check) I.push([P.ai_brief.check,()=>aiBrief()]);
+ if(!I.length) return go();const d=document.createElement('dialog');d.id='pgDlg';d.style.cssText='border:none;border-radius:12px;padding:20px 22px;max-width:580px;width:94vw;font:14px Segoe UI,system-ui,sans-serif';
+ d.innerHTML='<h3 style="margin:0 0 8px">Before you download</h3><p class="small" style="margin:0 0 10px">These are open in this report:</p>'+I.map(([t],i)=>'<div class="find" style="display:flex;gap:8px;align-items:center;border-left:4px solid var(--watch);padding:7px 10px;margin:6px 0"><span style="flex:1">'+esc(t)+'</span><button class="sm" data-fx="'+i+'">Fix it</button></div>').join('')+'<div class="row" style="margin-top:14px"><button class="go" id="pgAny">Download draft anyway</button><button id="pgNo">Fix first</button></div>';
+ document.body.appendChild(d);d.showModal();const close=()=>{d.close();d.remove();};
+ d.querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{close();I[+b.dataset.fx][1]();});d.querySelector('#pgAny').onclick=()=>{close();go();};d.querySelector('#pgNo').onclick=close;}
+
 function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
 const csv=rows=>'﻿'+rows.map(r=>r.map(c=>{const s=String(c??'');return /[",\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s;}).join(',')).join('\r\n');
 $('#bSave').onclick=()=>{dl('PAULA_'+today()+'.json',JSON.stringify(P,null,1),'application/json');log('File saved');save();};
 $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='paula-1') throw new Error('Not a PAULA file');P=Object.assign(BLANK(),j);P.t={...DEF_T,...j.t};CUR=null;VIEW='port';log('File opened',f.name);save();render();}catch(err){alert('Could not open: '+err.message);}});};
 if(window.MSfill) P.projects=P.projects.map(p=>MSfill(blankProj(),p));
+P.projects.forEach(p=>{if(!p.country&&p.installation){const g=locate(p.installation);if(g){p.country=g[2];if(!p.lat){p.lat=g[0];p.lon=g[1];}}}});
 render();
 </script>
 <script id="corbel-lib">
