@@ -303,7 +303,7 @@ function vReg(){const v=$('#view');
  '<table class="reg" style="margin-top:12px"><thead><tr><th>Number</th><th>Title</th><th>TO / contract</th><th>Spec</th><th>Received</th><th>PM due</th><th>Suspense</th><th>Status</th><th>Intake returns</th><th>Time</th></tr></thead><tbody id="rb"></tbody></table></div>';
  const q=$('#rq');q.value=RF.q;q.oninput=()=>{RF.q=q.value;rows();};$('#rs').onchange=e=>{RF.show=e.target.value;rows();};
  $('#bNS').onclick=()=>newItem('submittal');$('#bNR').onclick=()=>newItem('rfi');
- $('#bCsv').onclick=()=>XL.save('IRMA_Register_'+today()+'.xlsx',[{name:'Register',rows:[['Number','Kind','Title','TO / contract','Spec','Received','PM due','Suspense','Status','Disposition','Intake returns','Minutes','Reviewers']].concat(I.items.map(x=>[num(x),x.kind,x.title,x.to,x.spec,x.received,pmDue(x),suspense(x),STATUS[x.status],x.disp?(DISP_S[x.disp]||DISP_R[x.disp]):'',x.intake_returns||0,x.minutes||0,(x.sme||[]).map(s=>s.name+' ('+s.disc+')').join('; ')]))}]);
+ $('#bCsv').onclick=()=>XL.save(projName()+'_IRMA-Register_'+today()+'.xlsx',[{name:'Register',rows:[['Number','Kind','Title','TO / contract','Spec','Received','PM due','Suspense','Status','Disposition','Intake returns','Minutes','Reviewers']].concat(I.items.map(x=>[num(x),x.kind,x.title,x.to,x.spec,x.received,pmDue(x),suspense(x),STATUS[x.status],x.disp?(DISP_S[x.disp]||DISP_R[x.disp]):'',x.intake_returns||0,x.minutes||0,(x.sme||[]).map(s=>s.name+' ('+s.disc+')').join('; ')]))}]);
  rows();
  function rows(){const t=RF.q.toLowerCase();const L=I.items.filter(x=>(RF.show==='all'||(RF.show==='closed'?x.status==='closed':RF.show==='over'?x.status!=='closed'&&daysTo(suspense(x))<0:x.status!=='closed'))&&(!t||(num(x)+' '+x.title+' '+x.to+' '+x.spec).toLowerCase().includes(t))).sort((a,b)=>(suspense(a)||'9').localeCompare(suspense(b)||'9'));
   const tb=$('#rb');tb.innerHTML=L.length?L.map(x=>{const d=daysTo(suspense(x));const cl=x.status!=='closed'&&d!==null?(d<0?'over':d<=3?'soon':''):'';
@@ -316,7 +316,7 @@ function newItem(kind){const n=I.items.filter(x=>x.kind===kind).reduce((m,x)=>Ma
 // ---------- references ----------
 function vRefs(){const v=$('#view');const sop=sophieText(),cs=coraSel();
  v.innerHTML='<div class="panel"><h2>Contract references</h2><p class="lead">The documents a finding may cite: the SOW, the specification sections, drawing notes, the criteria list. IRMA searches these, and every finding it asserts must quote one of them word for word. The submittal or RFI itself is always searched too, within its own four corners.'+(carlOn()?' Signed in to CARL, IRMA also searches CARL\u2019s library of governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR) and cites it word for word the same way.':' Sign in to CARL to add its library of governing criteria to every search.')+'</p>'+
- '<div class="row" style="margin-top:0">'+(sop?'<button class="sm go" id="bSop">Add the SOW from SOPHIE</button>':'')+(cs?'<button class="sm go" id="bCora">Add the CORA criteria list</button>':'')+'</div>'+
+ '<div class="row" style="margin-top:0">'+(sop&&!I.refs.some(r=>/^SOW – /.test(r.name))?'<button class="sm go" id="bSop">Add the SOW from SOPHIE</button>':'')+(cs&&!I.refs.some(r=>/^CORA criteria/.test(r.name))?'<button class="sm go" id="bCora">Add the CORA criteria list</button>':'')+'</div>'+
  '<div class="drop" id="drop" style="margin-top:12px">Drop PDF or text files here, or <button class="sm" id="bPick">choose files</button><input type="file" id="fRef" accept=".pdf,.txt,.md" multiple hidden></div><p class="small" id="rstat">'+esc(MSG.ref)+'</p>'+
  '<div class="row"><input id="pn" placeholder="Name (e.g. UFGS 07 57 13 project specification)" style="flex:1"><select id="pk" style="width:auto">'+opts({sow:'SOW / PWS',spec:'Specification',dwg:'Drawing notes',ifs:'Installation standard',crit:'Criteria list',other:'Other'},'spec')+'</select><button id="bPaste">Add pasted text</button></div><textarea id="pt" placeholder="Or paste text here" style="margin-top:6px"></textarea>'+
  '<table style="margin-top:12px"><thead><tr><th>Reference</th><th>Kind</th><th class="num">Pages</th><th class="num">Words</th><th></th></tr></thead><tbody>'+(I.refs.map(r=>'<tr><td>'+esc(r.name)+'</td><td>'+esc(r.kind)+'</td><td class="num">'+(r.pages?.length||'')+'</td><td class="num">'+words(r).toLocaleString()+'</td><td><button class="sm" data-del="'+r.id+'">Remove</button></td></tr>').join('')||'<tr><td colspan="5" class="empty">No references yet.</td></tr>')+'</tbody></table></div>';
@@ -390,11 +390,11 @@ function tDocs(){const x=CUR;const t=$('#tab');
    log(x,'Scanned pages transcribed by AI',r.label+' '+r.model+' · '+d.images.length+' pages · transcription is not verified against an original text layer');d.images=[];save();vItem();}catch(e){alert('Failed: '+e.message);b.disabled=false;b.textContent='Read scanned pages with AI';}});}
 function tIntake(){const x=CUR;const t=$('#tab');const all=INTAKE.every(([k])=>x.intake[k]);
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Intake check</h3><p class="lead">Is the package complete enough for technical review? If not, return it now; technical reviewers should never see an incomplete package.</p>'+
- INTAKE.map(([k,l])=>'<label style="display:block;margin:6px 0"><input type="checkbox" data-i="'+k+'" style="width:auto;margin-right:8px" '+(x.intake[k]?'checked':'')+'>'+esc(l)+'</label>').join('')+
+ (x.intakeEv?'<div class="mentor">Pre-checked from the packet. Ticks and notes show what IRMA found; confirm each, or return the package.</div>':'')+INTAKE.map(([k,l])=>{const ev=(x.intakeEv||{})[k];return '<label style="display:block;margin:6px 0"><input type="checkbox" data-i="'+k+'" style="width:auto;margin-right:8px" '+(x.intake[k]?'checked':'')+'>'+esc(l)+(ev?'<div class="small" style="margin-left:26px;color:'+(x.intake[k]?'var(--ok)':'var(--warn)')+'">'+esc(ev)+'</div>':'')+'</label>';}).join('')+
  '<label class="f" style="margin-top:8px">What is missing (goes in the return note)</label><textarea id="miss">'+esc(x.intake.note||'')+'</textarea>'+
  (x.status==='returned'?'<div class="find warn"><b>Returned at intake '+esc(x.lastReturn?.date||'')+'.</b> When the contractor resubmits, log it here: the revision goes up by one and the suspense clock restarts. <button class="sm go" id="bResub">Log resubmittal</button></div>':'')+'<div class="row"><button class="go" id="bPass" '+(all?'':'disabled')+'>Passes intake – start technical review</button><button id="bRet">Return at intake</button>'+((x.intake_returns||0)>=Number(I.settings.intake_flag)?'<span class="pill bad">'+x.intake_returns+' intake returns – put on the QC meeting agenda as a Contractor QC Plan issue</span>':'')+'</div></div>';
  t.querySelectorAll('[data-i]').forEach(c=>c.onchange=()=>{x.intake[c.dataset.i]=c.checked;save();tIntake();});
- if($('#bResub')) $('#bResub').onclick=()=>{x.rev=(Number(x.rev)||0)+1;x.received=today();x.status='received';x.intake={};x.email='';log(x,'Resubmittal logged',num(x));save();vItem();renderSteps();};$('#miss').oninput=e=>{x.intake.note=e.target.value;save();};
+ if($('#bResub')) $('#bResub').onclick=()=>{x.rev=(Number(x.rev)||0)+1;x.received=today();x.status='received';x.intake={};x.intakeEv=null;x.email='';log(x,'Resubmittal logged',num(x));save();vItem();renderSteps();};$('#miss').oninput=e=>{x.intake.note=e.target.value;save();};
  $('#bPass').onclick=()=>{x.status='technical';log(x,'Passed intake');save();TAB='elem';vItem();renderSteps();};
  $('#bRet').onclick=()=>{const miss=INTAKE.filter(([k])=>!x.intake[k]).map(([,l])=>l);x.intake_returns=(x.intake_returns||0)+1;const old=num(x);
   x.lastReturn={from:old,date:today(),missing:miss,note:x.intake.note||''};x.status='returned';log(x,'Returned at intake',old+' · '+(miss.join('; ')||x.intake.note));
@@ -522,9 +522,10 @@ async function reviewIt(x,again){if(!x||!x.docs.length) return;if(again&&x.eleme
   if(!x.elements.length){say('Nothing that needs an answer was found. Add elements by hand on the Elements tab.');save();vItem();return;}
   await groundAll(x,true,(k,n)=>say('Grounding '+k+' of '+n+'…'));
   x.email=buildEmail(x);if(x.kind==='submittal'&&!x.rec) x.rec=recFor(x);
+  if(x.kind==='submittal') preIntake(x,docText);
   if(x.status==='received') x.status=x.kind==='rfi'?'technical':'intake';
   log(x,'Reviewed in one step',(hs.length?'header: '+hs.join(', ')+'; ':'')+(ar.length?'references: '+ar.join(', ')+'; ':'')+x.elements.length+' elements');save();
-  MSG.doc='';TAB='resp';vItem();renderSteps();}
+  MSG.doc='';TAB=x.kind==='submittal'&&x.status==='intake'?'intake':'resp';vItem();renderSteps();}
  catch(e){say('Stopped: '+e.message);if(b) b.disabled=false;}}
 // The response as a Word document in the Corbel look.
 function respDoc(x){const E=x.elements.filter(e=>e.include);const A=E.filter(e=>e.result&&LABELS[e.result.label][1]>=GATE);const D=E.filter(e=>!e.result||LABELS[e.result.label][1]<GATE);const e2=t=>esc(t??'');
@@ -536,6 +537,23 @@ function respDoc(x){const E=x.elements.filter(e=>e.include);const A=E.filter(e=>
   (D.length?cdH(x.kind==='rfi'?'For the design agent’s or COR’s judgment':'Not verified against the contract documents')+D.map(e=>cdP('&#9675;&nbsp; '+e2((e.text||'').trim())+(e.result&&e.result.label==='ung'?' <span style="color:'+CD.mute+'">(no controlling language found in the loaded documents)</span>':''),'margin:0 0 4pt')).join(''):'')+
   cdLead('This is an advisory review. Direction to the contractor comes from the Contracting Officer.')+cdFoot('Prepared with Corbel IRMA  ·  '+e2(num(x)));
  return cdDoc(num(x)+' response',[body]);}
+
+
+// The intake check, pre-filled from what the packet itself shows. Each tick carries its evidence; anything IRMA cannot see stays unticked with a note.
+function projName(){try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];const n=String((pr&&(pr.core||pr).name)||'');return (n||'Project').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50);}catch(e){return 'Project';}}
+function preIntake(x,t){const ev={},ok={};const q=(re)=>{const m=t.match(re);return m?m[0].replace(/\s+/g,' ').trim().slice(0,90):'';};const pages=x.docs.reduce((a,d)=>a+d.pages.length,0);const empty=x.docs.reduce((a,d)=>a+d.pages.filter(p=>p.trim().length<40).length,0);
+ const hasNo=!!q(/\b(?:submittal|transmittal)\s*(?:no\.?|number|#)\s*:?\s*[0-9]/i),hasDate=!!q(/\bdate\s*:?\s*[0-9]/i),hasTO=!!(x.to||q(/\bcontract\s*(?:no\.?|number)?\s*:?\s*[A-Z0-9\-]{6,}/i));
+ ok.transmittal=hasNo&&hasDate&&hasTO;ev.transmittal=ok.transmittal?'Number, date and contract shown in the transmittal':'Not shown: '+[!hasNo&&'submittal number',!hasDate&&'date',!hasTO&&'contract or task order'].filter(Boolean).join(', ');
+ const par=q(/\b(?:paragraph|para\.?|part)\s*[0-9][0-9.]*|\b[1-3]\.[0-9]+(?:\.[0-9]+)*\s+[A-Z][A-Za-z]/);ok.spec=!!(x.spec&&par);ev.spec=x.spec?(par?'Section '+x.spec+', '+par:'Section '+x.spec+' shown; no paragraph identified'):'No specification section shown';
+ const qcName=q(/\b(?:QC|quality control)\s*(?:manager|system manager|representative|reviewer)\b[^\n]{0,40}/i),stamp=q(/\b(?:stamp(?:ed)?|signature|signed|approved by (?:the )?(?:contractor )?QC|reviewed and approved)\b[^\n]{0,40}/i);
+ ok.qc=!!stamp;ev.qc=stamp?'“'+stamp+'”':(qcName?'QC manager named (“'+qcName+'”) but no QC stamp or signature seen':'No contractor QC review stamp or signature seen');
+ ok.items=false;ev.items='Check against the submittal list in the specification section'+(x.spec?' '+x.spec:'');
+ const dv=q(/[^.\n]{0,80}\b(?:in lieu of|substitut\w*|deviat\w*|instead of|alternate|alternative|propos\w+)\b[^.\n]{0,80}/i),why=/\b(because|due to|in order to|reason|justif\w*|equal|equivalent|or equal|meets or exceeds|performance)\b/i.test(t);
+ if(dv){ok.dev=why;ev.dev=why?'Deviation stated and a reason given: “'+dv+'”':'Deviation stated with no justification: “'+dv+'”';}else{ok.dev=true;ev.dev='No deviation stated in the packet';}
+ ok.legible=pages>0&&!empty;ev.legible=pages?(empty?empty+' of '+pages+' pages have no readable text (scanned or blank)':'Text readable on all '+pages+' page'+(pages>1?'s':'')):'No pages';
+ x.intake=x.intake||{};INTAKE.forEach(([k])=>{x.intake[k]=!!ok[k];});x.intakeEv=ev;
+ const miss=INTAKE.filter(([k])=>!ok[k]&&k!=='items').map(([k])=>ev[k]);if(miss.length&&!x.intake.note) x.intake.note=miss.join('\n');
+ log(x,'Intake pre-checked from the packet',INTAKE.filter(([k])=>ok[k]).length+' of '+INTAKE.length+' shown');}
 
 // ---------- settings ----------
 function vSet(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Settings</h2><div class="form"><div><label class="f">Submittal suspense (calendar days)</label><input type="number" data-k="sub_days"></div><div><label class="f">RFI suspense (calendar days)</label><input type="number" data-k="rfi_days"></div><div><label class="f">PM review (days)</label><input type="number" data-k="pm_days"></div><div><label class="f">Intake returns before QC flag</label><input type="number" data-k="intake_flag"></div>'+
