@@ -461,10 +461,10 @@ function shape(l,x,y,r,tip){const c=LEVEL[l].c;const ring=' stroke="var(--surf)"
 
 // ---------- nav ----------
 function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['fund','Funding'],['seq','Sequence'],['reg','Actions'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
- nav.innerHTML=items.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k?'on':'')+'"><span class="n">'+(i+1)+'</span>'+esc(t.length>22?t.slice(0,21)+'…':t)+'<span class="c"></span></button>').join('')+
+ nav.innerHTML=items.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k||(VIEW==='imp'&&k==='proj')?'on':'')+'"><span class="n">'+(i+1)+'</span>'+esc(t.length>22?t.slice(0,21)+'…':t)+'<span class="c"></span></button>').join('')+
  '<div class="gate">'+P.projects.length+' projects<br>'+(P.projects.some(p=>p.sample)?'<span style="color:var(--warn)">Sample data loaded</span>':'')+'</div>';
  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
-function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,fund:vFund,seq:vSeq,reg:vReg,rep:vRep,data:vData})[VIEW]();}
+function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,fund:vFund,seq:vSeq,reg:vReg,rep:vRep,data:vData,imp:vImp})[VIEW]();}
 function openP(p,tab){CUR=p;VIEW='one';PTAB=tab||'ov';render();window.scrollTo(0,0);}
 
 // ---------- portfolio ----------
@@ -573,13 +573,13 @@ function vProj(){const v=$('#view');const L=filtered().map(p=>({p,h:health(p)}))
  const key={health:x=>x.h.overall*1e13+value(x.p),name:x=>x.p.name,loc:x=>x.p.installation,svc:x=>x.p.service,phase:x=>N(x.p.phase),val:x=>value(x.p),growth:x=>base(x.p)?(est(x.p)-base(x.p))/base(x.p):-9,slip:x=>x.p.baseline_finish&&x.p.forecast_finish?dd(x.p.baseline_finish,x.p.forecast_finish):-9999,pct:x=>N(x.p.pct),upd:x=>x.h.lastDate||''};
  L.sort((a,b)=>{const A=key[SORT.k](a),B=key[SORT.k](b);return (A>B?1:A<B?-1:0)*SORT.d;});
  const th=(k,t,c)=>'<th data-s="'+k+'" class="'+(c||'')+'">'+t+(SORT.k===k?(SORT.d>0?' ▲':' ▼'):'')+'</th>';
- v.innerHTML=filterRow()+'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">Projects</h2><div><button class="go" id="bAdd">Add project</button></div></div>'+
+ v.innerHTML=filterRow()+'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">Projects</h2><div><button id="bImpD">Import budget documents</button> <button class="go" id="bAdd">Add project</button></div></div>'+
  '<table class="ptable" style="margin-top:12px"><thead><tr>'+th('health','Health')+th('name','Project')+th('loc','Location')+th('svc','Service')+th('phase','Phase','num')+th('val','Value','num')+th('growth','Cost','num')+th('slip','Slip','num')+th('pct','Complete','num')+th('upd','Last update')+'</tr></thead><tbody>'+
  (L.map(x=>{const g=base(x.p)&&(N(x.p.cwe)||N(x.p.award))?(est(x.p)-base(x.p))/base(x.p):null;const sl=x.p.baseline_finish&&x.p.forecast_finish?dd(x.p.baseline_finish,x.p.forecast_finish):null;
   return '<tr class="clk" data-open="'+x.p.id+'"><td>'+chip(x.h.overall,x.h.override?'*':'')+'</td><td><b>'+esc(x.p.name||'(untitled)')+'</b><div class="small">'+esc([x.p.number,x.p.to].filter(Boolean).join(' · '))+'</div></td><td>'+esc(x.p.installation)+'</td><td>'+esc(x.p.service)+'</td><td class="num">'+x.p.phase+'</td><td class="num">'+M(value(x.p))+'</td><td class="num">'+(g==null?'–':(g>=0?'+':'')+pct(g,1))+'</td><td class="num">'+(sl==null?'–':(sl>0?'+':'')+sl+' d')+'</td><td class="num">'+(x.p.pct!==''?Math.round(N(x.p.pct))+'%':'–')+'</td><td>'+(x.h.lastDate||'–')+(x.h.stale?' <span class="chip n">Stale</span>':'')+'</td></tr>';}).join('')||'<tr><td colspan="10" class="empty">No projects match.</td></tr>')+'</tbody></table><p class="small">* health set by override.</p></div>';
  bindFilters();v.querySelectorAll('[data-open]').forEach(r=>r.onclick=()=>openP(P.projects.find(p=>p.id===r.dataset.open)));
  v.querySelectorAll('[data-s]').forEach(t=>t.onclick=()=>{SORT=SORT.k===t.dataset.s?{k:SORT.k,d:-SORT.d}:{k:t.dataset.s,d:t.dataset.s==='name'||t.dataset.s==='loc'?1:-1};vProj();});
- $('#bAdd').onclick=()=>{const p=blankProj();P.projects.push(p);log('Project added');save();openP(p,'edit');};}
+ $('#bAdd').onclick=()=>{const p=blankProj();P.projects.push(p);log('Project added');save();openP(p,'edit');};$('#bImpD').onclick=()=>{VIEW='imp';render();window.scrollTo(0,0);};}
 
 // ---------- one project ----------
 function vOne(){const p=CUR;if(!p){VIEW='proj';return render();}const v=$('#view');const h=health(p);
@@ -705,9 +705,215 @@ function dataRows(){const h=['Project','Number','Task order','Service','Installa
  return [h].concat(filtered().map(p=>{const H=health(p);return [p.name,p.number,p.to,p.service,p.installation,p.country,p.phase,p.fy,p.pm,p.contractor,p.programmed,p.authorized,p.award,p.cwe,p.obligated,p.expended,p.ntp,p.baseline_finish,p.forecast_finish,p.pct,LEVEL[H.overall].n,H.parts.map(z=>z.dim+': '+z.r).join(' | '),H.override?p.override.reason:'',H.lastDate,p.authority?AUTHN(p.authority):'',PROGN(progOf(p))==='Not set'?'':PROGN(progOf(p)),funds(p).map(l=>'FY'+l.fy+' '+ACC(l.src)[1]+' '+Math.round(N(l.amt))+' ('+(isHN(l)?(HNSTAGES.find(x=>x[0]===l.hnst)||HNSTAGES[0])[1]:STAGES[SI(l.stage)][1])+')').join('; '),funds(p).some(isHN)?'Yes':'',(p.hn||{}).country||'',(p.hn||{}).arrangement||'',funds(p).some(isHN)?(HNSTAGES.find(x=>x[0]===(p.hn||{}).status)||HNSTAGES[0])[1]:'',(p.posture||{}).pdi?'Yes':'',(p.posture||{}).ipl?'Yes':'',(p.posture||{}).upl?'Yes':'',(p.posture||{}).program||'',(p.posture||{}).component||''].concat(GATES.map(([k])=>{const g=gateOf(p,k);return g.st?(g.pct!==undefined?g.pct+'% – ':'')+(GSTAT.find(x=>x[0]===g.st)||['',''])[1]+(g.date?' '+g.date:''):'';})).concat([(p.ext||[]).map(x=>(EXT.find(e=>e[0]===x.type)||EXT[6])[1]+(x.label?' – '+x.label:'')+' ('+(x.status||'open')+')').join('; '),p.priority||'']);}));}
 
 // ---------- data + settings ----------
+// ---------- Import budget documents: justification books, single DD 1391s, PDI and other budget exhibits ----------
+// Two readers per document. The layout reader takes the DD 1391 header boxes by position on the page; the AI reader reads the same pages.
+// Where they disagree, a second AI engine arbitrates and must quote the page. Every number has to appear on its page.
+// Nothing is created until the reviewer approves it, and an update never overwrites a filled field without the reviewer choosing to.
+let IMP=null,PDFJS=null;
+const aiOn=()=>!!(window.CARLAI&&CARLAI.state().ok);
+async function pdfLib(){if(PDFJS) return PDFJS;
+ const r=await fetch('irma.html',{cache:'force-cache'});if(!r.ok) throw new Error('The PDF reader could not be loaded');const h=await r.text();
+ const grab=id=>{const m=h.match(new RegExp('<script id="'+id+'" type="text/plain">([\\s\\S]*?)<\/script>'));if(!m) throw new Error('The PDF reader could not be loaded');return Uint8Array.from(atob(m[1].trim()),c=>c.charCodeAt(0));};
+ const u=URL.createObjectURL(new Blob([grab('pdfjs')],{type:'text/javascript'}));const w=URL.createObjectURL(new Blob([grab('pdfw')],{type:'text/javascript'}));
+ PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
+async function pdfRead(file,say){const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await file.arrayBuffer())}).promise;const pages=[];let scans=0;
+ for(let i=1;i<=doc.numPages;i++){if(say&&(i===1||i%10===0)) say('Reading '+file.name+': page '+i+' of '+doc.numPages);const pg=await doc.getPage(i);const vp=pg.getViewport({scale:1});const tc=await pg.getTextContent();
+  const items=tc.items.filter(it=>it.str&&it.str.trim()).map(it=>({s:it.str.trim(),x:it.transform[4],y:vp.height-it.transform[5]}));
+  const srt=items.slice().sort((a,b)=>Math.abs(a.y-b.y)>2?a.y-b.y:a.x-b.x);let t='',ly=null;srt.forEach(it=>{if(ly!==null&&Math.abs(it.y-ly)>2) t+='\n';else if(t) t+=' ';t+=it.s;ly=it.y;});
+  t=t.replace(/[ \t]+/g,' ').trim();
+  if(t.length<40&&aiOn()&&scans<40){scans++;if(say) say('Reading scanned page '+i+' of '+file.name);try{const v2=pg.getViewport({scale:1.4});const c=document.createElement('canvas');c.width=v2.width;c.height=v2.height;await pg.render({canvasContext:c.getContext('2d'),viewport:v2}).promise;
+    const j=await CARLAI.ask('fast','Transcribe the page exactly. Return ONLY JSON {"text":"..."}. Keep line breaks. Do not summarize or correct.','Transcribe this page.',[c.toDataURL('image/jpeg',.75).split(',')[1]]);t=String(j.text||'');}catch(e){}}
+  pages.push({n:i,t,items});}
+ return pages;}
+// ---- the layout reader ----
+const LB=[['component',/^1\.\s*COMPONENT\b\s*/i],['date',/^2\.\s*DATE\b\s*/i],['installation',/^3\.\s*INSTALLATION(\s+AND\s+LOCATION)?\b\s*/i],['title',/^4\.\s*PROJECT\s+TITLE\b\s*/i],['pe',/^5\.\s*PROGRAM\s+ELEMENT\b\s*/i],['catcode',/^6\.\s*CATEGORY\s+CODE\b\s*/i],['number',/^7\.\s*PROJECT\s+NUMBER\b\s*/i],['cost',/^8\.\s*PROJECT\s+COST(\s*\(\$000\))?\s*/i]];
+const IMF=[['title','Project title'],['number','Project number'],['installation','Installation and location'],['component','Component'],['fy','Fiscal year'],['pe','Program element'],['catcode','Category code'],['cost','Project cost ($000)'],['dpct','Design percent complete'],['d35','35% design date'],['dc','Design complete date']];
+const IMKEY=['title','number','installation','fy','cost'];
+const is1391=pg=>/PROJECT\s+NUMBER/i.test(pg.t)&&/PROJECT\s+COST/i.test(pg.t)&&/INSTALLATION/i.test(pg.t);
+function hdrPos(pg){const o={};const it=pg.items||[];const labs=[];it.forEach(x=>LB.forEach(([k,re])=>{if(re.test(x.s)) labs.push({k,x});}));
+ labs.forEach(({k,x})=>{const re=LB.find(l=>l[0]===k)[1];const tail=x.s.replace(re,'').trim();if(tail){o[k]=tail;return;}
+  const right=Math.min(1e9,...labs.filter(l=>l.x!==x&&Math.abs(l.x.y-x.y)<6&&l.x.x>x.x+5).map(l=>l.x.x));const below=Math.min(x.y+34,...labs.filter(l=>l.x.y>x.y+4).map(l=>l.x.y-1));
+  const v=it.filter(z=>z!==x&&!labs.some(l=>l.x===z)&&z.y>x.y+1&&z.y<=below&&z.x>=x.x-6&&z.x<right-2).sort((a,b)=>Math.abs(a.y-b.y)>2?a.y-b.y:a.x-b.x).map(z=>z.s).join(' ').trim();if(v) o[k]=v;});
+ return o;}
+function hdrText(t){const o={};const q=[];const lab=s=>LB.find(([,re])=>new RegExp(re.source.replace(/^\^/,''),'i').test(s));
+ for(const s of t.split('\n').flatMap(l=>l.split(/\s{3,}|\t/)).map(x=>x.trim())){if(!s) continue;if(/^(9|10|11|12)\.\s/.test(s)) break;const L=lab(s);
+  if(L){const re=new RegExp(L[1].source.replace(/^\^/,''),'i');const m=s.match(re);const rest=s.slice(m.index+m[0].length).replace(/^[:\s]+/,'').trim();if(rest&&!lab(rest)){if(!o[L[0]]) o[L[0]]=rest;}else q.push(L[0]);continue;}
+  if(/MILITARY\s+CONSTRUCTION\s+PROJECT\s+DATA|^\(?computer generated\)?$|^DD\s*FORM/i.test(s)) continue;
+  if(q.length){const k=q.shift();if(!o[k]) o[k]=s;}}
+ return o;}
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function ymOf(s){s=String(s||'');let m=s.match(/(\d{1,2})\s+([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/);if(m&&MON[m[2].toLowerCase()]) return m[3]+'-'+String(MON[m[2].toLowerCase()]).padStart(2,'0');
+ m=s.match(/([A-Za-z]{3})[a-z]*\.?\s+(\d{4})/);if(m&&MON[m[1].toLowerCase()]) return m[2]+'-'+String(MON[m[1].toLowerCase()]).padStart(2,'0');m=s.match(/(\d{1,2})\/(?:\d{1,2}\/)?(\d{4})/);if(m) return m[2]+'-'+m[1].padStart(2,'0');m=s.match(/(\d{4})-(\d{2})/);return m?m[1]+'-'+m[2]:'';}
+function blk12(t){const o={};let m=t.match(/Percent\s+Complete\s+as\s+of[\s\S]{0,120}?(\d{1,3}(?:\.\d+)?)\s*%/i);if(m&&+m[1]<=100) o.dpct=String(Math.round(+m[1]));
+ const dt=re=>{const x=t.match(re);return x?ymOf(x[1]):'';};o.d35=dt(/35\s*%\s*Design[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);o.dc=dt(/Date\s+Design\s+Complete[^\n]*?((?:\d{1,2}\s+)?[A-Za-z]{3}[a-z]*\.?\s+\d{4}|\d{1,2}\/(?:\d{1,2}\/)?\d{4})/i);
+ Object.keys(o).forEach(k=>{if(!o[k]) delete o[k];});return o;}
+const SVCN=s=>{const t=String(s||'').toLowerCase();return /marine/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space/.test(t)?'Space Force':/air\s*force|^af$|usaf/.test(t)?'Air Force':/health|dha/.test(t)?'DHA':/defense|dod|dla|socom|mda|wide/.test(t)?'Defense-Wide':String(s||'').trim();};
+const nzI=s=>String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+const numI=s=>String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+const digI=s=>String(s||'').replace(/[^\d.]/g,'').replace(/\.0+$/,'');
+function normF(k,v){return k==='number'?numI(v):['cost','fy','dpct'].includes(k)?digI(v):['d35','dc'].includes(k)?ymOf(v)||String(v||''):nzI(k==='component'?SVCN(v):v);}
+const onPage=(v,t)=>{const d=String(v||'').replace(/[,$\s]/g,'');if(!d) return false;return String(t).replace(/[,$\s]/g,'').toLowerCase().includes(d.toLowerCase());};
+function readerA(grp){const first=grp.pages[0];let h=hdrPos(first);if(Object.keys(h).length<4) h={...hdrText(first.t),...h};
+ const all=grp.pages.map(p=>p.t).join('\n');const o={},pg={};const set=(k,v,n)=>{if(v){o[k]=String(v).trim();pg[k]=n;}};
+ ['title','number','installation','pe','catcode'].forEach(k=>set(k,h[k],first.n));set('component',h.component&&SVCN(h.component),first.n);set('cost',h.cost&&digI(h.cost),first.n);
+ const fy=(first.t.match(/FY\s*(20\d\d)\s+MILITARY\s+CONSTRUCTION/i)||first.t.match(/\bFY\s*(20\d\d)\b/i)||[])[1];set('fy',fy,first.n);
+ const b=blk12(all);Object.entries(b).forEach(([k,v])=>{const p=grp.pages.find(x=>k==='dpct'?/Percent\s+Complete/i.test(x.t):k==='d35'?/35\s*%\s*Design/i.test(x.t):/Design\s+Complete/i.test(x.t));set(k,v,p?p.n:first.n);});
+ return {o,pg};}
+// Group the 1391 pages of a book by project number; continuation pages carry the same header.
+function groups(pages,file){const out=[];let cur=null;
+ pages.forEach(pg=>{if(!is1391(pg)){if(cur&&!/INDEX|TABLE OF CONTENTS|DD\s*FORM\s*1390|1390\b/i.test(pg.t.slice(0,400))&&/^(\s*\d{1,2}\.|\s*[A-Z(])/m.test(pg.t)&&pg.t.length>200&&cur.loose<1){cur.pages.push(pg);cur.loose++;}else cur=null;return;}
+  const h=hdrPos(pg);const no=numI(h.number||hdrText(pg.t).number||'');const ti=nzI(h.title||hdrText(pg.t).title||'');
+  if(cur&&((no&&no===cur.no)||(!no&&ti&&ti===cur.ti))){cur.pages.push(pg);return;}
+  cur={file,no,ti,pages:[pg],loose:0};out.push(cur);});
+ return out;}
+const R1391_SYS=`You read DD Form 1391 pages from a U.S. military construction budget justification book. Return ONLY JSON:
+{"title":"","number":"","installation":"","component":"","fy":"","pe":"","catcode":"","cost":"","dpct":"","d35":"","dc":"","pages":{"title":0,"number":0,"installation":0,"component":0,"fy":0,"pe":0,"catcode":0,"cost":0,"dpct":0,"d35":0,"dc":0}}
+title is block 4, number block 7, installation block 3, component block 1, pe block 5, catcode block 6, cost block 8 in thousands of dollars (digits only, as printed). fy is the fiscal year in the form heading. From block 12: dpct is the design percent complete (digits only), d35 the date 35% design is complete and dc the date design is complete, both YYYY-MM. Copy text exactly as printed. Leave a field empty if it is not on the pages; never estimate. pages gives the page number each value is printed on.`;
+const ARB_SYS=`Two readers took one field from the same DD Form 1391 pages and disagree. Read the pages and decide which value is printed there, or give the correct printed value if neither is right. Return ONLY JSON {"value":"","quote":"the exact words on the page that show it","page":0}. If the field is not on the pages, return an empty value.`;
+const RTAB_SYS=`You read a U.S. defense budget exhibit table (for example the Pacific Deterrence Initiative display or a military construction project list) and list every construction project row. Return ONLY JSON {"unit":"thousands|millions","rows":[{"title":"","installation":"","component":"","fy":"","amount":"","account":"","page":0}]}
+amount is the request for that row exactly as printed (digits and commas, no symbols); unit is the unit the table states. fy is the fiscal year of the amount. Copy text exactly; skip subtotal and total rows; never estimate.`;
+const REVB_SYS=`You review DD Form 1391 pages the way an OSD or congressional staff reviewer would before the budget hearing. Find what a reviewer would challenge: a requirement with no number behind it, scope with no requirement, a solution stated as the requirement, a vague impact if not provided, block 11 that contradicts block 9 or 12, dates that do not hang together. Return ONLY JSON {"findings":[{"severity":"bad|warn","title":"short","detail":"one or two sentences on what to fix","quote":"exact words from the pages, or empty"}]} with at most 3 findings, most important first. Only real issues.`;
+async function aiRead(grp){const src=grp.pages.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n').slice(0,60000);const j=await CARLAI.ask('claude',R1391_SYS,src,null,{fresh:true});const o={},pg={};
+ IMF.forEach(([k])=>{let v=String(j[k]??'').trim();if(!v) return;if(k==='component') v=SVCN(v);if(k==='cost'||k==='dpct') v=digI(v);if(k==='d35'||k==='dc') v=ymOf(v)||v;o[k]=v;const n=N((j.pages||{})[k]);pg[k]=grp.pages.some(p=>p.n===n)?n:grp.pages[0].n;});return {o,pg};}
+async function arbitrate(grp,k,a,b){const src=grp.pages.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n').slice(0,60000);
+ const j=await CARLAI.ask('gemini',ARB_SYS,'FIELD: '+(IMF.find(f=>f[0]===k)||[k,k])[1]+'\nREADER A: '+a+'\nREADER B: '+b+'\n\nPAGES:\n'+src,null,{fresh:true});
+ const q=String(j.quote||'').trim(),v=String(j.value||'').trim();if(!v||!q) return null;const all=grp.pages.map(p=>p.t).join('\n');
+ if(!nzI(all).includes(nzI(q))) return null;if(['cost','fy','dpct'].includes(k)?!onPage(v,q):!nzI(q).includes(nzI(k==='component'?v:v).split(' ')[0])) return null;
+ const n=N(j.page);return {v:k==='component'?SVCN(v):v,page:grp.pages.some(p=>p.n===n)?n:grp.pages[0].n,quote:q};}
+// Merge the two readings field by field.
+async function settle(grp,A,B,say){const F={};const all=grp.pages.map(p=>p.t).join('\n');
+ for(const [k] of IMF){const a=A.o[k]||'',b=B?(B.o[k]||''):'';let bOk=!!b&&(!['cost','fy','dpct'].includes(k)||onPage(b,all));const f={a,b:b||'',bDropped:!!b&&!bOk};
+  if(a&&bOk&&normF(k,a)===normF(k,b)){f.v=a;f.how='agree';f.page=A.pg[k];}
+  else if(a&&!bOk){f.v=a;f.how=B?'a':'one';f.page=A.pg[k];}
+  else if(!a&&bOk){f.v=b;f.how='b';f.page=B.pg[k];}
+  else if(a&&bOk){let r=null;if(aiOn()){if(say) say('Settling '+(grp.no||grp.ti)+': '+k);try{r=await arbitrate(grp,k,a,b);}catch(e){}}
+   if(r){f.v=r.v;f.how='arb';f.page=r.page;f.quote=r.quote;}else{f.v=a;f.how='dispute';f.page=A.pg[k];}}
+  else{f.v='';f.how='';}
+  F[k]=f;}
+ return F;}
+function matchOf(it){const no=numI(it.F.number.v),ins=nzI(it.F.installation.v),ti=nzI(it.F.title.v);const insHit=p=>{const a=nzI(p.installation);if(!a||!ins) return false;const w=a.split(' ').filter(x=>x.length>3);return w.some(x=>ins.includes(x));};
+ let M_=no?P.projects.filter(p=>numI(p.number)===no&&insHit(p)):[];if(!M_.length&&ti) M_=P.projects.filter(p=>nzI(p.name)===ti&&insHit(p));return M_;}
+function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const all=it.text||'';const pr=it.pages?(it.pages[0]+(it.pages.length>1?'–'+it.pages[it.pages.length-1]:'')):'';const src=it.file+(pr?', page '+pr:'');
+ IMF.forEach(([k,l])=>{if(F[k]&&F[k].how==='dispute') R.push(['bad','Readers disagree on '+l.toLowerCase()+': “'+F[k].a+'” or “'+F[k].b+'”. Pick one before adding.',src]);});
+ IMKEY.forEach(k=>{if(!v(k)&&(k!=='number'||it.kind==='1391')) R.push(['bad','No '+(IMF.find(f=>f[0]===k)[1]).toLowerCase()+' found on the form.',src]);});
+ if(it.kind==='1391'){[['REQUIREMENT\\s*:','Requirement'],['CURRENT\\s+SITUATION\\s*:','Current situation'],['IMPACT\\s+IF\\s+NOT\\s+PROVIDED\\s*:','Impact if not provided']].forEach(([re,l])=>{if(all&&!new RegExp(re,'i').test(all)) R.push(['warn','Block 11 has no “'+l+'” paragraph.',src]);});
+  ['pe','catcode'].forEach(k=>{if(!v(k)) R.push(['warn','No '+(IMF.find(f=>f[0]===k)[1]).toLowerCase()+' found.',src]);});
+  if(v('dpct')!==undefined&&v('dpct')!==''&&N(v('dpct'))<35) R.push(['warn','Design is '+N(v('dpct'))+'% complete, short of the 35% stage normally used to set scope and cost for the budget.',D35]);
+  if(!v('dpct')) R.push(['warn','No design percent complete found in block 12.',src]);}
+ const c=N(v('cost'))*(it.unit==='millions'?1e6:1e3);if(c&&c<=LAW.umc.v) R.push(['info','At '+M(c)+' it is at or under the '+M(LAW.umc.v)+' minor construction ceiling; it could go as unspecified minor construction instead of a line item.',LAW.umc.cite]);
+ const m=it.match&&P.projects.find(p=>p.id===it.match);if(m){const was=N(m.authorized)||N(m.programmed);if(c&&was&&Math.abs(c-was)/was>.05) R.push(['warn','The document shows '+M(c)+'; PAULA has '+M(was)+' ('+(c>was?'+':'')+Math.round((c-was)/was*100)+'%).',src]);
+  if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);}
+ if(it.dupe) R.push(['warn','The same project number and installation appear more than once in this import.',src]);
+ (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
+ return R;}
+// ---- read files ----
+async function impFiles(files,pasted){const say=t=>{const e=$('#imSt');if(e) e.textContent=t;};IMP=IMP||{files:[],items:[],at:new Date().toISOString()};
+ try{for(const f of files){let pages;if(f.pasted) pages=[{n:1,t:f.text,items:[]}];else if(/\.pdf$/i.test(f.name)){pages=await pdfRead(f,say);}else{pages=[{n:1,t:await f.text(),items:[]}];}
+   const url=f.pasted?'':URL.createObjectURL(f);IMP.files.push({name:f.name,url,n:pages.length});
+   const G=groups(pages,f.name);const pdi=/Pacific\s+Deterrence\s+Initiative/i.test(pages.slice(0,6).map(p=>p.t).join(' '));
+   if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){}}
+     const F=await settle(g,A,B,say);IMP.items.push({id:uid(),kind:'1391',file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi,two:!!B,unit:'thousands',sel:true});}}
+   else{if(!aiOn()){IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
+    const cand=pages.filter(p=>/\d{1,3}(,\d{3})+|\d{4,}/.test(p.t)).slice(0,40);for(let s=0;s<cand.length;s+=4){const ch=cand.slice(s,s+4);say('Reading the table in '+f.name+' with two readers: pages '+ch[0].n+'–'+ch[ch.length-1].n);
+     const src=ch.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n');let A,B;try{[A,B]=await Promise.all([CARLAI.ask('claude',RTAB_SYS,src,null,{fresh:true}),CARLAI.ask('gemini',RTAB_SYS,src,null,{fresh:true})]);}catch(e){IMP.notes=(IMP.notes||[]).concat([f.name+': the table could not be read ('+e.message+').']);continue;}
+     const unit=/million/i.test(A.unit||'')?'millions':'thousands';const key=r=>nzI(r.title)+'|'+nzI(r.installation).split(' ')[0];const BM=new Map((B.rows||[]).map(r=>[key(r),r]));
+     (A.rows||[]).forEach(r=>{const pgN=ch.some(p=>p.n===N(r.page))?N(r.page):ch[0].n;const pt=(ch.find(p=>p.n===pgN)||ch[0]).t;const b=BM.get(key(r));BM.delete(key(r));const F={};
+      const mk=(k,av,bv)=>{const aOk=!!av&&(!['cost','fy'].includes(k)||onPage(av,src)),bOk=!!bv&&(!['cost','fy'].includes(k)||onPage(bv,src));const f={a:aOk?av:'',b:bOk?bv:'',page:pgN};
+       if(aOk&&bOk&&normF(k,av)===normF(k,bv)){f.v=av;f.how='agree';}else if(aOk&&!bOk){f.v=av;f.how=b?'a':'one';}else if(!aOk&&bOk){f.v=bv;f.how='b';}else if(aOk&&bOk){f.v=av;f.how='dispute';}else{f.v='';f.how='';}F[k]=f;};
+      mk('title',r.title,b&&b.title);mk('installation',r.installation,b&&b.installation);mk('component',r.component&&SVCN(r.component),b&&b.component&&SVCN(b.component));mk('fy',digI(r.fy),b&&digI(b.fy));mk('cost',digI(r.amount),b&&digI(b.amount));
+      ['number','pe','catcode','dpct','d35','dc'].forEach(k=>F[k]={v:'',how:''});F.account={v:String(r.account||''),how:''};
+      IMP.items.push({id:uid(),kind:'table',file:f.name,pages:[pgN],text:pt,F,pdi,two:true,unit,sel:true});});
+     BM.forEach(r=>{const pgN=ch.some(p=>p.n===N(r.page))?N(r.page):ch[0].n;const F={};const mk=(k,bv)=>{F[k]=bv&&(!['cost','fy'].includes(k)||onPage(bv,src))?{v:bv,a:'',b:bv,how:'b',page:pgN}:{v:'',how:''};};
+      mk('title',r.title);mk('installation',r.installation);mk('component',r.component&&SVCN(r.component));mk('fy',digI(r.fy));mk('cost',digI(r.amount));['number','pe','catcode','dpct','d35','dc'].forEach(k=>F[k]={v:'',how:''});
+      IMP.items.push({id:uid(),kind:'table',file:f.name,pages:[pgN],text:(ch.find(p=>p.n===pgN)||ch[0]).t,F,pdi,two:true,unit,sel:true});});}}}
+  impMatch();log('Budget documents read',files.map(f=>f.name).join(', ')+': '+IMP.items.length+' projects');}
+ catch(e){alert('Could not read the document: '+e.message);}
+ say('');vImp();}
+function impMatch(){const seen={};IMP.items.forEach(it=>{const k=numI(it.F.number.v)+'|'+nzI(it.F.installation.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');it.dupe=!!seen[k]&&!!it.F.number.v;seen[k]=1;
+ if(it.mset) return;const M_=matchOf(it);it.cands=M_.map(p=>p.id);it.match=M_.length===1?M_[0].id:'';});}
+async function impAI(){if(!aiOn()) return alert('Sign in to CARL to add the AI review.');const L=IMP.items.filter(it=>it.kind==='1391'&&it.text);let i=0;
+ for(const it of L){i++;const e=$('#imSt');if(e) e.textContent='AI review: project '+i+' of '+L.length;try{const j=await CARLAI.ask('claude',REVB_SYS,it.text.slice(0,40000),null,{fresh:true});
+   it.ai=(j.findings||[]).filter(x=>x&&x.title&&(!x.quote||nzI(it.text).includes(nzI(x.quote)))).slice(0,3).map(x=>({s:x.severity==='bad'?'bad':'warn',t:String(x.title),d:String(x.detail||''),q:x.quote&&nzI(it.text).includes(nzI(x.quote))?String(x.quote):''}));}catch(err){}}
+ IMP.ai=true;log('AI review of imported 1391s',L.length+' projects');const e=$('#imSt');if(e) e.textContent='';vImp();}
+// ---- apply to the portfolio ----
+function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return alert('Tick at least one row.');const bad=L.filter(it=>IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')||IMKEY.some(k=>!it.F[k]||!it.F[k].v)&&it.kind==='1391');
+ if(bad.length&&!confirm(bad.length+' ticked row'+(bad.length>1?'s have':' has')+' a reader disagreement or a missing key field. Add '+(bad.length>1?'them':'it')+' anyway?')) return;
+ let a=0,u=0,pd=0;const today_=today();
+ L.forEach(it=>{const F=it.F,v=k=>F[k]?String(F[k].v||'').trim():'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1e6:1e3);const pg=k=>it.file+(F[k]&&F[k].page?' p.'+F[k].page:'');
+  let p=it.match&&P.projects.find(x=>x.id===it.match);const isNew=!p;if(!p){p=blankProj();P.projects.push(p);}
+  const fill=(k,val)=>{if(val!==''&&val!=null&&(p[k]===''||p[k]==null)) p[k]=val;};
+  fill('name',v('title')?v('title').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase()):'');fill('number',v('number'));fill('installation',v('installation')?v('installation').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase()):'');fill('service',v('component'));fill('fy',v('fy'));
+  if(!p.lat){const g=locate(p.installation);if(g){p.lat=g[0];p.lon=g[1];if(!p.country) p.country=g[2];}}
+  if(it.useCost&&amt) p.programmed=amt;else fill('programmed',amt||'');if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
+  if(isNew) p.phase=4;
+  if(amt&&N(v('fy'))&&(isNew||!p.fy||String(p.fy)===String(v('fy')))){p.funds=ownFunds(p);if(!p.funds.some(l=>N(l.fy)===N(v('fy'))&&l.stage==='requested'&&!isHN(l))) p.funds.push({id:uid(),fy:N(v('fy')),src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost')});}
+  if(isNew) p.prog_status='pb';
+  if(v('dpct')!==''&&!dPct(p)){p.gates={...(p.gates||{})};const g=p.gates.design||{};if(g.pct===undefined) p.gates.design={...g,pct:N(v('dpct')),date:g.date||(v('d35')?v('d35')+'-01':''),src:pg('dpct')};}
+  if(it.pdi){p.posture={...(p.posture||{}),pdi:true};pd++;}
+  p.docsrc=(p.docsrc||[]).concat([{file:it.file,pages:it.pages,read:today_,fields:Object.fromEntries(IMF.filter(([k])=>F[k]&&F[k].v).map(([k])=>[k,{v:F[k].v,how:F[k].how,page:F[k].page}]))}]).slice(-6);
+  it.done=isNew?'Added':'Updated';it.pid=p.id;isNew?a++:u++;it.sel=false;});
+ log('Projects added from budget documents',a+' added, '+u+' updated'+(pd?', '+pd+' marked PDI':''));save();renderSteps();vImp();}
+// ---- outputs ----
+const HOW={agree:'Both readers agree',a:'Layout reader only (AI reading not on the page)',b:'AI reader only',one:'One reader (sign in for the second)',arb:'Settled by the arbiter',dispute:'Readers disagree',you:'Set by the reviewer','':''};
+function impBook(){const I=IMP.items;const mt=it=>it.done?it.done+' '+((P.projects.find(p=>p.id===it.pid)||{}).name||''):it.match?'Matches '+((P.projects.find(p=>p.id===it.match)||{}).name||''):(it.cands||[]).length>1?'Several possible matches':'New';
+ return [{name:'Projects',rows:[['Project','Number','Installation','Component','FY','Program element','Category code','Cost ($000)','Design %','35% design','Design complete','PDI','Match','Fields needing a check','File','Pages']].concat(I.map(it=>{const v=k=>it.F[k]?it.F[k].v:'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1000:1);return [v('title'),v('number'),v('installation'),v('component'),v('fy')?N(v('fy')):'',v('pe'),v('catcode'),amt||'',v('dpct')!==''?N(v('dpct')):'',v('d35'),v('dc'),it.pdi?'Yes':'',mt(it),IMF.filter(([k])=>it.F[k]&&['dispute','b','one'].includes(it.F[k].how)).map(f=>f[1]).join(', '),it.file,it.pages.join(', ')];}))},
+  {name:'Findings',rows:[['Project','Severity','Finding','Source']].concat(I.flatMap(it=>itemFindings(it).map(f=>[it.F.title.v||'(no title)',{bad:'Fix',warn:'Check',info:'Note'}[f[0]],f[1],f[2]])))},
+  {name:'How each field was read',rows:[['Project','Field','Value','How it was read','Layout reader','AI reader','File','Page','Arbiter quote']].concat(I.flatMap(it=>IMF.filter(([k])=>it.F[k]&&(it.F[k].v||it.F[k].a||it.F[k].b)).map(([k,l])=>{const f=it.F[k];return [it.F.title.v,l,f.v,HOW[f.how]||'',f.a||'',(f.b||'')+(f.bDropped?' (not on the page – dropped)':''),it.file,f.page||'',f.quote||''];})))}];}
+function impMemo(){const I=IMP.items;const fs=[...new Set(I.map(it=>it.file))];const FN=I.flatMap(it=>itemFindings(it).map(f=>({it,f})));const fix=FN.filter(x=>x.f[0]==='bad'),chk=FN.filter(x=>x.f[0]==='warn');
+ const nw=I.filter(it=>!it.match&&!it.done&&!(it.cands||[]).length).length,mt=I.filter(it=>it.match||it.done==='Updated').length,dsp=I.filter(it=>IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')).length;
+ const seenT={};const tot=I.reduce((a,it)=>{const k=numI(it.F.number.v)||nzI(it.F.title.v)+'|'+nzI(it.F.installation.v).split(' ')[0];const k2=nzI(it.F.title.v)+'|'+nzI(it.F.installation.v).split(' ')[0];if(seenT[k]||seenT[k2]) return a;seenT[k]=seenT[k2]=1;return a+N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);},0);
+ let b=cdBand('Review memo','Budget Document Review',fs.join('  ·  ')+'  ·  '+fd(today())+(P.me?'  ·  '+P.me:''));
+ b+=kTiles([['Projects read',String(I.length)],['Total requested',M(tot)],['New to the portfolio',String(nw)],['Match a project',String(mt)],['Need a fix',String(new Set(fix.map(x=>x.it.id)).size)]]);
+ b+=cdH('Bottom line')+cdP(I.length+' project'+(I.length>1?'s were':' was')+' read from '+fs.length+' document'+(fs.length>1?'s':'')+'. '+(dsp?dsp+' ha'+(dsp>1?'ve':'s')+' a field the two readers read differently and must be settled before use. ':'Every key field was settled by the readers. ')+(chk.length?chk.length+' item'+(chk.length>1?'s':'')+' for the reviewer to check are listed below.':'No other issues were found.'));
+ b+=cdH('Projects')+cdTable(['Project','Installation','FY','Cost','Design','Source'],I.map(it=>{const v=k=>it.F[k]?it.F[k].v:'';return [esc(v('title')||'(no title)')+(v('number')?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc(v('number'))+'</span>':''),esc(v('installation')),esc(v('fy')),M(N(digI(v('cost')))*(it.unit==='millions'?1e6:1e3)),v('dpct')!==''?esc(v('dpct'))+'%':'–',esc(it.file)+', p. '+it.pages.join(', ')];}));
+ if(fix.length) b+=cdH('Fix before use')+cdTable(['Project','Finding','Source'],fix.map(x=>[esc(x.it.F.title.v||'(no title)'),esc(x.f[1]),esc(x.f[2])]));
+ if(chk.length) b+=cdH('For the reviewer to check')+cdTable(['Project','Finding','Source'],chk.map(x=>[esc(x.it.F.title.v||'(no title)'),esc(x.f[1]),esc(x.f[2])]));
+ const nt=FN.filter(x=>x.f[0]==='info');if(nt.length) b+=cdH('Notes')+cdTable(['Project','Note','Source'],nt.map(x=>[esc(x.it.F.title.v||''),esc(x.f[1]),esc(x.f[2])]));
+ b+=cdH('Method')+cdP('Each DD 1391 was read twice: once from the position of the header boxes on the page and once by AI. Where the two agreed the value was taken; where they differed a second AI engine was asked to decide and to quote the page, and its answer was used only if the quote is on the page. Any number not printed on its page was dropped. Tables such as the Pacific Deterrence Initiative display were read by two AI engines and compared row by row. Block 11 and block 12 were checked for the parts a reviewer expects. Nothing is added to the portfolio until the reviewer approves it, and an update fills empty fields only. The workbook lists how every field was read and the page it came from.'+(IMP.ai?' The AI review findings are advisory and quote the page they are about.':''));
+ b+=cdFoot('Prepared with Corbel PAULA  ·  '+fd(today())+'  ·  Advisory review; the Service and its design agent own the 1391.');
+ return cdDoc('Budget Document Review',[b]);}
+// ---- the screen ----
+function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
+ const dot=f=>!f||!f.how?'':'<span title="'+esc(HOW[f.how]+(f.quote?' – “'+f.quote+'”':'')+(f.bDropped?' – the AI reading was not on the page and was dropped':''))+'" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:'+({agree:'#2e7d32',arb:'#2e7d32',you:'#2e7d32',a:'#c98a00',b:'#c98a00',one:'#c98a00',dispute:'#b3261e'}[f.how]||'#999')+'"></span>';
+ const fileUrl=it=>(IMP.files.find(f=>f.name===it.file)||{}).url;
+ const cell=(it,k,w)=>{const f=it.F[k]||{};const pick=f.how==='dispute'?'<div class="small">'+[f.a,f.b].map((x,i)=>'<button class="sm" data-ipk="'+it.id+'|'+k+'|'+i+'">'+esc(x)+'</button>').join(' ')+'</div>':'';
+  return '<td><div style="display:flex;align-items:center"><input data-if="'+it.id+'|'+k+'" value="'+esc(f.v||'')+'" style="width:'+(w||120)+'px"'+(it.done?' disabled':'')+'>'+dot(f)+'</div>'+pick+'</td>';};
+ const mt=it=>{if(it.done) return '<b>'+it.done+'</b>';const c=it.cands||[];return '<select data-im="'+it.id+'" style="width:190px"><option value="">New project</option>'+P.projects.filter(p=>c.includes(p.id)||p.id===it.match).concat(P.projects.filter(p=>!c.includes(p.id)&&p.id!==it.match)).map(p=>'<option value="'+p.id+'"'+(it.match===p.id?' selected':'')+'>'+(c.includes(p.id)?'Matches: ':'')+esc(p.name+(p.number?' ('+p.number+')':''))+'</option>').join('')+'</select>'+(c.length>1&&!it.match?'<div class="small" style="color:#9b2c2c">Several possible matches – pick one</div>':'');};
+ const FN=I.map(it=>[it,itemFindings(it)]);const nFix=FN.filter(([,f])=>f.some(x=>x[0]==='bad')).length;
+ v.innerHTML='<div class="panel"><h2>Import budget documents</h2><p class="lead">Drop in a justification book, single DD 1391s or a budget exhibit such as the Pacific Deterrence Initiative display. Each 1391 is read twice and the readings compared; every value keeps the page it came from. Review the table, then add or update the projects in one step. Nothing changes in the portfolio until you do.</p>'+
+  '<div id="imDrop" style="border:2px dashed #9DB4C3;border-radius:10px;padding:18px;text-align:center;margin:10px 0"><button class="go" id="imPick">Choose PDFs</button> <span class="small">or drop them here. Several files at once is fine.</span><input type="file" id="imF" accept=".pdf,.txt" multiple hidden></div>'+
+  '<details><summary class="small" style="cursor:pointer">No PDF? Paste the text of a 1391 instead</summary><textarea id="imTx" rows="6" style="width:100%;margin-top:6px" placeholder="Paste the text of one DD 1391, header block included"></textarea><button class="sm" id="imTxGo">Read pasted text</button></details>'+
+  '<p class="small" id="imSt" style="color:#1F4E5F;font-weight:600"></p>'+(signed?'':'<p class="small">Signed out: 1391s are read by the layout reader alone and every field is marked for a check. Sign in to CARL for the second reader, the arbiter and tables.</p>')+
+  ((IMP&&IMP.notes||[]).map(n=>'<p class="small" style="color:#9b2c2c">'+esc(n)+'</p>').join(''))+'</div>'+
+  (I.length?'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Review '+I.length+' project'+(I.length>1?'s':'')+'</h3><div><button class="sm" id="imXl">Download review workbook</button> <button class="sm" id="imDoc">Download review memo</button> '+(signed?'<button class="sm" id="imAI">'+(IMP.ai?'Run the AI review again':'Add the AI review')+'</button> ':'')+'<button class="sm" id="imClr">Clear</button></div></div>'+
+   '<p class="small">Green: both readers agree, or the arbiter settled it from the page. Amber: one reader only – check it. Red: the readers disagree – pick a value. Hover a dot for how it was read.'+(nFix?' <b style="color:#9b2c2c">'+nFix+' row'+(nFix>1?'s need':' needs')+' a fix.</b>':'')+'</p>'+
+   '<div style="overflow:auto"><table class="ptable"><thead><tr><th><input type="checkbox" id="imAll" style="width:auto"'+(I.every(it=>it.sel||it.done)?' checked':'')+'></th><th>Project</th><th>Number</th><th>Installation</th><th>FY</th><th>Cost ($000)</th><th>Design %</th><th>Portfolio</th></tr></thead><tbody>'+
+   FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
+    return '<tr'+(it.done?' style="opacity:.6"':'')+' style="border-bottom:none"><td><input type="checkbox" data-isel="'+it.id+'" style="width:auto"'+(it.sel?' checked':'')+(it.done?' disabled':'')+'></td>'+cell(it,'title',200)+cell(it,'number',70)+cell(it,'installation',160)+cell(it,'fy',52)+cell(it,'cost',80)+cell(it,'dpct',44)+
+     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+'</td>'+
+     '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page '+it.pages.join(', ')+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
+   '<div class="row"><button class="go" id="imGo">Add or update the ticked projects</button></div></div>':'');
+ const go=fs=>{if(!fs.length) return;impFiles(fs);};
+ $('#imPick').onclick=()=>$('#imF').click();$('#imF').onchange=e=>{const fs=[...e.target.files];e.target.value='';go(fs);};
+ const dz=$('#imDrop');dz.ondragover=e=>{e.preventDefault();dz.style.background='#eef4f7';};dz.ondragleave=()=>dz.style.background='';dz.ondrop=e=>{e.preventDefault();dz.style.background='';go([...e.dataTransfer.files]);};
+ $('#imTxGo').onclick=()=>{const t=$('#imTx').value.trim();if((t.match(/\S+/g)||[]).length<15) return alert('Paste the whole 1391 text, header block included.');impFiles([{pasted:true,name:'Pasted text',text:t}]);};
+ if(!I.length) return;
+ const IT=id=>IMP.items.find(x=>x.id===id);
+ v.querySelectorAll('[data-if]').forEach(el=>el.onchange=()=>{const [id,k]=el.dataset.if.split('|');const it=IT(id);it.F[k]={...(it.F[k]||{}),v:el.value.trim(),how:'you'};if(['number','installation','title'].includes(k)) impMatch();vImp();});
+ v.querySelectorAll('[data-ipk]').forEach(b=>b.onclick=()=>{const [id,k,i]=b.dataset.ipk.split('|');const it=IT(id);const f=it.F[k];f.v=i==='0'?f.a:f.b;f.how='you';impMatch();vImp();});
+ v.querySelectorAll('[data-isel]').forEach(c=>c.onchange=()=>{IT(c.dataset.isel).sel=c.checked;});
+ v.querySelectorAll('[data-iuse]').forEach(c=>c.onchange=()=>{IT(c.dataset.iuse).useCost=c.checked;});
+ v.querySelectorAll('[data-im]').forEach(s=>s.onchange=()=>{const it=IT(s.dataset.im);it.match=s.value;it.mset=true;vImp();});
+ $('#imAll').onchange=e=>{IMP.items.forEach(it=>{if(!it.done) it.sel=e.target.checked;});vImp();};
+ $('#imGo').onclick=impApply;$('#imClr').onclick=()=>{if(confirm('Clear this import? Projects already added stay in the portfolio.')){IMP=null;vImp();}};
+ $('#imXl').onclick=()=>{XL.save('PAULA_Budget_Document_Review_'+today()+'.xlsx',impBook());log('Budget document review workbook downloaded');};
+ $('#imDoc').onclick=()=>{dl('PAULA_Budget_Document_Review_'+today()+'.doc',impMemo(),'application/msword');log('Budget document review memo downloaded');};
+ if($('#imAI')) $('#imAI').onclick=impAI;}
+
 const CSVCOLS=['name','number','to','service','installation','country','lat','lon','phase','fy','pm','contractor','delivery','programmed','authorized','award','cwe','obligated','expended','funded','scope_auth','scope_now','scope_unit','ntp','baseline_finish','forecast_finish','pct'];
 function vData(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Data</h2><div class="outs">'+
+ '<div class="card"><h4>Import budget documents</h4><p>A justification book, single DD 1391s or the PDI display as PDF. Each 1391 is read twice and checked against its page before you add it.</p><button class="sm go" id="bImpD2">Open</button></div>'+
  '<div class="card"><h4>Import projects</h4><p>From a spreadsheet saved as CSV, one row per project. Download the template for the columns. Rows matching an existing project number update it.</p><button class="sm" id="bTpl">Template</button> <button class="sm go" id="bImp">Import CSV</button><input type="file" id="fImp" accept=".csv" hidden></div>'+
  '<div class="card"><h4>Merge PM files</h4><p>Each PM keeps a copy and sends the saved file. Merge them here: projects match on project number or ID, and the most recent update wins.</p><button class="sm go" id="bMerge">Choose files</button><input type="file" id="fMerge" accept=".json" multiple hidden></div>'+
  '<div class="card"><h4>Link from the suite</h4><p>Bring in the 1391 amounts from PIPER and the project from NORA in this browser as a new or existing project.</p><button class="sm go" id="bLink">Link</button></div>'+
@@ -718,6 +924,7 @@ function vData(){const v=$('#view');
  '<div class="panel"><h2>Log</h2><div class="small">'+(P.log.slice().reverse().slice(0,150).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
  v.querySelectorAll('[data-t]').forEach(i=>i.onchange=()=>{P.t[i.dataset.t]=Number(i.value);log('Threshold changed',i.dataset.t+' = '+i.value);save();});$('#me').oninput=e=>{P.me=e.target.value;save();};
  $('#bResetT').onclick=()=>{P.t={...DEF_T};save();vData();};
+ $('#bImpD2').onclick=()=>{VIEW='imp';render();window.scrollTo(0,0);};
  $('#bTpl').onclick=()=>dl('PAULA_Project_Template.csv',csv([CSVCOLS]),'text/csv');
  $('#bImp').onclick=()=>$('#fImp').click();$('#fImp').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{const rows=parseCSV(t);const h=rows.shift().map(x=>x.trim().toLowerCase().replace(/\s+/g,'_'));let a=0,u=0;
   rows.forEach(r=>{if(!r.some(x=>x.trim())) return;const o={};h.forEach((k,i)=>{if(CSVCOLS.includes(k)) o[k]=(r[i]||'').trim();});let p=o.number&&P.projects.find(x=>x.number===o.number);if(p){Object.assign(p,o);u++;}else{p=Object.assign(blankProj(),o);P.projects.push(p);a++;}p.phase=N(p.phase)||1;});
