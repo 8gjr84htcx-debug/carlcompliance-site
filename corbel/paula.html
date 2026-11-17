@@ -245,7 +245,7 @@ dialog::backdrop{background:rgba(16,48,63,.45)}
 .meter b{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:5px}
 .tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs2 button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
 .samp{background:#fff3d6;border:1px solid #ecd59a;color:#7a5600;border-radius:8px;padding:6px 10px;font-size:12.5px;margin-bottom:12px}
-@media(max-width:900px){.wrap>*{min-width:0}.panel,.card2{overflow-x:auto}header{flex-wrap:wrap}.g-kpi{grid-template-columns:1fr 1fr}.filters{flex-wrap:wrap}.filters select,.filters input{flex:1 1 140px;max-width:100%;min-width:0}main,#view{min-width:0;max-width:100%;overflow-x:hidden}svg{max-width:100%;height:auto}}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.wrap>*{min-width:0}.panel,.card2{overflow-x:auto}header{flex-wrap:wrap}.g-kpi{grid-template-columns:1fr 1fr}.filters{flex-wrap:wrap}.filters select,.filters input{flex:1 1 140px;max-width:100%;min-width:0}main,#view{min-width:0;max-width:100%;overflow-x:hidden}svg{max-width:100%;height:auto}}
 @media print{.filters,nav.steps,header,.noprint{display:none!important}.wrap{display:block}}
 </style>
 </head>
@@ -716,7 +716,8 @@ function numBadW(t,src){const toks=s=>String(s).toLowerCase().replace(/,/g,'').m
 // ---------- Word outputs in the Corbel look ----------
 function kTiles(T){const w=Math.floor(100/T.length);return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:10pt 0 4pt"><tr>'+T.map(([l,v,c],i)=>'<td width="'+w+'%" bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:7pt 9pt">'+cdP(esc(l).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1.5pt;color:'+CD.mute)+cdP(v,'margin:2pt 0 0;font-size:17pt;color:'+(c||CD.navy))+'</td>'+(i<T.length-1?'<td width="6" style="width:5pt">&nbsp;</td>':'')).join('')+'</tr></table>';}
 const HC=['#1E6B33','#8A6100','#9B2C2C'];
-const hlD=l=>'<span style="color:'+HC[l]+'">'+LEVEL[l].i+' '+LEVEL[l].n+'</span>';
+const GLY=l=>'<span style="font-family:\'Segoe UI Symbol\',Arial,sans-serif">'+LEVEL[l].i+'</span>';
+const hlD=l=>'<span style="color:'+HC[l]+'">'+GLY(l)+' '+LEVEL[l].n+'</span>';
 function scopeText(){return [F.svc,F.ctry,F.phase?'Phase '+F.phase:'',F.pm].filter(Boolean).join('  ·  ')||'All projects';}
 function briefDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));const cnt=[0,1,2].map(l=>H.filter(x=>x.h.overall===l).length);const tv=L.reduce((s,p)=>s+value(p),0),aw=L.reduce((s,p)=>s+N(p.award),0),ex=L.reduce((s,p)=>s+N(p.expended),0);
  const att=H.filter(x=>x.h.overall>0).sort((a,b)=>b.h.overall-a.h.overall||value(b.p)-value(a.p));const dec=L.filter(p=>p.decisions);
@@ -735,11 +736,11 @@ function briefDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));const
  return cdDoc('Portfolio Leadership Brief',[b]);}
 function pagesDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)})).sort((a,b)=>b.h.overall-a.h.overall||value(b.p)-value(a.p));const cnt=[0,1,2].map(l=>H.filter(x=>x.h.overall===l).length);const tv=L.reduce((s,p)=>s+value(p),0);
  const pages=[];let b=cdBand('Status pages','Portfolio Status',scopeText()+'  ·  '+fd(today())+'  ·  '+L.length+' projects  ·  '+M(tv));
- b+=kTiles([['On track','✓ '+cnt[0],HC[0]],['Watch','▲ '+cnt[1],HC[1]],['Critical','■ '+cnt[2],HC[2]],['Awarded',M(L.reduce((s,p)=>s+N(p.award),0))],['Value',M(tv)]]);
+ b+=kTiles([['On track',GLY(0)+' '+cnt[0],HC[0]],['Watch',GLY(1)+' '+cnt[1],HC[1]],['Critical',GLY(2)+' '+cnt[2],HC[2]],['Awarded',M(L.reduce((s,p)=>s+N(p.award),0))],['Value',M(tv)]]);
  const att=H.filter(x=>x.h.overall>0);b+=cdH('Needs attention')+(att.length?cdTable(['Health','Project','Why'],att.slice(0,10).map(x=>[hlD(x.h.overall),esc(x.p.name),x.h.parts.filter(z=>z.l===x.h.overall).map(z=>esc(z.dim+': '+z.r)).join('<br>')])):cdP('Nothing on watch or critical.'));
  pages.push(b+cdFoot('Prepared with Corbel PAULA  ·  page 1'));
  H.forEach((x,i)=>{const p=x.p,u=lastUpd(p)||{};const aw=N(p.award);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;
-  let c=cdBand('Project status',LEVEL[x.h.overall].i+' '+(p.name||'(untitled)'),[p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.contractor].filter(Boolean).join('  ·  '));
+  let c=cdBand('Project status',(p.name||'(untitled)')+'  ('+LEVEL[x.h.overall].n+')',[p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.contractor].filter(Boolean).join('  ·  '));
   c+=kTiles([['Health',hlD(x.h.overall)],['Estimate',M(est(p))+(base(p)?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+pct((est(p)-base(p))/base(p),1)+' vs authorized</span>':'')],['Complete',p.pct!==''?Math.round(N(p.pct))+'%':'–'],['Forecast completion',p.forecast_finish?fd(p.forecast_finish)+(sl!=null?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+(sl>0?sl+' days late':'on or ahead of baseline')+'</span>':''):'–'],['Expended',aw?pct(N(p.expended)/aw):'–']]);
   c+=cdTable(['Done this period','Next period','Concerns'],[[esc(u.done||'–'),esc(u.next||'–'),esc(u.concerns||'–')]],['34%','33%','33%']);
   c+=cdH('Health')+cdTable(['Measure','Rating','Reason'],x.h.parts.filter(z=>z.l>=0).map(z=>[esc(z.dim),hlD(z.l),esc(z.r)]));
