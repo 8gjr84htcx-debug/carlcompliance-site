@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1};
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -29,6 +29,7 @@
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
+
 
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />

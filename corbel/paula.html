@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1};
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -453,11 +453,11 @@ function shape(l,x,y,r,tip){const c=LEVEL[l].c;const ring=' stroke="var(--surf)"
  if(l===1){const h=r*1.15;return '<path d="M'+x+','+(y-h)+'L'+(x+h)+','+(y+h*.8)+'L'+(x-h)+','+(y+h*.8)+'Z" fill="'+c+'" fill-opacity=".9"'+ring+'/>';}return '<rect x="'+(x-r*.9)+'" y="'+(y-r*.9)+'" width="'+(r*1.8)+'" height="'+(r*1.8)+'" rx="2" fill="'+c+'" fill-opacity=".85"'+ring+'/>';}
 
 // ---------- nav ----------
-function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
+function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
  nav.innerHTML=items.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k?'on':'')+'"><span class="n">'+(i+1)+'</span>'+esc(t.length>22?t.slice(0,21)+'…':t)+'<span class="c"></span></button>').join('')+
  '<div class="gate">'+P.projects.length+' projects<br>'+(P.projects.some(p=>p.sample)?'<span style="color:var(--warn)">Sample data loaded</span>':'')+'</div>';
  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
-function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,rep:vRep,data:vData})[VIEW]();}
+function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,rep:vRep,data:vData})[VIEW]();}
 function openP(p,tab){CUR=p;VIEW='one';PTAB=tab||'ov';render();window.scrollTo(0,0);}
 
 // ---------- portfolio ----------
@@ -656,8 +656,12 @@ function vRep(){const v=$('#view');
  '<div class="card"><h4>Summary paragraph</h4><p>'+(P.ai_brief&&P.ai_brief.key===briefKey()?esc(P.ai_brief.text)+(P.ai_brief.check?'<br><b style="color:var(--crit)">'+esc(P.ai_brief.check)+'</b>':''):'Opens the leadership brief: health, who needs attention and why, decisions needed. Written from the filtered data only, through CARL.')+'</p><button class="sm" id="bAIb">Write the summary with AI</button></div>'+
  out('briefdoc','Leadership brief','One to two pages in Word: headline numbers, health, the projects that need attention and why, decisions needed, the next 30 days, top risks.','Download Word')+
  out('slides','Status pages','Landscape Word pages for the PMO deck: one for the portfolio and one for each project, with health, progress, money, done, next and concerns.','Download Word')+
+ out('prdoc','Prioritization decision paper','Word: bottom line, the ranking with the funding line, projects on the margin, what falls below the line and why, the method and every score with its reason.','Download Word')+
+ out('prxl','Prioritization workbook','Excel: the ranking, every score with its reason and source, and the weights and budget used.','Download Excel')+
  out('csv','Data call export','Every field and the computed health for each project, ready to sort, filter or answer a data call.','Download Excel')+'</div></div>';
- bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({briefdoc:()=>preDlP(()=>{dl('PAULA_Leadership_Brief_'+today()+'.doc',briefDoc(),'application/msword');log('Brief downloaded');save();}),slides:()=>preDlP(()=>{dl('PAULA_Status_Pages_'+today()+'.doc',pagesDoc(),'application/msword');log('Status pages downloaded');save();}),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}])})[b.dataset.out]());
+ bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({briefdoc:()=>preDlP(()=>{dl('PAULA_Leadership_Brief_'+today()+'.doc',briefDoc(),'application/msword');log('Brief downloaded');save();}),slides:()=>preDlP(()=>{dl('PAULA_Status_Pages_'+today()+'.doc',pagesDoc(),'application/msword');log('Status pages downloaded');save();}),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}]),
+  prdoc:()=>preDlPr(async()=>{if(!PR().bluf&&window.CARLAI&&CARLAI.state().ok) await prBluf();dl('PAULA_Prioritization_'+(PR().fy?'FY'+PR().fy+'_':'')+today()+'.doc',prDoc(),'application/msword');log('Prioritization paper downloaded');save();if(PR().bluf&&PR().bluf.check) alert('The bottom line was left out of the paper because its figures did not match the ranking ('+PR().bluf.check+'). Write it again from Reports, or add your own in Word.');}),
+  prxl:()=>XL.save('PAULA_Prioritization_'+(PR().fy?'FY'+PR().fy+'_':'')+today()+'.xlsx',prBook())})[b.dataset.out]());
  $('#bAIb').onclick=aiBrief;
  function out(k,h,p,b){return '<div class="card"><h4>'+h+'</h4><p>'+p+'</p><button class="sm go" data-out="'+k+'">'+b+'</button></div>';}}
 function win(html){const w=window.open('','_blank');w.document.write(html);w.document.close();}
@@ -736,6 +740,118 @@ function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483
   if(rnd()<.2) p.decisions=pick(['Approve use of contingency for added AT/FP scope.','Decide whether to reprogram FY funds for the design-build award.','Approve host-nation cost-share proposal.']);
   P.projects.push(p);});
  log('Sample data loaded',defs.length+' projects');save();VIEW='port';render();}
+
+// ================= PRIORITIZE: weighted scoring, funding line, rank stability =================
+const CRIT=[['mission','Mission and posture effect','How much the project advances the operational posture or mission it supports.'],
+ ['readiness','Readiness risk if not funded','What the force loses, and how soon, if this waits a year.'],
+ ['condition','Condition and life safety','Failing or unsafe facilities, code or statutory compliance, typhoon and seismic resilience.'],
+ ['exec','Executability','How ready it is to obligate: requirement, analysis, 1391, design and site. Worked out from the project’s phase.'],
+ ['enabling','Enables other work','Whether other projects or bed-downs depend on it (utilities, swing space, site prep).']];
+const PRESETS={'Balanced':{mission:30,readiness:25,condition:20,exec:15,enabling:10},'Readiness first':{mission:20,readiness:40,condition:20,exec:10,enabling:10},'Fastest to obligate':{mission:20,readiness:15,condition:15,exec:40,enabling:10},'Posture first':{mission:45,readiness:20,condition:10,exec:10,enabling:15}};
+function PR(){if(!P.prio) P.prio={fy:'',budget:{},w:{...PRESETS['Balanced']},preset:'Balanced',awarded:false,fill:true,s:{},must:{},bluf:null};if(P.prio.fill==null) P.prio.fill=true;return P.prio;}
+function prCost(p){return N(p.authorized)||N(p.programmed)||est(p)||value(p);}
+function prCands(){const r=PR();return filtered().filter(p=>(r.awarded||!N(p.award))&&N(p.phase)<8&&(!r.fy||String(p.fy)===String(r.fy)));}
+function prExec(p){const ph=N(p.phase)||1;let v=Math.min(5,Math.max(1,ph>=5?5:ph));const h=health(p);if(h.overall===2&&v>1) v--;
+ return {v,src:'auto',why:'Phase '+ph+' – '+PHASES[ph]+(h.overall===2?'; critical health lowers it one step':'')};}
+function prScore(p,c){const r=PR();const o=(r.s[p.id]||{})[c];if(c==='exec'&&(!o||o.src==='auto')) return prExec(p);return o||null;}
+function prTotal(p,w){w=w||PR().w;const tw=CRIT.reduce((a,[c])=>a+N(w[c]),0)||1;return CRIT.reduce((a,[c])=>{const s=prScore(p,c);return a+(s?N(s.v):3)*N(w[c]);},0)/tw*20;}
+function prRank(w){const r=PR();const L=prCands().map(p=>({p,t:prTotal(p,w),c:prCost(p),must:!!r.must[p.id]}));L.sort((a,b)=>(b.must-a.must)||(b.t-a.t)||(a.c-b.c));
+ const B=N(r.budget[r.fy||'all']);let cum=0,line=true;L.forEach((x,i)=>{x.rank=i+1;cum+=x.c;x.cum=cum;x.above=B?(line&&cum<=B):null;if(B&&cum>B) line=false;});
+ if(B&&r.fill){let used=L.filter(x=>x.above).reduce((a,x)=>a+x.c,0);L.forEach(x=>{if(x.above===false&&x.c<=B-used){x.above=true;x.fill=true;used+=x.c;}});}return L;}
+function prStable(){const r=PR();const B=N(r.budget[r.fy||'all']);if(!B) return {};const runs=300,cnt={};let seed=7;const rnd=()=>{seed=(seed*16807)%2147483647;return seed/2147483647;};
+ for(let k=0;k<runs;k++){const w={};CRIT.forEach(([c])=>w[c]=N(r.w[c])*(0.6+0.8*rnd()));prRank(w).forEach(x=>{if(x.above) cnt[x.p.id]=(cnt[x.p.id]||0)+1;});}
+ const o={};prCands().forEach(p=>o[p.id]=(cnt[p.id]||0)/runs);return o;}
+function stabTag(f,must){if(must) return '<span class="chip" style="background:#E8EEF3;color:#10303F">Must fund</span>';if(f==null) return '';
+ return f>=.9?'<span class="chip g">Firm above</span>':f<=.1?'<span class="chip" style="background:#eef0f2;color:#555">Firm below</span>':'<span class="chip" style="background:#fdf1d6;color:#7a5200" title="Above the line in '+Math.round(f*100)+'% of 300 weight variations">On the margin '+Math.round(f*100)+'%</span>';}
+function prUnscored(){return prCands().filter(p=>CRIT.some(([c])=>c!=='exec'&&!prScore(p,c)));}
+let PRX=null;
+function vPri(){const v=$('#view');const r=PR();const L=prRank();const st=prStable();const B=N(r.budget[r.fy||'all']);const fys=[...new Set(P.projects.filter(p=>!N(p.award)).map(p=>String(p.fy||'')).filter(Boolean))].sort();
+ const ab=L.filter(x=>x.above),be=L.filter(x=>x.above===false),mg=L.filter(x=>!x.must&&st[x.p.id]!=null&&st[x.p.id]>.1&&st[x.p.id]<.9);const un=prUnscored();
+ const tot=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;
+ v.innerHTML=filterRow()+'<div class="panel"><h2>Prioritize</h2><p class="lead">Rank the projects still to be funded against weighted criteria, set the budget, and see where the funding line falls and which projects sit on the margin.</p>'+
+  '<div class="row" style="gap:14px;flex-wrap:wrap;align-items:flex-end"><div><label class="f">Fiscal year</label><select id="prFy"><option value="">All years</option>'+fys.map(y=>'<option '+(String(r.fy)===y?'selected':'')+'>'+y+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Budget for '+(r.fy?'FY'+String(r.fy).slice(-2):'these projects')+' ($M)</label><input id="prB" inputmode="decimal" style="width:120px" value="'+(B?(B/1e6).toFixed(1):'')+'" placeholder="e.g. 250"></div>'+
+  '<div style="display:flex;flex-direction:column;gap:4px"><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input style="width:auto;flex:none" type="checkbox" id="prFill" '+(r.fill?'checked':'')+'> Fill leftover money with lower-ranked projects that fit</label><label class="small" style="display:flex;gap:6px;align-items:center;white-space:nowrap"><input style="width:auto;flex:none" type="checkbox" id="prAw" '+(r.awarded?'checked':'')+'> Include awarded projects</label></div></div>'+
+  '<div style="margin-top:12px"><label class="f">Weights</label><div class="row" style="gap:6px;flex-wrap:wrap;margin-bottom:8px">'+Object.keys(PRESETS).map(k=>'<button class="sm'+(r.preset===k?' go':'')+'" data-pre="'+esc(k)+'">'+esc(k)+'</button>').join('')+'</div>'+
+  '<div class="g2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:8px 18px">'+CRIT.map(([c,n,d])=>'<div title="'+esc(d)+'"><div class="small" style="display:flex;justify-content:space-between"><span>'+esc(n)+'</span><b id="wv_'+c+'">'+Math.round(N(r.w[c])/tot*100)+'%</b></div><input type="range" min="0" max="50" step="1" data-w="'+c+'" value="'+N(r.w[c])+'" style="width:100%"></div>').join('')+'</div></div></div>'+
+  '<div class="panel"><div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+
+   tile('Above the line',B?ab.length+' · '+M(ab.reduce((a,x)=>a+x.c,0)):'Set a budget')+tile('Below the line',B?be.length+' · '+M(be.reduce((a,x)=>a+x.c,0)):'–')+tile('On the margin',B?String(mg.length):'–')+tile('Candidates',L.length+' · '+M(L.reduce((a,x)=>a+x.c,0)))+'</div>'+
+  '<div class="find" style="margin-top:10px">'+(un.length?un.length+' project'+(un.length>1?'s are':' is')+' not fully scored; unscored criteria count as 3 of 5. ':'Every project is scored. ')+
+   (window.CARLAI&&CARLAI.state().ok?'<button class="sm go" id="prAI">'+(un.length?'Score '+(un.length===L.length?'them':'the rest')+' with AI':'Rescore with AI')+'</button>':'Sign in to CARL to score with AI.')+' <span class="small" id="prMsg"></span></div>'+
+  '<div style="overflow-x:auto;margin-top:10px"><table class="ptable" id="prT"><thead><tr><th>#</th><th>Project</th><th>FY</th><th style="text-align:right">Cost</th><th style="text-align:right">Cumulative</th><th>Score</th><th>Standing</th></tr></thead><tbody>'+prRows(L,st,B)+'</tbody></table></div>'+
+  '<p class="small">Score is out of 100: each criterion is rated 1–5 and weighted. “On the margin” means the project crosses the line in some of 300 runs with every weight varied by up to ±40%. Click a project to see or change its scores.</p></div>';
+ bindFilters();
+ $('#prFy').onchange=e=>{r.fy=e.target.value;r.bluf=null;save();vPri();};
+ $('#prB').onchange=e=>{const x=N(e.target.value);r.budget[r.fy||'all']=x?x*1e6:0;r.bluf=null;save();vPri();};
+ $('#prAw').onchange=e=>{r.awarded=e.target.checked;save();vPri();};$('#prFill').onchange=e=>{r.fill=e.target.checked;r.bluf=null;save();vPri();};
+ v.querySelectorAll('[data-pre]').forEach(b=>b.onclick=()=>{r.w={...PRESETS[b.dataset.pre]};r.preset=b.dataset.pre;r.bluf=null;save();vPri();});
+ v.querySelectorAll('[data-w]').forEach(el=>{el.oninput=()=>{r.w[el.dataset.w]=N(el.value);r.preset='';const t=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;CRIT.forEach(([c])=>{const o=$('#wv_'+c);if(o) o.textContent=Math.round(N(r.w[c])/t*100)+'%';});$('#prT tbody').innerHTML=prRows(prRank(),{},N(r.budget[r.fy||'all']));bindPrRows();};el.onchange=()=>{r.bluf=null;save();vPri();};});
+ if($('#prAI')) $('#prAI').onclick=()=>prAI(!un.length);bindPrRows();
+ function tile(l,val){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px">'+val+'</div></div>';}}
+function prRows(L,st,B){let h='',drawn=false;const used=L.filter(x=>x.above).reduce((a,x)=>a+x.c,0);
+ L.forEach(x=>{if(B&&!drawn&&(x.above===false||x.fill)){drawn=true;h+='<tr><td colspan="7" style="border-top:3px solid var(--crit);background:#fbeeee;font-weight:600;color:#9b2c2c">Funding line – '+M(used)+' of '+M(B)+' funded'+(B-used>0?', '+M(B-used)+' left':'')+(L.some(y=>y.fill)?'. Lower-ranked projects marked “fills the gap” fit in the money left above the line.':'')+'</td></tr>';}
+  const p=x.p,dim=x.above===false?' style="opacity:.62"':x.fill?' style="background:#f1f8f1"':'';h+='<tr data-pr="'+p.id+'"'+dim+' class="clk"><td>'+x.rank+'</td><td><b>'+esc(p.name||'(untitled)')+'</b><div class="small">'+esc([p.installation,p.service,'Phase '+p.phase].filter(Boolean).join(' · '))+'</div></td><td>'+esc(String(p.fy||''))+'</td><td style="text-align:right">'+M(x.c)+'</td><td style="text-align:right">'+M(x.cum)+'</td>'+
+   '<td><div style="display:flex;align-items:center;gap:6px"><div style="width:70px;height:7px;background:#e6ebee;border-radius:4px"><div style="width:'+Math.round(x.t)+'%;height:7px;background:#1F4E5F;border-radius:4px"></div></div>'+Math.round(x.t)+'</div></td><td>'+(x.fill?'<span class="chip g">Fills the gap</span>':stabTag(st[p.id],x.must))+'</td></tr>';
+  if(PRX===p.id) h+='<tr><td></td><td colspan="6">'+prEditor(p)+'</td></tr>';});
+ if(B&&!drawn&&L.length) h+='<tr><td colspan="7" style="border-top:3px solid var(--crit);font-weight:600;color:#9b2c2c">Funding line – all '+L.length+' projects fit ('+M(used)+' of '+M(B)+')</td></tr>';
+ return h||'<tr><td colspan="7">No projects to prioritize under these filters. Unawarded projects in phases 1–7 are candidates.</td></tr>';}
+function prEditor(p){const r=PR();return '<div style="background:#f6f8f9;border-radius:8px;padding:10px 12px"><table class="ptable" style="margin:0"><tr><th>Criterion</th><th>Score</th><th>Why</th><th>Source</th></tr>'+CRIT.map(([c,n])=>{const s=prScore(p,c);
+  return '<tr><td>'+esc(n)+'</td><td><select data-ps="'+p.id+'|'+c+'">'+(s?'':'<option value="">–</option>')+[1,2,3,4,5].map(k=>'<option '+(s&&N(s.v)===k?'selected':'')+'>'+k+'</option>').join('')+'</select></td><td><input data-pw="'+p.id+'|'+c+'" value="'+esc(s?s.why||'':'')+'" style="width:100%;min-width:220px" placeholder="Reason"></td><td class="small">'+(s?{auto:'Worked out',ai:'AI suggested',you:'You'}[s.src]||s.src:'Not scored')+'</td></tr>';}).join('')+'</table>'+
+  '<label class="small" style="display:flex;gap:6px;align-items:center;margin-top:8px;text-align:left"><input type="checkbox" style="flex:none;width:auto" data-must="'+p.id+'" '+(r.must[p.id]?'checked':'')+'> Must fund (directed, congressional add, life-safety order) – always above the line</label></div>';}
+function bindPrRows(){const r=PR();document.querySelectorAll('[data-pr]').forEach(tr=>tr.onclick=()=>{PRX=PRX===tr.dataset.pr?null:tr.dataset.pr;$('#prT tbody').innerHTML=prRows(prRank(),prStable(),N(r.budget[r.fy||'all']));bindPrRows();});
+ document.querySelectorAll('[data-ps]').forEach(el=>el.onchange=()=>{const [id,c]=el.dataset.ps.split('|');r.s[id]=r.s[id]||{};const o=r.s[id][c]||{};r.s[id][c]={v:N(el.value),src:'you',why:o.why||($('[data-pw="'+id+'|'+c+'"]')||{}).value||''};r.bluf=null;save();vPri();});
+ document.querySelectorAll('[data-pw]').forEach(el=>el.onchange=()=>{const [id,c]=el.dataset.pw.split('|');r.s[id]=r.s[id]||{};const p=P.projects.find(q=>q.id===id);const o=r.s[id][c]||prScore(p,c)||{v:3};r.s[id][c]={v:N(o.v)||3,src:'you',why:el.value};save();});
+ document.querySelectorAll('[data-must]').forEach(el=>el.onchange=()=>{r.must[el.dataset.must]=el.checked;r.bluf=null;save();vPri();});}
+function prFacts(p){const o=['ID: '+p.id,'Name: '+(p.name||''),'Installation: '+(p.installation||''),'Service: '+(p.service||''),'FY: '+(p.fy||''),'Phase: '+p.phase+' '+PHASES[N(p.phase)||1],'Cost: '+M(prCost(p)),'Health: '+LEVEL[health(p).overall].n];
+ try{const st=JSON.parse(localStorage.getItem('milcon_store')||'{}');const sp=(st.projects||{})[p.id];if(sp&&sp.tools){const n=sp.tools.nora;if(n){if(n.need_statement) o.push('Need: '+n.need_statement);(n.gaps||[]).slice(0,3).forEach(g=>o.push('Gap: '+[g.area,g.current&&'has '+g.current,g.required&&'needs '+g.required,g.impact].filter(Boolean).join('; ')));(n.risks||[]).slice(0,3).forEach(x=>o.push('Risk if not met: '+(x.text||x.risk||'')));}
+  const e=(sp.tools.record||{}).earl;if(e&&e.recommended) o.push('Recommended alternative: '+e.recommended.name);}}catch(e){}
+ p.risks.filter(x=>x.status!=='closed').slice(0,3).forEach(x=>o.push('Open risk: '+x.text));if(p.decisions) o.push('Decision pending: '+p.decisions);return o.join('\n');}
+const PR_SYS=`You help a military construction program office rank projects for funding. For each project, rate four criteria from 1 (low) to 5 (high) using ONLY the facts given, and give a one-sentence reason drawn from those facts:
+mission = mission and posture effect; readiness = readiness risk if the project slips a year; condition = condition, life safety, compliance and resilience need; enabling = whether other work depends on it.
+Where the facts are thin, rate 3 and say "Not enough information". Do not invent facts or figures. No references to AI.
+Return ONLY JSON: {"scores":[{"id":"…","mission":{"v":4,"why":"…"},"readiness":{"v":3,"why":"…"},"condition":{"v":2,"why":"…"},"enabling":{"v":3,"why":"…"}}]}`;
+async function prAI(all){const r=PR();const L=all?prCands():prUnscored();if(!L.length) return;const m=$('#prMsg');const b=$('#prAI');if(b) b.disabled=true;
+ let done=0;try{for(let i=0;i<L.length;i+=12){const part=L.slice(i,i+12);if(m) m.textContent='Scoring '+(i+1)+'–'+(i+part.length)+' of '+L.length+'…';
+  const j=await CARLAI.ask('claude',PR_SYS,'PROJECTS:\n\n'+part.map(prFacts).join('\n\n'));(j.scores||[]).forEach(x=>{const p=part.find(q=>q.id===x.id);if(!p) return;r.s[p.id]=r.s[p.id]||{};
+   ['mission','readiness','condition','enabling'].forEach(c=>{const y=x[c];if(!y) return;const cur=r.s[p.id][c];if(cur&&cur.src==='you'&&!all) return;if(cur&&cur.src==='you') return;const v=Math.min(5,Math.max(1,Math.round(N(y.v))));if(v) r.s[p.id][c]={v,src:'ai',why:String(y.why||'').slice(0,240)};});done++;});}
+  r.bluf=null;save();log('Projects scored with AI',done+' of '+L.length);vPri();}
+ catch(e){if(m) m.textContent='Scoring stopped: '+e.message;if(b) b.disabled=false;}}
+// ---- outputs ----
+const PB_SYS=`You write the bottom line up front (BLUF) of a military construction prioritization decision paper for senior leaders. Two to four sentences: what fits within the budget, what falls below the line and the main consequence, and which projects are on the margin. Use ONLY the facts given and state every figure exactly as given. No references to AI.
+Return ONLY JSON: {"bluf":"…"}`;
+function prFactsAll(){const r=PR();const L=prRank(),st=prStable(),B=N(r.budget[r.fy||'all']);const ab=L.filter(x=>x.above),be=L.filter(x=>x.above===false);
+ return ['Fiscal year: '+(r.fy||'all years'),'Budget: '+M(B),'Candidates: '+L.length+' projects, '+M(L.reduce((a,x)=>a+x.c,0)),'Funded: '+ab.length+' projects, '+M(ab.reduce((a,x)=>a+x.c,0))+(L.some(x=>x.fill)?' (including '+L.filter(x=>x.fill).length+' lower-ranked projects that fill the gap)':''),'Not funded: '+be.length+' projects, '+M(be.reduce((a,x)=>a+x.c,0)),
+  'Weights: '+CRIT.map(([c,n])=>n+' '+Math.round(N(r.w[c])/(CRIT.reduce((a,[k])=>a+N(r.w[k]),0)||1)*100)+'%').join('; ')].concat(L.map(x=>'#'+x.rank+' '+x.p.name+' – '+M(x.c)+', score '+Math.round(x.t)+', '+(x.must?'must fund':x.above?'above the line':x.above===false?'below the line':'no line')+(st[x.p.id]!=null&&st[x.p.id]>.1&&st[x.p.id]<.9?', on the margin ('+Math.round(st[x.p.id]*100)+'% of runs above)':'')+((prScore(x.p,'readiness')||{}).why?'; readiness: '+prScore(x.p,'readiness').why:''))).join('\n');}
+async function prBluf(){const r=PR();const f=prFactsAll();try{let j=await CARLAI.ask('claude',PB_SYS,'FACTS:\n'+f);let t=String(j.bluf||'').trim();const chk=t=>{const L=prRank();const nA=L.filter(x=>x.above).length,nB=L.filter(x=>x.above===false).length;const b=numBadW(t,f);const lw=t.toLowerCase().replace(/,/g,'');const num=w=>NWD[w]!=null?NWD[w]:+w;
+   const mA=lw.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(projects?\s+)?(fit|are funded|get funded|are above|sit above)/);if(mA&&num(mA[1])!==nA) b.push('says '+mA[1]+' funded; the ranking has '+nA);
+   const mB=lw.match(/\b(\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\s+(projects?\s+)?(fall below|are below|are not funded|go unfunded|miss)/);if(mB&&num(mB[1])!==nB) b.push('says '+mB[1]+' below the line; the ranking has '+nB);return b;};let bad=chk(t);
+  if(bad.length){j=await CARLAI.ask('claude',PB_SYS,'FACTS:\n'+f+'\n\nYOUR DRAFT:\n'+t+'\n\nCORRECTIONS: these figures are not in FACTS: '+bad.join(', ')+'. Fix them.');const t2=String(j.bluf||'').trim();if(t2){t=t2;bad=chk(t);}}
+  r.bluf={text:t,check:bad.length?'Check these figures, not in the data: '+bad.join(', '):''};save();}catch(e){}}
+function prDoc(){const r=PR();const L=prRank(),st=prStable(),B=N(r.budget[r.fy||'all']);const ab=L.filter(x=>x.above),be=L.filter(x=>x.above===false),mg=L.filter(x=>!x.must&&st[x.p.id]>.1&&st[x.p.id]<.9);const tw=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;
+ let b=cdBand('Decision paper','Project Prioritization'+(r.fy?' – FY'+r.fy:''),scopeText()+'  ·  '+fd(today())+(P.me?'  ·  '+P.me:''));
+ b+=kTiles([['Budget',B?M(B):'Not set'],['Above the line',B?ab.length+' · '+M(ab.reduce((a,x)=>a+x.c,0)):'–'],['Below the line',B?be.length+' · '+M(be.reduce((a,x)=>a+x.c,0)):'–'],['On the margin',B?String(mg.length):'–']]);
+ if(r.bluf&&r.bluf.text&&!r.bluf.check) b+=cdH('Bottom line')+cdP(esc(r.bluf.text));
+ b+=cdH('Ranking')+cdTable(['#','Project','FY','Cost','Cumulative','Score','Standing'],(()=>{const rows=[];let drawn=false;L.forEach(x=>{if(B&&!drawn&&(x.above===false||x.fill)){drawn=true;rows.push(['','<b style="color:#9B2C2C">Funding line – '+M(ab.reduce((a,y)=>a+y.c,0))+' of '+M(B)+' funded</b>','','','','','']);}
+   const f=st[x.p.id];rows.push([String(x.rank),esc(x.p.name)+'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc([x.p.installation,x.p.service].filter(Boolean).join('  ·  '))+'</span>',esc(String(x.p.fy||'')),M(x.c),M(x.cum),String(Math.round(x.t)),x.must?'Must fund':x.fill?'Funded – fills the gap':f==null?'–':f>=.9?'Firm above':f<=.1?'Firm below':'On the margin ('+Math.round(f*100)+'%)']);});return rows;})());
+ if(mg.length) b+=cdH('On the margin')+cdP('These projects move across the line when the weights shift by up to 40%. Small changes in leadership priorities decide them.')+cdTable(['Project','Above the line in','Readiness risk if deferred'],mg.map(x=>[esc(x.p.name),Math.round(st[x.p.id]*100)+'% of runs',esc((prScore(x.p,'readiness')||{}).why||'–')]));
+ if(be.length) b+=cdH('Below the line')+cdTable(['Project','Cost','Readiness risk if deferred'],be.map(x=>[esc(x.p.name),M(x.c),esc((prScore(x.p,'readiness')||{}).why||'–')]));
+ b+=cdH('Method')+cdP('Each project is rated 1–5 on five criteria, the ratings are weighted, and the total is scaled to 100. Projects marked must fund go first. Projects are funded in rank order until the next one no longer fits'+(r.fill?'; lower-ranked projects that fit in the money left are then funded and marked “fills the gap”':'')+'. Each project’s standing is tested with 300 runs in which every weight varies by up to ±40%.')+
+  cdTable(['Criterion','Weight','What it measures'],CRIT.map(([c,n,d])=>[esc(n),Math.round(N(r.w[c])/tw*100)+'%',esc(d)]));
+ b+=cdH('Scores and reasons')+cdTable(['Project'].concat(CRIT.map(([c,n])=>n.split(' ')[0])).concat(['Basis']),L.map(x=>[esc(x.p.name)].concat(CRIT.map(([c])=>{const s=prScore(x.p,c);return s?String(s.v):'3*';})).concat([CRIT.map(([c,n])=>{const s=prScore(x.p,c);return s&&s.why?'<b>'+esc(n.split(' ')[0])+':</b> '+esc(s.why)+(s.src==='ai'?' (AI)':''):'';}).filter(Boolean).join('<br>')||'–'])));
+ b+=cdP('* Not scored; counted as 3. (AI) marks a suggested score not yet changed by a reviewer.','font-size:8pt;color:'+CD.mute);
+ b+=cdFoot('Prepared with Corbel PAULA  ·  '+fd(today())+'  ·  Advisory analysis to inform the decision; it is not the decision.');
+ return cdDoc('Project Prioritization',[b]);}
+function prBook(){const r=PR();const L=prRank(),st=prStable();const tw=CRIT.reduce((a,[c])=>a+N(r.w[c]),0)||1;
+ return [{name:'Ranking',rows:[['Rank','Project','Installation','Service','FY','Phase','Cost','Cumulative','Score','Above the line','Must fund','Above the line in (% of runs)']].concat(L.map(x=>[x.rank,x.p.name,x.p.installation,x.p.service,x.p.fy,x.p.phase,Math.round(x.c),Math.round(x.cum),Math.round(x.t*10)/10,x.above==null?'':x.above?'Yes':'No',x.must?'Yes':'',st[x.p.id]==null?'':Math.round(st[x.p.id]*100)]))},
+  {name:'Scores',rows:[['Project'].concat(CRIT.flatMap(([c,n])=>[n,n+' – reason',n+' – source']))].concat(L.map(x=>[x.p.name].concat(CRIT.flatMap(([c])=>{const s=prScore(x.p,c);return s?[N(s.v),s.why||'',{auto:'Worked out',ai:'AI suggested',you:'Reviewer'}[s.src]||s.src]:['','','Not scored'];}))))},
+  {name:'Weights',rows:[['Criterion','Weight (%)','What it measures']].concat(CRIT.map(([c,n,d])=>[n,Math.round(N(r.w[c])/tw*100),d])).concat([[],['Budget',N(r.budget[r.fy||'all'])],['Fiscal year',r.fy||'All']])}];}
+function preDlPr(go){const r=PR();const I=[];const un=prUnscored();if(!N(r.budget[r.fy||'all'])) I.push(['No budget set, so there is no funding line',()=>{VIEW='pri';render();setTimeout(()=>$('#prB')&&$('#prB').focus(),50);}]);
+ if(un.length) I.push([un.length+' project'+(un.length>1?'s':'')+' not fully scored',()=>{VIEW='pri';render();}]);
+ const aiN=prCands().filter(p=>CRIT.some(([c])=>(prScore(p,c)||{}).src==='ai')).length;if(aiN) I.push([aiN+' project'+(aiN>1?'s have':' has')+' AI-suggested scores no one has reviewed',()=>{VIEW='pri';render();}]);
+ if(!r.bluf&&window.CARLAI&&CARLAI.state().ok) I.push(['No bottom line written yet',async()=>{await prBluf();vRep();}]);else if(r.bluf&&r.bluf.check) I.push([r.bluf.check,async()=>{await prBluf();vRep();}]);
+ if(!I.length) return go();const d=document.createElement('dialog');d.id='pgDlg';d.style.cssText='border:none;border-radius:12px;padding:20px 22px;max-width:580px;width:94vw;font:14px Segoe UI,system-ui,sans-serif';
+ d.innerHTML='<h3 style="margin:0 0 8px">Before you download</h3><p class="small" style="margin:0 0 10px">These are open in the prioritization:</p>'+I.map(([t],i)=>'<div class="find" style="display:flex;gap:8px;align-items:center;border-left:4px solid var(--watch);padding:7px 10px;margin:6px 0"><span style="flex:1">'+esc(t)+'</span><button class="sm" data-fx="'+i+'">Fix it</button></div>').join('')+'<div class="row" style="margin-top:14px"><button class="go" id="pgAny">Download draft anyway</button><button id="pgNo">Fix first</button></div>';
+ document.body.appendChild(d);d.showModal();const close=()=>{d.close();d.remove();};d.querySelectorAll('[data-fx]').forEach(b=>b.onclick=()=>{close();I[+b.dataset.fx][1]();});d.querySelector('#pgAny').onclick=()=>{close();go();};d.querySelector('#pgNo').onclick=close;}
 
 // ---------- status update drafted from the suite ----------
 const fd=d=>{if(!d) return '';const x=new Date(d+'T00:00');return isNaN(x)?d:x.getDate()+' '+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][x.getMonth()]+' '+x.getFullYear();};
