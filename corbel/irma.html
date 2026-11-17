@@ -222,12 +222,13 @@ tr.over td{background:var(--badbg)}tr.soon td{background:var(--warnbg)}
 .tabs2 button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
 pre.email{white-space:pre-wrap;font:14px/1.5 Calibri,"Segoe UI",sans-serif;background:#fff;border:1px solid var(--line);border-radius:8px;padding:14px 16px}
 </style>
-</head>
+<style>@media(max-width:900px){.wrap>*{min-width:0}.panel{overflow-x:auto}header{flex-wrap:wrap}}</style></head>
 <body>
 <header>
  <a class="home" href="/corbel/">Corbel</a>
  <h1>IRMA <span style="font-weight:400;font-size:15px;opacity:.75">Information Request Management Assistant</span></h1>
  <div class="sp"></div>
+ <span id="msbar" style="display:flex;align-items:center;margin-right:8px"></span>
  <span class="saved" id="saved"></span>
  <button id="bOpen">Open…</button>
  <input type="file" id="fOpen" accept=".json" hidden>
@@ -262,7 +263,7 @@ const DISP_S={A:'Approved',B:'Approved as noted',C:'Revise and resubmit',D:'Reje
 const DISP_R={answered:'Answered',withdrawn:'Withdrawn'};
 const INTAKE=[['transmittal','Transmittal complete: number, revision, date, contract or task order'],['spec','Specification section and paragraph identified'],['qc','Contractor QC review stamp and signature'],['items','Every item the specification requires is included (product data, shop drawings, certificates, samples, calculations)'],['dev','Deviations from the contract identified and justified'],['legible','Legible and complete; no missing pages']];
 const DISC={'Roofing and envelope':/roof|membrane|flashing|coping|parapet|sealant|waterproof|envelope|cladding|insulation|vapor|silicone|tpo|spf|gutter|drain/i,'Structural':/structur|beam|column|joist|deck|anchor|weld|bolt|load|seismic|foundation|footing|rebar|concrete|steel|wind|uplift/i,'Electrical':/electric|conduit|panel|breaker|circuit|wire|grounding|lightning|lps|air terminal|voltage|generator|lighting|transformer/i,'Mechanical':/hvac|duct|chiller|ahu|fan|damper|mechanical|refrigerant|exhaust|ventilat/i,'Plumbing':/plumb|pipe|piping|water heater|fixture|sanitary|domestic water|backflow/i,'Fire protection':/sprinkler|fire alarm|fire protection|nfpa 13|standpipe|suppression|firestop/i,'Civil':/grading|paving|asphalt|storm|sewer|utility|excavat|trench|compaction|erosion/i,'Safety':/fall protection|osha|em 385|guardrail|harness|ppe|hazard|confined space|scaffold|crane|hot work/i,'Security':/scif|sapf|ids|access control|vault|antiterror|at\/fp|standoff|bollard/i,'Environmental':/asbestos|lead|hazardous|waste|spill|storm water|historic|nepa/i};
-const LABELS={conf:['CONFIRMED',0.95,'l-conf'],ver:['VERIFIED',0.85,'l-ver'],nr:['NEEDS REVIEW',0.65,'l-nr'],ung:['UNGROUNDABLE',0,'l-ung']};
+const LABELS={conf:['Strong',0.95,'l-conf'],ver:['Supported',0.85,'l-ver'],nr:['Needs review',0.65,'l-nr'],ung:['No basis found',0,'l-ung']};
 const GATE=0.85;
 // The numbers are a subjective indicator of evidence strength, not a measured probability (same vocabulary as CARL).
 const IND_NOTE='Subjective indicator of evidence strength, not a measured probability of being right.';
@@ -309,7 +310,7 @@ function vReg(){const v=$('#view');
    return '<tr class="'+cl+'" data-id="'+x.id+'"><td><b>'+esc(num(x))+'</b></td><td>'+esc(x.title)+'</td><td>'+esc(x.to)+'</td><td>'+esc(x.spec)+'</td><td>'+esc(x.received)+'</td><td>'+esc(pmDue(x))+'</td><td>'+esc(suspense(x))+(x.status!=='closed'&&d!==null?' <span class="small">('+(d<0?-d+' days over':d+' days')+')</span>':'')+'</td><td>'+esc(STATUS[x.status])+(x.disp?' – '+esc(DISP_S[x.disp]||DISP_R[x.disp]):'')+'</td><td class="num">'+(x.intake_returns||0)+((x.intake_returns||0)>=Number(I.settings.intake_flag)?' <span class="pill bad">QC agenda</span>':'')+'</td><td class="num">'+(x.minutes||0)+' min</td></tr>';}).join(''):'<tr><td colspan="10" class="empty">Nothing here. Add a submittal or RFI.</td></tr>';
   tb.querySelectorAll('[data-id]').forEach(r=>r.onclick=()=>{CUR=I.items.find(x=>x.id===r.dataset.id);VIEW='item';TAB='docs';startTimer(CUR);render();window.scrollTo(0,0);});}}
 function newItem(kind){const n=I.items.filter(x=>x.kind===kind).reduce((m,x)=>Math.max(m,Number(x.no)||0),0)+1;
- const x={id:uid(),kind,no:String(n),rev:0,title:'',to:'',spec:'',received:today(),status:'received',disp:'',intake_returns:0,intake:{},sme:[],docs:[],elements:[],rec:'',email:'',minutes:0,log:[]};
+ const x={id:uid(),kind,no:String(n),rev:0,title:'',to:recTO(),spec:'',received:today(),status:'received',disp:'',intake_returns:0,intake:{},sme:[],docs:[],elements:[],rec:'',email:'',minutes:0,log:[]};
  I.items.push(x);log(x,'Created');log(null,'Item created',num(x));CUR=x;VIEW='item';TAB='docs';startTimer(x);save();render();}
 
 // ---------- references ----------
@@ -346,10 +347,10 @@ async function ingestFiles(files,target){const st=target==='ref'?$('#rstat'):$('
   if(/\.pdf$/i.test(f.name)){const r=await readPdf(f);pages=r.pages;images=r.images;}else pages=[await f.text()];
   const empty=pages.filter(p=>p.length<40).length;
   if(target==='ref'){I.refs.push({id:uid(),name:f.name.replace(/\.[^.]+$/,''),kind:/spec|ufgs|\d{2} \d{2} \d{2}/i.test(f.name)?'spec':/sow|pws/i.test(f.name)?'sow':'other',pages,added:today()});log(null,'Reference added',f.name);}
-  else{CUR.docs.push({id:uid(),name:f.name,pages,images,added:today()});log(CUR,'Document added',f.name+' ('+pages.length+' pages)');}
+  else{CUR.docs.push({id:uid(),name:f.name,pages,images,added:today()});log(CUR,'Document added',f.name+' ('+pages.length+' pages)');AUTO=true;}
   MSG[target==='ref'?'ref':'doc']=st.textContent=f.name+': '+pages.length+' pages read'+(empty?'; '+empty+' pages have no text layer (scanned or flattened)'+(images.length?' – use “Read scanned pages with AI”':''):'')+'.';
  }catch(e){st.textContent='Could not read '+f.name+': '+e.message;}}
- save();if(target==='ref') vRefs();else vItem();renderSteps();}
+ save();if(target==='ref') vRefs();else{vItem();if(AUTO){AUTO=false;reviewIt(CUR);}}renderSteps();}
 
 // ---------- search ----------
 const STOP=new Set('the a an and or of to in for on at by with is are be shall will this that from as it its per not no all any each other than such which into within upon'.split(' '));
@@ -369,7 +370,7 @@ const discOf=t=>Object.entries(DISC).filter(([k,re])=>re.test(t)).map(([k])=>k);
 function vItem(){const x=CUR;if(!x){VIEW='reg';return render();}const v=$('#view');
  v.innerHTML='<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">'+esc(num(x))+' <span style="font-weight:400">'+esc(x.title||'(untitled)')+'</span></h2><span class="small">'+(x.minutes||0)+' min logged</span></div>'+
  '<div class="form" style="margin-top:10px"><div><label class="f">Number</label><input data-k="no"></div><div><label class="f">Revision</label><input data-k="rev" type="number" min="0"></div><div class="wide"><label class="f">Title</label><input data-k="title"></div>'+
- '<div><label class="f">Task order / contract</label><input data-k="to"></div><div><label class="f">Spec section</label><input data-k="spec" placeholder="07 57 13"></div><div><label class="f">Received</label><input type="date" data-k="received"></div>'+
+ '<div><label class="f">Task order / contract</label><input data-k="to"></div><div><label class="f">Spec section</label><input data-k="spec" placeholder="07 57 13"></div><div><label class="f">Received</label><input type="date" data-k="received"></div><div><label class="f">Submitted by</label><input data-k="by"></div>'+
  '<div><label class="f">Status</label><select data-k="status">'+opts(STATUS,x.status)+'</select></div><div><label class="f">Disposition</label><select data-k="disp">'+opts(x.kind==='rfi'?DISP_R:DISP_S,x.disp,'—')+'</select></div>'+
  '<div><label class="f">PM due / suspense</label><div style="padding:6px 0">'+esc(pmDue(x))+' / '+esc(suspense(x))+'</div></div></div></div>'+
  '<div class="tabs2">'+[['docs','Documents'],x.kind==='submittal'?['intake','Intake check']:null,['elem','Elements and grounding'],['sme','Reviewers'],['resp','Response'],['log','Log']].filter(Boolean).map(([k,t])=>'<button data-t="'+k+'" class="'+(TAB===k?'on':'')+'">'+t+'</button>').join('')+'</div><div id="tab"></div>';
@@ -379,10 +380,10 @@ function vItem(){const x=CUR;if(!x){VIEW='reg';return render();}const v=$('#view
 function tDocs(){const x=CUR;const t=$('#tab');
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Documents</h3><div class="drop" id="drop">Drop the '+(x.kind==='rfi'?'RFI':'submittal')+' PDF here, or <button class="sm" id="bPick">choose files</button><input type="file" id="fDoc" accept=".pdf,.txt" multiple hidden></div><p class="small" id="dstat">'+esc(MSG.doc)+'</p>'+
  x.docs.map(d=>'<div class="card"><div class="hd"><b>'+esc(d.name)+'</b> <span class="small">'+d.pages.length+' pages'+(d.images?.length?' · '+d.images.length+' scanned pages':'')+'</span> <button class="sm" data-ocr="'+d.id+'" '+(d.images?.length?'':'hidden')+'>Read scanned pages with AI</button> <button class="sm" data-del="'+d.id+'">Remove</button></div><details><summary>Show text</summary><div class="passage">'+esc(d.pages.map((p,i)=>'[page '+(i+1)+']\n'+p).join('\n\n').slice(0,20000))+'</div></details></div>').join('')+
- '<h3>Or paste the text</h3><textarea id="pt" class="tall" style="min-height:120px"></textarea><button class="sm" id="bPaste">Add pasted text</button></div>';
- $('#bPick').onclick=()=>$('#fDoc').click();$('#fDoc').onchange=e=>{ingestFiles([...e.target.files],'doc');e.target.value='';};
+ (x.docs.length?'<div class="row"><button class="go" id="bRevIt">'+(x.elements.length?'Review it again':'Review it')+'</button><span class="small" id="rvStat">Reads the header, finds what needs an answer, grounds each one and drafts the response.</span></div>':'')+'<h3>Or paste the text</h3><textarea id="pt" class="tall" style="min-height:120px"></textarea><button class="sm" id="bPaste">Add pasted text</button></div>';
+ $('#bPick').onclick=()=>$('#fDoc').click();$('#fDoc').onchange=e=>{ingestFiles([...e.target.files],'doc');e.target.value='';};if($('#bRevIt')) $('#bRevIt').onclick=()=>reviewIt(x,true);
  const dr=$('#drop');dr.ondragover=e=>{e.preventDefault();dr.classList.add('on');};dr.ondragleave=()=>dr.classList.remove('on');dr.ondrop=e=>{e.preventDefault();dr.classList.remove('on');ingestFiles([...e.dataTransfer.files],'doc');};
- $('#bPaste').onclick=()=>{const tx=$('#pt').value.trim();if(!tx) return;x.docs.push({id:uid(),name:'Pasted text',pages:[tx],images:[],added:today()});log(x,'Document added','pasted text');save();vItem();};
+ $('#bPaste').onclick=()=>{const tx=$('#pt').value.trim();if(!tx) return;x.docs.push({id:uid(),name:'Pasted text',pages:[tx],images:[],added:today()});log(x,'Document added','pasted text');save();vItem();reviewIt(x);};
  t.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{x.docs=x.docs.filter(d=>d.id!==b.dataset.del);save();vItem();});
  t.querySelectorAll('[data-ocr]').forEach(b=>b.onclick=async()=>{const d=x.docs.find(z=>z.id===b.dataset.ocr);const r=readers()[0];if(!r){alert('Sign in to CARL to read images with AI.');return;}b.disabled=true;b.textContent='Reading…';
   try{for(const im of d.images){const j=await callAI(r,'Transcribe the page exactly. Return ONLY JSON {"text":"..."}. Keep line breaks. Do not summarize or correct.','Transcribe this page.',[im.data]);d.pages[im.page-1]=String(j.text||'');}
@@ -403,16 +404,16 @@ function intakeEmail(x){const r=x.lastReturn;return (I.settings.cor_name?I.setti
 
 // ---------- elements ----------
 function tElem(){const x=CUR;const t=$('#tab');const docText=x.docs.map(d=>d.pages.join('\n')).join('\n');
- t.innerHTML='<div class="panel"><h3 style="margin-top:0">Elements and grounding</h3><p class="lead">IRMA breaks the packet into the things that need an answer: each question, proposal, deviation and claim. Claims the packet makes about the contract are checked, not trusted. Each element is grounded against the contract references and the packet itself.</p><p class="small">Labels: CONFIRMED 0.95, VERIFIED 0.85, NEEDS REVIEW 0.65, UNGROUNDABLE 0. The numbers are a subjective indicator of evidence strength, not a measured probability of being right; only 0.85 and above is carried into the response without a person deciding.</p>'+
+ t.innerHTML='<div class="panel"><h3 style="margin-top:0">Elements and grounding</h3><p class="lead">IRMA breaks the packet into the things that need an answer: each question, proposal, deviation and claim. Claims the packet makes about the contract are checked, not trusted. Each element is grounded against the contract references and the packet itself.</p><p class="small">Each element is labelled by the strength of its evidence: <b>Strong</b> (both readers agree, quotes verified), <b>Supported</b> (one verified quote, upheld by the arbiter or picked by you), <b>Needs review</b>, or <b>No basis found</b>. Only Strong and Supported go into the response as findings; the rest are listed for the COR’s judgment.</p>'+
  (!x.docs.length?'<div class="find warn"><b>No documents.</b> Add the packet on the Documents tab.</div>':'')+(!I.refs.length?(carlOn()?'<div class="find"><b>No contract references loaded.</b> IRMA will search CARL\u2019s library of governing criteria. Add the SOW and specifications for answers specific to this contract.</div>':'<div class="find warn"><b>No contract references loaded.</b> Findings can only cite the packet itself until you add the SOW and specifications, or sign in to CARL to search its library.</div>'):'')+
  '<div class="row" style="margin-top:0"><button class="go" id="bDec">Find elements</button><button id="bAddE">Add element</button><button class="go" id="bGr">Ground all</button><span class="engines" id="eng"></span></div><div id="els"></div></div>';
  $('#bDec').onclick=()=>decompose(x,docText);$('#bAddE').onclick=()=>{x.elements.push({id:uid(),text:'',quote:'',kind:'question',disc:[],include:true});save();tElem();};$('#bGr').onclick=()=>groundAll(x);
  const box=$('#els');if(!x.elements.length){box.innerHTML='<div class="empty">No elements yet. Use Find elements, or add them by hand.</div>';return;}
  x.elements.forEach((e,i)=>{const d=document.createElement('div');d.className='el';const L=e.result?LABELS[e.result.label]:null;
   const refCover=e.disc.filter(dd=>!I.refs.some(r=>DISC[dd].test(r.pages.join(' '))));
-  d.innerHTML='<div class="hd"><b>'+(i+1)+'.</b><select data-k="kind" style="width:auto">'+opts({question:'Question',proposal:'Proposal / substitution',deviation:'Deviation',claim:'Claim about the contract',product:'Product or item',other:'Other'},e.kind)+'</select>'+(L?'<span class="lbl '+L[2]+'" title="'+IND_NOTE+'">'+L[0]+(L[1]?' '+L[1].toFixed(2):'')+'</span>':'')+'<span class="small">'+e.disc.map(esc).join(', ')+'</span><label class="small" style="margin-left:auto"><input type="checkbox" data-k="include" style="width:auto"> In response</label><button class="sm" data-g>Ground</button><button class="sm" data-del>Remove</button></div>'+
+  d.innerHTML='<div class="hd"><b>'+(i+1)+'.</b><select data-k="kind" style="width:auto">'+opts({question:'Question',proposal:'Proposal / substitution',deviation:'Deviation',claim:'Claim about the contract',product:'Product or item',other:'Other'},e.kind)+'</select>'+(L?'<span class="lbl '+L[2]+'" title="'+IND_NOTE+'">'+L[0]+'</span>':'')+'<span class="small">'+e.disc.map(esc).join(', ')+'</span><label class="small" style="margin-left:auto"><input type="checkbox" data-k="include" style="width:auto"> In response</label><button class="sm" data-g>Ground</button><button class="sm" data-del>Remove</button></div>'+
   '<textarea data-k="text" style="min-height:44px;margin-top:6px" placeholder="What needs an answer"></textarea>'+(e.quote?'<div class="ev">Packet: <q>'+esc(e.quote)+'</q>'+(e.qok===false?' <span class="pill bad">quote not found in packet</span>':'')+'</div>':'')+
-  (refCover.length?'<div class="find warn" style="margin-top:6px"><b>Discipline not covered by any loaded reference:</b> '+esc(refCover.join(', '))+'. Add that specification or criteria before relying on this finding.</div>':'')+
+  (refCover.length&&(!e.result||!['conf','ver'].includes(e.result.label))?'<div class="find warn" style="margin-top:6px"><b>Discipline not covered by any loaded reference:</b> '+esc(refCover.join(', '))+'. Add that specification or criteria before relying on this finding.</div>':'')+
   (e.result?resultHTML(e):'')+'<div data-cand></div>';
   bindAll(d,e,k=>{if(k==='text'){e.disc=discOf(e.text+' '+(e.quote||''));}});
   d.querySelector('[data-del]').onclick=()=>{x.elements=x.elements.filter(z=>z!==e);save();tElem();};
@@ -425,8 +426,8 @@ function resultHTML(e){const r=e.result;return '<div style="margin-top:8px"><lab
  (r.label!=='conf'&&r.label!=='ver'&&r.cands&&r.cands.length?'<details'+(r.label==='ung'?' open':'')+'><summary>Closest passages – select one that answers this element</summary>'+r.cands.map((p,i)=>'<div class="passage"><b>'+esc(p.src)+(p.page?' p.'+p.page:'')+'</b>\n'+esc(p.text.slice(0,700))+'\n<button class="sm" data-pick="'+i+'">This answers it</button></div>').join('')+'</details>':'')+'</div>';}
 const Q_RE=/\?|\b(request(s|ed)?|propose[sd]?|proposal|substitut\w*|in lieu of|alternate|alternative|deviat\w*|clarif\w*|confirm|please advise|conflict\w*|discrepan\w*|cannot|unable to|not feasible|recommend\w*)\b/i;
 const CLAIM_RE=/\b(per (the )?(spec|specification|contract|sow|drawings?|ufc|ufgs)|in accordance with|complies with|meets|as required by|section \d|\d{2} \d{2} \d{2})\b/i;
-async function decompose(x,docText){if(!docText.trim()){alert('Add the packet first.');return;}
- if(x.elements.length&&!confirm('Replace the current elements?')) return;const eng=$('#eng');const rd=readers();let els=[];
+async function decompose(x,docText,quiet){if(!docText.trim()){if(!quiet) alert('Add the packet first.');return;}
+ if(!quiet&&x.elements.length&&!confirm('Replace the current elements?')) return;const eng=$('#eng')||{innerHTML:''};const rd=readers();let els=[];
  const sents=docText.replace(/\r/g,'').split(/(?<=[.?!])\s+|\n{2,}/).map(s=>s.replace(/\s+/g,' ').trim()).filter(s=>s.length>15&&s.length<700);
  const off=sents.filter(s=>Q_RE.test(s)||CLAIM_RE.test(s)).map(s=>({text:s,quote:s,kind:/\?/.test(s)?'question':/substitut|in lieu|alternate|propos/i.test(s)?'proposal':/deviat/i.test(s)?'deviation':CLAIM_RE.test(s)?'claim':'question'}));
  if(rd.length){eng.innerHTML='<span class="eng"><span class="dot run"></span>'+esc(rd[0].label)+' reading</span>';
@@ -434,8 +435,8 @@ async function decompose(x,docText){if(!docText.trim()){alert('Add the packet fi
    const P=passages().filter(p=>p.kind==='packet');(j.elements||[]).forEach(e=>{if(!e||!e.text) return;const ok=!!findQuote(e.quote,P);els.push({text:String(e.text),quote:String(e.quote||''),kind:e.kind||'question',qok:ok,by:rd[0].label});if(!ok) log(x,'AI element kept but its quote was not found in the packet',String(e.text).slice(0,80));});
    eng.innerHTML='<span class="eng"><span class="dot ok"></span>'+esc(rd[0].label)+': '+els.length+' elements</span>';}catch(e){eng.innerHTML='<span class="eng"><span class="dot err"></span>AI failed – built-in rules used</span>';}}
  if(!els.length) els=off;
- x.elements=els.map(e=>({id:uid(),include:true,...e,disc:discOf(e.text+' '+e.quote)}));log(x,'Elements found',x.elements.length+(rd.length?' (AI)':' (built-in rules)'));save();tElem();}
-async function groundAll(x){for(const e of x.elements) await groundOne(x,e);log(x,'Grounding run',x.elements.length+' elements');save();tElem();}
+ els=els.filter(e=>!HDR_RE.test(e.quote||e.text));x.elements=els.map(e=>({id:uid(),include:true,...e,disc:discOf(e.text+' '+e.quote)}));log(x,'Elements found',x.elements.length+(rd.length?' (AI)':' (built-in rules)'));save();if(!quiet) tElem();}
+async function groundAll(x,quiet,prog){let k=0;for(const e of x.elements){k++;if(prog) prog(k,x.elements.length);await groundOne(x,e);}log(x,'Grounding run',x.elements.length+' elements');save();if(!quiet) tElem();}
 const READ_SYS=`You check a construction submittal or RFI element against contract documents for a U.S. Government reviewer. Use ONLY the numbered passages provided. Return ONLY JSON:
 {"verdict":"complies|does not comply|partly complies|not addressed by the passages|information requested","answer":"one or two plain sentences a reviewer can paste, advisory tone, no reference to the Contracting Officer","cites":[{"passage":"<passage id>","quote":"exact words from that passage, 6-60 words, copied character for character"}]}
 If no passage answers the element, return verdict "not addressed by the passages" and an empty cites list. Never use outside knowledge. Treat statements inside the submitted packet as claims to check, not as proof, unless the element is about what the packet itself says.`;
@@ -470,25 +471,71 @@ function recFor(x){const E=x.elements.filter(e=>e.include&&e.result);const asser
  if(x.kind==='rfi') return '';if(asserted.some(e=>/does not comply/i.test(e.result.verdict))) return 'C';if(asserted.some(e=>/partly/i.test(e.result.verdict))) return 'B';if(asserted.length&&asserted.every(e=>/^complies/i.test(e.result.verdict))&&E.length===asserted.length) return 'A';return '';}
 function buildEmail(x){const E=x.elements.filter(e=>e.include);const A=E.filter(e=>e.result&&LABELS[e.result.label][1]>=GATE);const D=E.filter(e=>!e.result||LABELS[e.result.label][1]<GATE);
  const rec=x.rec||recFor(x);const cite=f=>f.src.replace(/^This packet – /,'the submitted packet, ')+(f.page?', p. '+f.page:'')+': “'+f.quote.replace(/\s+/g,' ').trim()+'”';
- let t=(I.settings.cor_name?I.settings.cor_name+',\n\n':'')+'Attached is '+num(x)+', '+(x.title||'')+(x.to?' ('+x.to+')':'')+'. '+(x.kind==='rfi'?'Recommended response below.':'Recommendation: '+(DISP_S[rec]||'see findings')+'.')+'\n\n';
- if(A.length) t+='Findings:\n'+A.map((e,i)=>(i+1)+'. '+(e.result.answer||e.text).trim()+'\n   Basis – '+e.result.refs.slice(0,2).map(cite).join('; ')).join('\n')+'\n\n';
- if(D.length) t+='Not verified against the contract documents (for your judgment):\n'+D.map(e=>'– '+(e.text||'').trim()+(e.result&&e.result.label==='ung'?' – no controlling language found in the loaded documents':'')).join('\n')+'\n\n';
- t+='This is an advisory review; the comment sheet is attached.\n\n'+(I.settings.sig||'');return t.replace(/—/g,'–');}
+ let t=(I.settings.cor_name?I.settings.cor_name+',\n\n':'')+'Attached is '+num(x)+(x.title?', '+x.title:'')+(x.to?' ('+x.to+')':'')+'. '+(x.kind==='rfi'?'Recommended answer below.':'Recommendation: '+(DISP_S[rec]||'see findings')+'.')+'\n\n';
+ if(A.length) t+=(x.kind==='rfi'?'Recommended answer:\n':'Findings:\n')+A.map((e,i)=>(i+1)+'. '+(x.kind==='rfi'&&e.text?'Q: '+e.text.trim()+'\n   A: ':'')+(e.result.answer||e.text).trim()+'\n   Basis – '+e.result.refs.slice(0,2).map(cite).join('; ')).join('\n')+'\n\n';
+ if(D.length) t+=(x.kind==='rfi'?'Needs the design agent\u2019s or your judgment (no controlling language verified):\n':'Not verified against the contract documents (for your judgment):\n')+D.map(e=>'– '+(e.text||'').trim()+(e.result&&e.result.label==='ung'?' – no controlling language found in the loaded documents':'')).join('\n')+'\n\n';
+ t+='This is an advisory review; the response and comment sheet are attached.\n\n'+(I.settings.sig||'');return t.replace(/—/g,'–');}
 function tResp(){const x=CUR;const t=$('#tab');if(!x.email) x.email=x.status==='returned'&&x.lastReturn?intakeEmail(x):buildEmail(x);
  const E=x.elements.filter(e=>e.include&&e.result);const A=E.filter(e=>LABELS[e.result.label][1]>=GATE).length;
- t.innerHTML='<div class="panel"><h3 style="margin-top:0">Response to the COR</h3><p class="lead">Advisory and paste-ready. Only findings at or above the '+GATE+' gate are stated as findings; everything else goes in the “not verified” list for the COR’s judgment.</p>'+
+ t.innerHTML='<div class="panel"><h3 style="margin-top:0">Response to the COR</h3><p class="lead">Advisory and paste-ready. Only Strong and Supported elements are stated as findings; everything else is listed for the COR’s judgment.</p>'+
  '<div class="kpis" style="display:flex;gap:10px"><div class="card" style="margin:0"><span class="small">Stated as findings</span><div class="big" style="font:600 24px Bahnschrift">'+A+'</div></div><div class="card" style="margin:0"><span class="small">Disclosed, not verified</span><div style="font:600 24px Bahnschrift">'+(x.elements.filter(e=>e.include).length-A)+'</div></div></div>'+
  (x.kind==='submittal'?'<div class="row"><label class="small">Recommendation</label><select id="rec" style="width:auto">'+opts(DISP_S,x.rec||recFor(x),'—')+'</select><span class="small">'+(recFor(x)?'IRMA suggests '+DISP_S[recFor(x)]:'')+'</span></div>':'')+
  '<textarea id="em" class="tall" style="min-height:320px;font:14px/1.5 Calibri,Segoe UI,sans-serif;margin-top:8px"></textarea>'+
- '<div class="row"><button id="bReb">Rebuild from findings</button><button class="go" id="bCopy">Copy email</button><button id="bCrm">Download comment sheet (Excel)</button><button id="bSend">Mark sent to COR</button></div></div>';
+ '<div class="row"><button id="bReb">Rebuild from findings</button><button class="go" id="bCopy">Copy email</button><button id="bDoc">Download response (Word)</button><button id="bCrm">Download comment sheet (Excel)</button><button id="bSend">Mark sent to COR</button></div></div>';
  const em=$('#em');em.value=x.email;em.oninput=()=>{x.email=em.value;save();};
  if($('#rec')) $('#rec').onchange=e=>{x.rec=e.target.value;x.email=buildEmail(x);save();tResp();};
  $('#bReb').onclick=()=>{if(x.email&&!confirm('Replace the email text?')) return;x.email=x.lastReturn&&x.status==='returned'?intakeEmail(x):buildEmail(x);save();tResp();};
  $('#bCopy').onclick=()=>navigator.clipboard.writeText(em.value.replace(/—/g,'–')).then(()=>{$('#bCopy').textContent='Copied';setTimeout(()=>$('#bCopy').textContent='Copy email',1500);});
- $('#bCrm').onclick=()=>XL.save(num(x).replace(/\s/g,'_')+'_CRM_'+today()+'.xlsx',[{name:'Comments',rows:[['No.','Element','Packet reference','Comment','Recommendation','Basis','Label']].concat(x.elements.filter(e=>e.include).map((e,i)=>[i+1,e.text,e.quote,e.result?.answer||'',e.result?.verdict||'',(e.result?.refs||[]).map(f=>f.src+(f.page?' p.'+f.page:'')+': "'+f.quote+'"').join(' | '),e.result?LABELS[e.result.label][0]:'Not grounded']))}]);
+ $('#bCrm').onclick=()=>XL.save(fileName(x,'Comments','xlsx'),[{name:'Comments',rows:[['No.','Element','Packet reference','Comment','Recommendation','Basis','Label']].concat(x.elements.filter(e=>e.include).map((e,i)=>[i+1,e.text,e.quote,e.result?.answer||'',e.result?.verdict||'',(e.result?.refs||[]).map(f=>f.src+(f.page?' p.'+f.page:'')+': "'+f.quote+'"').join(' | '),e.result?LABELS[e.result.label][0]:'Not grounded']))}]);
+ $('#bDoc').onclick=()=>{dl(fileName(x,'Response','doc'),respDoc(x),'application/msword');log(x,'Response downloaded','Word');save();};
  $('#bSend').onclick=()=>{x.status='cor';x.sentCor=today();log(x,'Sent to COR',x.rec?DISP_S[x.rec]:'');save();vItem();renderSteps();};}
-function tLog(){const x=CUR;$('#tab').innerHTML='<div class="panel"><h3 style="margin-top:0">Log</h3><div class="small">'+(x.log.slice().reverse().map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div><div class="row"><button class="sm" id="bDelI">Delete this item</button></div></div>';
+function tLog(){const x=CUR;$('#tab').innerHTML='<div class="panel"><h3 style="margin-top:0">Log</h3><div class="small">'+(x.log.slice().reverse().map(l=>'<div>'+esc(lt(l.at))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div><div class="row"><button class="sm" id="bDelI">Delete this item</button></div></div>';
  $('#bDelI').onclick=()=>{if(!confirm('Delete '+num(x)+' and its documents? This cannot be undone. Save a file first if you need the record.')) return;I.items=I.items.filter(z=>z!==x);log(null,'Item deleted',num(x));CUR=null;VIEW='reg';save();render();};}
+
+
+// ---------- One step: from the packet to a draft response ----------
+let AUTO=false;
+const HDR_RE=/^(request for information|rfi\s*(no\.?|number|#)|submittal\s*(no\.?|number|#)|transmittal|date\s*:|contract\s*(no\.?|number)?\s*:|project\s*:|spec(ification)?\s*(section)?\s*:|submitted by|from\s*:|to\s*:|page \d)/i;
+function lt(iso){const d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+function recTO(){try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];const c=(pr&&(pr.core||pr))||{};const so=JSON.parse(localStorage.getItem('sophie_project')||'null');return String(c.to||c.number||(so&&so.p&&so.p.contract)||'');}catch(e){return '';}}
+function fileName(x,k,ext){return num(x).replace(/\s+/g,'_')+(x.title?'_'+x.title.replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,40):'')+'_'+k+'_'+today()+'.'+ext;}
+const HDR_SYS=`You read the header of a construction RFI or submittal transmittal. Return ONLY JSON {"no":"the RFI or submittal number as written, digits and dots only","title":"a short title, 3 to 10 words, from the subject or question","to":"contract or task order number as written","spec":"specification section number as written, e.g. 07 54 23","received":"date the document is dated, YYYY-MM-DD","by":"name and role of who submitted it"}. Leave a field empty when the document does not show it. Never invent.`;
+function hdrRules(t){const g=re=>{const m=t.match(re);return m?m[1].trim():'';};const d=g(/\bdate\s*:?\s*([0-9]{1,2}\s+[A-Za-z]{3,9}\s+[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i);
+ return {no:g(/\b(?:rfi|submittal)\s*(?:no\.?|number|#)\s*:?\s*([0-9][0-9.\-]*)/i),to:g(/\bcontract\s*(?:no\.?|number)?\s*:?\s*([A-Z0-9][A-Z0-9\-]{6,})/i),spec:g(/\bspec(?:ification)?\s*(?:section)?\s*:?\s*([0-9]{2}\s?[0-9]{2}\s?[0-9]{2}(?:\.[0-9]+)?)/i),received:d,title:g(/\b(?:subject|title)\s*:\s*([^\n]{3,80})/i)};}
+function isoDate(v){if(!v) return '';if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;const d=new Date(v);if(isNaN(d)) return '';const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
+async function readHeader(x,t){const H=hdrRules(t);const rd=readers();if(rd.length){try{const j=await callAI(rd[0],HDR_SYS,t.slice(0,6000));['no','title','to','spec','received','by'].forEach(k=>{const v=String(j[k]||'').trim();if(!v) return;
+   // a value must appear in the document, except the title, which may be a short restatement
+   if(k==='title'||k==='received'||norm(t).includes(norm(v))) H[k]=H[k]||v;});}catch(e){log(x,'Header read by AI failed',e.message);}}
+ const set=[];if(H.no&&(!x.no||x.no===String(I.items.filter(z=>z.kind===x.kind).length))){x.no=String(H.no).replace(/^0+(?=\d)/,'');set.push('number');}
+ if(H.title&&!x.title){x.title=H.title.slice(0,90);set.push('title');}if(H.to&&!x.to){x.to=H.to;set.push('contract');}if(H.spec&&!x.spec){x.spec=H.spec;set.push('spec section');}
+ const dd=isoDate(H.received);if(dd&&x.received===today()&&dd<=today()){x.received=dd;set.push('date');}if(H.by&&!x.by){x.by=H.by;set.push('submitted by');}
+ if(set.length) log(x,'Header read from the document',set.join(', '));return set;}
+function autoRefs(x){if(I.refs.length) return [];const a=[];const sop=sophieText(),cs=coraSel();
+ if(sop){I.refs.push({id:uid(),name:'SOW – '+(sop.title||'from SOPHIE'),kind:'sow',pages:[sop.text],added:today()});a.push('the SOW from SOPHIE');}
+ if(cs&&cs.items&&cs.items.length){I.refs.push({id:uid(),name:'CORA criteria selection '+today(),kind:'crit',pages:[cs.items.map(z=>[z.mod,z.number,z.title].filter(Boolean).join(' ')).join('\n')],added:today()});a.push('the CORA criteria list');}
+ if(a.length) log(null,'References added automatically',a.join(' and '));return a;}
+async function reviewIt(x,again){if(!x||!x.docs.length) return;if(again&&x.elements.length&&!confirm('Review it again? Elements and findings are rebuilt; the response text is redrafted.')) return;
+ const st=()=>document.getElementById('rvStat');const say=t=>{const e=st();if(e) e.textContent=t;MSG.doc=t;};const b=document.getElementById('bRevIt');if(b) b.disabled=true;
+ const docText=x.docs.map(d=>d.pages.join('\n')).join('\n');
+ try{say('Reading the header…');const hs=await readHeader(x,docText);const ar=autoRefs(x);
+  say('Finding what needs an answer…');await decompose(x,docText,true);
+  if(!x.elements.length){say('Nothing that needs an answer was found. Add elements by hand on the Elements tab.');save();vItem();return;}
+  await groundAll(x,true,(k,n)=>say('Grounding '+k+' of '+n+'…'));
+  x.email=buildEmail(x);if(x.kind==='submittal'&&!x.rec) x.rec=recFor(x);
+  if(x.status==='received') x.status=x.kind==='rfi'?'technical':'intake';
+  log(x,'Reviewed in one step',(hs.length?'header: '+hs.join(', ')+'; ':'')+(ar.length?'references: '+ar.join(', ')+'; ':'')+x.elements.length+' elements');save();
+  MSG.doc='';TAB='resp';vItem();renderSteps();}
+ catch(e){say('Stopped: '+e.message);if(b) b.disabled=false;}}
+// The response as a Word document in the Corbel look.
+function respDoc(x){const E=x.elements.filter(e=>e.include);const A=E.filter(e=>e.result&&LABELS[e.result.label][1]>=GATE);const D=E.filter(e=>!e.result||LABELS[e.result.label][1]<GATE);const e2=t=>esc(t??'');
+ const rec=x.kind==='submittal'?(DISP_S[x.rec||recFor(x)]||'See findings'):'';const cite=f=>e2(f.src.replace(/^This packet – /,'Submitted packet, '))+(f.page?', p. '+f.page:'')+': “'+e2(String(f.quote).replace(/\s+/g,' ').trim())+'”';
+ const info=[['Number',num(x)],['Title',x.title],['Contract / task order',x.to],['Specification section',x.spec],['Received',x.received],['Submitted by',x.by]].concat(x.kind==='submittal'?[['Recommendation',rec]]:[]).filter(r=>String(r[1]||'').trim());
+ const body=cdBand(x.kind==='rfi'?'RFI response':'Submittal review',x.title||num(x),[num(x),x.to].filter(Boolean).join('  ·  '),'Advisory  ·  '+today())+
+  cdTable(['Item','Detail'],info.map(r=>[e2(r[0]),e2(r[1])]),['30%','70%'])+
+  cdH(x.kind==='rfi'?'Recommended answer':'Findings')+(A.length?A.map((e,i)=>(x.kind==='rfi'&&e.text?cdP('<b>'+(i+1)+'.</b>&nbsp; <i>'+e2(e.text.trim())+'</i>','margin:8pt 0 2pt;color:'+CD.navy):'')+cdP((x.kind==='rfi'?'':'<b>'+(i+1)+'.</b>&nbsp; ')+e2((e.result.answer||e.text).trim()),'margin:'+(x.kind==='rfi'?'0 0 2pt 14pt':'6pt 0 2pt'))+cdP('Basis: '+e.result.refs.slice(0,2).map(cite).join('; '),'margin:0 0 6pt 14pt;font-size:9pt;color:'+CD.mute)).join(''):cdP('<i>No element has verified support yet.</i>'))+
+  (D.length?cdH(x.kind==='rfi'?'For the design agent’s or COR’s judgment':'Not verified against the contract documents')+D.map(e=>cdP('&#9675;&nbsp; '+e2((e.text||'').trim())+(e.result&&e.result.label==='ung'?' <span style="color:'+CD.mute+'">(no controlling language found in the loaded documents)</span>':''),'margin:0 0 4pt')).join(''):'')+
+  cdLead('This is an advisory review. Direction to the contractor comes from the Contracting Officer.')+cdFoot('Prepared with Corbel IRMA  ·  '+e2(num(x)));
+ return cdDoc(num(x)+' response',[body]);}
 
 // ---------- settings ----------
 function vSet(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Settings</h2><div class="form"><div><label class="f">Submittal suspense (calendar days)</label><input type="number" data-k="sub_days"></div><div><label class="f">RFI suspense (calendar days)</label><input type="number" data-k="rfi_days"></div><div><label class="f">PM review (days)</label><input type="number" data-k="pm_days"></div><div><label class="f">Intake returns before QC flag</label><input type="number" data-k="intake_flag"></div>'+
