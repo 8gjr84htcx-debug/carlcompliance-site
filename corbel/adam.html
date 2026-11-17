@@ -1,0 +1,749 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<script id="corbel-pf">/* Corbel portfolios: each portfolio keeps its own copy of every tool's data in this browser.
+   "My portfolio" uses the plain keys; any other portfolio stores its keys as pf:<id>:<key>. */
+(function(){
+ var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
+ var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
+ function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
+ function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
+ SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
+ SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
+ SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
+ var NAMES={'':'My portfolio',test:'Test portfolio'};
+ function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
+ function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
+ function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+   wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
+ window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
+  use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
+   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+  reset:function(id){return seed(id||'test');}};
+ function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
+  d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
+  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  document.body.insertBefore(d,document.body.firstChild);}
+ document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
+})();
+</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ADAM – Alignment, Deterrence, and Mission Advisor</title>
+<style>
+
+
+:root{--paper:#E9F0EE;--ink:#10303F;--depth:#1F5566;--shoal:#7FB7B2;--buoy:#F2B632;--line:#c9d6d3;--card:#fff;--mute:#4f6873;--ok:#1e6b45;--okbg:#e1f1e8;--warn:#8a5a00;--warnbg:#fdf1d6;--bad:#9b2c2c;--badbg:#f8e3e3}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 "Segoe UI",system-ui,sans-serif;color:var(--ink);background:var(--paper)}
+a{color:var(--depth)}
+header{display:flex;align-items:center;gap:18px;padding:14px 28px;background:var(--ink);color:#fff;flex-wrap:wrap}
+header .home{color:var(--shoal);text-decoration:none;font-size:14px}
+header h1{margin:0;font:600 22px/1.1 Bahnschrift,"DIN Alternate","Segoe UI",sans-serif;letter-spacing:.01em}
+header .sp{flex:1}
+header .saved{font-size:12.5px;color:var(--shoal)}
+button{font:inherit;font-size:14px;border:1px solid var(--line);background:#fff;color:var(--ink);padding:7px 14px;border-radius:6px;cursor:pointer}
+button:focus-visible,select:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible{outline:3px solid var(--buoy);outline-offset:1px}
+button.go{background:var(--depth);border-color:var(--depth);color:#fff}
+button.go:disabled{opacity:.5;cursor:default}
+button.sm{font-size:12.5px;padding:3px 9px}
+button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
+header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
+.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}}
+nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
+nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
+nav.steps button .n{width:24px;height:24px;border-radius:50%;border:1.5px solid var(--shoal);display:grid;place-items:center;font-size:12px;flex:none;color:var(--depth)}
+nav.steps button.on{background:#fff;border-color:var(--line);font-weight:600}
+nav.steps button.on .n{background:var(--depth);border-color:var(--depth);color:#fff}
+nav.steps button .c{margin-left:auto;font-size:12px;color:var(--mute);font-weight:400}
+nav.steps .gate{margin-top:10px;font-size:12.5px;color:var(--mute);padding:10px 12px;border-top:1px solid var(--line)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:20px 22px;margin-bottom:18px}
+h2{font:600 21px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:0 0 4px}
+h3{font:600 16px/1.2 Bahnschrift,"Segoe UI",sans-serif;margin:18px 0 8px;color:var(--depth)}
+.lead{color:var(--mute);margin:0 0 14px;font-size:14px;max-width:78ch}
+.mentor{font-size:13.5px;background:#f3f8f7;border-left:3px solid var(--shoal);padding:9px 12px;border-radius:4px;margin:0 0 14px;max-width:90ch}
+.form{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px 14px}
+.form .wide{grid-column:1/-1}
+label.f{font-size:12.5px;color:var(--mute);display:block;margin-bottom:2px}
+input,select,textarea{width:100%;font:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+textarea{min-height:70px;resize:vertical;line-height:1.45}
+textarea.tall{min-height:200px}
+table{width:100%;border-collapse:collapse;font-size:13.5px}
+th,td{text-align:left;padding:7px 8px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-size:12px;color:var(--mute);font-weight:600;white-space:nowrap}
+td input,td select,td textarea{font-size:13px;padding:4px 6px}
+td textarea{min-height:44px}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.pill{font-size:11.5px;border-radius:10px;padding:1px 8px;border:1px solid var(--line);color:var(--mute);white-space:nowrap;display:inline-block;margin:1px 2px 1px 0}
+.pill.ok{background:var(--okbg);border-color:#b9dcc8;color:var(--ok)}
+.pill.warn{background:var(--warnbg);border-color:#ecd59a;color:var(--warn)}
+.pill.bad{background:var(--badbg);border-color:#e6bcbc;color:var(--bad)}
+.small{font-size:12.5px;color:var(--mute)}
+.empty{color:var(--mute);padding:22px 8px;text-align:center;font-size:14px}
+.card{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:10px 0;background:#fff}
+.card.withdrawn{opacity:.55}
+.card .hd{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:8px}
+.card .id{font:600 14px Bahnschrift,"Segoe UI",sans-serif;color:var(--depth)}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 10px}
+@media(max-width:1000px){.grid4{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.flags{margin-top:6px}
+q.ev{background:#fff6d8;font-size:12.5px;color:var(--mute);quotes:"\201C" "\201D"}
+.check li{margin:4px 0;list-style:none}
+.check{padding-left:0}
+.check .y::before{content:"\2713";color:var(--ok);font-weight:700;margin-right:8px}
+.check .n::before{content:"\25CB";color:var(--warn);margin-right:8px}
+.quad{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:8px}
+.quad div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-height:70px;font-size:13px}
+.quad b{display:block;font-size:12px;color:var(--mute);font-weight:600;margin-bottom:3px}
+.cols2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:1000px){.cols2{grid-template-columns:1fr}}
+.qbank li{margin:5px 0;font-size:13.5px}
+.engines{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}
+.eng{display:flex;align-items:center;gap:7px;border:1px solid var(--line);border-radius:14px;padding:3px 10px;font-size:12.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:#c4cfcc}
+.dot.ok{background:var(--ok)}.dot.run{background:var(--buoy)}.dot.err{background:var(--bad)}
+dialog{border:none;border-radius:12px;padding:0;max-width:760px;width:94vw;box-shadow:0 20px 60px rgba(16,48,63,.35)}
+dialog::backdrop{background:rgba(16,48,63,.45)}
+.dlg{padding:20px 22px}
+.slot{border:1px solid var(--line);border-radius:8px;padding:12px 14px;margin:12px 0}
+.slot h4{margin:0 0 8px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px 12px}
+.grid2 label{font-size:12.5px;color:var(--mute)}
+.foot{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}
+.score{font-weight:700;padding:1px 7px;border-radius:5px}
+.s-hi{background:var(--badbg);color:var(--bad)}.s-md{background:var(--warnbg);color:var(--warn)}.s-lo{background:var(--okbg);color:var(--ok)}
+.outs{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px}
+.outs .card h4{margin:0 0 4px;font:600 15px Bahnschrift,"Segoe UI",sans-serif}
+.outs .card p{margin:0 0 10px;font-size:13px;color:var(--mute)}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media print{header,nav.steps{display:none}.wrap{display:block}}
+
+:root{--s1:#2a78d6;--s2:#eb6834;--good:#0ca30c;--watch:#fab219;--crit:#d03b3b;--na:#c3c2b7;--grid:#e1e0d9;--axis:#c3c2b7;--muted2:#898781;--surf:#fcfcfb;--seq250:#86b6ef;--seq350:#5598e7;--seq450:#2a78d6;--seq550:#1c5cab;--seq650:#104281}
+.wrap{grid-template-columns:200px minmax(0,1fr)}
+.filters{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:14px}
+.filters select,.filters input{width:auto;font-size:13px;padding:5px 8px}
+.filters .small{margin-left:auto}
+.grid{display:grid;gap:14px}
+.g-kpi{grid-template-columns:1.3fr repeat(5,1fr)}
+.g-2{grid-template-columns:1.6fr 1fr}.g-11{grid-template-columns:1fr 1fr}
+@media(max-width:1200px){.g-kpi{grid-template-columns:repeat(3,1fr)}.g-2,.g-11{grid-template-columns:1fr}}
+.tile{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.tile .lab{font-size:12.5px;color:var(--mute)}
+.tile .val{font:600 26px/1.15 system-ui,"Segoe UI",sans-serif;color:var(--ink);margin-top:4px}
+.tile .sub{font-size:12px;color:var(--mute);margin-top:3px}
+.hero .val{font-size:44px}
+.card2{background:var(--surf);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.card2 h3{margin:0 0 2px;font:600 15px system-ui,"Segoe UI",sans-serif;color:var(--ink)}
+.card2 .cap{font-size:12.5px;color:var(--mute);margin:0 0 8px}
+.card2 svg{display:block;width:100%;height:auto;overflow:visible}
+.leg{display:flex;gap:14px;flex-wrap:wrap;font-size:12.5px;color:var(--mute);margin-top:6px}
+.leg span{display:inline-flex;align-items:center;gap:6px}
+.leg i{display:inline-block;width:10px;height:10px;border-radius:2px}
+.leg i.ln{height:2px;width:14px;border-radius:1px}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;border-radius:10px;padding:1px 8px;white-space:nowrap}
+.chip.g{background:#e3f4e3;color:#006300}.chip.w{background:#fff3d6;color:#7a5600}.chip.c{background:#fbe3e3;color:#9b2c2c}.chip.n{background:#eeedea;color:#52514e}
+.att{display:flex;flex-direction:column;gap:8px;max-height:420px;overflow:auto}
+.att .it{border:1px solid var(--line);border-radius:8px;padding:8px 10px;cursor:pointer;background:#fff}
+.att .it:hover{border-color:var(--shoal)}
+.att .it b{font-size:13.5px}.att .it .r{font-size:12px;color:var(--mute);margin-top:3px}
+#tip{position:fixed;z-index:50;pointer-events:none;background:#fff;border:1px solid var(--line);border-radius:6px;box-shadow:0 6px 20px rgba(16,48,63,.15);padding:7px 10px;font-size:12.5px;display:none;max-width:320px}
+#tip .tv{font-weight:700;color:#0b0b0b}#tip .tl{color:#52514e}
+.ptable td,.ptable th{font-size:13px}.ptable tr.clk{cursor:pointer}.ptable tr.clk:hover td{background:#f3f8f7}
+.ptable th{cursor:pointer;user-select:none}
+.parts{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:8px}
+.parts div{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:#fff;font-size:12.5px}
+.meter{height:10px;border-radius:5px;background:#cde2fb;position:relative;overflow:hidden;margin-top:8px}
+.meter b{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:5px}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}.tabs2 button.on{background:var(--depth);color:#fff;border-color:var(--depth)}
+.samp{background:#fff3d6;border:1px solid #ecd59a;color:#7a5600;border-radius:8px;padding:6px 10px;font-size:12.5px;margin-bottom:12px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}nav.steps{position:static!important;top:auto}.wrap>*{min-width:0}.panel,.card2{overflow-x:auto}header{flex-wrap:wrap}.g-kpi{grid-template-columns:1fr 1fr}.g-kpi>*:first-child{grid-column:1/-1}.filters{flex-wrap:wrap}.filters select,.filters input{flex:1 1 140px;max-width:100%;min-width:0}main,#view{min-width:0;max-width:100%;overflow-x:hidden}svg{max-width:100%;height:auto}}
+@media print{.filters,nav.steps,header,.noprint{display:none!important}.wrap{display:block}}
+
+.tl{width:100%;height:auto;display:block;overflow:visible}
+.req{border:1px solid var(--line);border-radius:10px;background:#fff;padding:12px 14px;margin:10px 0}
+.req h4{margin:0 0 2px;font:600 15px system-ui,"Segoe UI",sans-serif}
+.req .meta{font-size:12.5px;color:var(--mute)}
+.lk{display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:13px;padding:4px 0;border-top:1px dashed var(--line)}
+.lk:first-of-type{border-top:none}
+.sug{background:#f3f8f7;border:1px dashed var(--shoal);border-radius:8px;padding:8px 10px;margin-top:8px;font-size:13px}
+</style>
+</head>
+<body>
+<header>
+ <a class="home" href="/corbel/">Corbel</a>
+ <h1>ADAM <span style="font-weight:400;font-size:15px;opacity:.75">Alignment, Deterrence, and Mission Advisor</span></h1>
+ <div class="sp"></div>
+ <span class="saved" id="saved"></span>
+ <button id="bOpen">Open…</button><input type="file" id="fOpen" accept=".json" hidden>
+ <button id="bSave">Save file</button>
+</header>
+<div class="wrap">
+ <nav class="steps" id="steps" aria-label="ADAM views"></nav>
+ <main id="view"></main>
+</div>
+<script>
+'use strict';
+const INST={'andersen':[13.58,144.93,'Guam'],'naval base guam':[13.44,144.65,'Guam'],'camp blaz':[13.58,144.84,'Guam'],'guam':[13.45,144.78,'Guam'],'tinian':[15.0,145.63,'CNMI'],'saipan':[15.19,145.75,'CNMI'],'kadena':[26.35,127.77,'Japan'],'camp hansen':[26.46,127.92,'Japan'],'camp schwab':[26.52,128.04,'Japan'],'camp foster':[26.3,127.77,'Japan'],'futenma':[26.27,127.75,'Japan'],'yokota':[35.75,139.35,'Japan'],'misawa':[40.7,141.37,'Japan'],'iwakuni':[34.14,132.24,'Japan'],'yokosuka':[35.29,139.67,'Japan'],'sasebo':[33.16,129.72,'Japan'],'atsugi':[35.45,139.45,'Japan'],'camp zama':[35.5,139.39,'Japan'],'camp humphreys':[36.96,127.03,'Korea'],'osan':[37.09,127.03,'Korea'],'kunsan':[35.9,126.62,'Korea'],'daegu':[35.85,128.6,'Korea'],'pearl harbor':[21.35,-157.95,'Hawaii'],'hickam':[21.33,-157.95,'Hawaii'],'schofield':[21.5,-158.06,'Hawaii'],'kaneohe':[21.44,-157.75,'Hawaii'],'pmrf':[22.02,-159.78,'Hawaii'],'barking sands':[22.02,-159.78,'Hawaii'],'fort shafter':[21.35,-157.88,'Hawaii'],'wake':[19.28,166.65,'Wake Island'],'kwajalein':[8.72,167.73,'Marshall Islands'],'darwin':[-12.42,130.87,'Australia'],'tindal':[-14.52,132.38,'Australia'],'palau':[7.37,134.54,'Palau'],'yap':[9.5,138.1,'FSM'],'basa':[14.99,120.49,'Philippines'],'subic':[14.79,120.27,'Philippines'],'eielson':[64.67,-147.1,'Alaska'],'jber':[61.25,-149.8,'Alaska'],'elmendorf':[61.25,-149.8,'Alaska'],'fort wainwright':[64.83,-147.65,'Alaska'],'clear':[64.29,-149.19,'Alaska'],'stirling':[-32.23,115.68,'Australia'],'amberley':[-27.64,152.71,'Australia'],'townsville':[-19.25,146.77,'Australia'],'pearce':[-31.67,116.01,'Australia'],'learmonth':[-22.24,114.09,'Australia'],'diego garcia':[-7.31,72.41,'BIOT'],'singapore':[1.35,103.82,'Singapore'],'lombrum':[-2.04,147.38,'Papua New Guinea'],'manus':[-2.04,147.38,'Papua New Guinea']};
+// ADAM links posture requirements (a capability needed at a place by a date) to the MILCON projects that deliver them.
+// The capability date is set by the latest required project; that project is the binding one. ADAM passes a mission
+// score to PAULA's Prioritize step. Unclassified, publicly released requirements only.
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Math.random().toString(36).slice(2,9);
+const today=()=>new Date().toLocaleDateString('en-CA');
+const N=v=>{const x=Number(String(v??'').replace(/[$,]/g,''));return isFinite(x)?x:0;};
+const M=n=>{const a=Math.abs(n);return (n<0?'-':'')+(a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(a>=1e8?0:1)+'M':a>=1e3?'$'+Math.round(a/1e3)+'K':'$'+Math.round(a));};
+function locate(inst){const t=String(inst||'').toLowerCase();const k=Object.keys(INST).sort((a,b)=>b.length-a.length).find(k=>t.includes(k));return k?{k,g:INST[k]}:null;}
+const POSTURE_PROGRAMS=['Marine Corps relocation to Guam','Guam Defense System','Tinian and CNMI','EDCA (Philippines)','Australia force posture','Other posture program'];
+const COMPONENTS=['PACFLT','PACAF','USARPAC','MARFORPAC','SOCPAC','Other'];
+const TIERS=[['critical','Critical',5],['high','High',4],['medium','Medium',3],['low','Low',2]];
+const TIER=k=>TIERS.find(t=>t[0]===k)||TIERS[2];
+const ST={ok:['On track','#e3f4e3','#006300'],risk:['At risk','#fdf1d6','#7a5200'],late:['Late','#fbeeee','#9b2c2c'],none:['No project linked','#eeedea','#52514e'],noneed:['No need date','#eeedea','#52514e'],unk:['Dates unknown','#eeedea','#52514e']};
+const chip=k=>'<span class="chip" style="background:'+ST[k][1]+';color:'+ST[k][2]+'">'+ST[k][0]+'</span>';
+const fm=ym=>{if(!ym) return '–';const [y,m]=String(ym).split('-');return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][N(m)-1]+' '+y;};
+const mo=ym=>{const [y,m]=String(ym).split('-').map(Number);return y*12+(m-1);};
+const ymAdd=(ym,n)=>{const t=mo(ym)+n;return Math.floor(t/12)+'-'+String(t%12+1).padStart(2,'0');};
+// ---------- state ----------
+const DEF={schema:'adam-1',reqs:[],t:{build:30,risk:6},me:'',log:[]};
+let A=load()||JSON.parse(JSON.stringify(DEF));let VIEW='req',OPEN='';
+function load(){try{const j=JSON.parse(localStorage.getItem('adam_portfolio')||'null');if(j){j.t={...DEF.t,...j.t};j.reqs=j.reqs||[];j.log=j.log||[];}return j;}catch(e){return null;}}
+let saveT=null;
+function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('adam_portfolio',JSON.stringify(A));$('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},250);}
+function log(w,d){A.log.push({at:new Date().toISOString(),what:w,detail:d||''});A.log=A.log.slice(-300);}
+// ---------- projects: PAULA's list, plus record projects PAULA has not seen ----------
+function projects(){let pa=null,st=null;try{pa=JSON.parse(localStorage.getItem('paula_project')||'null');}catch(e){}try{st=JSON.parse(localStorage.getItem('milcon_store')||'null');}catch(e){}
+ const L=(pa&&pa.projects||[]).filter(p=>p.name).map(p=>({...p,_src:'PAULA'}));
+ Object.values(st&&st.projects||{}).forEach(r=>{const c=r.core||{};if(!c.name||L.some(p=>p.id===r.id)) return;L.push({id:r.id,name:c.name,installation:c.installation,service:c.service,fy:c.fy,number:c.number,posture:c.posture,forecast_finish:c.forecast_finish,baseline_finish:c.baseline_finish,award:c.award,programmed:c.programmed,authorized:c.authorized,_src:'Shared record'});});
+ return L;}
+// When a project will deliver: its forecast, else its baseline, else an estimate from its fiscal year (an assumption, set in Data and settings).
+function pDate(p){const f=String(p.forecast_finish||'').slice(0,7),b=String(p.baseline_finish||'').slice(0,7);
+ if(/^\d{4}-\d{2}$/.test(f)) return {ym:f,how:'PAULA forecast completion',est:false};if(/^\d{4}-\d{2}$/.test(b)) return {ym:b,how:'PAULA baseline completion',est:false};
+ const fy=N(p.fy);if(fy>2000){const now=today().slice(0,7);const late=!N(p.award)&&mo(fy+'-09')<mo(now);const st=late?now:fy+'-09';return {ym:ymAdd(st,N(A.t.build)),how:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+N(A.t.build)+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+N(A.t.build)+' months to build (assumption)',est:true};}return null;}
+function evalReq(r,P){const PL=P||projects();const L=(r.links||[]).map(l=>({...l,p:PL.find(p=>p.id===l.pid)})).filter(l=>l.p);const req=L.filter(l=>l.role!=='supports');
+ if(!req.length) return {st:'none',L,req};const D=req.map(l=>({l,d:pDate(l.p)}));const miss=D.filter(x=>!x.d);
+ const known=D.filter(x=>x.d);if(!known.length) return {st:'unk',L,req,miss};const bind=known.slice().sort((a,b)=>mo(b.d.ym)-mo(a.d.ym))[0];const cap=bind.d.ym;
+ const gap=r.need?mo(cap)-mo(r.need):null;const st=gap==null?'noneed':gap<=0?'ok':gap<=N(A.t.risk)?'risk':'late';
+ return {st:miss.length&&st==='ok'?'unk':st,L,req,cap,gap,bind,miss,est:known.some(x=>x.d.est)};}
+// The mission score PAULA reads: the highest tier of any requirement a project serves; supporting links count one step lower.
+function missionFor(pid){const P=projects();let best=null;A.reqs.forEach(r=>(r.links||[]).forEach(l=>{if(l.pid!==pid) return;const t=TIER(r.tier);let v=t[2]-(l.role==='supports'?1:0);v=Math.max(1,v);const e=evalReq(r,P);
+  const why=(l.role==='supports'?'Supports':'Required for')+' “'+r.name+'” ('+t[1]+(r.need?', needed '+fm(r.need):'')+')'+(e.bind&&e.bind.l.pid===pid&&l.role!=='supports'?'; this project sets its capability date'+(e.gap>0?', '+e.gap+' months after the need date':''):'');
+  if(!best||v>best.v) best={v,why:'ADAM: '+why,src:'adam'};}));return best;}
+// ---------- link suggestions: same installation, or a project tagged with the same posture program ----------
+function suggest(r,P){const loc=locate(r.location);const have=new Set((r.links||[]).map(l=>l.pid));
+ return (P||projects()).filter(p=>!have.has(p.id)).map(p=>{const why=[];const pl=locate(p.installation);if(loc&&pl&&loc.k===pl.k&&loc.k!=='guam') why.push('same installation');
+  if(r.program&&p.posture&&p.posture.program===r.program) why.push('tagged '+r.program);return {p,why};}).filter(x=>x.why.length).slice(0,8);}
+// ---------- screens ----------
+const VIEWS=[['req','Requirements'],['aln','Alignment'],['prj','Projects'],['rep','Reports'],['data','Data and settings']];
+function renderSteps(){const nav=$('#steps');const E=A.reqs.map(r=>evalReq(r));const late=E.filter(e=>e.st==='late').length;
+ nav.innerHTML=VIEWS.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k?'on':'')+'"><span class="n">'+(i+1)+'</span>'+t+'<span class="c">'+(k==='req'?A.reqs.length||'':k==='aln'&&late?late+' late':'')+'</span></button>').join('')+'<div class="gate">'+A.reqs.length+' requirement'+(A.reqs.length===1?'':'s')+'<br>Unclassified, publicly released requirements only.</div>';
+ nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
+function render(){renderSteps();({req:vReq,aln:vAln,prj:vPrj,rep:vRep,data:vData})[VIEW]();}
+function tiles(T){return '<div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px">'+T.map(([l,v,s])=>'<div class="tile"><div class="lab">'+l+'</div><div class="val">'+v+'</div>'+(s?'<div class="sub">'+s+'</div>':'')+'</div>').join('')+'</div>';}
+function vReq(){const v=$('#view');const P=projects();
+ v.innerHTML='<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">Posture requirements</h2><div><button id="bRead">Read a posture document</button> <button class="go" id="bAdd">Add requirement</button></div></div>'+
+  '<p class="lead">A requirement is a capability the force needs at a place by a date, from a publicly released source. Link the projects that deliver it; the latest required project sets the capability date. Record nothing classified or controlled here.</p>'+
+  (P.length?'':'<p class="samp">No projects found in this browser. Add projects in PAULA first, or switch to the Test portfolio on the Corbel home page.</p>')+'<div id="rdBox"></div>'+
+  (A.reqs.length?A.reqs.map(r=>reqCard(r,P)).join(''):'<p class="small">No requirements yet. Add one, or read a posture document and pick from what it finds.</p>')+'</div>';
+ $('#bAdd').onclick=()=>{const r={id:uid(),name:'',location:'',component:'',program:'',need:'',tier:'high',effect:'',source:'',links:[]};A.reqs.unshift(r);OPEN=r.id;log('Requirement added');save();vReq();setTimeout(()=>{const e=document.querySelector('[data-rf="'+r.id+'|name"]');if(e) e.focus();},50);};
+ $('#bRead').onclick=readBox;bindReq(P);}
+function reqCard(r,P){const e=evalReq(r,P);const t=TIER(r.tier);const ed=OPEN===r.id;
+ const head='<div class="row" style="margin:0;justify-content:space-between;align-items:flex-start;gap:10px"><div><h4>'+esc(r.name||'(unnamed requirement)')+'</h4><div class="meta">'+esc([r.location,r.component,r.program,t[1],r.need?'Needed '+fm(r.need):'No need date'].filter(Boolean).join('  ·  '))+'</div></div><div style="text-align:right">'+chip(e.st)+
+  (e.cap?'<div class="small" style="margin-top:4px">Capability '+fm(e.cap)+(e.gap!=null?' · '+(e.gap>0?e.gap+' mo late':e.gap<0?(-e.gap)+' mo early':'on the date'):'')+'</div>':'')+'</div></div>';
+ const form=ed?'<div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">'+
+  '<div style="grid-column:1/-1"><label class="f">Requirement – the capability needed</label><input data-rf="'+r.id+'|name" value="'+esc(r.name)+'" placeholder="e.g. Dispersed fighter operations from Tinian"></div>'+
+  '<div><label class="f">Location</label><input data-rf="'+r.id+'|location" value="'+esc(r.location)+'" placeholder="Installation or island"></div>'+
+  '<div><label class="f">Needed by</label><input type="month" data-rf="'+r.id+'|need" value="'+esc(r.need)+'"></div>'+
+  '<div><label class="f">Priority</label><select data-rf="'+r.id+'|tier">'+TIERS.map(([k,n])=>'<option value="'+k+'"'+(r.tier===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Component command</label><select data-rf="'+r.id+'|component"><option value="">Not set</option>'+COMPONENTS.map(x=>'<option'+(r.component===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Posture program</label><select data-rf="'+r.id+'|program"><option value="">None</option>'+POSTURE_PROGRAMS.map(x=>'<option'+(r.program===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'+
+  '<div style="grid-column:1/-1"><label class="f">Effect – what the capability gives the commander</label><input data-rf="'+r.id+'|effect" value="'+esc(r.effect)+'"></div>'+
+  '<div style="grid-column:1/-1"><label class="f">Source – a publicly released document, with its date</label><input data-rf="'+r.id+'|source" value="'+esc(r.source)+'" placeholder="e.g. INDOPACOM posture statement to Congress, Apr 2026"></div></div>':
+  (r.effect||r.source?'<div class="small" style="margin-top:6px">'+esc(r.effect||'')+(r.source?'<br><i>Source: '+esc(r.source)+'</i>':'')+'</div>':'');
+ const links='<div style="margin-top:10px"><b style="font-size:13px">Projects</b>'+(e.L.length?e.L.map(l=>{const d=pDate(l.p);const isB=e.bind&&e.bind.l.pid===l.pid;return '<div class="lk"><select data-lr="'+r.id+'|'+l.pid+'" style="width:auto"><option value="required"'+(l.role!=='supports'?' selected':'')+'>Required</option><option value="supports"'+(l.role==='supports'?' selected':'')+'>Supports</option></select><b>'+esc(l.p.name)+'</b><span class="small">'+esc([l.p.installation,l.p.fy?'FY'+l.p.fy:''].filter(Boolean).join(' · '))+'</span><span class="small" style="margin-left:auto">'+(d?(d.est?'Est. ':'')+fm(d.ym):'No date')+'</span>'+(isB?'<span class="chip c" title="This project sets the capability date">Binding</span>':'')+'<button class="sm" data-lx="'+r.id+'|'+l.pid+'" title="Remove link">Remove</button></div>';}).join(''):'<div class="small">None linked.</div>')+
+  '<div class="row" style="margin-top:6px"><select data-la="'+r.id+'" style="width:auto;max-width:360px"><option value="">Link a project…</option>'+P.filter(p=>!(r.links||[]).some(l=>l.pid===p.id)).map(p=>'<option value="'+p.id+'">'+esc(p.name+(p.installation?' – '+p.installation:''))+'</option>').join('')+'</select></div></div>';
+ const sg=suggest(r,P);const sug=sg.length?'<div class="sug"><b>Likely links:</b> '+sg.map(x=>'<button class="sm" data-ls="'+r.id+'|'+x.p.id+'" title="'+esc(x.why.join(', '))+'">+ '+esc(x.p.name)+'</button>').join(' ')+' <button class="sm" data-lsa="'+r.id+'">Link all</button></div>':'';
+ const miss=e.miss&&e.miss.length?'<div class="small" style="color:#7a5200;margin-top:6px">No delivery date for '+e.miss.map(x=>esc(x.l.p.name)).join(', ')+': add a fiscal year or completion date in PAULA.</div>':'';
+ return '<div class="req">'+head+form+links+sug+miss+'<div class="row" style="margin:8px 0 0"><button class="sm" data-re="'+r.id+'">'+(ed?'Done':'Edit')+'</button> <button class="sm" data-rd="'+r.id+'">Delete</button></div></div>';}
+function bindReq(P){const R=id=>A.reqs.find(r=>r.id===id);const sv=()=>{save();vReq();};
+ document.querySelectorAll('[data-rf]').forEach(el=>el.onchange=()=>{const [id,k]=el.dataset.rf.split('|');R(id)[k]=el.value.trim();save();if(k!=='name'&&k!=='effect'&&k!=='source') vReq();});
+ document.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>{OPEN=OPEN===b.dataset.re?'':b.dataset.re;vReq();});
+ document.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>{const r=R(b.dataset.rd);if(!confirm('Delete “'+(r.name||'this requirement')+'”?')) return;A.reqs=A.reqs.filter(x=>x!==r);log('Requirement deleted',r.name);sv();});
+ document.querySelectorAll('[data-la]').forEach(s=>s.onchange=()=>{if(!s.value) return;const r=R(s.dataset.la);r.links=(r.links||[]).concat([{pid:s.value,role:'required'}]);log('Project linked',r.name);sv();});
+ document.querySelectorAll('[data-lr]').forEach(s=>s.onchange=()=>{const [id,pid]=s.dataset.lr.split('|');const l=R(id).links.find(x=>x.pid===pid);l.role=s.value;sv();});
+ document.querySelectorAll('[data-lx]').forEach(b=>b.onclick=()=>{const [id,pid]=b.dataset.lx.split('|');const r=R(id);r.links=r.links.filter(x=>x.pid!==pid);sv();});
+ document.querySelectorAll('[data-ls]').forEach(b=>b.onclick=()=>{const [id,pid]=b.dataset.ls.split('|');const r=R(id);r.links=(r.links||[]).concat([{pid,role:'required'}]);log('Project linked',r.name);sv();});
+ document.querySelectorAll('[data-lsa]').forEach(b=>b.onclick=()=>{const r=R(b.dataset.lsa);suggest(r,P).forEach(x=>r.links=(r.links||[]).concat([{pid:x.p.id,role:'required'}]));log('Projects linked',r.name);sv();});}
+// ---------- read a posture document: AI lists candidate requirements, each must quote the document ----------
+let PDFJS=null;
+async function pdfLib(){if(PDFJS) return PDFJS;const r=await fetch('irma.html',{cache:'force-cache'});if(!r.ok) throw new Error('The PDF reader could not be loaded');const h=await r.text();
+ const grab=id=>{const m=h.match(new RegExp('<script id="'+id+'" type="text/plain">([\\s\\S]*?)<\/script>'));if(!m) throw new Error('The PDF reader could not be loaded');return Uint8Array.from(atob(m[1].trim()),c=>c.charCodeAt(0));};
+ const u=URL.createObjectURL(new Blob([grab('pdfjs')],{type:'text/javascript'}));const w=URL.createObjectURL(new Blob([grab('pdfw')],{type:'text/javascript'}));PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
+async function fileText(f){if(!/\.pdf$/i.test(f.name)) return await f.text();const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;const out=[];
+ for(let i=1;i<=Math.min(doc.numPages,120);i++){const tc=await (await doc.getPage(i)).getTextContent();out.push('[Page '+i+']\n'+tc.items.map(x=>x.str).join(' ').replace(/\s+/g,' '));}return out.join('\n\n');}
+const READ_SYS=`You read a publicly released U.S. defense posture document (for example a combatant command posture statement, a budget overview or a congressional report) and list the force posture requirements it states that military construction would deliver: a capability needed at a place, by a date where the document gives one. Return ONLY JSON {"reqs":[{"name":"the capability, short","location":"installation or island as written","need":"YYYY-MM or empty","component":"PACFLT|PACAF|USARPAC|MARFORPAC|SOCPAC|Other|","program":"","effect":"what it gives the commander, one sentence from the document","quote":"exact words from the document that state it","page":0}]}
+At most 15, most specific first. Use only what the document states; leave need empty unless a date is written. Never infer or add classified detail.`;
+const nz=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
+let RD=null;
+function readBox(){const b=$('#rdBox');const on=!!(window.CARLAI&&CARLAI.state().ok);
+ b.innerHTML='<div class="sug" style="margin:0 0 12px"><b>Read a posture document</b><p class="small" style="margin:4px 0">A posture statement, budget overview or congressional report as PDF or text. ADAM lists the requirements it states; each must quote the document. Nothing is added until you pick it.</p>'+(on?'<button class="go sm" id="rdPick">Choose a file</button><input type="file" id="rdF" accept=".pdf,.txt" hidden> <span class="small" id="rdSt"></span>':'<span class="small">Sign in to CARL to use this.</span>')+'<div id="rdOut"></div></div>';
+ if(!on) return;$('#rdPick').onclick=()=>$('#rdF').click();$('#rdF').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f) return;const st=$('#rdSt');
+  try{st.textContent='Reading '+f.name+'…';const t=await fileText(f);if((t.match(/\S+/g)||[]).length<80) throw new Error('Too little text found');st.textContent='Finding requirements…';
+   const j=await CARLAI.ask('claude',READ_SYS,t.slice(0,150000),null,{fresh:true});const nt=nz(t);
+   RD={file:f.name,items:(j.reqs||[]).filter(x=>x&&x.name&&x.quote&&nt.includes(nz(x.quote))).map(x=>({...x,need:/^\d{4}-\d{2}$/.test(String(x.need||''))&&nt.includes(String(x.need).slice(0,4))?x.need:'',component:COMPONENTS.includes(x.component)?x.component:'',program:POSTURE_PROGRAMS.includes(x.program)?x.program:''}))};
+   RD.dropped=(j.reqs||[]).length-RD.items.length;st.textContent='';log('Posture document read',f.name+': '+RD.items.length+' requirements');rdShow();}catch(err){st.textContent='';alert('Could not read the document: '+err.message);}};}
+function rdShow(){const o=$('#rdOut');if(!o||!RD) return;o.innerHTML=(RD.items.length?'<table class="ptable" style="margin-top:8px"><thead><tr><th></th><th>Requirement</th><th>Location</th><th>Needed</th><th>From the document</th></tr></thead><tbody>'+RD.items.map((x,i)=>'<tr><td><input type="checkbox" data-rk="'+i+'" style="width:auto" checked></td><td><b>'+esc(x.name)+'</b>'+(x.component?'<div class="small">'+esc(x.component)+'</div>':'')+'</td><td>'+esc(x.location)+'</td><td>'+(x.need?fm(x.need):'–')+'</td><td class="small">“'+esc(x.quote)+'”'+(x.page?' (p. '+x.page+')':'')+'</td></tr>').join('')+'</tbody></table><div class="row"><button class="go sm" id="rdAdd">Add the ticked requirements</button></div>':'<p class="small">No requirements found that the document states outright.</p>')+(RD.dropped?'<p class="small">'+RD.dropped+' suggestion'+(RD.dropped>1?'s were':' was')+' dropped because the quote is not in the document.</p>':'');
+ if($('#rdAdd')) $('#rdAdd').onclick=()=>{const pick=RD.items.filter((x,i)=>document.querySelector('[data-rk="'+i+'"]').checked);pick.forEach(x=>A.reqs.push({id:uid(),name:x.name,location:x.location||'',component:x.component,program:x.program,need:x.need||'',tier:'high',effect:x.effect||'',source:RD.file+(x.page?', p. '+x.page:'')+' – “'+x.quote+'”',links:[]}));log('Requirements added from a document',pick.length+' from '+RD.file);RD=null;save();vReq();};}
+// ---------- alignment ----------
+function vAln(){const v=$('#view');const P=projects();const E=A.reqs.map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k).length;
+ const order={late:0,risk:1,unk:2,noneed:2,none:3,ok:4};E.sort((a,b)=>order[a.e.st]-order[b.e.st]||(b.e.gap||0)-(a.e.gap||0));
+ v.innerHTML='<div class="panel"><h2>Alignment</h2><p class="lead">Each requirement’s need date against the date its projects deliver. The capability date is the latest required project’s completion; that project is binding. At risk means up to '+N(A.t.risk)+' months late.</p>'+
+  tiles([['Requirements',String(A.reqs.length)],['On track',String(c('ok'))],['At risk',String(c('risk'))],['Late',String(c('late'))],['No project or no date',String(c('none')+c('unk')+c('noneed'))]])+
+  (E.length?'<div class="card2">'+timeline(E)+'<div class="leg"><span><i style="background:#1F5566;transform:rotate(45deg);width:9px;height:9px"></i>Needed by</span><span><i style="background:#0ca30c;border-radius:50%"></i>Capability, on time</span><span><i style="background:#d03b3b;border-radius:50%"></i>Capability, late</span><span><i style="background:#fab219;border-radius:50%"></i>At risk</span><span><i class="ln" style="background:#d03b3b"></i>Gap</span></div></div>':'<p class="small">Add requirements first.</p>')+'</div>'+
+  (E.length?'<div class="panel"><h3 style="margin-top:0">What sets each date</h3><table class="ptable"><thead><tr><th>Requirement</th><th>Needed</th><th>Capability</th><th>Gap</th><th>Binding project</th><th>Status</th></tr></thead><tbody>'+
+  E.map(({r,e})=>'<tr><td><b>'+esc(r.name||'(unnamed)')+'</b><div class="small">'+esc([r.location,TIER(r.tier)[1]].filter(Boolean).join(' · '))+'</div></td><td>'+fm(r.need)+'</td><td>'+(e.cap?fm(e.cap)+(e.est?' <span class="small">(est.)</span>':''):'–')+'</td><td>'+(e.gap==null?'–':e.gap>0?'+'+e.gap+' mo':e.gap+' mo')+'</td><td>'+(e.bind?esc(e.bind.l.p.name)+'<div class="small">'+esc(e.bind.d.how)+'</div>':'–')+'</td><td>'+chip(e.st)+'</td></tr>').join('')+'</tbody></table></div>':'');}
+function timeline(E){const pts=E.flatMap(({r,e})=>[r.need,e.cap].filter(Boolean)).map(mo);const now=mo(today().slice(0,7));const a=Math.min(now,...pts)-6,b=Math.max(now+12,...pts)+6;
+ const W=960,lh=34,top=26,left=310,H=top+E.length*lh+10;const X=m=>left+(m-a)/(b-a)*(W-left-20);let s='<svg class="tl" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Need dates and capability dates">';
+ for(let y=Math.ceil(a/12);y*12<=b;y++){const x=X(y*12);s+='<line x1="'+x+'" x2="'+x+'" y1="'+(top-6)+'" y2="'+(H-6)+'" stroke="#e1e0d9"/><text x="'+(x+3)+'" y="14" font-size="11" fill="#898781">'+y+'</text>';}
+ s+='<line x1="'+X(now)+'" x2="'+X(now)+'" y1="'+(top-6)+'" y2="'+(H-6)+'" stroke="#1F5566" stroke-dasharray="3 3"/><text x="'+(X(now)+3)+'" y="'+(H-8)+'" font-size="10" fill="#1F5566">Today</text>';
+ E.forEach(({r,e},i)=>{const y=top+i*lh+lh/2;s+='<text x="0" y="'+(y+4)+'" font-size="12" fill="#10303F">'+esc((r.name||'(unnamed)').length>44?(r.name).slice(0,43)+'…':(r.name||'(unnamed)'))+'</text>';
+  if(r.need&&e.cap){const x1=X(mo(r.need)),x2=X(mo(e.cap));if(x2>x1) s+='<line x1="'+x1+'" x2="'+x2+'" y1="'+y+'" y2="'+y+'" stroke="'+(e.st==='late'?'#d03b3b':'#fab219')+'" stroke-width="3"/>';}
+  if(r.need){const x=X(mo(r.need));s+='<rect x="'+(x-5)+'" y="'+(y-5)+'" width="10" height="10" transform="rotate(45 '+x+' '+y+')" fill="#1F5566"><title>Needed by '+fm(r.need)+'</title></rect>';}
+  if(e.cap){const x=X(mo(e.cap));s+='<circle cx="'+x+'" cy="'+y+'" r="6" fill="'+({ok:'#0ca30c',risk:'#fab219',late:'#d03b3b'}[e.st]||'#898781')+'" stroke="#fff" stroke-width="2"><title>Capability '+fm(e.cap)+' – set by '+esc(e.bind.l.p.name)+'</title></circle>';}
+  if(!e.cap) s+='<text x="'+left+'" y="'+(y+4)+'" font-size="11.5" fill="#898781">'+(e.st==='none'?'No project linked':'No delivery date')+'</text>';});
+ return s+'</svg>';}
+// ---------- projects: what each project serves and the score PAULA gets ----------
+function vPrj(){const v=$('#view');const P=projects();const rows=P.map(p=>({p,m:missionFor(p.id),R:A.reqs.filter(r=>(r.links||[]).some(l=>l.pid===p.id))})).sort((a,b)=>(b.m?b.m.v:0)-(a.m?a.m.v:0));
+ const un=rows.filter(x=>!x.m).length;
+ v.innerHTML='<div class="panel"><h2>Projects</h2><p class="lead">The mission score each project passes to PAULA’s Prioritize step: the priority of the highest requirement it serves (Critical 5, High 4, Medium 3, Low 2; a supporting link counts one step lower). A score a reviewer sets in PAULA always wins.</p>'+
+  tiles([['Projects',String(P.length)],['Linked to a requirement',String(P.length-un)],['Not linked',String(un),'PAULA leaves their mission score open']])+
+  '<table class="ptable"><thead><tr><th>Project</th><th>Serves</th><th style="text-align:right">Mission score</th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.p.name)+'</b><div class="small">'+esc([x.p.installation,x.p.fy?'FY'+x.p.fy:'',x.p._src].filter(Boolean).join(' · '))+'</div></td><td class="small">'+(x.R.length?x.R.map(r=>esc(r.name)).join('<br>'):'–')+'</td><td style="text-align:right">'+(x.m?'<b>'+x.m.v+'</b>':'–')+'</td></tr>').join('')+'</tbody></table></div>';}
+// ---------- reports ----------
+function kTiles(T){const w=Math.floor(100/T.length);return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:10pt 0 4pt"><tr>'+T.map(([l,v,c],i)=>'<td width="'+w+'%" bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:7pt 9pt">'+cdP(esc(l).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1.5pt;color:'+CD.mute)+cdP(v,'margin:2pt 0 0;font-size:17pt;color:'+(c||CD.navy))+'</td>'+(i<T.length-1?'<td width="6" style="width:5pt">&nbsp;</td>':'')).join('')+'</tr></table>';}
+function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+function paper(){const P=projects();const E=A.reqs.map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k);const late=c('late').sort((a,b)=>b.e.gap-a.e.gap),risk=c('risk');
+ let b=cdBand('Decision paper','Posture Alignment',fdt()+(A.me?'  ·  '+A.me:''));
+ b+=kTiles([['Requirements',String(E.length)],['On track',String(c('ok').length)],['At risk',String(risk.length)],['Late',String(late.length),late.length?'#9B2C2C':null],['No project or date',String(c('none').length+c('unk').length+c('noneed').length)]]);
+ const bind=[...new Set(late.concat(risk).map(x=>x.e.bind.l.p.name))];
+ b+=cdH('Bottom line')+cdP(E.length?(late.length?late.length+' of '+E.length+' requirements will be met late on current project dates'+(late[0]?', the furthest by '+late[0].e.gap+' months ('+esc(late[0].r.name)+')':'')+'. ':'No requirement is late on current project dates. ')+(bind.length?'The dates are set by '+bind.slice(0,4).map(esc).join(', ')+(bind.length>4?' and '+(bind.length-4)+' more':'')+'; recovering them recovers the capability. ':'')+(c('none').length?c('none').length+' requirement'+(c('none').length>1?'s have':' has')+' no project linked.':''):'No requirements recorded.');
+ b+=cdH('Requirements and their binding projects')+cdTable(['Requirement','Priority','Needed','Capability','Gap','Binding project','Status'],E.map(({r,e})=>[esc(r.name)+(r.location?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc(r.location)+'</span>':''),TIER(r.tier)[1],fm(r.need),e.cap?fm(e.cap)+(e.est?' (est.)':''):'–',e.gap==null?'–':(e.gap>0?'+':'')+e.gap+' mo',e.bind?esc(e.bind.l.p.name):'–',ST[e.st][0]]));
+ if(late.length||risk.length) b+=cdH('What would recover the late ones')+cdTable(['Requirement','Binding project','Delivers','Must deliver by','Basis'],late.concat(risk).map(({r,e})=>[esc(r.name),esc(e.bind.l.p.name),fm(e.cap),fm(r.need),esc(e.bind.d.how)]));
+ const un=P.filter(p=>!missionFor(p.id));if(un.length) b+=cdH('Projects not linked to a requirement')+cdP('PAULA leaves the mission score open for these until a reviewer scores them or links them here: '+un.slice(0,30).map(p=>esc(p.name)).join(', ')+(un.length>30?' and '+(un.length-30)+' more':'')+'.');
+ const src=[...new Set(A.reqs.map(r=>r.source).filter(Boolean))];if(src.length) b+=cdH('Sources')+cdP(src.map(esc).join('<br>'),'font-size:9pt');
+ b+=cdH('Method')+cdP('A requirement is a capability needed at a place by a date, from a publicly released source. Its capability date is the latest completion among the projects marked required; that project is binding. Completion is PAULA’s forecast, else its baseline, else an estimate of award by the end of the project’s fiscal year plus '+N(A.t.build)+' months to build (an assumption, adjustable). At risk means up to '+N(A.t.risk)+' months late. The mission score passed to PAULA is the priority of the highest requirement a project serves.');
+ b+=cdFoot('Prepared with Corbel ADAM  ·  '+fdt()+'  ·  Advisory analysis; the component commands and the Services own the requirements.');
+ return cdDoc('Posture Alignment',[b]);}
+function fdt(){return new Date().toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
+function book(){const P=projects();return [{name:'Requirements',rows:[['Requirement','Location','Component','Posture program','Priority','Needed by','Capability date','Gap (months)','Status','Binding project','Basis for the date','Effect','Source']].concat(A.reqs.map(r=>{const e=evalReq(r,P);return [r.name,r.location,r.component,r.program,TIER(r.tier)[1],r.need,e.cap||'',e.gap==null?'':e.gap,ST[e.st][0],e.bind?e.bind.l.p.name:'',e.bind?e.bind.d.how:'',r.effect,r.source];}))},
+ {name:'Links',rows:[['Requirement','Project','Role','Installation','FY','Delivers','Basis','Binding']].concat(A.reqs.flatMap(r=>{const e=evalReq(r,P);return e.L.map(l=>{const d=pDate(l.p);return [r.name,l.p.name,l.role==='supports'?'Supports':'Required',l.p.installation||'',l.p.fy||'',d?d.ym:'',d?d.how:'No date',e.bind&&e.bind.l.pid===l.pid?'Yes':''];});}))},
+ {name:'Mission scores',rows:[['Project','Installation','FY','Mission score for PAULA','Reason']].concat(P.map(p=>{const m=missionFor(p.id);return [p.name,p.installation||'',p.fy||'',m?m.v:'',m?m.why.replace(/^ADAM: /,''):'Not linked'];}))}];}
+function vRep(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Reports</h2><div class="outs">'+
+ '<div class="card"><h4>Posture alignment paper</h4><p>Word, in the Corbel look: which requirements are late, the binding project behind each, and what would recover them.</p><button class="sm go" id="oDoc">Download Word</button></div>'+
+ '<div class="card"><h4>Alignment workbook</h4><p>Excel: requirements, every link with its delivery date and basis, and the mission score each project passes to PAULA.</p><button class="sm go" id="oXl">Download Excel</button></div></div></div>';
+ $('#oDoc').onclick=()=>{dl('ADAM_Posture_Alignment_'+today()+'.doc',paper(),'application/msword');log('Alignment paper downloaded');save();};
+ $('#oXl').onclick=()=>{XL.save('ADAM_Alignment_'+today()+'.xlsx',book());log('Alignment workbook downloaded');save();};}
+// ---------- data and settings ----------
+function vData(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Data and settings</h2><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'+
+ '<div><label class="f">Months to build, when a project has no completion date (assumption)</label><input type="number" min="6" max="96" id="tB" value="'+N(A.t.build)+'"></div>'+
+ '<div><label class="f">At risk up to this many months late</label><input type="number" min="0" max="36" id="tR" value="'+N(A.t.risk)+'"></div>'+
+ '<div><label class="f">Your name (on reports)</label><input id="me" value="'+esc(A.me)+'"></div></div>'+
+ '<p class="small">Completion dates come from PAULA: the forecast, else the baseline. Projects with neither use the fiscal year plus the months to build above, and every report says so.</p></div>'+
+ '<div class="panel"><h2>Log</h2><div class="small">'+(A.log.slice().reverse().slice(0,100).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
+ $('#tB').onchange=e=>{A.t.build=Math.max(6,N(e.target.value));log('Months to build set',String(A.t.build));save();};$('#tR').onchange=e=>{A.t.risk=Math.max(0,N(e.target.value));log('At-risk window set',String(A.t.risk));save();};$('#me').oninput=e=>{A.me=e.target.value;save();};}
+// ---------- file ----------
+$('#bSave').onclick=()=>{dl('ADAM_'+today()+'.json',JSON.stringify(A,null,1),'application/json');};
+$('#bOpen').onclick=()=>$('#fOpen').click();$('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='adam-1') throw 0;if(!confirm('Replace the requirements in this browser with this file?')) return;A=j;A.t={...DEF.t,...A.t};save();render();}catch(err){alert('That is not an ADAM file.');}});};
+window.addEventListener('storage',e=>{if(e.key&&/paula_project|milcon_store/.test(e.key)) render();});
+render();
+</script>
+<script id="corbel-lib">
+// ---------- Corbel Word forms: one look for every printed sheet ----------
+// Word reads this HTML as a document. Georgia stands in for the site's serif; colors are the site's.
+// Styles are written inline so Word and other word processors render them the same way.
+const CD={navy:'#1B2F4E',deep:'#0F1E36',gold:'#E8D5A8',taupe:'#8B6F3D',taupe2:'#5C4A33',rule:'#C9B998',ink:'#1A1410',tint:'#F6F1E7',tint2:'#FBF8F2',mute:'#7A7065'};
+const CDF='font-family:Georgia,\'Times New Roman\',serif;';
+const CDK=CDF+'font-size:7.5pt;letter-spacing:2pt;text-transform:uppercase;color:'+CD.taupe+';';
+function cdDoc(title,pages,landscape){const sz=landscape?'11.0in 8.5in;mso-page-orientation:landscape':'8.5in 11.0in';
+ return '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8"><title>'+esc(title)+'</title>'+
+ '<!--[if gte mso 9]><xml><w:WordDocument><w:View>Print</w:View><w:Zoom>100</w:Zoom><w:DoNotOptimizeForBrowser/></w:WordDocument></xml><![endif]-->'+
+ '<style>@page Section1{size:'+sz+';margin:0.6in 0.7in 0.6in 0.7in}div.Section1{page:Section1}body{'+CDF+'font-size:10.5pt;color:'+CD.ink+'}p{margin:0 0 6pt}table{border-collapse:collapse}td{vertical-align:top}</style></head>'+
+ '<body style="'+CDF+'font-size:10.5pt;color:'+CD.ink+'"><div class="Section1">'+pages.join('<br clear="all" style="page-break-before:always;mso-break-type:page-break">')+'</div></body></html>';}
+function cdP(t,st){return '<p style="'+CDF+'margin:0 0 6pt;'+(st||'')+'">'+t+'</p>';}
+// Writing lines: a small table of underlined rows works in every word processor.
+function cdLines(n,bg){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse">'+Array(n).fill('<tr><td height="24" style="height:18pt;border-bottom:0.75pt solid '+CD.rule+(bg?';background:'+bg:'')+'"'+(bg?' bgcolor="'+bg+'"':'')+'>&nbsp;</td></tr>').join('')+'</table>';}
+// The navy band at the top of each page.
+function cdBand(kind,title,sub,chip){return '<table width="100%" cellpadding="14" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.navy+'" style="background:'+CD.navy+';padding:14pt 16pt">'+
+ cdP('CORBEL &nbsp;&middot;&nbsp; '+esc(kind).toUpperCase(),'margin:0 0 6pt;font-size:7.5pt;letter-spacing:2.5pt;color:'+CD.gold)+
+ cdP(esc(title),'margin:0;font-size:20pt;line-height:120%;color:#FFFFFF')+(sub?cdP(esc(sub),'margin:5pt 0 0;font-size:9.5pt;font-style:italic;color:'+CD.gold):'')+'</td></tr></table>'+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td height="4" bgcolor="'+CD.gold+'" style="height:3pt;background:'+CD.gold+';font-size:2pt;line-height:2pt">&nbsp;</td></tr></table>'+
+ (chip?'<table cellpadding="4" cellspacing="0" style="border-collapse:collapse;margin-top:8pt"><tr><td bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:3pt 8pt">'+cdP(esc(chip).toUpperCase(),'margin:0;font-size:8pt;letter-spacing:1.5pt;color:'+CD.navy)+'</td></tr></table>':'');}
+// Name / title / date boxes.
+function cdWho(fields){return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:10pt"><tr>'+fields.map((f,i)=>'<td width="'+Math.floor(100/fields.length)+'%" style="padding:0 '+(i<fields.length-1?'14pt':'0')+' 0 0">'+cdP(esc(f).toUpperCase(),CDK+'margin:0 0 4pt')+cdLines(1)+'</td>').join('')+'</tr></table>';}
+function cdLead(t){return cdP(t,'margin:12pt 0 4pt;font-style:italic;color:'+CD.taupe2);}
+function cdH(t){return cdP(esc(t),'margin:16pt 0 2pt;font-size:13pt;color:'+CD.navy)+'<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-bottom:8pt"><tr><td height="2" style="height:1pt;border-top:0.75pt solid '+CD.gold+';font-size:1pt">&nbsp;</td></tr></table>';}
+// "What we have so far": tinted rows with tick boxes.
+function cdKnown(rows){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse">'+rows.map(([a,b],i)=>{const bg=i%2?CD.tint2:CD.tint;const td=(w,c)=>'<td'+(w?' width="'+w+'"':'')+' bgcolor="'+bg+'" style="background:'+bg+';padding:6pt 8pt;border-bottom:0.5pt solid '+CD.rule+'">'+c+'</td>';
+  return '<tr>'+td('24%',cdP(esc(a).toUpperCase(),CDK+'margin:0'))+td('',cdP(esc(b),'margin:0'))+td('28%',cdP('&#9744; Correct &nbsp; &#9744; Change:','margin:0;font-size:9pt;color:'+CD.taupe2))+'</tr>';}).join('')+'</table>';}
+// One question: number and question, then a ruled answer box with a gold edge.
+function cdQ(n,q,code,lines){lines=lines||4;return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:0 0 12pt;page-break-inside:avoid"><tr><td style="padding:0">'+
+ cdP('<span style="font-size:15pt;color:'+CD.taupe+'">'+n+'</span>&nbsp;&nbsp;'+esc(q),'margin:0 0 5pt;font-size:11pt;color:'+CD.navy)+
+ '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse"><tr><td bgcolor="'+CD.tint2+'" style="background:'+CD.tint2+';border-left:2.25pt solid '+CD.gold+';padding:2pt 10pt 8pt 10pt">'+cdLines(lines,CD.tint2)+'</td></tr></table></td></tr></table>';}
+// A data table with a navy header row and tinted stripes.
+function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4pt 0">'+
+ '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
+ rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
+function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+
+// ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
+// Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
+const XL=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const col=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+ const STY='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="3"><font><sz val="10"/><color rgb="FF1A1410"/><name val="Georgia"/></font><font><b/><sz val="9"/><color rgb="FFE8D5A8"/><name val="Georgia"/></font><font><sz val="9"/><i/><color rgb="FF7A7065"/><name val="Georgia"/></font></fonts>'+
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'+
+  '<xf numFmtId="3" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)){const ss=(Number.isInteger(v)&&Math.abs(v)>=1000&&(s===2||s===3))?(s===2?5:6):s;return '<c r="'+ref+'" s="'+ss+'"><v>'+v+'</v></c>';}return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
+  const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+   '<sheetViews><sheetView workbookViewId="0"'+(sh.zoom?' zoomScale="'+sh.zoom+'"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+
+   '<cols>'+Array.from({length:nc},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(W[i]||16)+'" customWidth="1"/>').join('')+'</cols>'+
+   '<sheetData>'+rows+note+'</sheetData>'+(R.length>1?'<autoFilter ref="A1:'+col(nc-1)+R.length+'"/>':'')+'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';}
+ function book(sheets){const names=sheets.map((s,i)=>String(s.name||('Sheet'+(i+1))).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31));
+  const F=[['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
+    '<definedNames>'+sheets.map((s,i)=>s.rows.length>1?'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+x(names[i])+'\'!$A$1:$'+col(Math.max(...s.rows.map(r=>r.length))-1)+'$'+s.rows.length+'</definedName>':'').join('')+'</definedNames></workbook>'],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',STY]].concat(sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(s)]));
+  return zip(F);}
+ // Column widths from the content: header and the longest cell, capped.
+ function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
+ function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ return {save,book,fit};})();
+
+// ---------- Corbel Word documents: a real .docx, built in the page ----------
+// Every tool lays its documents out as simple styled HTML (docstyle.js). DX turns that
+// layout into WordprocessingML: paragraphs, runs, tables, shading, borders, page breaks.
+const DX=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ // Lengths to points.
+ function pt(v,base){if(v==null||v==='') return null;v=String(v).trim();const m=v.match(/^(-?[\d.]+)\s*(pt|px|in|cm|mm|em|%)?$/);if(!m) return null;const n=parseFloat(m[1]);
+  switch(m[2]){case 'px':return n*0.75;case 'in':return n*72;case 'cm':return n*28.35;case 'mm':return n*2.835;case 'em':return n*(base||10.5);case '%':return null;default:return m[2]==='pt'?n:n*0.75;}}
+ function hex(c){if(!c) return null;c=String(c).trim().toLowerCase();if(c==='transparent'||c==='none'||c==='inherit') return null;
+  const N={white:'FFFFFF',black:'000000',red:'C00000',green:'2E7D32',gray:'808080',grey:'808080',navy:'1B2F4E'};if(N[c]) return N[c];
+  let m=c.match(/^#([0-9a-f]{3})$/);if(m) return m[1].split('').map(h=>h+h).join('').toUpperCase();m=c.match(/^#([0-9a-f]{6})$/);if(m) return m[1].toUpperCase();
+  m=c.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);if(m) return [m[1],m[2],m[3]].map(n=>(+n).toString(16).padStart(2,'0')).join('').toUpperCase();return null;}
+ function css(s){const o={};String(s||'').split(';').forEach(d=>{const i=d.indexOf(':');if(i<0) return;const k=d.slice(0,i).trim().toLowerCase(),v=d.slice(i+1).trim();if(k) o[k]=v;});
+  // Expand shorthands we use.
+  const box=(k)=>{if(o[k]==null) return;const p=o[k].split(/\s+/);const [t,r,b,l]=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;
+   ['top','right','bottom','left'].forEach((s,i)=>{if(o[k+'-'+s]==null) o[k+'-'+s]=[t,r,b,l][i];});};box('margin');box('padding');
+  if(o.border!=null) ['top','right','bottom','left'].forEach(s=>{if(o['border-'+s]==null) o['border-'+s]=o.border;});
+  if(o.background&&!o['background-color']) o['background-color']=o.background.split(/\s+/)[0];
+  if(o.font){const m=o.font.match(/^(.*?)([\d.]+(?:pt|px|em|%))(?:\/[\d.]+\S*)?\s+(.+)$/);if(m){if(!o['font-size']) o['font-size']=m[2];if(!o['font-family']) o['font-family']=m[3];if(/bold|[6-9]00/.test(m[1])&&!o['font-weight']) o['font-weight']='bold';if(/italic/.test(m[1])&&!o['font-style']) o['font-style']='italic';}}
+  return o;}
+ function border(v){if(!v) return null;v=String(v).trim();if(/^(none|0)$/.test(v)) return {none:true};const w=v.match(/([\d.]+)(pt|px)/),c=v.match(/(#[0-9a-fA-F]{3,6}|rgb\([^)]+\)|\b[a-z]+\b(?=\s*$))/);
+  const style=/dashed/.test(v)?'dashed':/dotted/.test(v)?'dotted':/double/.test(v)?'double':'single';
+  const wpt=w?(w[2]==='px'?parseFloat(w[1])*0.75:parseFloat(w[1])):0.75;return {sz:Math.max(2,Math.min(96,Math.round(wpt*8))),color:hex(c&&c[1])||'000000',style};}
+ const BLOCK=new Set(['P','DIV','H1','H2','H3','H4','H5','H6','TABLE','UL','OL','LI','BLOCKQUOTE','SECTION','ARTICLE','HEADER','FOOTER','CENTER','HR','PRE','DL','DT','DD','FORM','FIELDSET','NAV','MAIN','ASIDE','FIGURE']);
+ // Web fonts become the first family in the list that Word installs; the Corbel serif falls back to Georgia.
+ function wordFont(list){const F=list.split(',').map(f=>f.replace(/['"]/g,'').trim()).filter(Boolean);const ok=['Georgia','Calibri','Arial','Cambria','Times New Roman','Corbel','Consolas','Segoe UI','Verdana','Tahoma','Garamond','Book Antiqua','Palatino Linotype','Courier New'];
+  return F.find(f=>ok.includes(f))||(F.some(f=>/serif/i.test(f)&&!/sans/i.test(f))?'Georgia':F.some(f=>/sans/i.test(f))?'Calibri':F[0]);}
+ const HSZ={H1:20,H2:15,H3:13,H4:11.5,H5:10.5,H6:9.5};
+ // Inherited run style.
+ function runCtx(base,el,st){const r=Object.assign({},base);const t=el.tagName;
+  if(t==='B'||t==='STRONG'||t==='TH'||/^H\d$/.test(t)) r.b=true;if(t==='I'||t==='EM'||t==='CITE') r.i=true;if(t==='U') r.u=true;if(t==='S'||t==='DEL'||t==='STRIKE') r.strike=true;
+  if(t==='SUP') r.va='superscript';if(t==='SUB') r.va='subscript';if(t==='SMALL') r.sz=(r.sz||10.5)*0.85;if(HSZ[t]&&!st['font-size']) r.sz=HSZ[t];
+  if(t==='CODE'||t==='TT'||t==='KBD') r.font='Consolas';if(t==='A') {r.color=r.color||'1B2F4E';}
+  if(t==='FONT'){if(el.getAttribute('color')) r.color=hex(el.getAttribute('color'))||r.color;if(el.getAttribute('face')) r.font=el.getAttribute('face').split(',')[0].replace(/['"]/g,'').trim();}
+  if(st['font-size']){const v=st['font-size'];const p=/%$/.test(v)?(r.sz||10.5)*parseFloat(v)/100:/em$/.test(v)?(r.sz||10.5)*parseFloat(v):pt(v);if(p) r.sz=p;}
+  if(st.color) r.color=hex(st.color)||r.color;if(st['font-weight']) r.b=/bold|[6-9]00/.test(st['font-weight']);if(st['font-style']) r.i=/italic|oblique/.test(st['font-style']);
+  if(st['text-decoration']) {r.u=/underline/.test(st['text-decoration']);r.strike=/line-through/.test(st['text-decoration']);}
+  if(st['text-transform']) r.caps=/uppercase/.test(st['text-transform']);if(st['letter-spacing']) r.ls=pt(st['letter-spacing'])||0;
+  if(st['font-family']) r.font=wordFont(st['font-family']);if(st['vertical-align']&&/super|sub/.test(st['vertical-align'])) r.va=/super/.test(st['vertical-align'])?'superscript':'subscript';
+  if(st['background-color']&&el.tagName!=='TD'&&el.tagName!=='TH'&&!BLOCK.has(t)) r.hl=hex(st['background-color']);
+  if(st.display==='none'||st.visibility==='hidden') r.hide=true;return r;}
+ function rPr(r){let s='';if(r.font) s+='<w:rFonts w:ascii="'+x(r.font)+'" w:hAnsi="'+x(r.font)+'" w:cs="'+x(r.font)+'"/>';if(r.b) s+='<w:b/>';if(r.i) s+='<w:i/>';if(r.caps) s+='<w:caps/>';if(r.strike) s+='<w:strike/>';
+  if(r.color) s+='<w:color w:val="'+r.color+'"/>';if(r.ls) s+='<w:spacing w:val="'+Math.round(r.ls*20)+'"/>';if(r.sz) s+='<w:sz w:val="'+Math.max(2,Math.round(r.sz*2))+'"/><w:szCs w:val="'+Math.max(2,Math.round(r.sz*2))+'"/>';
+  if(r.hl) s+='<w:shd w:val="clear" w:color="auto" w:fill="'+r.hl+'"/>';if(r.u) s+='<w:u w:val="single"/>';if(r.va) s+='<w:vertAlign w:val="'+r.va+'"/>';return s?'<w:rPr>'+s+'</w:rPr>':'';}
+ function run(text,r){if(r.hide||text==='') return '';return '<w:r>'+rPr(r)+'<w:t xml:space="preserve">'+x(text)+'</w:t></w:r>';}
+ function conv(html){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  const styleText=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n');
+  // Simple tag rules from the <style> block (p{...}, td{...}, body{...}).
+  const RULES={};styleText.replace(/@page[^{]*\{[^}]*\}/g,'').replace(/([a-z0-9,\s.]+)\{([^}]*)\}/gi,(m,sel,body)=>{sel.split(',').forEach(s=>{s=s.trim().toUpperCase();if(/^[A-Z0-9]+$/.test(s)) RULES[s]=Object.assign(RULES[s]||{},css(body));});return m;});
+  const st=el=>Object.assign({},RULES[el.tagName]||{},css(el.getAttribute&&el.getAttribute('style')));
+  const land=/landscape/i.test(styleText)||/size:\s*11(\.0)?in\s+8\.5in/i.test(styleText);
+  const pm=styleText.match(/@page[^{]*\{[^}]*margin:\s*([^;}]+)/i);let mg=[0.75,0.75,0.75,0.75].map(v=>v*72);
+  if(pm){const p=pm[1].trim().split(/\s+/).map(v=>pt(v));const q=p.length===1?[p[0],p[0],p[0],p[0]]:p.length===2?[p[0],p[1],p[0],p[1]]:p.length===3?[p[0],p[1],p[2],p[1]]:p;if(q.every(v=>v!=null)) mg=q;}
+  const pageW=land?792:612,pageH=land?612:792,textW=pageW-mg[1]-mg[3];
+  const body=doc.body;const bst=st(body);const R0=runCtx({},body,bst);
+  // ---- paragraph assembly ----
+  function pPr(s,extra){let o='';extra=extra||{};if(extra.style) o+='<w:pStyle w:val="'+extra.style+'"/>';if(extra.keep) o+='<w:keepNext/>';if(extra.pb) o+='<w:pageBreakBefore/>';
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return b&&!b.none?'<w:'+k+' w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="2" w:color="'+b.color+'"/>':'';}).join('');if(bd) o+='<w:pBdr>'+bd+'</w:pBdr>';
+   const bg=hex(s['background-color']);if(bg&&!extra.inCell) o+='<w:shd w:val="clear" w:color="auto" w:fill="'+bg+'"/>';
+   const before=pt(s['margin-top']),after=pt(s['margin-bottom']);const lh=s['line-height'];let line='';
+   if(lh){if(/%$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh)/100)+'" w:lineRule="auto"';else if(/^[\d.]+$/.test(lh)) line=' w:line="'+Math.round(240*parseFloat(lh))+'" w:lineRule="auto"';else {const p=pt(lh);if(p) line=' w:line="'+Math.round(p*20)+'" w:lineRule="exact"';}}
+   o+='<w:spacing w:before="'+Math.round((before||0)*20)+'" w:after="'+Math.round((after||0)*20)+'"'+line+'/>';
+   const il=(pt(s['margin-left'])||0)+(pt(s['padding-left'])||0)+(extra.indent||0);if(il||extra.hang) o+='<w:ind w:left="'+Math.round(il*20)+'"'+(extra.hang?' w:hanging="'+Math.round(extra.hang*20)+'"':'')+'/>';
+   const ta=s['text-align'];if(ta) o+='<w:jc w:val="'+(ta==='center'?'center':ta==='right'?'right':ta==='justify'?'both':'left')+'"/>';
+   if(extra.mark) o+='<w:rPr>'+rPr(extra.mark).replace(/^<w:rPr>|<\/w:rPr>$/g,'')+'</w:rPr>';
+   return '<w:pPr>'+o+'</w:pPr>';}
+  // Inline content to runs. Leading/trailing whitespace is trimmed per paragraph, as a browser would.
+  function inl(node,r,acc){
+   if(node.nodeType===3){let t=node.nodeValue.replace(/[\t\n\r ]+/g,' ');acc.push({t,r});return;}
+   if(node.nodeType!==1) return;const t=node.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='TITLE'||t==='HEAD') return;
+   if(t==='BR'){acc.push({br:true,r});return;}
+   if(t==='INPUT'){const ty=(node.getAttribute('type')||'').toLowerCase();if(ty==='checkbox'||ty==='radio') acc.push({t:node.checked||node.hasAttribute('checked')?'☒ ':'☐ ',r});else acc.push({t:node.value||node.getAttribute('value')||'',r});return;}
+   if(t==='IMG'){if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
+   const s=st(node);const rr=runCtx(r,node,s);for(const c of node.childNodes) inl(c,rr,acc);}
+  function para(acc,s,extra){// acc: [{t,r}|{br}]
+   let i=0;while(i<acc.length&&!acc[i].br&&acc[i].t!=null&&!acc[i].t.trim()){i++;}let j=acc.length-1;while(j>=i&&!acc[j].br&&acc[j].t!=null&&!acc[j].t.trim()) j--;
+   const items=acc.slice(i,j+1);if(items.length){items[0]=Object.assign({},items[0],{t:items[0].t!=null?items[0].t.replace(/^ +/,''):items[0].t});const L=items.length-1;items[L]=Object.assign({},items[L],{t:items[L].t!=null?items[L].t.replace(/ +$/,''):items[L].t});}
+   // In a narrow table cell, spaced capitals (column headings) shrink their spacing, then their size, so no word breaks mid-word.
+   if(extra&&extra.fitW){const fw=extra.fitW;items.forEach((it,k)=>{if(it.br||!it.t) return;const r0=it.r;const up=/[A-Z]/.test(it.t)&&it.t===it.t.toUpperCase();if(!(r0.caps||r0.ls)) return;const r=Object.assign({},r0,{caps:r0.caps||up});const sz=r.sz||10.5;const longest=Math.max(0,...it.t.split(/\s+/).map(w=>w.length));if(!longest) return;
+     const wid=(ls,z)=>longest*(z*(r.caps?0.8:0.6)+ls);if(wid(r.ls||0,sz)<=fw) return;const nr=Object.assign({},r0);
+     nr.ls=Math.max(0,(fw/longest)-sz*(r.caps?0.8:0.6));if(wid(nr.ls,sz)>fw||nr.ls<0.2){nr.ls=0;nr.sz=Math.max(5.5,fw/(longest*(r.caps?0.8:0.6)));}items[k]=Object.assign({},it,{r:nr});});}
+   const mark=(acc[0]&&acc[0].r)||extra&&extra.r0;
+   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else rs+=run(it.t,it.r);}
+   return '<w:p>'+pPr(s,Object.assign({},extra,{mark}))+rs+'</w:p>';}
+  // Is this element's content purely inline?
+  function hasBlock(el){for(const c of el.children){if(BLOCK.has(c.tagName)) return true;if(c.tagName==='BR'&&/page-break-before/.test(c.getAttribute('style')||'')) return true;if(!BLOCK.has(c.tagName)&&hasBlock(c)) return true;}return false;}
+  const isPB=el=>el.tagName==='BR'&&/page-break-before\s*:\s*always|mso-break-type\s*:\s*page-break/i.test(el.getAttribute('style')||'');
+  // Block walker: returns an array of body-level XML strings.
+  function blocks(el,r,ps,ctx){const out=[];let acc=[];let pendPB=false;
+   const flush=()=>{if(acc.some(a=>a.br||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
+   for(const c of el.childNodes){
+    if(c.nodeType===3){acc.push({t:c.nodeValue.replace(/[\t\n\r ]+/g,' '),r});continue;}
+    if(c.nodeType!==1) continue;const t=c.tagName;
+    if(isPB(c)){flush();pendPB=true;continue;}
+    if(t==='SCRIPT'||t==='STYLE'||t==='HEAD'||t==='TITLE') continue;
+    if(!BLOCK.has(t)&&!hasBlock(c)){inl(c,r,acc);continue;}
+    flush();const s=st(c);const rr=runCtx(r,c,s);if(rr.hide) continue;
+    if(t==='TABLE'){if(c.hasAttribute('data-keepprev')){for(let q=out.length-1;q>=0&&q>=out.length-3;q--){out[q]=out[q].replace(/<w:pPr>(?!<w:keepNext\/>)/g,'<w:pPr><w:keepNext/>');if(/^<w:tbl>/.test(out[q])) break;}}
+     out.push(...table(c,rr,ctx,pendPB));pendPB=false;continue;}
+    if(t==='HR'){out.push('<w:p><w:pPr><w:pBdr><w:bottom w:val="single" w:sz="4" w:space="1" w:color="C9B998"/></w:pBdr><w:spacing w:before="60" w:after="60"/></w:pPr></w:p>');continue;}
+    if(t==='UL'||t==='OL'){let n=0;for(const li of c.children){if(li.tagName!=='LI') continue;n++;const ls=Object.assign({},s,st(li));const lr=runCtx(rr,li,ls);const a=[{t:(t==='OL'?n+'.':'•')+'\t',r:lr}];
+      if(hasBlock(li)){const sub=blocks(li,lr,ls,ctx);out.push(...sub);}else{for(const k of li.childNodes) inl(k,lr,a);out.push(para(a,Object.assign({'margin-bottom':'3pt'},ls),{indent:(ctx.depth||0)*14+18,hang:14,inCell:ctx.inCell}));}}continue;}
+    // Boxed div (background or border): render as a one-cell table so the box survives.
+    if((t==='DIV'||t==='BLOCKQUOTE')&&(hex(s['background-color'])||['top','right','bottom','left'].some(k=>{const b=border(s['border-'+k]);return b&&!b.none;}))&&!ctx.noBox){
+     out.push(...boxTable(c,rr,s,ctx,pendPB));pendPB=false;continue;}
+    if(hasBlock(c)){const sub=blocks(c,rr,s,ctx);if(pendPB&&sub.length){sub[0]=sub[0].replace('<w:pPr>','<w:pPr><w:pageBreakBefore/>');pendPB=false;}out.push(...sub);}
+    else{const a=[];for(const k of c.childNodes) inl(k,rr,a);const ex={pb:pendPB,inCell:ctx.inCell,r0:rr,keep:/^H\d$/.test(t),fitW:ctx.inCell?ctx.width:0};
+     if(/^H\d$/.test(t)&&!s['margin-top']) s['margin-top']='10pt';if(/^H\d$/.test(t)&&!s['margin-bottom']) s['margin-bottom']='4pt';
+     if(!a.some(q=>q.br||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
+     else out.push(para(a,s,ex));pendPB=false;}
+   }
+   flush();return out;}
+  function shd(fill){return fill?'<w:shd w:val="clear" w:color="auto" w:fill="'+fill+'"/>':'';}
+  function boxTable(el,r,s,ctx,pb){const w=ctx.width||textW;const pad=k=>Math.round((pt(s['padding-'+k])||4)*20);
+   const bd=['top','left','bottom','right'].map(k=>{const b=border(s['border-'+k]);return '<w:'+k+' '+(b&&!b.none?'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"':'w:val="nil"')+'/>';}).join('');
+   const inner=blocks(el,r,Object.assign({},s,{'margin-top':'0','margin-bottom':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:w-12,noBox:true}));
+   const pre=pb?['<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>']:[];
+   const sp=pt(s['margin-bottom']);
+   return pre.concat(['<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tblLayout w:type="fixed"/><w:tblCellMar><w:top w:w="'+pad('top')+'" w:type="dxa"/><w:left w:w="'+pad('left')+'" w:type="dxa"/><w:bottom w:w="'+pad('bottom')+'" w:type="dxa"/><w:right w:w="'+pad('right')+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid><w:gridCol w:w="'+Math.round(w*20)+'"/></w:tblGrid>'+
+    '<w:tr><w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/><w:tcBorders>'+bd+'</w:tcBorders>'+shd(hex(s['background-color']))+'</w:tcPr>'+(inner.length&&/<w:p>|<w:p /.test(inner[inner.length-1])?inner.join(''):inner.join('')+'<w:p><w:pPr><w:spacing w:before="0" w:after="0"/></w:pPr></w:p>')+'</w:tc></w:tr></w:tbl>',
+    '<w:p><w:pPr><w:spacing w:before="0" w:after="'+Math.round((sp||4)*20)+'" w:line="20" w:lineRule="exact"/></w:pPr></w:p>']);}
+  function table(tb,r,ctx,pb){const ts=st(tb);const avail=ctx.width||textW;
+   const rows=[];const collect=(e)=>{for(const c of e.children){if(c.tagName==='TR') rows.push(c);else if(/^(THEAD|TBODY|TFOOT)$/.test(c.tagName)) collect(c);}};collect(tb);if(!rows.length) return [];
+   const wAttr=tb.getAttribute('width')||ts.width;let W;if(wAttr&&/%$/.test(wAttr)) W=avail*parseFloat(wAttr)/100;else if(wAttr&&pt(wAttr)) W=Math.min(avail,pt(/^\d+$/.test(wAttr)?wAttr+'px':wAttr));else W=null;
+   const cp=tb.getAttribute('cellpadding');const cpad=cp!=null?parseFloat(cp)*0.75:1.5;
+   const keep=/page-break-inside\s*:\s*avoid/.test(tb.getAttribute('style')||'');
+   // Grid: widest row decides the column count; widths from the first row that states them.
+   const cells=rows.map(tr=>[...tr.children].filter(c=>c.tagName==='TD'||c.tagName==='TH'));
+   const ncol=Math.max(1,...cells.map(rc=>rc.reduce((a,c)=>a+(parseInt(c.getAttribute('colspan'))||1),0)));
+   const tw=W||avail;const cw=Array(ncol).fill(null);
+   for(const rc of cells){let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;const cs=css(c.getAttribute('style'));const a=c.getAttribute('width')||cs.width;
+     if(span===1&&a&&cw[k]==null){if(/%$/.test(a)) cw[k]=tw*parseFloat(a)/100;else{const p=pt(/^\d+$/.test(a)?a+'px':a);if(p) cw[k]=p;}}k+=span;}}
+   const known=cw.filter(v=>v!=null).reduce((a,b)=>a+b,0),unk=cw.filter(v=>v==null).length;
+   let grid;if(unk){const rest=Math.max(tw-known,unk*24);
+    // Columns without a stated width share the rest by content, the way a browser's auto layout does:
+    // the longest word must fit (caps and letter-spacing count extra), then longer text gets more room.
+    const need=Array(ncol).fill(0),want=Array(ncol).fill(1);
+    cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1&&cw[k]==null){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+      const hd=c.tagName==='TH'||/text-transform\s*:\s*uppercase|letter-spacing/.test(c.innerHTML);const f=hd?1.45:1;
+      const lw=Math.max(0,...t.split(' ').map(w=>w.length))*f;need[k]=Math.max(need[k],lw);want[k]=Math.max(want[k],Math.min(t.length*f,60));}k+=span;}});
+    const ix=cw.map((v,i)=>v==null?i:-1).filter(i=>i>=0);const chr=5.2;// points per character at body size
+    let base=ix.map(i=>Math.max(24,need[i]*chr+8));const bsum=base.reduce((a,b)=>a+b,0);
+    if(bsum>=rest){grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]*rest/bsum);}
+    else{const extra=rest-bsum;const ww=ix.map(i=>Math.max(1,want[i]*chr+8-(need[i]*chr+8)));const wsum=ww.reduce((a,b)=>a+b,0);grid=cw.slice();ix.forEach((i,j)=>grid[i]=base[j]+extra*ww[j]/wsum);}}
+   else grid=cw.slice();
+   // Like a browser, never make a column narrower than its longest word (headings in capitals shrink instead, below).
+   {const minW=Array(ncol).fill(0);cells.forEach(rc=>{let k=0;for(const c of rc){const span=parseInt(c.getAttribute('colspan'))||1;if(span===1){const t=(c.textContent||'').replace(/\s+/g,' ').trim();
+     if(t&&t===t.toUpperCase()&&/[A-Z]{3}/.test(t)){const lw=Math.max(0,...t.split(' ').map(w=>w.length));minW[k]=Math.max(minW[k],lw*6.5*0.78+12);}
+     else if(t){const fs=pt((c.querySelector('[style*="font-size"]')||c).style.fontSize)||9.5;const lw=Math.max(0,...t.split(' ').map(w=>w.length));const pd=(pt(css(c.getAttribute('style'))['padding-left'])??cpad)+(pt(css(c.getAttribute('style'))['padding-right'])??cpad);
+      minW[k]=Math.max(minW[k],lw*fs*0.68+pd+2);}}k+=span;}});
+    const tot0=grid.reduce((a,b)=>a+b,0);let short=0;grid=grid.map((g,i)=>{if(g<minW[i]){short+=minW[i]-g;return minW[i];}return g;});
+    if(short>0){const slack=grid.map((g,i)=>Math.max(0,g-minW[i]));const sl=slack.reduce((a,b)=>a+b,0);if(sl>0){const take=Math.min(short,sl);grid=grid.map((g,i)=>g-take*slack[i]/sl);}}
+    if(W) {const t=grid.reduce((a,b)=>a+b,0);if(t>tot0+0.5) grid=grid.map(g=>g*tot0/t);}}
+   const sum=grid.reduce((a,b)=>a+b,0);const scale=W||sum>avail?(W||avail)/sum:1;grid=grid.map(v=>v*scale);const tot=grid.reduce((a,b)=>a+b,0);
+   const tblBd=tb.getAttribute('border')&&tb.getAttribute('border')!=='0';
+   let o='<w:tbl><w:tblPr><w:tblW w:w="'+Math.round(tot*20)+'" w:type="dxa"/>'+(ts['margin-left']==='auto'||tb.getAttribute('align')==='center'?'<w:jc w:val="center"/>':'')+'<w:tblLayout w:type="fixed"/>'+
+    (tblBd?'<w:tblBorders>'+['top','left','bottom','right','insideH','insideV'].map(k=>'<w:'+k+' w:val="single" w:sz="4" w:space="0" w:color="C9B998"/>').join('')+'</w:tblBorders>':'')+
+    '<w:tblCellMar><w:top w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:left w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:bottom w:w="'+Math.round(cpad*20)+'" w:type="dxa"/><w:right w:w="'+Math.round(cpad*20)+'" w:type="dxa"/></w:tblCellMar></w:tblPr><w:tblGrid>'+grid.map(g=>'<w:gridCol w:w="'+Math.round(g*20)+'"/>').join('')+'</w:tblGrid>';
+   const vm={};// rowspan carry: col -> remaining
+   rows.forEach((tr,ri)=>{const trs=st(tr);const trBg=hex(tr.getAttribute('bgcolor'))||hex(trs['background-color']);let hRow=0;let k=0;let tcs='';const rc=cells[ri];let ci=0;
+    const emitMerge=()=>{while(vm[k]&&vm[k].n>0){const m=vm[k];tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(m.w*20)+'" w:type="dxa"/>'+(m.span>1?'<w:gridSpan w:val="'+m.span+'"/>':'')+'<w:vMerge/>'+m.pr+'</w:tcPr><w:p/></w:tc>';m.n--;k+=m.span;}};
+    emitMerge();
+    for(const c of rc){emitMerge();const span=parseInt(c.getAttribute('colspan'))||1;const rs=parseInt(c.getAttribute('rowspan'))||1;const cs=st(c);const w=grid.slice(k,k+span).reduce((a,b)=>a+b,0);
+     const fill=hex(c.getAttribute('bgcolor'))||hex(cs['background-color'])||trBg;
+     const bd=['top','left','bottom','right'].map(s=>{const b=border(cs['border-'+s]);return b?'<w:'+s+' '+(b.none?'w:val="nil"':'w:val="'+b.style+'" w:sz="'+b.sz+'" w:space="0" w:color="'+b.color+'"')+'/>':'';}).join('');
+     const mar=['top','left','bottom','right'].map(s=>{const p=pt(cs['padding-'+s]);return p!=null?'<w:'+s+' w:w="'+Math.round(p*20)+'" w:type="dxa"/>':'';}).join('');
+     const va=cs['vertical-align']||c.getAttribute('valign');const h=pt(cs.height)||(c.getAttribute('height')?parseFloat(c.getAttribute('height'))*0.75:0);if(h>hRow) hRow=h;
+     const pr=(bd?'<w:tcBorders>'+bd+'</w:tcBorders>':'')+shd(fill)+(mar?'<w:tcMar>'+mar+'</w:tcMar>':'')+(va==='middle'?'<w:vAlign w:val="center"/>':va==='bottom'?'<w:vAlign w:val="bottom"/>':'');
+     const cr=runCtx(r,c,cs);const padL=pt(cs['padding-left']),padR=pt(cs['padding-right']);const inner=blocks(c,cr,Object.assign({},cs,{'padding-left':'0','margin-left':'0','border-top':'','border-bottom':'','border-left':'','border-right':'','background-color':''}),Object.assign({},ctx,{inCell:true,width:Math.max(24,w-(padL!=null?padL:cpad)-(padR!=null?padR:cpad)),depth:(ctx.depth||0)}));
+     let body=inner.join('');if(!inner.length||/<\/w:tbl>$/.test(inner[inner.length-1])) body+='<w:p><w:pPr><w:spacing w:before="0" w:after="0"/>'+(cr.sz&&cr.sz<6?'<w:rPr><w:sz w:val="'+Math.max(2,Math.round(cr.sz*2))+'"/></w:rPr>':'')+'</w:pPr></w:p>';
+     tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(span>1?'<w:gridSpan w:val="'+span+'"/>':'')+(rs>1?'<w:vMerge w:val="restart"/>':'')+pr+'</w:tcPr>'+body+'</w:tc>';
+     if(rs>1) vm[k]={n:rs-1,span,w,pr};k+=span;ci++;}
+    emitMerge();
+    if(k<ncol){const w=grid.slice(k).reduce((a,b)=>a+b,0);tcs+='<w:tc><w:tcPr><w:tcW w:w="'+Math.round(w*20)+'" w:type="dxa"/>'+(ncol-k>1?'<w:gridSpan w:val="'+(ncol-k)+'"/>':'')+'</w:tcPr><w:p/></w:tc>';}
+    const trPr=(hRow?'<w:trHeight w:val="'+Math.round(hRow*20)+'" w:hRule="'+(hRow<=6?'exact':'atLeast')+'"/>':'')+(keep||rows.length<=3?'<w:cantSplit/>':'')+(ri===0&&rc.some(c=>c.tagName==='TH')?'<w:tblHeader/>':'');
+    o+='<w:tr>'+(trPr?'<w:trPr>'+trPr+'</w:trPr>':'')+tcs+'</w:tr>';});
+   o+='</w:tbl>';
+   const out=[];if(pb) out.push('<w:p><w:pPr><w:pageBreakBefore/><w:spacing w:before="0" w:after="0" w:line="20" w:lineRule="exact"/></w:pPr></w:p>');
+   const mt=pt(ts['margin-top']);if(mt) out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round(mt*20))+'" w:lineRule="exact"/></w:pPr></w:p>');
+   out.push(o);
+   // Word needs a paragraph between two tables or they merge; a hairline one keeps the gap as small as the HTML's.
+   const mb=pt(ts['margin-bottom']);out.push('<w:p><w:pPr><w:spacing w:before="0" w:after="0" w:line="'+Math.max(20,Math.round((mb||0)*20))+'" w:lineRule="exact"/><w:rPr><w:sz w:val="2"/></w:rPr></w:pPr></w:p>');
+   if(keep) out[out.length-2]=out[out.length-2].replace(/<w:p>((?:(?!<\/w:p>).)*)<\/w:p>/g,(m,b)=>'<w:p>'+b.replace('<w:pPr>','<w:pPr><w:keepNext/>')+'</w:p>');
+   return out;}
+  let parts=blocks(body,R0,bst,{depth:0});
+  // Drop trailing spacer paragraphs at the very end of the document.
+  while(parts.length>1&&/w:line="20" w:lineRule="exact"/.test(parts[parts.length-1])) parts.pop();
+  const twip=v=>Math.round(v*20);
+  const sect='<w:sectPr><w:pgSz w:w="'+twip(pageW)+'" w:h="'+twip(pageH)+'"'+(land?' w:orient="landscape"':'')+'/><w:pgMar w:top="'+twip(mg[0])+'" w:right="'+twip(mg[1])+'" w:bottom="'+twip(mg[2])+'" w:left="'+twip(mg[3])+'" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>';
+  const title=(doc.title||'').trim();
+  const font=(R0.font||'Georgia');const sz=Math.round((R0.sz||10.5)*2);const color=R0.color||'1A1410';
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const files=[
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>'],
+   ['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+x(title)+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>'],
+   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>'],
+   ['word/settings.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings '+W+'><w:zoom w:percent="100"/><w:defaultTabStop w:val="360"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>'],
+   ['word/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+x(font)+'" w:hAnsi="'+x(font)+'" w:eastAsia="'+x(font)+'" w:cs="'+x(font)+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'+
+    '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'+
+    '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
+   ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
+  return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
+ function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
+ function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
+ return {conv,save,hook};})();
+</script>
+<script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
+   through CARL's server, on CARL's keys, for anyone signed in to
+   carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
+   engines simply stay off and each tool keeps working without them. */
+(function(){
+ var BASE='https://carl.carlcompliance.com';
+ try{BASE=localStorage.getItem('carl_ai_base')||BASE;}catch(e){}
+ var ST={ok:null,user:'',msg:'Checking CARL sign-in…'},READY=[];
+ var TOOL=function(){return window.MS_TOOL||document.title;};
+ function proj(){try{return (window.MS&&MS.active&&MS.active())||'default';}catch(e){return 'default';}}
+ // ---- usage, per project and tool, kept in this browser
+ function useGet(){try{return JSON.parse(localStorage.getItem('carl_ai_usage')||'{}');}catch(e){return {};}}
+ function useAdd(kind,u,cached){try{var U=useGet(),p=proj(),t=TOOL();U[p]=U[p]||{};var r=U[p][t]=U[p][t]||{calls:0,cached:0,in:0,out:0,library:0};
+  if(kind==='library') r.library++;else if(cached) r.cached++;else{r.calls++;r.in+=(u&&u.in)||0;r.out+=(u&&u.out)||0;}localStorage.setItem('carl_ai_usage',JSON.stringify(U));}catch(e){}}
+ // ---- answer cache: the same question to the same engine is answered once
+ var CK='carl_ai_cache';
+ function h(s){var a=5381,b=52711;for(var i=0;i<s.length;i++){var c=s.charCodeAt(i);a=(a*33)^c;b=(b*33)^c;}return (a>>>0).toString(36)+(b>>>0).toString(36)+s.length.toString(36);}
+ function cGet(k){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');return C[k]?C[k].r:null;}catch(e){return null;}}
+ function cPut(k,r){try{var C=JSON.parse(localStorage.getItem(CK)||'{}');C[k]={r:r,t:Date.now()};var ks=Object.keys(C);if(ks.length>150){ks.sort(function(a,b){return C[a].t-C[b].t;}).slice(0,ks.length-150).forEach(function(x){delete C[x];});}
+  var s=JSON.stringify(C);if(s.length>1500000){ks=Object.keys(C).sort(function(a,b){return C[a].t-C[b].t;});ks.slice(0,Math.ceil(ks.length/2)).forEach(function(x){delete C[x];});s=JSON.stringify(C);}localStorage.setItem(CK,s);}catch(e){}}
+ // ---- one notice per browser session before anything leaves the page
+ function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
+  var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
+  if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
+ async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
+  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+ // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
+ // Engines are named for their job on screen; which service runs each stays here.
+ var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
+ async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
+  var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
+  var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
+  if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
+  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
+ async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
+ function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
+  if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
+   b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
+  if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
+  b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.title=ST.ok?'Click for AI use in this project':ST.msg;}
+ window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
+
+ // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
+ if(typeof callAI==='function'&&typeof loadSettings==='function'){
+  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
+  var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
+  var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
+  loadSettings=function(){var s=_load();
+   if(!s.slots.some(function(x){return x.key||x.provider==='carl';})) s.slots=DEF().map(function(d,i){return Object.assign({},SLOT_DEF,s.slots[i]||{},d,{key:''});});
+   s.slots.forEach(function(x){if(x.provider==='carl'){if(x.role==='arbiter'){x.model='reviewer';x.label='Reviewer';}else if(/gemini|reader-b/i.test(x.model)){x.model='reader-b';x.label='Reader B';}else{x.model='reader-a';x.label='Reader A';}}});
+   s.slots.forEach(function(x){if(x.provider==='carl'&&x.enabled&&ST.ok!==true){x.enabled=false;x._carlOff=true;}});return s;};
+  if(_save) saveSettings=function(){var off=SET.slots.filter(function(x){return x._carlOff&&!x.enabled;});off.forEach(function(x){x.enabled=true;});try{return _save.apply(this,arguments);}finally{off.forEach(function(x){x.enabled=false;});}};
+  if(_base) defaultBase=function(p){return p==='carl'?'carl.carlcompliance.com':_base(p);};
+  callAI=async function(slot,sys,user,images){if(slot.provider!=='carl') return _call.apply(this,arguments);
+   // The connection test goes to the quick tier; real work stays on the slot's model.
+   var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
+ }
+ fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
+   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+  .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
+  .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
+   READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
+   // Redraw once so the tool's own text reflects CARL being available.
+   if(ST.ok&&typeof render==='function'&&typeof callAI!=='function'){try{render();}catch(e){}}
+   if(ST.ok&&typeof render==='function'&&typeof callAI==='function'&&window.MS_TOOL==='irma'){try{render();}catch(e){}}
+   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',badge);else badge();});
+ // Connecting other AI services (the .mil build's GenAI.mil, for one) is an administrator task.
+ function gate(){var adm=false;try{adm=localStorage.getItem('carl_ai_admin')==='1';}catch(e){}var b=document.getElementById('bSettings');if(b&&!adm) b.style.display='none';}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',gate);else gate();
+})();
+</script>
+</body>
+</html>
