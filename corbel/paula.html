@@ -460,11 +460,11 @@ function shape(l,x,y,r,tip){const c=LEVEL[l].c;const ring=' stroke="var(--surf)"
  if(l===1){const h=r*1.15;return '<path d="M'+x+','+(y-h)+'L'+(x+h)+','+(y+h*.8)+'L'+(x-h)+','+(y+h*.8)+'Z" fill="'+c+'" fill-opacity=".9"'+ring+'/>';}return '<rect x="'+(x-r*.9)+'" y="'+(y-r*.9)+'" width="'+(r*1.8)+'" height="'+(r*1.8)+'" rx="2" fill="'+c+'" fill-opacity=".85"'+ring+'/>';}
 
 // ---------- nav ----------
-function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['fund','Funding'],['seq','Sequence'],['reg','Actions'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
+function renderSteps(){const nav=$('#steps');const items=[['port','Portfolio'],['proj','Projects'],CUR?['one',CUR.name||'(project)']:null,['upd','Status update'],['pri','Prioritize'],['fund','Funding'],['cal','Budget calendar'],['seq','Sequence'],['reg','Actions'],['rep','Reports'],['data','Data and settings']].filter(Boolean);
  nav.innerHTML=items.map(([k,t],i)=>'<button data-v="'+k+'" class="'+(VIEW===k||(VIEW==='imp'&&k==='proj')?'on':'')+'"><span class="n">'+(i+1)+'</span>'+esc(t.length>22?t.slice(0,21)+'…':t)+'<span class="c"></span></button>').join('')+
  '<div class="gate">'+P.projects.length+' projects<br>'+(P.projects.some(p=>p.sample)?'<span style="color:var(--warn)">Sample data loaded</span>':'')+'</div>';
  nav.querySelectorAll('button').forEach(b=>b.onclick=()=>{VIEW=b.dataset.v;render();window.scrollTo(0,0);});}
-function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,fund:vFund,seq:vSeq,reg:vReg,rep:vRep,data:vData,imp:vImp})[VIEW]();}
+function render(){renderSteps();TIP.style.display='none';({port:vPort,proj:vProj,one:vOne,upd:vUpd,pri:vPri,fund:vFund,cal:vCal,seq:vSeq,reg:vReg,rep:vRep,data:vData,imp:vImp})[VIEW]();}
 function openP(p,tab){CUR=p;VIEW='one';PTAB=tab||'ov';render();window.scrollTo(0,0);}
 
 // ---------- portfolio ----------
@@ -668,11 +668,15 @@ function vRep(){const v=$('#view');
  out('fundxl','Funding workbook','Excel: each project’s money by fiscal year and stage, every funding line, and the funding flags with their statutory basis.','Download Excel')+
  out('seqxl','Sequencing workbook','Excel: every dependency, the knock-on problems, the dated critical path, outside dependencies, the readiness-gate matrix, the delivery-method comparison and the bundling candidates.','Download Excel')+
  out('regxl','Action register','Excel: every decision, action, request and tasker with owner, due date and status, each tasker’s coordination chain, and the stakeholder list with open and late counts.','Download Excel')+
+  out('caldoc','Budget calendar paper','Word: projects that missed or may miss their budget window and what they lack, and every dated milestone in the next six months.','Download Word')+
+  out('calxl','Budget calendar workbook','Excel: the calendar for the next 24 months, each project’s decision window, and the planning assumptions.','Download Excel')+
   out('tkdoc','Tasker tracker','Word: open taskers by suspense, who holds each one, and the full chain for any that are late or at risk.','Download Word')+
  out('csv','Data call export','Every field and the computed health for each project, ready to sort, filter or answer a data call.','Download Excel')+'</div></div>'+ipPanel();
  bindFilters();v.querySelectorAll('[data-out]').forEach(b=>b.onclick=()=>({briefdoc:()=>preDlP(()=>{dl('PAULA_Leadership_Brief_'+today()+'.doc',briefDoc(),'application/msword');log('Brief downloaded');save();}),slides:()=>preDlP(()=>{dl('PAULA_Status_Pages_'+today()+'.doc',pagesDoc(),'application/msword');log('Status pages downloaded');save();}),csv:()=>XL.save('PAULA_Data_'+today()+'.xlsx',[{name:'Portfolio data',rows:dataRows()}]),
   prdoc:()=>preDlPr(async()=>{if(!PR().bluf&&window.CARLAI&&CARLAI.state().ok) await prBluf();dl('PAULA_Prioritization_'+(PR().fy?'FY'+PR().fy+'_':'')+today()+'.doc',prDoc(),'application/msword');log('Prioritization paper downloaded');save();if(PR().bluf&&PR().bluf.check) alert('The bottom line was left out of the paper because its figures did not match the ranking ('+PR().bluf.check+'). Write it again from Reports, or add your own in Word.');}),
   regxl:()=>XL.save('PAULA_Actions_'+today()+'.xlsx',regRows().concat(tkRows())),
+  calxl:()=>XL.save('PAULA_Budget_Calendar_'+today()+'.xlsx',calRows()),
+  caldoc:()=>{dl('PAULA_Budget_Calendar_'+today()+'.doc',calDoc(),'application/msword');log('Budget calendar paper downloaded');save();},
   tkdoc:()=>{dl('PAULA_Tasker_Tracker_'+today()+'.doc',tkDoc(),'application/msword');log('Tasker tracker downloaded');save();},
   seqxl:()=>XL.save('PAULA_Sequencing_'+today()+'.xlsx',seqRows().concat(seqRows2())),
   fundxl:()=>XL.save('PAULA_Funding_'+today()+'.xlsx',fundRows()),
@@ -1163,6 +1167,79 @@ function tkDoc(){const r=REG();const T=r.items.filter(i=>i.kind==='tasker'&&i.st
 function tkRows(){const r=REG();const T=r.items.filter(i=>i.kind==='tasker');return [
  {name:'Taskers',rows:[['Tasker number','Ask','Project','Tasked by','Received','Suspense','Internal suspense','Response','Current step','With','Status','Closed']].concat(T.map(i=>{const st=tkState(i);return [i.ref||'',i.text,(pById(i.pid)||{}).name||'',orgN(i.from),i.recv||'',i.due||'',tkInt(i),{input:'Input',concur:'Concurrence',info:'Information only',brief:'Brief'}[i.resp||'input'],st.cur>=0?st.cur+1:'',st.s?orgN(st.s.org):'',st.t,i.closed||''];}))},
  {name:'Coordination chain',rows:[['Tasker','Step','Office','Role','Point of contact','Due','Status','Done','Days overdue','Comments']].concat(T.flatMap(i=>(i.chain||[]).map((s,k)=>[i.ref||i.text,k+1,orgN(s.org),(ROLES.find(r=>r[0]===s.role)||ROLES[1])[1],s.poc||'',s.due||'',(RSTAT.find(x=>x[0]===s.status)||RSTAT[0])[1],s.done||'',s.status!=='done'&&s.due&&s.due<today()?dd(s.due,today()):'',s.notes||''])))}];}
+
+// ================= BUDGET CALENDAR: the budget cycle and each project's decision windows =================
+// Statutory dates come from the U.S. Code (checked 18 Nov 2026). PPBE dates inside DoD are set each year by OSD guidance,
+// so they are planning assumptions the reviewer can change; every report labels them that way.
+const CAL_SRC={pb:'31 U.S.C. 1105(a)',fy:'31 U.S.C. 1102',bud:'2 U.S.C. 631',asof:'U.S. Code, checked 18 Nov 2026'};
+// Each assumption: key, name, years before the budget year's start, month-day, what a project must have by then.
+const CAL_DEF=[['h1391','Service 1391s for the budget year due to headquarters',2,'03-31','A validated requirement and a draft 1391'],
+ ['pom','Service POM and budget estimate to OSD',2,'08-31','A validated 1391 and a cost estimate that will hold; the project is in the POM or it waits a year'],
+ ['review','OSD program and budget review',2,'11-15','Answers to OSD questions on scope and cost'],
+ ['lock','President’s Budget locked',2,'12-15','35% design or a parametric estimate, so scope and cost are set for the budget'],
+ ['jbook','Justification books to Congress',1,'03-15','Final 1391 for the justification book'],
+ ['hasc','Defense authorization markups',1,'05-31','Answers to committee questions; any change to scope or cost explained']];
+function CALA(){const o=P.calA||{};return CAL_DEF.map(([k,n,y,md,need])=>({k,n,y:N(o[k]&&o[k].y!=null?o[k].y:y),md:(o[k]&&o[k].md)||md,need,edited:!!o[k]}));}
+const firstMon=(y,m)=>{const d=new Date(y,m-1,1);while(d.getDay()!==1) d.setDate(d.getDate()+1);return d.toLocaleDateString('en-CA');};
+// Events for budget year B (the fiscal year that begins 1 Oct B-1).
+function calYear(B){const E=[];const add=(d,k,n,kind,src,need)=>E.push({d,k,n:n+' – FY'+B,B,kind,src,need:need||''});
+ CALA().forEach(a=>{const yr=B-a.y;add(yr+'-'+a.md,a.k,a.n,'ppbe','Planning assumption (OSD sets the dates each year)',a.need);});
+ add(firstMon(B-1,2),'pb','President’s Budget due to Congress, no later than','law',CAL_SRC.pb);
+ add((B-1)+'-04-15','budres','Congress completes the budget resolution (target)','law',CAL_SRC.bud);
+ add((B-1)+'-06-10','hac','House Appropriations Committee reports its last bill (target)','law',CAL_SRC.bud);
+ add((B-1)+'-06-30','house','House completes the appropriation bills (target)','law',CAL_SRC.bud);
+ add((B-1)+'-10-01','fy','Fiscal year begins','law',CAL_SRC.fy);
+ return E;}
+function calEvents(from,to){const cf=curFY();const out=[];for(let B=cf-1;B<=cf+4;B++) calYear(B).forEach(e=>{if(e.d>=from&&e.d<=to) out.push(e);});
+ // Project items on the same calendar: funds that expire, outside dependencies, tasker suspenses.
+ filtered().forEach(p=>{funds(p).forEach(l=>{if(l.stage!=='appropriated'||isHN(l)) return;const a=ACC(l.src);if(!a[3]) return;const d=(N(l.fy)+a[3]-1)+'-09-30';if(d>=from&&d<=to) out.push({d,k:'exp',n:M(N(l.amt))+' of FY'+l.fy+' '+a[1]+' expires for new obligations – '+p.name,kind:'proj',src:a[4]||'',pid:p.id});});
+  (p.ext||[]).forEach(x=>{if((x.status||'open')==='met'||!x.need) return;if(x.need>=from&&x.need<=to) out.push({d:x.need,k:'ext',n:(EXT.find(t=>t[0]===x.type)||EXT[6])[1]+' needed – '+p.name,kind:'proj',src:'Outside dependency',pid:p.id});});});
+ REG().items.filter(i=>i.kind==='tasker'&&i.status!=='closed'&&i.due&&i.due>=from&&i.due<=to).forEach(i=>out.push({d:i.due,k:'tk',n:'Tasker suspense – '+(i.ref||i.text),kind:'proj',src:orgN(i.from)||'Tasker'}));
+ return out.sort((a,b)=>a.d.localeCompare(b.d));}
+// The next window a project has to make, and what it still lacks.
+function calWin(p){const cf=curFY();const fy=N(p.fy);if(N(p.award)||!fy) return null;const ps=progOf(p);if(['cut'].includes(ps)) return null;
+ const Y=calYear(fy);const at=k=>Y.find(e=>e.k===k);const gaps=k=>{const g=[];if(k==='h1391'||k==='pom'){if(gateOf(p,'v1391').st!=='done') g.push('1391 not validated');}
+  if(k==='lock'||k==='jbook'){const d=dPct(p);if(!d||d.v<35) g.push(d?'design at '+d.v+'%':'no design percent recorded');if(gateOf(p,'v1391').st!=='done') g.push('1391 not validated');}
+  ['site','nepa'].forEach(x=>{const s=gateOf(p,x).st;if(k!=='h1391'&&s==='blocked') g.push((GATES.find(q=>q[0]===x)||['',x])[1]+' blocked');});return g;};
+ const steps=['h1391','pom','lock','pb','jbook','fy'].map(k=>{const e=at(k);return e?{...e,gaps:['pb','fy'].includes(k)?[]:gaps(k)}:null;}).filter(Boolean);
+ const next=steps.find(s=>s.d>=today());const passed=steps.filter(s=>s.d<today());
+ const done=['pb','authorized','appropriated','obligated'].includes(ps);
+ let st,why;if(done){st='ok';why='Programming status: '+PROGN(ps)+' (FY'+fy+')';}
+ else if((passed.some(s=>s.k==='lock')&&!['pb','authorized','appropriated'].includes(ps))||(passed.some(s=>s.k==='pom')&&ps==='requirement')){const lk=passed.some(s=>s.k==='lock');let nb=fy+1;while(nb<fy+12&&(calYear(nb).find(e=>e.k===(lk?'lock':'pom'))||{}).d<today()) nb++;
+  st='missed';why=(lk?'The FY'+fy+' President’s Budget is locked':'The FY'+fy+' POM has gone to OSD')+' and the project’s programming status is “'+(PROGN(ps)==='Not set'?'not set':PROGN(ps))+'”; the next budget it can still make is FY'+nb;
+  const Y2=calYear(nb);const nx=['h1391','pom','lock','pb'].map(k=>Y2.find(e=>e.k===k)).filter(e=>e&&e.d>=today())[0];if(nx){const g=gaps(nx.k);return {fy,next:{...nx,gaps:g},steps,st,why:why+(g.length?'; '+g.join('; '):''),days:dd(today(),nx.d)};}}
+ else if(next&&next.gaps.length){st='risk';why=next.gaps.join('; ')+' – needed by '+fd(next.d);}
+ else{st='ok';why=next?'Ready for the next window: '+next.n.replace(/ – FY\d+$/,'')+' ('+fd(next.d)+')':'';}
+ return {fy,next,steps,st,why,days:next?dd(today(),next.d):null};}
+const CWS={ok:['On track','#e3f4e3','#006300'],risk:['Gap','#fdf1d6','#7a5200'],missed:['Window missed','#fbeeee','#9b2c2c']};
+function vCal(){const v=$('#view');const to=addD(today(),730),from=addD(today(),-30);const E=calEvents(from,to);const L=filtered().map(p=>({p,w:calWin(p)})).filter(x=>x.w).sort((a,b)=>({missed:0,risk:1,ok:2}[a.w.st]-{missed:0,risk:1,ok:2}[b.w.st])||((a.w.days??1e9)-(b.w.days??1e9)));
+ const cnt=k=>L.filter(x=>x.w.st===k).length;const next90=E.filter(e=>e.d>=today()&&dd(today(),e.d)<=90);
+ const months={};E.forEach(e=>{const m=e.d.slice(0,7);(months[m]=months[m]||[]).push(e);});
+ const tag=k=>({law:['Law','#1F5566','#fff'],ppbe:['Assumption','#fdf1d6','#7a5200'],proj:['Portfolio','#eef4f7','#1F5566']})[k];
+ v.innerHTML=filterRow()+'<div class="panel"><h2>Budget calendar</h2><p class="lead">The budget cycle for the next three budget years, with each project’s next decision window and what it still lacks. Dates set in law are marked Law; dates OSD sets each year are planning assumptions you can change below.</p>'+
+  '<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+t('Windows missed',String(cnt('missed')),cnt('missed')?'#9b2c2c':'')+t('Projects with a gap',String(cnt('risk')),cnt('risk')?'#7a5200':'')+t('On track',String(cnt('ok')))+t('Dates in the next 90 days',String(next90.length))+'</div></div>'+
+  '<div class="panel"><h3 style="margin-top:0">Decision windows</h3>'+(L.length?'<table class="ptable"><thead><tr><th>Project</th><th>FY</th><th>Next window</th><th style="text-align:right">Days</th><th>Status</th></tr></thead><tbody>'+L.map(({p,w})=>'<tr class="clk" data-cpo="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc([p.installation,PROGN(progOf(p))!=='Not set'?PROGN(progOf(p)):''].filter(Boolean).join(' · '))+'</div></td><td>'+w.fy+'</td><td>'+(w.next?esc(w.next.n.replace(/ – FY\d+$/,''))+'<div class="small">'+fd(w.next.d)+(w.next.kind==='ppbe'?' (assumed)':'')+'</div>':'–')+'</td><td style="text-align:right">'+(w.days??'–')+'</td><td><span class="chip" style="background:'+CWS[w.st][1]+';color:'+CWS[w.st][2]+'">'+CWS[w.st][0]+'</span><div class="small">'+esc(w.why)+'</div></td></tr>').join('')+'</tbody></table>':'<p class="small">No unawarded projects with a fiscal year under these filters.</p>')+'</div>'+
+  '<div class="panel"><h3 style="margin-top:0">Calendar – next 24 months</h3>'+Object.keys(months).sort().map(m=>'<div style="display:grid;grid-template-columns:110px 1fr;gap:10px;border-top:1px solid var(--line);padding:8px 0"><div style="font-weight:600">'+['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][N(m.slice(5))-1]+' '+m.slice(0,4)+'</div><div>'+months[m].map(e=>{const g=tag(e.kind);return '<div style="display:flex;gap:8px;align-items:baseline;margin:2px 0'+(e.d<today()?';opacity:.55':'')+'"><span class="small" style="min-width:46px">'+fd(e.d).replace(/ \d{4}$/,'')+'</span><span class="chip" style="background:'+g[1]+';color:'+g[2]+';font-size:10.5px">'+g[0]+'</span><span>'+esc(e.n)+(e.kind==='law'?' <span class="small">('+esc(e.src)+')</span>':'')+'</span></div>';}).join('')+'</div></div>').join('')+'</div>'+
+  '<div class="panel"><h3 style="margin-top:0">Planning assumptions</h3><p class="small">OSD sets the internal PPBE dates each year in its program and budget guidance. Replace these with the current year’s dates when the guidance is out. Years are counted back from the start of the budget year (FY'+(curFY()+2)+' begins 1 Oct '+(curFY()+1)+').</p><table class="ptable"><thead><tr><th>Milestone</th><th>Years before the FY begins</th><th>Month and day</th><th>What a project needs by then</th></tr></thead><tbody>'+
+  CALA().map(a=>'<tr><td>'+esc(a.n)+(a.edited?' <span class="small">(changed)</span>':'')+'</td><td><input type="number" min="0" max="3" data-cal="'+a.k+'|y" value="'+a.y+'" style="width:70px"></td><td><input data-cal="'+a.k+'|md" value="'+esc(a.md)+'" style="width:90px" pattern="\\d{2}-\\d{2}" title="MM-DD"></td><td class="small">'+esc(a.need)+'</td></tr>').join('')+'</tbody></table><div class="row"><button class="sm" id="calReset">Restore the defaults</button></div>'+
+  '<p class="small">In law: the President’s Budget is due on or after the first Monday in January and no later than the first Monday in February ('+CAL_SRC.pb+'); the fiscal year begins 1 October ('+CAL_SRC.fy+'); the congressional budget timetable sets targets for the budget resolution (15 April) and House appropriations (10 and 30 June) ('+CAL_SRC.bud+'), which Congress often misses. '+CAL_SRC.asof+'.</p></div>';
+ bindFilters();
+ v.querySelectorAll('[data-cpo]').forEach(r=>r.onclick=()=>openP(pById(r.dataset.cpo),'prog'));
+ v.querySelectorAll('[data-cal]').forEach(el=>el.onchange=()=>{const [k,f]=el.dataset.cal.split('|');if(f==='md'&&!/^\d{2}-\d{2}$/.test(el.value)) return alert('Use MM-DD, for example 08-31.');const a=CALA().find(x=>x.k===k);P.calA={...(P.calA||{}),[k]:{y:a.y,md:a.md,[f]:f==='y'?N(el.value):el.value}};log('Calendar assumption changed',k+' '+f+' = '+el.value);save();vCal();});
+ $('#calReset').onclick=()=>{P.calA={};save();vCal();};
+ function t(l,val,c){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px'+(c?';color:'+c:'')+'">'+val+'</div></div>';}}
+function calRows(){const E=calEvents(addD(today(),-30),addD(today(),730));const L=filtered().map(p=>({p,w:calWin(p)})).filter(x=>x.w);return [
+ {name:'Calendar',rows:[['Date','Event','Budget year','Kind','Source']].concat(E.map(e=>[e.d,e.n,e.B?'FY'+e.B:'',{law:'In law',ppbe:'Planning assumption',proj:'Portfolio'}[e.kind],e.src]))},
+ {name:'Decision windows',rows:[['Project','Installation','FY','Programming status','Next window','Date','Days','Status','Why']].concat(L.map(({p,w})=>[p.name,p.installation||'',w.fy,PROGN(progOf(p))==='Not set'?'':PROGN(progOf(p)),w.next?w.next.n.replace(/ – FY\d+$/,''):'',w.next?w.next.d:'',w.days??'',CWS[w.st][0],w.why]))},
+ {name:'Assumptions',rows:[['Milestone','Years before the FY begins','Month and day','Changed','What a project needs by then']].concat(CALA().map(a=>[a.n,a.y,a.md,a.edited?'Yes':'',a.need])).concat([[],['In law: President’s Budget no later than the first Monday in February ('+CAL_SRC.pb+'); fiscal year begins 1 October ('+CAL_SRC.fy+'); congressional budget targets ('+CAL_SRC.bud+'). '+CAL_SRC.asof+'.']])}];}
+function calDoc(){const L=filtered().map(p=>({p,w:calWin(p)})).filter(x=>x.w);const E=calEvents(today(),addD(today(),180));const miss=L.filter(x=>x.w.st==='missed'),risk=L.filter(x=>x.w.st==='risk');
+ let b=cdBand('Decision paper','Budget Calendar and Decision Windows',scopeText()+'  ·  '+fd(today())+(P.me?'  ·  '+P.me:''));
+ b+=kTiles([['Windows missed',String(miss.length),miss.length?'#9B2C2C':null],['Projects with a gap',String(risk.length)],['On track',String(L.filter(x=>x.w.st==='ok').length)],['Dates in 6 months',String(E.length)]]);
+ b+=cdH('Bottom line')+cdP((miss.length?miss.length+' project'+(miss.length>1?'s have':' has')+' missed the budget window for '+(miss.length>1?'their':'its')+' planned year and will move a year unless leadership acts: '+miss.slice(0,4).map(x=>esc(x.p.name)+' (FY'+x.w.fy+')').join(', ')+'. ':'No project has missed its budget window. ')+(risk.length?risk.length+' more '+(risk.length>1?'have':'has')+' a gap to close before the next window; the nearest is '+esc(risk.slice().sort((a,b)=>(a.w.days??1e9)-(b.w.days??1e9))[0].p.name)+'.':''));
+ if(miss.length||risk.length) b+=cdH('Projects to act on')+cdTable(['Project','FY','Next window','Date','What it lacks'],miss.concat(risk).map(({p,w})=>[esc(p.name),String(w.fy),w.next?esc(w.next.n.replace(/ – FY\d+$/,'')):'–',w.next?fd(w.next.d)+(w.next.kind==='ppbe'?' (assumed)':''):'–',esc(w.why)]));
+ b+=cdH('The next six months')+cdTable(['Date','Event','Basis'],E.map(e=>[fd(e.d),esc(e.n),e.kind==='law'?esc(e.src):e.kind==='ppbe'?'Planning assumption':esc(e.src||'Portfolio')]));
+ b+=cdH('Method')+cdP('Each project’s windows are counted back from its planned fiscal year. Dates in law: President’s Budget no later than the first Monday in February ('+CAL_SRC.pb+'); fiscal year begins 1 October ('+CAL_SRC.fy+'); congressional budget targets ('+CAL_SRC.bud+'), often missed. OSD’s internal PPBE dates change each year and are planning assumptions here: '+CALA().map(a=>a.n.toLowerCase()+' '+a.y+' year'+(a.y===1?'':'s')+' ahead on '+a.md).join('; ')+'. A gap means the project lacks what the next window needs, from its readiness gates: a validated 1391, 35% design for the budget lock, no blocked site or NEPA gate.');
+ b+=cdFoot('Prepared with Corbel PAULA  ·  '+fd(today())+'  ·  Advisory; the Services and the comptroller set the program.');return cdDoc('Budget Calendar',[b]);}
 
 // ================= SEQUENCE: dependencies, knock-on slips, bundling =================
 const DEPT=[['utility','Needs utilities or infrastructure from it'],['site','Needs its site cleared or prepared'],['swing','Needs swing space it provides'],['finish','Can’t start until it finishes'],['other','Other dependency']];
