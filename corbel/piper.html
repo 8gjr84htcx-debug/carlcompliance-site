@@ -264,13 +264,19 @@ function datesIn(t){const out=[];String(t||'').replace(/\b(jan|feb|mar|apr|may|j
 function noraNeed(s){const nb=has(s.project?.need_date)?String(s.project.need_date).slice(0,7):'';let best=nb,src='NORA (needed by)';
  (s.requirements||[]).filter(r=>r&&r.status!=='withdrawn'&&(!r.priority||r.priority==='must')).forEach(r=>datesIn(r.text).forEach(d=>{if(!best||d<best){best=d;src='NORA ('+(r.id||'requirement')+': '+String(r.text||'').slice(0,60)+')';}}));
  datesIn(s.need_statement).forEach(d=>{if(!best||d<best){best=d;src='NORA (need statement)';}});return {v:best||undefined,src:best?src:'NORA'};}
-// PIPER review: block 8 goes to the record only when it agrees with the form's own total. When PIPER flags it, the form total is offered and nothing is written until a person chooses.
+// PIPER review: the record's programmed amount is the Service form's total rounded per UFS 3-730-01 Appendix A (the rule PIPER applies).
+// The form's own figure, and a block 8 PIPER flags as must-fix, are shown as notes; nothing is written until a person chooses.
+// Appendix A rounding table: the same values as PIPER's ROUND table (piper_src.html); change both together.
+const ROUND_A=[[1e6,1e4],[5e6,5e4],[1e7,1e5],[1.5e7,2e5],[2e7,5e5],[Infinity,1e6]];
+function roundA(x){x=Number(x)||0;for(const [lim,to] of ROUND_A) if(x<=lim) return Math.round(x/to)*to;return x;}
 function piperReviewCost(s){if(s.mode!=='review') return {};const n=v=>Number(String(v||'').replace(/[^\d.]/g,''));const b8=n(s.review?.ext_total),b9=n(s.review?.ext_b9);if(!b8&&!b9) return {};
- if(b8&&b9&&Math.abs(b8-b9)/Math.max(b8,b9)>0.002) return {programmed:Math.round(b9*1000),_ask:{programmed:'Block 8 on the Service 1391 is $'+(b8/1000).toFixed(1)+'M, which PIPER flags as must-fix: the form’s own block 9 total is $'+(b9/1000).toFixed(1)+'M. Offered here: the form total.'}};
- return {programmed:Math.round((b8||b9)*1000)};}
+ const flag=b8&&b9&&Math.abs(b8-b9)/Math.max(b8,b9)>0.002;const form=(flag?b9:(b8||b9))*1000;const R=roundA(form);const k=v=>'$'+Math.round(v/1000).toLocaleString('en-US')+'K';
+ const notes=[];if(R!==Math.round(form)) notes.push('The Service form shows '+k(form)+(flag?' (block 9 total)':'')+'; rounded per UFS 3-730-01 Appendix A that is $'+(R/1e6).toFixed(1)+'M.');
+ if(flag) notes.push('Block 8 on the form is $'+(b8/1000).toFixed(1)+'M, which PIPER flags as must-fix.');
+ return notes.length?{programmed:R,_ask:{programmed:'Offered: $'+(R/1e6).toFixed(1)+'M. '+notes.join(' ')}}:{programmed:R};}
 // ---- the facts one record owns: cost, scope basis, primary quantity with its unit, and need date ----
 // A tool fills an empty fact, or updates one it set itself; anything else waits in core.pending for a person to choose.
-const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date'};
+const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date',to:'Task order or contract'};
 function qtyStr(q,u){const n=Number(String(q).replace(/[^\d.]/g,''));if(!n) return undefined;return n.toLocaleString('en-US')+' '+String(u||'').trim().toUpperCase();}
 function scopeOf(type,text){const t=String(type||'').toLowerCase(),x=String(text||'').toLowerCase();if(/^(new|replace|addition)$/.test(t)) return 'New or replacement construction';if(/^(renovate|repair|modernize|alter|alteration)$/.test(t)) return 'Renovation or repair';if(t&&!/^(status_quo)$/.test(t)) return t.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
  if(/\b(renovat|repair|moderniz|upgrade|rehabilitat|restor|alter)/.test(x)) return 'Renovation or repair';if(/\b(replac|new |construct|addition|build)/.test(x)) return 'New or replacement construction';return undefined;}
@@ -302,7 +308,7 @@ if(PER.includes(TOOL)){
 }
 // Saved work: facts already in the record keep their value (source "existing record"); every tool's current value is compared with them and any difference waits for a choice.
 (function factScan(){const St=loadStore();let ch=false;Object.values(St.projects).forEach(P=>{const c=P.core;c.facts=c.facts||{};OWN.forEach(k=>{if(has(c[k])&&!c.facts[k]){c.facts[k]={src:'existing record',at:today()};ch=true;}});
-  Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
+  Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src'||k==='_ask')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
 if(TOOL==='paula') paulaIn();
 
 // ---- every save flows back into the record ----
@@ -332,7 +338,7 @@ function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sampl
   const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o,'PAULA',true)) ch=true;});if(ch) saveStore(St);}
 
 // ---- public helpers ----
-window.MS={propose:(id,k,v,src,note)=>{const s=loadStore();const p=s.projects[id];if(!p||!OWN.includes(k)||!has(v)) return false;const c=p.core;if(ownEq(k,c[k],v)) return false;const r=ownSet(c,k,v,src,false,src,note||(src+' differs from the record'));if(r) saveStore(s);return r;},store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
+window.MS={propose:(id,k,v,src,note)=>{const s=loadStore();const p=s.projects[id];if(!p||!(OWN.includes(k)||k==='to')||!has(v)) return false;const c=p.core;if(ownEq(k,c[k],v)) return false;const r=ownSet(c,k,v,src,false,src,note||(src+' differs from the record'));if(r) saveStore(s);return r;},store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
  pending:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?(p.core.pending||[]).map(x=>({...x,cur:p.core[x.k],curSrc:(p.core.facts||{})[x.k]?.src||''})):[];},
  facts:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?OWN.map(k=>({k,label:OWNL[k],v:p.core[k],src:(p.core.facts||{})[k]?.src||''})):[];},
  resolve:(id,k,src,use)=>{const s=loadStore();const p=s.projects[id||s.active];if(!p) return false;const c=p.core;const i=(c.pending||[]).findIndex(x=>x.k===k&&x.src===src);if(i<0) return false;const it=c.pending[i];c.pending.splice(i,1);
@@ -381,13 +387,21 @@ function manage(){const s=loadStore();const dlg=document.createElement('dialog')
  dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a Corbel backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
 
 // ---- IRMA and QUINN entries carry the suite project they were made under, so PAULA and HANK can attach them without a typed task order ----
-if(TOOL==='irma'||TOOL==='quinn'){const K=TOOL+'_project';const stamp=()=>{const s=loadStore();const a=s.active&&s.projects[s.active];if(!a) return;
+if(TOOL==='irma'||TOOL==='quinn'){const K=TOOL+'_project';
+ // entries that existed before this page opened are only claimed when nothing ties them elsewhere (no contract number, or the project's own);
+ // entries made in this session belong to the active project unless another project owns their contract number
+ const keyOf=x=>x.id||('b:'+x.building);const listOf=v=>TOOL==='irma'?(v.items||[]):[].concat(v.registry||[],v.issues||[],v.records||[]);
+ const pre=new Set((()=>{try{const v=JSON.parse(ls.getItem(K)||'null');return v?listOf(v).map(keyOf):[];}catch(e){return [];}})());
+ const stamp=()=>{const s=loadStore();const a=s.active&&s.projects[s.active];if(!a) return;
   // stamp the tool's live data too, so its next save keeps the link
   let mem=null;try{mem=TOOL==='irma'?(typeof I!=='undefined'?I:null):(typeof Q!=='undefined'?Q:null);}catch(e){}
   let v=mem;if(!v){try{v=JSON.parse(ls.getItem(K)||'null');}catch(e){return;}}if(!v) return;
   const to=String(a.core.to||'').trim().toLowerCase();const L=TOOL==='irma'?(v.items||[]):[].concat(v.registry||[],v.issues||[],v.records||[]);let ch=false;
   const other=new Set(Object.values(s.projects).filter(q=>q.id!==a.id).map(q=>String(q.core.to||'').trim().toLowerCase()).filter(Boolean));
-  L.forEach(x=>{if(x.pid) return;const xt=String(x.to||'').trim().toLowerCase();if(xt&&to&&xt!==to) return;if(xt&&!to&&other.has(xt)) return;x.pid=a.id;ch=true;});if(ch) raw(K,JSON.stringify(v));};
+  L.forEach(x=>{if(x.pid) return;const xt=String(x.to||'').trim().toLowerCase();if(xt&&to&&xt!==to) return;if(xt&&!to&&(other.has(xt)||pre.has(keyOf(x)))) return;x.pid=a.id;ch=true;});if(ch) raw(K,JSON.stringify(v));
+  // the documents for this project carry a contract or task order number and the record has none: offer it in the settlement prompt
+  if(!has(a.core.to)){const cnt={};L.forEach(x=>{if(x.pid!==a.id) return;const t=String(x.to||x.contract||'').trim();if(/[A-Z0-9]{4,}-\d{2}-[A-Z]-\d{3,}/i.test(t)) cnt[t.toUpperCase()]=(cnt[t.toUpperCase()]||0)+1;});const ks=Object.keys(cnt);
+   if(ks.length===1){const n=cnt[ks[0]];window.MS.propose(a.id,'to',ks[0],TOOL==='irma'?'IRMA documents':'QUINN reports',(TOOL==='irma'?'The '+n+(n===1?' RFI or submittal':' RFIs and submittals'):'The '+n+' inspection record'+(n===1?'':'s'))+' for this project '+(n===1?'carries':'carry')+' contract '+ks[0]+'; the record has no task order. Use it to link IRMA, QUINN, HANK Block 7 and the PAULA header.');}}};
  setTimeout(stamp,800);setInterval(stamp,4000);window.addEventListener('beforeunload',stamp);}
 // ---- task order suggestions in IRMA and QUINN ----
 function toList(){if(TOOL!=='irma'&&TOOL!=='quinn') return;const dl2=document.createElement('datalist');dl2.id='ms-to';dl2.innerHTML=window.MS.tos().map(t=>'<option value="'+esc(t)+'">').join('');document.body.appendChild(dl2);
@@ -748,7 +762,7 @@ async function read1391(f){if(!aiOn()){alert('Sign in to CARL to read a 1391.');
   const bad=[];const chk=(v,lbl)=>{const x=String(v??'').replace(/[,$]/g,'').trim();if(x&&/\d/.test(x)&&!String(text).replace(/[,$]/g,'').includes(x.replace(/\.0+$/,''))) bad.push(lbl+' '+v);};
   chk(j.block8,'Block 8');chk(j.total_request,'Block 9 total');chk(j.cont,'Contingency');chk(j.sioh,'SIOH');(j.lines||[]).forEach(l=>{chk(l.qty,l.item+' quantity');chk(l.cost,l.item+' cost');});
   XR={file:f.name,text,j,bad};log('1391 read with AI',f.name+(bad.length?'; '+bad.length+' numbers not found on the form':''));say('');}
- catch(e){say('');alert('Could not read the 1391: '+e.message);}
+ catch(e){if(st) st.innerHTML='<span class="pill bad" role="status">Not read: '+esc(/too little text|invalid pdf/i.test(e.message)?'this file does not look like a DD Form 1391 (too little text, or not a readable PDF)':e.message)+'</span>';else alert('Could not read the 1391: '+e.message);}
  vBuild();}
 // Names as the suite already holds them: a form in capitals does not rename the project.
 const SVCN={'AIR FORCE':'Air Force','NAVY':'Navy','ARMY':'Army','MARINE CORPS':'Marine Corps','SPACE FORCE':'Space Force','DEFENSE-WIDE':'Defense-Wide','DEFENSE WIDE':'Defense-Wide','ARMY NATIONAL GUARD':'Army National Guard','AIR NATIONAL GUARD':'Air National Guard','ARMY RESERVE':'Army Reserve','NAVY RESERVE':'Navy Reserve','AIR FORCE RESERVE':'Air Force Reserve'};
