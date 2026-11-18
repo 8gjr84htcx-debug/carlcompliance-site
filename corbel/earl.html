@@ -96,6 +96,66 @@
  window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
 })();
 </script>
+<script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
+   so "AIR FORCE" and "Air Force", or "ANDERSEN AIR FORCE BASE, GUAM" and "Andersen AFB, Guam", are the same thing. */
+(function(){
+ if(window.CorbelID) return;
+ function svc(s){var t=String(s==null?'':s).toLowerCase().trim();if(!t) return '';
+  return /^don$|department of the navy/.test(t)?'Navy':/marine/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space\s*force|^ussf$/.test(t)?'Space Force':/air\s*force|^af$|^usaf$|^daf$/.test(t)?'Air Force':/health|^dha$/.test(t)?'DHA':/defense|^dod$|^dla$|socom|^mda$|wide/.test(t)?'Defense-Wide':String(s).trim();}
+ // Canonical installation names, with the ways budget books, 1391s and people write them.
+ var INST=[
+  ['Andersen AFB, Guam',/\bandersen\b|\baafb\b|\bnsa andersen\b|\bandy south\b/],
+  ['Naval Base Guam',/\bnaval base guam\b|\bnavbase guam\b|\bnbg\b|\bapra harbor\b/],
+  ['Camp Blaz, Guam',/\bcamp blaz\b|\bmcb camp blaz\b|\bfinegayan\b/],
+  ['Tinian, CNMI',/\btinian\b/],
+  ['Saipan, CNMI',/\bsaipan\b/],
+  ['Kadena AB, Okinawa',/\bkadena\b/],
+  ['Camp Hansen, Okinawa',/\bcamp hansen\b/],
+  ['Camp Schwab, Okinawa',/\bcamp schwab\b/],
+  ['Camp Foster, Okinawa',/\bcamp foster\b/],
+  ['MCAS Futenma, Okinawa',/\bfutenma\b/],
+  ['Yokota AB, Japan',/\byokota\b/],
+  ['Misawa AB, Japan',/\bmisawa\b/],
+  ['MCAS Iwakuni, Japan',/\biwakuni\b/],
+  ['Yokosuka, Japan',/\byokosuka\b/],
+  ['Sasebo, Japan',/\bsasebo\b/],
+  ['Camp Zama, Japan',/\bcamp zama\b/],
+  ['Camp Humphreys, Korea',/\bhumphreys\b/],
+  ['Osan AB, Korea',/\bosan\b/],
+  ['Kunsan AB, Korea',/\bkunsan\b/],
+  ['JB Pearl Harbor-Hickam, Hawaii',/\bpearl harbor\b|\bhickam\b|\bjbphh\b/],
+  ['Schofield Barracks, Hawaii',/\bschofield\b/],
+  ['MCB Hawaii (Kaneohe Bay)',/\bkaneohe\b|\bmcb hawaii\b/],
+  ['PMRF Barking Sands, Hawaii',/\bpmrf\b|\bbarking sands\b|\bpacific missile range\b/],
+  ['Wake Island',/\bwake island\b|\bwake atoll\b/],
+  ['Kwajalein Atoll',/\bkwajalein\b|\breagan test site\b/],
+  ['RAAF Darwin, Australia',/\bdarwin\b/],
+  ['RAAF Tindal, Australia',/\btindal\b/],
+  ['Eielson AFB, Alaska',/\beielson\b/],
+  ['JB Elmendorf-Richardson, Alaska',/\belmendorf\b|\bjber\b|\bfort richardson\b/],
+  ['Fort Wainwright, Alaska',/\bwainwright\b/],
+  ['Diego Garcia',/\bdiego garcia\b/]];
+ var KEEP=/^(AFB|AB|NAS|NSA|JB|USAF|USMC|US|DOD|NAVFAC|MCB|MCAS|CNMI|RAAF|PMRF|II|III|IV)$/;
+ function tcase(t){t=String(t);if(t!==t.toUpperCase()||!/[A-Z]{3}/.test(t)) return t;return t.split(/(\s+|-|\/|,)/).map(function(w){return KEEP.test(w)?w:/^[A-Z]+$/.test(w)?w[0]+w.slice(1).toLowerCase():w;}).join('');}
+ function inst(s){var raw=String(s==null?'':s).trim();if(!raw) return '';var t=raw.toLowerCase();for(var i=0;i<INST.length;i++) if(INST[i][1].test(t)) return INST[i][0];return tcase(raw);}
+ function sameInst(a,b){a=inst(a);b=inst(b);return !!a&&!!b&&a.toLowerCase()===b.toLowerCase();}
+ // Project numbers: "P-107", "P107", "AJJY 29-1001" and "AJJY291001" compare equal.
+ function num(s){return String(s==null?'':s).toUpperCase().replace(/[^A-Z0-9]/g,'');}
+ var NUMRE=/\b(?:[A-Z]{4}\s?\d{2}-?\d{3,4}|P-?\d{2,4}[A-Z]?|[A-Z]{2,4}\d{6})\b/g;
+ function numsIn(s){return (String(s||'').toUpperCase().match(NUMRE)||[]).map(num);}
+ function words(s){var STOP={the:1,and:1,of:1,for:1,at:1,to:1,in:1,on:1,a:1,an:1,phase:1,ph:1,project:1,facility:1,facilities:1,new:1,construct:1,construction:1,replace:1,replacement:1};
+  return String(s||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(function(w){return (w.length>1||/\d/.test(w))&&!STOP[w];});}
+ // Share of the shorter title's words found in the other title (0 to 1). Different numbers ("Phase 2" against "Phase 1" or none) never match.
+ function titleSim(a,b){var A=words(a),B=words(b);if(!A.length||!B.length) return 0;
+  var dA=A.filter(function(w){return /^\d+$/.test(w);}).sort().join(','),dB=B.filter(function(w){return /^\d+$/.test(w);}).sort().join(',');if(dA!==dB) return 0;
+  var S=A.length<=B.length?A:B,L=A.length<=B.length?B:A;var hit=S.filter(function(w){return L.some(function(x){return x===w||(w.length>4&&x.length>4&&(x.indexOf(w)===0||w.indexOf(x)===0));});}).length;return hit/S.length;}
+ window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
+})();
+</script>
+
+
+
+
 
 
 
@@ -173,7 +233,7 @@ function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) retu
 // ---- PAULA: one PAULA project per record project, same id ----
 function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',created:new Date().toISOString(),projects:[],t:{},me:'',log:[]};let ch=false;
  for(const [id,p] of Object.entries(S.projects)){let pp=pa.projects.find(x=>x.id===id);if(!pp){pp={id,phase:1,risks:[],milestones:[],updates:[],override:{level:'',reason:''}};pa.projects.push(pp);ch=true;}
-  PAULA_F.forEach(f=>{const v=p.core[f];if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!(Array.isArray(v)&&!v.length&&Array.isArray(pp[f]))&&!same(pp[f],v)){pp[f]=JSON.parse(JSON.stringify(v));ch=true;}});
+  PAULA_F.forEach(f=>{let v=p.core[f];if(window.CorbelID&&typeof v==='string'){if(f==='service') v=CorbelID.svc(v);else if(f==='installation') v=CorbelID.inst(v);}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!(Array.isArray(v)&&!v.length&&Array.isArray(pp[f]))&&!same(pp[f],v)){pp[f]=JSON.parse(JSON.stringify(v));ch=true;}});
   const ph={'Requirement validated':2,'Economic analysis approved':3,'1391 validated':4,'SOW final':6};
   const T=p.tools||{},rc=T.record||{};const lv=[[1,'NORA',!!T.nora],[3,'EARL recommendation',!!(rc.earl&&rc.earl.recommended)],[3,'PIPER 1391',!!(rc.piper&&(rc.piper.rounded||rc.piper.contract))],[5,'SOPHIE SOW',!!(T.sophie&&(T.sophie.sections||[]).length)]].filter(x=>x[2]);
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
