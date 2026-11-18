@@ -982,15 +982,19 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
  const PARTS=[['project','stakeholders','requirements','conflicts'],['gaps','constraints','assumptions','risks','measures']];
  const pieceKey=(c,w,pi)=>{const t=CH[c]+'|'+w+'|'+pi+'|'+recCtx;let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);};
  P.build_pieces=P.build_pieces||{};const jobs=[];for(let c=0;c<CH.length;c++) for(const w of ['claude','gemini']) for(let pi=0;pi<PARTS.length;pi++) jobs.push({c,w,pi,key:pieceKey(c,w,pi)});
- const one=async jb=>{if(P.build_pieces[jb.key]) return P.build_pieces[jb.key].j;
-  const note='\n\nTHIS REQUEST: return only these keys: '+PARTS[jb.pi].join(', ')+'. Leave every other key out.';
-  for(let t=0;t<2;t++){const j=await CARLAI.ask(jb.w,EXTRACT_SYS()+note,'SOURCES:\n'+CH[jb.c]+recCtx).then(j=>j&&typeof j==='object'&&(jb.pi===1||PARTS[jb.pi].some(k=>Array.isArray(j[k])&&j[k].length)||!emptyAns(j))?j:{err:'empty answer'}).catch(e=>({err:e.message}));
-   if(j&&!j.err){P.build_pieces[jb.key]={j,at:new Date().toISOString()};save();return j;}if(t===1) return j;}};
+ // A piece is asked once (the CARL link retries a dropped connection twice). If it still does not come back, it is split into one request per kind of item, which return sooner.
+ const askKeys=(jb,keys)=>CARLAI.ask(jb.w,EXTRACT_SYS()+'\n\nTHIS REQUEST: return only these keys: '+keys.join(', ')+'. Leave every other key out.','SOURCES:\n'+CH[jb.c]+recCtx).then(j=>j&&typeof j==='object'&&(jb.pi===1||keys.some(k=>Array.isArray(j[k])&&j[k].length)||!emptyAns(j))?j:{err:'empty answer'}).catch(e=>({err:e.message}));
+ const one=async jb=>{if(P.build_pieces[jb.key]) return P.build_pieces[jb.key].j;const keys=PARTS[jb.pi];
+  let j=await askKeys(jb,keys);
+  if((!j||j.err)&&keys.length>1){say('One reading did not come back in time; asking for it in smaller parts…');const sub=await Promise.all(keys.map(k=>{const sk=pieceKey(jb.c,jb.w,jb.pi)+'|'+k;if(P.build_pieces[sk]) return Promise.resolve(P.build_pieces[sk].j);return askKeys(jb,[k]).then(x=>{if(x&&!x.err){P.build_pieces[sk]={j:x,at:new Date().toISOString()};save();}return x;});}));
+   const ok=sub.filter(x=>x&&!x.err);if(ok.length){const m={};keys.forEach((k,i)=>{const x=sub[i];if(x&&!x.err&&Array.isArray(x[k])) m[k]=x[k];});const miss=keys.filter((k,i)=>!sub[i]||sub[i].err);if(miss.length) m._missing=miss;j=m;}}
+  if(j&&!j.err&&!j._missing){P.build_pieces[jb.key]={j,at:new Date().toISOString()};save();}return j;};
  let done=0;const total=jobs.length;const res=new Array(total);let next=0;
  say(CH.length>1?'Two readers are reading '+CH.length+' documents, each on its own…':'Two readers are reading your documents on their own…');
  await Promise.all(Array.from({length:Math.min(4,total)},async()=>{while(next<total){const k=next++;res[k]=await one(jobs[k]);done++;say('Reading: '+done+' of '+total+' pieces back…');}}));
  for(let c=0;c<CH.length;c++) [['claude','Reader A'],['gemini','Reader B']].forEach(([w,who])=>{const mine=jobs.map((jb,k)=>[jb,res[k]]).filter(([jb])=>jb.c===c&&jb.w===w);const ok=mine.filter(([,j])=>j&&!j.err);
   mine.filter(([,j])=>!j||j.err).forEach(([jb,j])=>{err=err||(j&&j.err);failed.push({who,part:c+1,err:'('+(jb.pi?'gaps and risks':'requirements')+') '+String(j&&j.err||'no answer').slice(0,110)});});
+  mine.filter(([,j])=>j&&!j.err&&j._missing).forEach(([jb,j])=>failed.push({who,part:c+1,err:'('+j._missing.join(', ')+') did not come back'}));
   if(ok.length){const m={};ok.forEach(([jb,j])=>PARTS[jb.pi].forEach(k=>{if(Array.isArray(j[k])) m[k]=(m[k]||[]).concat(j[k]);}));runs.push([m,who,c]);}});
  const readers=[...new Set(runs.map(r=>r[1]))];
  if(!runs.length){b.disabled=false;say('');alert('AI did not answer: '+err);return;}
