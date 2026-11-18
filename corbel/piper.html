@@ -97,8 +97,6 @@
 })();
 </script>
 
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIPER – Programming, Investment, and Project Estimate Reviewer</title>
@@ -480,7 +478,7 @@ function ym(y,m){return y+'-'+String(m).padStart(2,'0');}
 function addMonths(s,n){const [y,m]=s.split('-').map(Number);const t=y*12+(m-1)+n;return ym(Math.floor(t/12),t%12+1);}
 // Find the closest area cost factor row for an installation name.
 function locFind(name){const w=nz(name).replace(/[^a-z0-9 ]/g,' ').split(' ').filter(x=>x.length>2&&!['air','force','base','naval','station','army','camp','joint','the'].includes(x));if(!w.length) return null;
- let best=null,sc=0;D.acf.forEach(a=>{const t=nz(a[0]+' '+a[3]);const k=w.filter(x=>t.includes(x)).length;if(k>sc){sc=k;best=a;}});return sc?best:null;}
+ let best=null,sc=0;D.acf.forEach(a=>{const t=nz(a[0]+' '+a[3]),c=nz(a[1]);const k=w.reduce((s,x,i)=>s+(t.includes(x)?(i?2:3):c.includes(x)?1:0),0);if(k>sc){sc=k;best=a;}});return sc>1||(sc&&w.length===1)?best:null;}
 function setLoc(a,src){P.loc.name=a[0]+(a[3]&&a[3]!==a[0]?' – '+a[3]:'');P.loc.acf=a[2];P.loc.country=a[1];P.loc.conus=a[4]===1&&!['Hawaii','Alaska'].includes(a[1]);P.loc.src=src;}
 function setGuc(i,qty,dc){const g=D.guc[i];if(!g||g.na) return false;const f=P.pf;f.guc_i=String(i);f.guc_name=g.n;f.guc=g.usd;f.ref=g.ref||'';f.um=g.per?'VF':'SF';
  if(qty) f.qty=String(qty);if(dc&&DC[dc]) f.dc=dc;f.size_kind=/BARRACKS|DORMITOR|UNACCOMPANIED/i.test(g.n)?'barracks':/FAMILY HOUSING/i.test(g.n)?'mfh':'std';return true;}
@@ -549,29 +547,42 @@ async function build1391(){const st=$('#bStat');const say=t=>{if(st) st.textCont
 const X1391_SYS=()=>`You read a DD Form 1391 (Military Construction Project Data) and return its content exactly as written.
 Return ONLY JSON:
 {"component":"","date":"","installation":"","title":"","pe":"","catcode":"","project_no":"","fy":"program fiscal year, 4 digits","block8":"total in $000 as a number",
-"primary":{"facility":"the closest of these Table 2 facility types, copied exactly: ${D.guc.filter(g=>!g.na).map(g=>g.n).join(' | ')}","qty":"","um":""},
+"primary":{"facility":"ONLY when the primary facility is a building measured in square feet or square meters: the closest of these Table 2 facility types, copied exactly: ${D.guc.filter(g=>!g.na).map(g=>g.n).join(' | ')}. Otherwise (a fuel system, pier, pavement, utility, range or anything counted in EA, LF, LS or other units) leave it empty","qty":"the primary facility quantity","um":"its unit exactly as written (SF, SM, EA, LF, LS, OUTLETS …)"},
+"total_request":"the total of block 9 exactly as printed on the form (the TOTAL REQUEST or bottom total line) in $000, or empty if none is printed",
 "lines":[{"group":"primary|supporting|markup","item":"","um":"","qty":"","unit_cost":"","cost":"cost in $000 as a number"}],
 "cont":"contingency percent","sioh":"SIOH percent","design":"design-build design percent, or empty",
-"desc":"block 10 text","project":"block 11 Project","requirement":"block 11 Requirement","current":"block 11 Current situation","impact":"block 11 Impact if not provided","additional":"block 11 Additional","req":"","adqt":"","substd":"",
-"s12":{"acq":"","ds":"YYYY-MM","pct":"","asof":"YYYY-MM","d35":"YYYY-MM","dc":"YYYY-MM","dcost":"$000","energy":"Yes|No|","std":"Yes|No|","award":"YYYY-MM","start":"YYYY-MM","complete":"YYYY-MM","fci":""}}
+"desc":"block 10 text","project":"block 11 Project","requirement":"block 11 Requirement","current":"block 11 Current situation","impact":"block 11 Impact if not provided","additional":"block 11 Additional","req":"block 11 REQ quantity, number only","adqt":"ADQT quantity, number only","substd":"SUBSTD quantity, number only","req_um":"the unit written after the REQ quantity (SF, EA, OUTLETS …)",
+"s12":{"acq":"acquisition strategy","ds":"design start date YYYY-MM","pct":"percent design complete","asof":"as-of date of that percent YYYY-MM","d35":"35% design date YYYY-MM","dc":"date DESIGN complete (not construction) YYYY-MM","dcost":"total design cost $000","energy":"Yes|No|","std":"standard or definitive design used: Yes|No|","award":"contract award date YYYY-MM","start":"construction start YYYY-MM","complete":"CONSTRUCTION complete date YYYY-MM","fci":"facility condition index"}}
 Copy text and numbers exactly; leave anything not on the form empty. Contingency, SIOH and design go in "markup" lines and in cont, sioh, design.`;
 let XR=null;
 async function read1391(f){if(!aiOn()){alert('Sign in to CARL to read a 1391.');return;}const st=$('#rStat');const say=t=>{if(st) st.textContent=t;};
  try{say('Reading '+f.name+'…');const r=await readAny(f,say);const text=r.text;if((text.match(/\S+/g)||[]).length<30) throw new Error('Too little text found');
   say('Extracting the blocks…');const j=await CARLAI.ask('claude',X1391_SYS(),'1391:\n'+text.slice(0,120000),null,{fresh:true});
   const bad=[];const chk=(v,lbl)=>{const x=String(v??'').replace(/[,$]/g,'').trim();if(x&&/\d/.test(x)&&!String(text).replace(/[,$]/g,'').includes(x.replace(/\.0+$/,''))) bad.push(lbl+' '+v);};
-  chk(j.block8,'Block 8');chk(j.cont,'Contingency');chk(j.sioh,'SIOH');(j.lines||[]).forEach(l=>{chk(l.qty,l.item+' quantity');chk(l.cost,l.item+' cost');});
+  chk(j.block8,'Block 8');chk(j.total_request,'Block 9 total');chk(j.cont,'Contingency');chk(j.sioh,'SIOH');(j.lines||[]).forEach(l=>{chk(l.qty,l.item+' quantity');chk(l.cost,l.item+' cost');});
   XR={file:f.name,text,j,bad};log('1391 read with AI',f.name+(bad.length?'; '+bad.length+' numbers not found on the form':''));say('');}
  catch(e){say('');alert('Could not read the 1391: '+e.message);}
  vBuild();}
-function apply1391(){const j=XR.j;P.mode='review';P.auto={};P.ai_rev=[];['component','date','installation','title','pe','catcode','project_no','fy'].forEach(k=>{if(j[k]) P.b[k]=String(j[k]);});
- ['desc','project','requirement','current','impact','additional','req','adqt','substd'].forEach(k=>{if(j[k]) P.n[k]=String(j[k]);});
+// Names as the suite already holds them: a form in capitals does not rename the project.
+const SVCN={'AIR FORCE':'Air Force','NAVY':'Navy','ARMY':'Army','MARINE CORPS':'Marine Corps','SPACE FORCE':'Space Force','DEFENSE-WIDE':'Defense-Wide','DEFENSE WIDE':'Defense-Wide','ARMY NATIONAL GUARD':'Army National Guard','AIR NATIONAL GUARD':'Air National Guard','ARMY RESERVE':'Army Reserve','NAVY RESERVE':'Navy Reserve','AIR FORCE RESERVE':'Air Force Reserve'};
+function tCase(t){t=String(t);if(t!==t.toUpperCase()||!/[A-Z]{3}/.test(t)) return t;const KEEP=/^(AFB|AB|NAS|NSA|JB|USAF|USMC|US|DOD|NAVFAC|MCB|CNMI|II|III|IV|PH|HQ|DLA|SOF|ATFP|AT\/FP)$/;
+ return t.split(/(\s+|-|\/|,)/).map(w=>KEEP.test(w)?w:/^[A-Z]+$/.test(w)?w[0]+w.slice(1).toLowerCase():w).join('').replace(/\b(Of|And|The|For|At|To|In|On)\b/g,(m,x,i)=>i?x.toLowerCase():x);}
+function headVal(k,v){v=String(v).trim();const cur=String(P.b[k]||'').trim();if(k==='component'){const c=SVCN[v.toUpperCase()];if(c) return c;}
+ if(cur&&nz(cur).replace(/[^a-z0-9]/g,'')===nz(v).replace(/[^a-z0-9]/g,'')) return cur;if(cur&&v===v.toUpperCase()&&['installation','title'].includes(k)){const a=nz(cur).replace(/[^a-z0-9 ]/g,' ').split(' ').filter(x=>x.length>3),b=nz(v);if(a.length&&a.filter(x=>b.includes(x)).length>=Math.ceil(a.length/2)) return cur;}
+ return ['installation','title','component'].includes(k)?tCase(v):v;}
+const AREA_UM=/^(sf|sq\.?\s?ft|square\s+f(?:ee|oo)t|sm|m2|m²|sq\.?\s?m|square\s+met(?:er|re)s?)$/i,SM_UM=/^(sm|m2|m²|sq\.?\s?m|square\s+met(?:er|re)s?)$/i;
+function apply1391(){const j=XR.j;P.mode='review';P.auto={};P.ai_rev=[];['component','date','installation','title','pe','catcode','project_no','fy'].forEach(k=>{if(j[k]) P.b[k]=headVal(k,j[k]);});
+ ['desc','project','requirement','current','impact','additional'].forEach(k=>{if(j[k]) P.n[k]=String(j[k]);});
  Object.entries(j.s12||{}).forEach(([k,v])=>{if(v&&k in P.s12) P.s12[k]=String(v);});
- const gi=D.guc.findIndex(g=>g.n===String(j.primary?.facility||''));if(gi>=0) setGuc(gi,String(j.primary.qty||'').replace(/,/g,''),'');
+ // Map to a Table 2 unit cost only when the primary facility is a building in area units; anything else keeps the lines as submitted.
+ {const f=P.pf;Object.assign(f,{guc_i:'',guc_name:'',guc:'',ref:'',qty:'',um:'SF',size_kind:'std',members:'',units:''});const pu=String(j.primary?.um||'').trim();const gi=D.guc.findIndex(g=>g.n===String(j.primary?.facility||''));
+  if(gi>=0&&AREA_UM.test(pu)&&!D.guc[gi].per){let q=N(String(j.primary.qty||'').replace(/,/g,''));if(SM_UM.test(pu)) q=Math.round(q*10.7639);if(q) setGuc(gi,String(q),'');}
+  else if(j.primary&&(j.primary.facility||pu)&&!AREA_UM.test(pu)) P.auto.guc='The form’s primary facility is counted in '+(pu||'no stated unit')+', not square feet, so PIPER kept its block 9 lines as submitted instead of pricing it from a Table 2 building type.';}
+ {const ru=String(j.req_um||'').trim()||((String(j.req||'').match(/[A-Za-z][A-Za-z ./]*$/)||[''])[0].trim());['req','adqt','substd'].forEach(k=>{if(j[k]!=null&&j[k]!=='') P.n[k]=String(j[k]).replace(/[^0-9.,]/g,'');});if(ru) P.n.um=ru.toUpperCase().slice(0,20);}
  P.prim=[];P.sup=[];(j.lines||[]).forEach(l=>{if(l.group==='markup') return;const it={id:uid(),item:String(l.item||'').slice(0,90),um:l.um||'LS',qty:String(l.qty||'').replace(/,/g,''),unit:String(l.unit_cost||'').replace(/[,$]/g,'')||(N(l.cost)&&N(l.qty)?(N(l.cost)*1000/N(l.qty)).toFixed(2):N(l.cost)?String(N(l.cost)*1000):''),adj:false,src:'As submitted'};if(it.um==='LS'&&!it.qty) it.qty='1';
-  if(l.group==='primary'&&P.pf.guc_i!==''&&nz(l.item).includes(nz(P.pf.guc_name).split(' ')[0])) return;(l.group==='primary'?P.prim:P.sup).push(it);});
+  if(l.group==='primary'&&P.pf.guc_i!==''&&(nz(l.item).includes(nz(P.pf.guc_name).split(' ')[0])||(N(l.qty)&&Math.abs(N(String(l.qty).replace(/,/g,''))-N(P.pf.qty))/N(P.pf.qty)<.02))) return;(l.group==='primary'?P.prim:P.sup).push(it);});
  if(P.b.installation){const a=locFind(P.b.installation);if(a){setLoc(a,'matched from installation name');P.auto.loc='Matched from the installation on the form; check it';}}
- P.review.ext=true;P.review.ext_total=String(j.block8||'').replace(/[,$]/g,'');P.review.ext_cont=String(j.cont||'').replace('%','');P.review.ext_sioh=String(j.sioh||'').replace('%','');if(N(j.design)) P.db=String(N(j.design));
+ P.review.ext=true;P.review.ext_total=String(j.block8||'').replace(/[,$]/g,'');P.review.ext_b9=String(j.total_request||'').replace(/[,$]/g,'');P.review.ext_lines=(j.lines||[]).reduce((a,l)=>a+N(String(l.cost||'').replace(/[,$]/g,'')),0);P.review.ext_cont=String(j.cont||'').replace('%','');P.review.ext_sioh=String(j.sioh||'').replace('%','');if(N(j.design)) P.db=String(N(j.design));
  const ss={file:XR.file,read:new Date().toISOString(),bad:XR.bad};P.review.src=ss;P.review.text=XR.text.slice(0,200000);log('1391 applied for review',XR.file);XR=null;save();
  (async()=>{if(aiOn()) await aiReview(true);STEP='done';render();window.scrollTo(0,0);})();}
 
@@ -920,6 +931,12 @@ function findings(){const F=[];const C=calc();const n=P.n;const add=(s,t,d)=>F.p
  if(s.award&&N(P.b.fy)){const a=new Date(s.award+'-01');const fyEnd=new Date(N(P.b.fy)+'-09-30');if(a>fyEnd) add('warn','Award after the end of the program year','Award '+s.award+' falls after FY'+P.b.fy+'. Reviewers move projects that cannot award in their year.');}
  const R=rec();if(R.earl?.recommended&&!(function(nm,t){const w=String(nm).toLowerCase().match(/[a-z0-9]{3,}/g)||[];const T=String(t).toLowerCase();return !w.length||w.filter(x=>T.includes(x.replace(/e$/,'')))
 .length/w.length>=0.6;})(R.earl.recommended.name,n.additional+' '+n.desc+' '+n.project)) add('warn','EARL recommendation not mentioned','EARL recommended “'+R.earl.recommended.name+'”. Make sure the 1391 describes the same alternative.');
+ if(ext){const et=N(P.review.ext_total),eb=N(P.review.ext_b9),el=N(P.review.ext_lines);
+  if(et&&eb&&Math.abs(et-eb)>Math.max(1,eb*.001)) add('bad','Block 8 does not match the form’s own block 9 total','Block 8 says $'+et.toLocaleString()+'K; the block 9 total printed on the same form is $'+eb.toLocaleString()+'K (a difference of $'+Math.abs(et-eb).toLocaleString()+'K). One of them is wrong; the Service must correct it before the 1391 goes forward.');
+  else if(et&&!eb&&el&&Math.abs(et-el)>Math.max(5,el*.01)) add('warn','Block 8 does not match the block 9 lines','Block 8 says $'+et.toLocaleString()+'K; the block 9 line costs on the form add up to $'+Math.round(el).toLocaleString()+'K. Check the arithmetic on the form.');
+  if(eb&&el&&Math.abs(eb-el)>Math.max(5,eb*.01)) add('warn','Block 9 lines do not add up to the block 9 total','The line costs add up to $'+Math.round(el).toLocaleString()+'K; the printed total is $'+eb.toLocaleString()+'K. Some lines may be missing from the reading or from the form.');}
+ {const s=P.s12;if(s.dc&&s.complete&&s.dc>=s.complete) add('warn','Block 12 design-complete date is not before construction complete','Design complete '+s.dc+'; construction complete '+s.complete+'. Check that the design-complete date was read from the right line.');}
+ if((P.auto||{}).guc) add('warn','Primary facility kept as submitted',P.auto.guc);
  if(ext){const et=N(P.review.ext_total);if(et&&Math.abs(et*1000-C.rounded)>1){const d=(C.rounded/1000)/et-1;const g=D.guc[P.pf.guc_i];const band=Math.min(g&&g.sd?g.sd:.15,.25);const msg='Submitted $'+et.toLocaleString()+'K; PIPER\u2019s UFS rebuild $'+k$(C.rounded)+'K ('+(d*100).toFixed(1)+'%). ';
   if(Math.abs(d)>2*band) add('bad','Submitted block 8 far from the UFS rebuild',msg+'More than twice the '+(g&&g.sd?'published spread for this facility type':'15% planning band')+' ('+(band*100).toFixed(0)+'%). Ask for the Service\u2019s estimate backup.');
   else if(Math.abs(d)>band) add('warn','Submitted block 8 differs from the UFS rebuild',msg+'Outside the '+(g&&g.sd?'published spread for this facility type':'15% planning band')+' ('+(band*100).toFixed(0)+'%). Check the unit cost and factors.');}
