@@ -184,6 +184,29 @@
   localStorage.removeItem('ccs_project');localStorage.removeItem('cora_selection');return 'new';}catch(e){return '';}}
  window.CorbelCCS={sync:sync,pid:function(){var st=J('milcon_store');return st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';},name:function(){var st=J('milcon_store');var p=st&&st.active&&st.projects&&st.projects[st.active];return p?String((p.core||{}).name||''):'';}};
  window.__ccsSync=sync();})();
+// Questions are asked in the page, not in a browser pop-up. A page can't pause for an answer the way the browser's box does, so the
+// question opens over the page and the action waits: "Yes" runs the same action again with the answer given; "No" leaves everything as it was.
+(function(){if(window.__corbelAsk) return;window.__corbelAsk=1;var last=null,pass=null;
+ ['click','change','submit','keydown'].forEach(function(t){document.addEventListener(t,function(e){if(e.isTrusted||e.__corbelReplay) last={type:t,target:e.target,key:e.key,files:(t==='change'&&e.target&&e.target.files&&e.target.files.length)?Array.prototype.slice.call(e.target.files):null};},true);});
+ function replay(ev){if(!ev||!ev.target||!document.contains(ev.target)) return false;if(ev.type==='click'){ev.target.click();return true;}
+  if(ev.files&&ev.target.files!==undefined){try{var dt=new DataTransfer();ev.files.forEach(function(f){dt.items.add(f);});ev.target.files=dt.files;}catch(x){}}
+  var e=ev.type==='keydown'?new KeyboardEvent('keydown',{key:ev.key,bubbles:true}):new Event(ev.type,{bubbles:true});e.__corbelReplay=true;ev.target.dispatchEvent(e);return true;}
+ function box(msg,withInput,def,cb){var o=document.createElement('div');o.id='corbel-ask';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');
+  o.style.cssText='position:fixed;inset:0;background:rgba(15,30,54,.45);z-index:2147483001;display:flex;align-items:center;justify-content:center';
+  var c=document.createElement('div');c.style.cssText='background:#fff;color:#1A1410;border-radius:8px;box-shadow:0 10px 30px rgba(15,30,54,.3);padding:18px 20px;max-width:520px;width:92%;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif';
+  var p=document.createElement('div');p.style.cssText='white-space:pre-wrap;margin-bottom:12px';p.textContent=String(msg==null?'':msg);c.appendChild(p);
+  var inp=null;if(withInput){inp=document.createElement('input');inp.type='text';inp.value=def==null?'':String(def);inp.style.cssText='width:100%;box-sizing:border-box;padding:6px 8px;margin-bottom:12px;font:inherit;border:1px solid #C9B998;border-radius:4px';c.appendChild(inp);}
+  var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+  var no=document.createElement('button');no.type='button';no.textContent=withInput?'Cancel':'No';no.style.cssText='padding:5px 14px;font:inherit;border:1px solid #1B2F4E;background:#fff;color:#1B2F4E;border-radius:4px;cursor:pointer';
+  var yes=document.createElement('button');yes.type='button';yes.textContent=withInput?'OK':'Yes';yes.style.cssText='padding:5px 14px;font:inherit;border:1px solid #1B2F4E;background:#1B2F4E;color:#fff;border-radius:4px;cursor:pointer';
+  row.appendChild(no);row.appendChild(yes);c.appendChild(row);o.appendChild(c);document.body.appendChild(o);
+  function done(v){o.remove();document.removeEventListener('keydown',kh,true);cb(v);}
+  function kh(e){if(e.key==='Escape'){e.stopPropagation();done(null);}else if(e.key==='Enter'&&(withInput||document.activeElement===yes)){e.preventDefault();e.stopPropagation();done(withInput?inp.value:true);}}
+  document.addEventListener('keydown',kh,true);no.onclick=function(){done(null);};yes.onclick=function(){done(withInput?inp.value:true);};setTimeout(function(){(inp||yes).focus();},0);}
+ window.confirm=function(msg){if(window.__corbelAutoYes) return true;var k='c:'+msg;if(pass&&pass.k===k){pass=null;return true;}if(document.getElementById('corbel-ask')) return false;var ev=last;
+  box(msg,false,null,function(v){if(v){pass={k:k};if(!replay(ev)) pass={k:k};}});return false;};
+ window.prompt=function(msg,def){if(window.__corbelAutoYes) return def==null?'':String(def);var k='p:'+msg;if(pass&&pass.k===k){var v=pass.v;pass=null;return v;}if(document.getElementById('corbel-ask')) return null;var ev=last;
+  box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
 
 <meta charset="utf-8">
@@ -1514,7 +1537,10 @@ function tkState(i){if(i.status==='closed') return {k:'closed',t:'Closed'};const
 const TKC={late:['#fbeeee','#9b2c2c'],risk:['#fdf1d6','#7a5200'],ok:['#e3f4e3','#006300'],ready:['#e3f4e3','#006300'],closed:['#eeedea','#52514e']};
 const tkChip=st=>'<span class="chip" style="background:'+TKC[st.k][0]+';color:'+TKC[st.k][1]+'">'+esc(st.t)+'</span>';
 // Plan the chain backward from the internal suspense, a set number of working days per step (an adjustable assumption).
-function tkPlan(i){const c=i.chain||[];const it=tkInt(i);if(!it||!c.length) return;const n=c.length;c.forEach((s,k)=>{if(s.status==='done') return;s.due=wdAdd(it,-(n-1-k)*N(TKS().step));});}
+function tkPlan(i){const c=i.chain||[];const it=tkInt(i);if(!it||!c.length) return;const n=c.length;let step=N(TKS().step);
+ // a long chain must not start before the tasker arrived: squeeze the steps into the working days left
+ const start=i.recv||today();if(wdAdd(it,-(n-1)*step)<start){let avail=0;for(let d=start;d<it&&avail<400;d=wdAdd(d,1)) avail++;step=n>1?Math.max(0,Math.floor(avail/(n-1))):0;}
+ c.forEach((s,k)=>{if(s.status==='done') return;s.due=wdAdd(it,-(n-1-k)*step);if(s.due<start&&start<=it) s.due=start;});}
 function tkStd(i){const p=pById(i.pid);const own=i.org||orgBy('JPMO');const svc=p?orgBy(svcOrg(p)):'';const st=[{org:own,role:'draft'},{org:orgBy('JPMO'),role:'review'}];if(svc) st.push({org:svc,role:'concur'});if(p) st.push({org:orgBy(dcaFor(p)),role:'concur'});st.push({org:orgBy('JPMO'),role:'sign'});
  i.chain=st.filter((s,k,a)=>s.org&&!(k&&a[k-1].org===s.org&&a[k-1].role===s.role)).map(s=>({id:uid(),...s,poc:'',due:'',done:'',status:'pending',notes:''}));tkPlan(i);}
 function tkEditor(i){const r=REG();const oopt=sel=>'<option value="">Office</option>'+r.orgs.map(o=>'<option value="'+o.id+'"'+(sel===o.id?' selected':'')+'>'+esc(o.name)+'</option>').join('');const st=tkState(i);
@@ -1532,7 +1558,7 @@ function bindTk(){const r=REG();const I=id=>r.items.find(x=>x.id===id);const sv=
  document.querySelectorAll('[data-tkx]').forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.tkx.split('|');I(id).chain.splice(+k,1);sv();});
  document.querySelectorAll('[data-tku]').forEach(b=>b.onclick=()=>{const [id,k]=b.dataset.tku.split('|');const c=I(id).chain;const n=+k;if(n>0){[c[n-1],c[n]]=[c[n],c[n-1]];}sv();});}
 // Read a tasker from pasted text (an email or tasking memo). Every value must appear in the text.
-const TK_SYS=`You read a U.S. military tasker (a tasking email or memo) and pull out what a program office tracks. Return ONLY JSON {"ref":"tasker or control number as written, or empty","from":"the tasking office as written","suspense":"YYYY-MM-DD or empty","ask":"what is asked, one imperative sentence","resp":"input|concur|info|brief","project":"<project id from PROJECTS if one is named, or empty>","projects":["every project id from PROJECTS the tasker names"],"quote":"the exact sentence that states the ask"}
+const TK_SYS=`You read a U.S. military tasker (a tasking email or memo) and pull out what a program office tracks. Return ONLY JSON {"ref":"tasker or control number as written, or empty","from":"the tasking office as written","suspense":"YYYY-MM-DD or empty","ask":"what is asked, one imperative sentence","resp":"input|concur|info|brief","project":"<project id from PROJECTS if one is named, or empty>","projects":["every project id from PROJECTS the tasker names"],"coord":["each office the tasker says to coordinate with or get concurrence from, exactly as written"],"quote":"the exact sentence that states the ask"}
 Use only what the text says. Leave suspense empty unless a date is written.`;
 async function tkRead(){const r=REG();const t=$('#tkTx').value.trim();if(!t) return $('#tkTx').focus();const m=$('#tkMsg');m.textContent='Reading the tasker…';
  try{const j=await CARLAI.ask('claude',TK_SYS,'TODAY: '+today()+'\nPROJECTS:\n'+filtered().map(p=>p.id+' | '+p.name+' | '+(p.installation||'')).join('\n')+'\n\nTASKER:\n'+t,null,{fresh:true});const nt=String(t).toLowerCase().replace(/\s+/g,' ');
@@ -1540,7 +1566,13 @@ async function tkRead(){const r=REG();const t=$('#tkTx').value.trim();if(!t) ret
   let sus=/^\d{4}-\d{2}-\d{2}$/.test(j.suspense||'')?j.suspense:'';if(sus){const [yy,mm,dy]=sus.split('-');if(!(nt.includes(yy)||nt.includes(yy.slice(2)))||!new RegExp('\\b0?'+Number(dy)+'\\b').test(nt)) sus='';}const ref=j.ref&&nt.includes(String(j.ref).toLowerCase())?String(j.ref):'';
   const fo=orgBy(j.from)||(r.orgs.find(o=>j.from&&String(j.from).toLowerCase().includes(o.name.toLowerCase()))||{}).id||'';
   const pids=[...new Set([j.project].concat(Array.isArray(j.projects)?j.projects:[]).filter(x=>x&&pById(x)))];const i={id:uid(),kind:'tasker',text:String(j.ask).slice(0,200),pid:pids[0]||'',pids,org:orgBy('JPMO'),due:sus,poc:'',notes:q?'From the tasker: “'+q+'”':'',status:'open',created:today(),src:'tasker',from:fo,ref,recv:today(),resp:['input','concur','info','brief'].includes(j.resp)?j.resp:'input',chain:[]};
-  tkStd(i);r.items.push(i);RGX=i.id;log('Tasker added from text',(ref||'')+' '+i.text);save();vReg();
+  tkStd(i);
+  // offices the tasker names for coordination get a concurrence step before the sign-off; a name not in the list is added as an organization
+  const cn=(Array.isArray(j.coord)?j.coord:[]).map(x=>String(x||'').trim()).filter(x=>x&&nt.includes(x.toLowerCase().replace(/\s+/g,' ')));const added=[];
+  cn.forEach(nm=>{let oid=orgMatch(nm);if(!oid){const o={id:uid(),name:nm,type:'Named in a tasker',poc:'',role:'',email:''};r.orgs.push(o);oid=o.id;added.push(nm);}
+   if(i.chain.some(s=>s.org===oid&&s.role==='concur')) return;const at=i.chain.findIndex(s=>s.role==='sign');i.chain.splice(at<0?i.chain.length:at,0,{id:uid(),org:oid,role:'concur',poc:'',due:'',done:'',status:'pending',notes:'Named in the tasker'});});
+  if(cn.length) tkPlan(i);if(added.length) log('Organizations added from a tasker',added.join(', '));
+  r.items.push(i);RGX=i.id;log('Tasker added from text',(ref||'')+' '+i.text);save();vReg();
   const m2=$('#tkMsg');if(m2) m2.textContent='Added'+(sus?'':' – no suspense date found in the text; set it')+(fo?'':' – tasking office not matched; pick it')+'. Check it against the tasker.';}
  catch(e){m.textContent='Could not read the tasker: '+e.message;}}
 function tkDoc(){const r=REG();const T=r.items.filter(i=>i.kind==='tasker'&&i.status!=='closed').sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));const S=T.map(i=>({i,st:tkState(i)}));

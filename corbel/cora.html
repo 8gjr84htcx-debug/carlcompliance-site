@@ -184,6 +184,29 @@
   localStorage.removeItem('ccs_project');localStorage.removeItem('cora_selection');return 'new';}catch(e){return '';}}
  window.CorbelCCS={sync:sync,pid:function(){var st=J('milcon_store');return st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';},name:function(){var st=J('milcon_store');var p=st&&st.active&&st.projects&&st.projects[st.active];return p?String((p.core||{}).name||''):'';}};
  window.__ccsSync=sync();})();
+// Questions are asked in the page, not in a browser pop-up. A page can't pause for an answer the way the browser's box does, so the
+// question opens over the page and the action waits: "Yes" runs the same action again with the answer given; "No" leaves everything as it was.
+(function(){if(window.__corbelAsk) return;window.__corbelAsk=1;var last=null,pass=null;
+ ['click','change','submit','keydown'].forEach(function(t){document.addEventListener(t,function(e){if(e.isTrusted||e.__corbelReplay) last={type:t,target:e.target,key:e.key,files:(t==='change'&&e.target&&e.target.files&&e.target.files.length)?Array.prototype.slice.call(e.target.files):null};},true);});
+ function replay(ev){if(!ev||!ev.target||!document.contains(ev.target)) return false;if(ev.type==='click'){ev.target.click();return true;}
+  if(ev.files&&ev.target.files!==undefined){try{var dt=new DataTransfer();ev.files.forEach(function(f){dt.items.add(f);});ev.target.files=dt.files;}catch(x){}}
+  var e=ev.type==='keydown'?new KeyboardEvent('keydown',{key:ev.key,bubbles:true}):new Event(ev.type,{bubbles:true});e.__corbelReplay=true;ev.target.dispatchEvent(e);return true;}
+ function box(msg,withInput,def,cb){var o=document.createElement('div');o.id='corbel-ask';o.setAttribute('role','dialog');o.setAttribute('aria-modal','true');
+  o.style.cssText='position:fixed;inset:0;background:rgba(15,30,54,.45);z-index:2147483001;display:flex;align-items:center;justify-content:center';
+  var c=document.createElement('div');c.style.cssText='background:#fff;color:#1A1410;border-radius:8px;box-shadow:0 10px 30px rgba(15,30,54,.3);padding:18px 20px;max-width:520px;width:92%;font:14px/1.5 system-ui,-apple-system,Segoe UI,sans-serif';
+  var p=document.createElement('div');p.style.cssText='white-space:pre-wrap;margin-bottom:12px';p.textContent=String(msg==null?'':msg);c.appendChild(p);
+  var inp=null;if(withInput){inp=document.createElement('input');inp.type='text';inp.value=def==null?'':String(def);inp.style.cssText='width:100%;box-sizing:border-box;padding:6px 8px;margin-bottom:12px;font:inherit;border:1px solid #C9B998;border-radius:4px';c.appendChild(inp);}
+  var row=document.createElement('div');row.style.cssText='display:flex;gap:8px;justify-content:flex-end';
+  var no=document.createElement('button');no.type='button';no.textContent=withInput?'Cancel':'No';no.style.cssText='padding:5px 14px;font:inherit;border:1px solid #1B2F4E;background:#fff;color:#1B2F4E;border-radius:4px;cursor:pointer';
+  var yes=document.createElement('button');yes.type='button';yes.textContent=withInput?'OK':'Yes';yes.style.cssText='padding:5px 14px;font:inherit;border:1px solid #1B2F4E;background:#1B2F4E;color:#fff;border-radius:4px;cursor:pointer';
+  row.appendChild(no);row.appendChild(yes);c.appendChild(row);o.appendChild(c);document.body.appendChild(o);
+  function done(v){o.remove();document.removeEventListener('keydown',kh,true);cb(v);}
+  function kh(e){if(e.key==='Escape'){e.stopPropagation();done(null);}else if(e.key==='Enter'&&(withInput||document.activeElement===yes)){e.preventDefault();e.stopPropagation();done(withInput?inp.value:true);}}
+  document.addEventListener('keydown',kh,true);no.onclick=function(){done(null);};yes.onclick=function(){done(withInput?inp.value:true);};setTimeout(function(){(inp||yes).focus();},0);}
+ window.confirm=function(msg){if(window.__corbelAutoYes) return true;var k='c:'+msg;if(pass&&pass.k===k){pass=null;return true;}if(document.getElementById('corbel-ask')) return false;var ev=last;
+  box(msg,false,null,function(v){if(v){pass={k:k};if(!replay(ev)) pass={k:k};}});return false;};
+ window.prompt=function(msg,def){if(window.__corbelAutoYes) return def==null?'':String(def);var k='p:'+msg;if(pass&&pass.k===k){var v=pass.v;pass=null;return v;}if(document.getElementById('corbel-ask')) return null;var ev=last;
+  box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
 
 
