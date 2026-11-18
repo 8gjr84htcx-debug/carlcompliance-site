@@ -101,7 +101,7 @@
 (function(){
  if(window.CorbelID) return;
  function svc(s){var t=String(s==null?'':s).toLowerCase().trim();if(!t) return '';
-  return /^don$|department of the navy/.test(t)?'Navy':/marine/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space\s*force|^ussf$/.test(t)?'Space Force':/air\s*force|^af$|^usaf$|^daf$/.test(t)?'Air Force':/health|^dha$/.test(t)?'DHA':/defense|^dod$|^dla$|socom|^mda$|wide/.test(t)?'Defense-Wide':String(s).trim();}
+  return /^don$|department of the navy/.test(t)?'Navy':/marine|^usmc$/.test(t)?'Marine Corps':/navy|naval/.test(t)?'Navy':/army/.test(t)?'Army':/space\s*force|^ussf$/.test(t)?'Space Force':/air\s*force|^af$|^usaf$|^daf$/.test(t)?'Air Force':/health|^dha$/.test(t)?'DHA':/defense|^dod$|^dla$|socom|^mda$|wide/.test(t)?'Defense-Wide':String(s).trim();}
  // Canonical installation names, with the ways budget books, 1391s and people write them.
  var INST=[
   ['Andersen AFB, Guam',/\bandersen\b|\baafb\b|\bnsa andersen\b|\bandy south\b/],
@@ -152,6 +152,7 @@
  window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
 })();
 </script>
+
 
 
 
