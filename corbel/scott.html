@@ -20,7 +20,15 @@
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
-  reset:function(id){return seed(id||'test');}};
+  reset:function(id){return seed(id||'test');},
+  // One file holding every Corbel tool's data for the current portfolio, and the way back.
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
+   this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
+   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
+  restore:function(file){return file.text().then(function(t){var j=JSON.parse(t);if(j.schema!=='corbel-backup-1'||!j.keys) throw new Error('That is not a Corbel backup file');
+   var ks=Object.keys(j.keys).filter(function(k){return window.CorbelPF.TOOLKEYS.indexOf(k)>=0;});if(!ks.length) throw new Error('The backup holds no tool data');
+   ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
   d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
@@ -29,6 +37,7 @@
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
+
 
 
 <meta charset="utf-8">

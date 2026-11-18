@@ -20,7 +20,15 @@
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
-  reset:function(id){return seed(id||'test');}};
+  reset:function(id){return seed(id||'test');},
+  // One file holding every Corbel tool's data for the current portfolio, and the way back.
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
+   this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
+   var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
+  restore:function(file){return file.text().then(function(t){var j=JSON.parse(t);if(j.schema!=='corbel-backup-1'||!j.keys) throw new Error('That is not a Corbel backup file');
+   var ks=Object.keys(j.keys).filter(function(k){return window.CorbelPF.TOOLKEYS.indexOf(k)>=0;});if(!ks.length) throw new Error('The backup holds no tool data');
+   ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
   d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
@@ -106,7 +114,7 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   const ph={'Requirement validated':2,'Economic analysis approved':3,'1391 validated':4,'SOW final':6};
   const T=p.tools||{},rc=T.record||{};const lv=[[1,'NORA',!!T.nora],[3,'EARL recommendation',!!(rc.earl&&rc.earl.recommended)],[3,'PIPER 1391',!!(rc.piper&&(rc.piper.rounded||rc.piper.contract))],[5,'SOPHIE SOW',!!(T.sophie&&(T.sophie.sections||[]).length)]].filter(x=>x[2]);
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
-  if(rc.piper&&rc.piper.contract&&!has(pp.cwe)){pp.cwe=rc.piper.contract;ch=true;}
+  if(rc.piper&&rc.piper.contract&&Number(pp.ecc)!==Number(rc.piper.contract)){pp.ecc=rc.piper.contract;ch=true;if(has(pp.cwe)&&!Number(pp.award)&&Number(pp.cwe)===Number(pp.ecc_was||rc.piper.contract)){pp.cwe='';}pp.ecc_was=rc.piper.contract;}
   for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]&&!pp.phase_manual){pp.phase=ph[n];pp.phase_src=n;ch=true;}}}
  if(ch) raw('paula_project',JSON.stringify(pa));}
 function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sample) return;let p=St.projects[pp.id];if(!p){if(!has(pp.name)) return;p=St.projects[pp.id]={id:pp.id,core:{},tools:{},created:today()};ch=true;}
@@ -345,19 +353,31 @@ function quinnFor(p){try{const Q=JSON.parse(localStorage.getItem('quinn_project'
  const iss=Q.issues.filter(i=>bl.includes(i.building)&&i.status!=='closed');const aged=iss.filter(i=>i.first&&dd(i.first,today())>30);const last=Q.records.filter(r=>bl.includes(r.building)).map(r=>r.date).filter(Boolean).sort().pop()||'';return {open:iss.length,aged:aged.length,last};}catch(e){return null;}}
 
 // ---------- health engine ----------
-const base=p=>N(p.authorized)||N(p.programmed);
-const est=p=>N(p.cwe)||N(p.award)||N(p.programmed);
-const value=p=>N(p.cwe)||N(p.award)||N(p.authorized)||N(p.programmed);
+// ---- Money on one basis. The 1391 request (and the authorized amount) is a TOTAL: contract cost plus contingency, SIOH and the rest.
+// A contract estimate is compared with the contract part of that total; the rest is carried over unchanged, so the comparison is like with like.
+// "Authorized" is said only when an authorized amount is recorded; otherwise the base is the programmed request, named by its programming status.
+const EARLY=['requirement','pom','fydp','pb'];
+const authConflict=p=>!!(N(p.authorized)&&p.prog_status&&EARLY.includes(p.prog_status));
+function baseOf(p){if(N(p.authorized)&&!authConflict(p)) return {v:N(p.authorized),lab:'authorized',kind:'auth'};if(authConflict(p)) return {v:N(p.authorized),lab:'requested ('+PROGN(p.prog_status).replace(/^In the /,'')+'; an authorized amount is recorded but the status says otherwise)',kind:'conflict'};if(N(p.programmed)){const w=typeof progOf==='function'?PROGN(progOf(p)):'';return {v:N(p.programmed),lab:'programmed'+(w&&w!=='Not set'?' ('+w.replace(/^In the /,'')+')':''),kind:'prog'};}return null;}
+function money(p){const B=baseOf(p);const c=N(p.cwe),aw=N(p.award);let e=N(p.ecc);if(!e&&!aw&&c) e=c;
+ const bc=aw||e;const add=B&&bc?Math.max(0,B.v-bc):null;const cur=aw?(c||aw):(c||e);const cmp=!!(B&&cur&&add!=null&&(aw||(c&&c!==e)));
+ return {B,cur,bc,add,tot:cur&&add!=null?cur+add:(B?B.v:0),cmp,basis:aw?'award':e?'1391 contract cost':''};}
+const base=p=>{const B=baseOf(p);return B?B.v:0;};
+const baseLab=p=>{const B=baseOf(p);return B?B.lab:'';};
+const est=p=>money(p).tot||N(p.cwe)||N(p.award);
+function isAuth(p){if(p.prog_status&&EARLY.includes(p.prog_status)) return false;return N(p.authorized)>0||(typeof funds==='function'&&funds(p).some(l=>!isHN(l)&&SI(l.stage)>=SI('authorized')));}
+const value=p=>money(p).tot||N(p.cwe)||N(p.award)||N(p.authorized)||N(p.programmed);
 function lastUpd(p){return p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date)).pop();}
 function spi(p,asOf){if(!p.ntp||!p.baseline_finish||p.pct==='') return null;const tot=dd(p.ntp,p.baseline_finish);const el=dd(p.ntp,asOf||today());if(tot<=0||el<=0) return null;const tp=Math.min(1,el/tot);if(tp<.1) return null;return {spi:(N(p.pct)/100)/tp,tp};}
 function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(dim,l,r)=>parts.push({dim,l,r});
- const b=base(p),e=est(p),hasE=!!(N(p.cwe)||N(p.award)),A=N(p.authorized);
+ const MN=money(p),b=base(p),e=est(p),hasE=MN.cmp,A=authConflict(p)?0:N(p.authorized);
+ if(authConflict(p)) add('Legal authority',1,'An authorized amount ('+M(N(p.authorized))+') is recorded but the programming status is '+PROGN(p.prog_status)+'; confirm which is right before anyone briefs it');
  // 1 Legal authority: the estimate against the amount Congress authorized (10 U.S.C. 2853).
  if(A&&hasE){const d=e-A,g=d/A,lim=Math.min(LAW.costPct.v/100*A,2*T.umc);
   if(d>lim) add('Legal authority',2,'Up '+M(d)+' ('+pct(g,1)+') – beyond the '+LAW.costPct.cite+' limit of '+M(lim)+'; needs a waiver and congressional notice before obligating');
   else if(d>0) add('Legal authority',A>LAW.report.v&&g>=.25?1:0,'Up '+M(d)+', inside the '+M(lim)+' variation limit; the Secretary concerned must determine it is needed for unusual cost variations ('+LAW.costPct.cite+')'+(A>LAW.report.v&&g>=.25?' – also needs the 2853(f) report':''));
   else add('Legal authority',0,'Within the authorized amount');}
- else add('Legal authority',-1,A?'No current estimate yet':'No authorized amount recorded');
+ else if(!authConflict(p)) add('Legal authority',-1,A?'No current estimate yet':'Not yet authorized'+(baseOf(p)?' – the '+M(b)+' is '+baseLab(p):''));
  // 2 Funds available: can the money on hand cover the estimate?
  const F=N(p.funded);if(F&&hasE){const h=(F-e)/F;
   add('Funds',e>F?2:h*100<T.fundsWatch?1:0,e>F?'Estimate exceeds funds available by '+M(e-F):h*100<T.fundsWatch?'Only '+M(F-e)+' ('+pct(h,1)+') headroom left':M(F-e)+' headroom ('+pct(h,1)+')');}
@@ -371,9 +391,9 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
   else add('Scope',0,'As in the 1391: '+sn.toLocaleString()+' '+su);}
  else add('Scope',-1,'Scope not recorded');
  // 4 Cost performance: growth against the baseline, by your thresholds.
- if(b&&hasE){const g=(e-b)/b;
-  if(g*100>T.costCrit) add('Cost',2,'Up '+pct(g,1)+' on '+M(b));else if(g*100>T.costWatch) add('Cost',1,'Up '+pct(g,1)+' on '+M(b));else add('Cost',0,(g>=0?'Up ':'Down ')+pct(Math.abs(g),1));}
- else add('Cost',-1,'No estimate against the authorized amount yet');
+ if(b&&hasE){const g=(e-b)/b;const on=' on the '+M(b)+' '+baseLab(p)+' (contract estimate against the '+MN.basis+', the rest of the request carried over)';
+  if(g*100>T.costCrit) add('Cost',2,'Up '+pct(g,1)+on);else if(g*100>T.costWatch) add('Cost',1,'Up '+pct(g,1)+on);else add('Cost',0,(g>=0?'Up ':'Down ')+pct(Math.abs(g),1)+on);}
+ else add('Cost',-1,b?'No newer contract estimate than the 1391 yet':'No programmed or authorized amount yet');
  if(N(p.phase)>=7&&p.baseline_finish&&p.forecast_finish){const s=dd(p.baseline_finish,p.forecast_finish);const sp=spi(p,now);let l=s>T.slipCrit?2:s>T.slipWatch?1:0;let r=s>0?s+' days late to baseline':'On or ahead of baseline';
   if(sp&&N(p.phase)===7){const l2=sp.spi<T.spiCrit?2:sp.spi<T.spiWatch?1:0;if(l2>l){l=l2;}r+='; '+Math.round(N(p.pct))+'% complete at '+pct(sp.tp)+' of time';}add('Schedule',l,r);}
  else{const late=p.milestones.filter(m=>!m.actual&&(m.forecast||m.baseline)&&dd(m.baseline||m.forecast,now)>0);const worst=late.reduce((x,m)=>Math.max(x,dd(m.baseline||m.forecast,now)),0);
@@ -381,17 +401,27 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  const or=p.risks.filter(r=>r.status!=='closed');const mx=or.reduce((x,r)=>Math.max(x,N(r.l)*N(r.i)),0);
  add('Risk',or.length?(mx>=T.riskCrit?2:mx>=T.riskWatch?1:0):-1,or.length?'Highest open risk scores '+mx+' of 25 ('+or.length+' open)':'No open risks recorded');
  const ir=irmaFor(p),q=quinnFor(p);if(ir||q){const n=(ir?ir.overdue:0)+(q?q.aged:0);add('Actions',n>=T.actCrit?2:n>=T.actWatch?1:0,[ir?ir.overdue+' RFI/submittal past suspense of '+ir.open+' open':'',q?q.aged+' deficiencies open over 30 days':''].filter(Boolean).join('; '));}
+ if(!N(p.award)&&typeof gateCheck==='function'){const gc=gateCheck(p);if(gc.cls==='blocked') add('Readiness gates',2,'Not executable as proposed: '+gc.why.map(w=>w[0]).slice(0,2).join('; '));else if(gc.cls==='conditional') add('Readiness gates',1,gc.why.map(w=>w[0]).slice(0,2).join('; '));else add('Readiness gates',0,'No gate blocks the project');}
+ if(typeof cpmC==='function'){const C=cpmC(),c=C[p.id];const xr=(p.ext||[]).filter(x=>(x.status||'open')==='risk'&&!x.expect);
+  if(c&&c.slip>0){const mo_=Math.round(c.slip/30.4);add('Projected finish',c.slip>T.slipCrit?2:1,mo_+' month'+(mo_===1?'':'s')+' past the forecast once dependencies are counted: '+chainOf(p.id,C).join(' → '));}
+  else if(xr.length) add('Projected finish',1,xr.length+' outside dependenc'+(xr.length>1?'ies':'y')+' at risk with no date from the provider');}
  const lu=lastUpd(p);const stale=!lu||dd(lu.date,today())>T.stale;
  let overall=parts.reduce((x,y)=>Math.max(x,y.l),-1);if(overall<0) overall=0;let ov=false;
  if(p.override&&p.override.level!==''){overall=N(p.override.level);ov=true;}
  return {overall,parts,stale,lastDate:lu?lu.date:'',override:ov};}
 // ---------- AI commentary through CARL ----------
 function aiOk(){if(window.CARLAI&&CARLAI.state().ok) return true;alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return false;}
+// Status words checked against the record: a sentence that calls a project authorized, appropriated or in the President's Budget must match its programming status.
+function statusBad(t,L){const out=[];const S=String(t).split(/(?<=[.;!?])\s+/);(L||[]).forEach(p=>{const ps=progOf(p),nm=String(p.name||'').toLowerCase();if(!nm) return;const sts=S.filter(x=>L.length===1||x.toLowerCase().includes(nm));
+ sts.forEach(x=>{if(/\bauthori[sz]ed\b/i.test(x)&&!/\b(not|un|before|until|once|if|when|awaiting|pending|yet to be)\b[^.]{0,30}authori/i.test(x)&&!isAuth(p)) out.push(p.name+' is described as authorized, but its programming status is '+(PROGN(ps)==='Not set'?'not set':PROGN(ps)));
+  if(/\bappropriated\b/i.test(x)&&!/\b(not|un|before|until|once|if|when|awaiting|pending)\b[^.]{0,30}appropriated/i.test(x)&&!['appropriated','obligated'].includes(ps)&&!funds(p).some(l=>!isHN(l)&&SI(l.stage)>=SI('appropriated'))) out.push(p.name+' is described as appropriated, but its programming status is '+(PROGN(ps)==='Not set'?'not set':PROGN(ps)));
+  if(/\b(is|are|was|sits|remains) (now )?in the President['’]s Budget/i.test(x)&&!['pb','authorized','appropriated','obligated'].includes(ps)) out.push(p.name+' is described as in the President’s Budget, but its programming status is '+(PROGN(ps)==='Not set'?'not set':PROGN(ps)));});});return [...new Set(out)];}
 function numBad(t,src){const S=String(src).replace(/,/g,'');return [...new Set((String(t).match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
 function projFacts(p,h){const L=[];const b=base(p),e=est(p);const U=p.updates.slice().sort((a,c)=>a.date.localeCompare(c.date));const u=U[U.length-1];const ir=irmaFor(p),q=quinnFor(p);
  L.push('PROJECT: '+[p.name,p.number,p.to&&('task order '+p.to),p.installation,p.service,'phase '+p.phase+' '+PHASES[p.phase],p.contractor&&('contractor '+p.contractor)].filter(Boolean).join('; '));
  L.push('HEALTH: '+LEVEL[h.overall].n+(h.override?' (override: '+p.override.reason+')':''));h.parts.forEach(z=>L.push('  '+z.dim+': '+(z.l<0?'not assessed':LEVEL[z.l].n)+' – '+z.r));
- L.push('MONEY: authorized '+M(b)+', current estimate '+M(e)+', award '+M(N(p.award))+', obligated '+M(N(p.obligated))+', expended '+M(N(p.expended)));
+ L.push('PROGRAMMING STATUS: '+(PROGN(progOf(p))==='Not set'?'not set':PROGN(progOf(p)))+(isAuth(p)?'':' (NOT authorized: never call this project or its amount authorized)'));
+ L.push('MONEY: '+baseLab(p)+' '+M(b)+', current total estimate on the same basis '+M(e)+', award '+M(N(p.award))+', obligated '+M(N(p.obligated))+', expended '+M(N(p.expended)));
  L.push('SCHEDULE: NTP '+(p.ntp||'–')+', baseline finish '+(p.baseline_finish||'–')+', forecast finish '+(p.forecast_finish||'–')+', '+(p.pct!==''?Math.round(N(p.pct))+'% complete':'percent complete not reported'));
  if(u) L.push('LATEST UPDATE '+u.date+': done: '+(u.done||'')+' | next: '+(u.next||'')+' | concerns: '+(u.concerns||'none'));
  p.risks.filter(r=>r.status!=='closed').forEach(r=>L.push('OPEN RISK (score '+N(r.l)*N(r.i)+'): '+r.text+(r.response?'; response: '+r.response:'')));
@@ -399,21 +429,23 @@ function projFacts(p,h){const L=[];const b=base(p),e=est(p);const U=p.updates.sl
  if(ir) L.push('RFIS AND SUBMITTALS: '+ir.open+' open, '+ir.overdue+' past suspense');if(q) L.push('DEFICIENCIES: '+q.open+' open, '+q.aged+' open over 30 days');
  if(p.decisions) L.push('DECISIONS NEEDED: '+p.decisions);return L;}
 const EXPLAIN_SYS=`You explain a DoD military construction project's status for a program manager's briefing. Two short paragraphs in plain language: what is driving the health rating, and what needs attention or a decision next. Use ONLY facts in SOURCES and state figures exactly as given. No speculation about causes the sources do not state. No references to AI.
+Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 Return ONLY JSON: {"text":"the paragraphs, separated by a blank line"}`;
 async function aiExplain(p){if(!aiOk()) return;const h=health(p);const src=projFacts(p,h).join('\n');const b=$('#bAIx');b.disabled=true;b.textContent='Writing…';
- try{const j=await CARLAI.ask('claude',EXPLAIN_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
-  p.ai_note={text:t,at:new Date().toISOString(),check:bad.length?'Check these numbers, not found in the project data: '+bad.join(', '):''};save();vOne();}
+ try{const j=await CARLAI.ask('claude',EXPLAIN_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src),sb=statusBad(t,[p]);
+  p.ai_note={text:t,at:new Date().toISOString(),check:[bad.length?'Check these numbers, not found in the project data: '+bad.join(', '):'',sb.join('; ')].filter(Boolean).join('. ')};save();vOne();}
  catch(err){alert('Failed: '+err.message);b.disabled=false;b.textContent='Explain with AI';}}
 const BRIEF_SYS=`You write the opening summary of a military construction portfolio leadership brief. One paragraph of four to six sentences: overall portfolio health, the projects that most need leadership attention and why, and the decisions needed. Use ONLY facts in SOURCES and state figures exactly as given. No references to AI.
+Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 Return ONLY JSON: {"text":"the paragraph"}`;
 function briefKey(){return [F.svc,F.ctry,F.phase,F.pm].join('|')+'|'+today();}
 async function aiBrief(){if(!aiOk()) return;const L=filtered();if(!L.length){alert('No projects in the current filter.');return;}
  const H=L.map(p=>({p,h:health(p)}));const src=['PORTFOLIO: '+L.length+' projects, value '+M(L.reduce((s,p)=>s+value(p),0))+'; health '+[0,1,2].map(l=>LEVEL[l].n+' '+H.filter(x=>x.h.overall===l).length).join(', ')]
-  .concat(H.filter(x=>x.h.overall>0).sort((a,c)=>c.h.overall-a.h.overall||value(c.p)-value(a.p)).slice(0,8).map(x=>'ATTENTION: '+x.p.name+' ('+LEVEL[x.h.overall].n+', '+M(value(x.p))+'): '+x.h.parts.filter(z=>z.l===x.h.overall).map(z=>z.dim+' – '+z.r).join('; ')))
+  .concat(H.filter(x=>x.h.overall>0).sort((a,c)=>c.h.overall-a.h.overall||value(c.p)-value(a.p)).slice(0,8).map(x=>'ATTENTION: '+x.p.name+' ('+LEVEL[x.h.overall].n+', '+M(value(x.p))+', programming status '+(PROGN(progOf(x.p))==='Not set'?'not set':PROGN(progOf(x.p)))+(isAuth(x.p)?'':', not authorized')+'): '+x.h.parts.filter(z=>z.l===x.h.overall).map(z=>z.dim+' – '+z.r).join('; ')))
   .concat(L.filter(p=>p.decisions).map(p=>'DECISION: '+p.name+': '+p.decisions)).join('\n');
  const b=document.getElementById('bAIb');if(b){b.disabled=true;b.textContent='Writing…';}
- try{const j=await CARLAI.ask('claude',BRIEF_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src);
-  P.ai_brief={key:briefKey(),text:t,check:bad.length?'Check these numbers, not found in the data: '+bad.join(', '):''};save();vRep();}
+ try{const j=await CARLAI.ask('claude',BRIEF_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src),sb=statusBad(t,L);
+  P.ai_brief={key:briefKey(),text:t,check:[bad.length?'Check these numbers, not found in the data: '+bad.join(', '):'',sb.join('; ')].filter(Boolean).join('. ')};save();vRep();}
  catch(err){alert('Failed: '+err.message);if(b){b.disabled=false;b.textContent='Write the summary with AI';}}}
 function chip(l,extra){const L=LEVEL[l];return '<span class="chip '+L.k+'">'+L.i+' '+L.n+(extra||'')+'</span>';}
 
@@ -589,7 +621,7 @@ function vOne(){const p=CUR;if(!p){VIEW='proj';return render();}const v=$('#view
  ({ov:pOv,edit:pEdit,prog:pProg,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);const bx=document.getElementById('bAIx');if(bx) bx.onclick=()=>aiExplain(p);}
 function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const sp=spi(p);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;const ir=irmaFor(p),q=quinnFor(p);
  const U=p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date));
- t.innerHTML='<div class="grid g-kpi"><div class="tile hero"><div class="lab">Current estimate</div><div class="val">'+M(e)+'</div><div class="sub">'+(b?((e-b)>=0?'+':'')+M(e-b)+' ('+pct((e-b)/b,1)+') against '+M(b)+' authorized':'No authorized amount')+'</div></div>'+
+ t.innerHTML='<div class="grid g-kpi"><div class="tile hero"><div class="lab">Current estimate</div><div class="val">'+M(e)+'</div><div class="sub">'+(b?((e-b)>=0?'+':'')+M(e-b)+' ('+pct((e-b)/b,1)+') against '+M(b)+' '+baseLab(p)+(money(p).cmp?'':' – no newer estimate yet'):'No programmed or authorized amount')+'</div></div>'+
  '<div class="tile"><div class="lab">Physical complete</div><div class="val">'+(p.pct!==''?Math.round(N(p.pct))+'%':'–')+'</div><div class="sub">'+(sp?pct(sp.tp)+' of time elapsed':'')+'</div></div>'+
  '<div class="tile"><div class="lab">Forecast completion</div><div class="val" style="font-size:20px">'+(p.forecast_finish||'–')+'</div><div class="sub">'+(sl!=null?(sl>0?sl+' days late':Math.abs(sl)+' days early')+' to baseline':'')+'</div></div>'+
  '<div class="tile"><div class="lab">Obligated / expended</div><div class="val" style="font-size:20px">'+(aw?pct(N(p.obligated)/aw)+' / '+pct(N(p.expended)/aw):'–')+'</div><div class="meter"><b style="width:'+(aw?Math.min(100,N(p.obligated)/aw*100):0)+'%;background:var(--seq250)"></b><b style="width:'+(aw?Math.min(100,N(p.expended)/aw*100):0)+'%"></b></div></div>'+
@@ -708,7 +740,7 @@ function slidesHTML(){const L=filtered();const H=L.map(p=>({p,h:health(p)}));con
  html+='<div class="s"><h1>MILCON Portfolio Status</h1><div class="sub">'+today()+' · '+L.length+' projects · '+M(tv)+'</div><div class="row"><div class="k">On track<b class="g">✓ '+cnt[0]+'</b></div><div class="k">Watch<b class="w">▲ '+cnt[1]+'</b></div><div class="k">Critical<b class="c">■ '+cnt[2]+'</b></div><div class="k">Awarded<b>'+M(L.reduce((s,p)=>s+N(p.award),0))+'</b></div></div><div class="row"><div class="col">'+mapSVG(H).replace(/ data-tip="[^"]*"| tabindex="0"| data-open="[^"]*"/g,'')+'</div><div class="col"><h3>Needs attention</h3>'+H.filter(x=>x.h.overall>0).sort((a,b)=>b.h.overall-a.h.overall).slice(0,8).map(x=>'<p><b class="'+LEVEL[x.h.overall].k+'">'+LEVEL[x.h.overall].i+'</b> '+esc(x.p.name)+' – '+esc(x.h.parts.find(z=>z.l===x.h.overall)?.r||x.p.override.reason||'')+'</p>').join('')+'</div></div><div class="ft"><span>Prepared with PAULA</span><span>1</span></div></div>';
  H.sort((a,b)=>b.h.overall-a.h.overall||value(b.p)-value(a.p)).forEach((x,i)=>{const p=x.p,u=lastUpd(p)||{};const aw=N(p.award);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;
   html+='<div class="s"><h1><span class="'+LEVEL[x.h.overall].k+'">'+LEVEL[x.h.overall].i+'</span> '+esc(p.name)+'</h1><div class="sub">'+esc([p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.contractor].filter(Boolean).join(' · '))+'</div>'+
-  '<div class="row"><div class="k">Estimate<b>'+M(est(p))+'</b><small>'+(base(p)?pct((est(p)-base(p))/base(p),1)+' vs authorized':'')+'</small></div><div class="k">Complete<b>'+(p.pct!==''?Math.round(N(p.pct))+'%':'–')+'</b><div class="bar"><i style="width:'+Math.min(100,N(p.pct))+'%"></i></div></div><div class="k">Forecast completion<b style="font-size:16pt">'+(p.forecast_finish||'–')+'</b><small>'+(sl!=null?(sl>0?sl+' days late':'on or ahead of baseline'):'')+'</small></div><div class="k">Expended<b>'+(aw?pct(N(p.expended)/aw):'–')+'</b><small>'+M(N(p.expended))+' of '+M(aw)+'</small></div></div>'+
+  '<div class="row"><div class="k">Estimate<b>'+M(est(p))+'</b><small>'+(base(p)?pct((est(p)-base(p))/base(p),1)+' vs '+baseLab(p):'')+'</small></div><div class="k">Complete<b>'+(p.pct!==''?Math.round(N(p.pct))+'%':'–')+'</b><div class="bar"><i style="width:'+Math.min(100,N(p.pct))+'%"></i></div></div><div class="k">Forecast completion<b style="font-size:16pt">'+(p.forecast_finish||'–')+'</b><small>'+(sl!=null?(sl>0?sl+' days late':'on or ahead of baseline'):'')+'</small></div><div class="k">Expended<b>'+(aw?pct(N(p.expended)/aw):'–')+'</b><small>'+M(N(p.expended))+' of '+M(aw)+'</small></div></div>'+
   '<div class="row"><div class="col"><h3>Done this period</h3><p>'+esc(u.done||'–')+'</p><h3>Next period</h3><p>'+esc(u.next||'–')+'</p></div><div class="col"><h3>Concerns</h3><p>'+esc(u.concerns||'–')+'</p><h3>Health</h3>'+x.h.parts.filter(z=>z.l>=0).map(z=>'<p><b class="'+LEVEL[z.l].k+'">'+LEVEL[z.l].i+'</b> '+esc(z.dim)+': '+esc(z.r)+'</p>').join('')+(p.decisions?'<h3>Decision needed</h3><p>'+esc(p.decisions)+'</p>':'')+'</div></div><div class="ft"><span>Status as of '+(u.date||'–')+'</span><span>'+(i+2)+'</span></div></div>';});
  return html+'</body></html>';}
 function dataRows(){const h=['Project','Number','Task order','Service','Installation','Country','Phase','FY','PM','Contractor','Programmed','Authorized','Award','CWE','Obligated','Expended','NTP','Baseline completion','Forecast completion','Percent complete','Health','Health reasons','Override','Last update','Construction authority','Programming status','Funding lines','Host-nation funded','Host nation','Host-nation arrangement','Host-nation status','PDI-identified','IPL','UPL','Posture program','Component command'].concat(GATES.map(g=>'Gate: '+g[1])).concat(['Outside dependencies','Priority']);
@@ -936,6 +968,7 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
 const CSVCOLS=['name','number','to','service','installation','country','lat','lon','phase','fy','pm','contractor','delivery','programmed','authorized','award','cwe','obligated','expended','funded','scope_auth','scope_now','scope_unit','ntp','baseline_finish','forecast_finish','pct'];
 function vData(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Data</h2><div class="outs">'+
+ '<div class="card"><h4>Back up every Corbel tool</h4><p>One file with this portfolio’s data from every tool: NORA, EARL, PIPER, SOPHIE, CORA, IRMA, QUINN, PAULA, ADAM and HANK. Save file above keeps PAULA only. Restore it from the Corbel home page.</p><button class="sm go" id="bBakAll">Back up all tools</button></div>'+
  '<div class="card"><h4>Import budget documents</h4><p>A justification book, single DD 1391s or the PDI display as PDF. Each 1391 is read twice and checked against its page before you add it.</p><button class="sm go" id="bImpD2">Open</button></div>'+
  '<div class="card"><h4>Import projects</h4><p>From a spreadsheet saved as CSV, one row per project. Download the template for the columns. Rows matching an existing project number update it.</p><button class="sm" id="bTpl">Template</button> <button class="sm go" id="bImp">Import CSV</button><input type="file" id="fImp" accept=".csv" hidden></div>'+
  '<div class="card"><h4>Merge PM files</h4><p>Each PM keeps a copy and sends the saved file. Merge them here: projects match on project number or ID, and the most recent update wins.</p><button class="sm go" id="bMerge">Choose files</button><input type="file" id="fMerge" accept=".json" multiple hidden></div>'+
@@ -947,6 +980,7 @@ function vData(){const v=$('#view');
  '<div class="panel"><h2>Log</h2><div class="small">'+(P.log.slice().reverse().slice(0,150).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
  v.querySelectorAll('[data-t]').forEach(i=>i.onchange=()=>{P.t[i.dataset.t]=Number(i.value);log('Threshold changed',i.dataset.t+' = '+i.value);save();});$('#me').oninput=e=>{P.me=e.target.value;save();};
  $('#bResetT').onclick=()=>{P.t={...DEF_T};save();vData();};
+ $('#bBakAll').onclick=()=>{if(!window.CorbelPF) return alert('Open PAULA from carlcompliance.com/corbel to back up every tool.');const n=CorbelPF.backup();log('All-tool backup downloaded',n+' tool records');save();};
  $('#bImpD2').onclick=()=>{VIEW='imp';render();window.scrollTo(0,0);};
  $('#bTpl').onclick=()=>dl('PAULA_Project_Template.csv',csv([CSVCOLS]),'text/csv');
  $('#bImp').onclick=()=>$('#fImp').click();$('#fImp').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{const rows=parseCSV(t);const h=rows.shift().map(x=>x.trim().toLowerCase().replace(/\s+/g,'_'));let a=0,u=0;
@@ -989,7 +1023,7 @@ function ipEvidence(sel){const E=[];const add=(src,text)=>{if(text) E.push({id:'
  let p=null,item=null;if(sel.startsWith('i:')&&r){item=r.items.find(i=>i.id===sel.slice(2));if(item) p=pById(item.pid);}else if(sel.startsWith('p:')) p=pById(sel.slice(2));
  if(item){add('Action register',KIND.find(k=>k[0]===item.kind)[1]+' pending: '+item.text+(item.org?'. Owner: '+orgN(item.org):'')+(item.due?'. Due '+fd(item.due)+(regLate(item)?' (late)':''):''));if(item.notes) add('Action register','Notes: '+item.notes);}
  if(p){add('PAULA project record',p.name+' – '+[p.installation,p.service,p.fy?'FY'+p.fy:'','phase '+p.phase+' ('+PHASES[N(p.phase)||1]+')'].filter(Boolean).join(', '));
-  add('PAULA project record','Cost: programmed '+M(N(p.programmed))+(N(p.authorized)?', authorized '+M(N(p.authorized)):'')+(N(p.award)?', awarded '+M(N(p.award)):'')+(est(p)?', current estimate '+M(est(p)):''));
+  add('PAULA project record','Programming status: '+(PROGN(progOf(p))==='Not set'?'not set':PROGN(progOf(p)))+(isAuth(p)?'':' (not authorized)')+'. Cost: programmed '+M(N(p.programmed))+(N(p.authorized)&&isAuth(p)?', authorized '+M(N(p.authorized)):'')+(N(p.award)?', awarded '+M(N(p.award)):'')+(est(p)?', current estimate '+M(est(p)):''));
   if(p.forecast_finish) add('PAULA project record','Forecast completion '+fd(p.forecast_finish)+(p.baseline_finish?' against a baseline of '+fd(p.baseline_finish):''));
   const h=health(p);add('PAULA health engine','Health '+LEVEL[h.overall].n+(h.parts.filter(z=>z.l>0).length?': '+h.parts.filter(z=>z.l>0).map(z=>z.dim+' – '+z.r).join('; '):''));
   const sp=stP(p);if(sp&&sp.tools){const n=sp.tools.nora;if(n){add('NORA',n.need_statement);(n.gaps||[]).slice(0,3).forEach(g=>add('NORA','Gap – '+[g.area,g.current&&'has '+g.current,g.required&&'needs '+g.required,g.impact].filter(Boolean).join('; ')));}
@@ -1004,6 +1038,7 @@ function ipEvidence(sel){const E=[];const add=(src,text)=>{if(text) E.push({id:'
   const u=lastUpd(p);if(u&&u.concerns) add('Status update '+fd(u.date),'Concerns: '+u.concerns);}
  const ctx=($('#ipCtx')||{}).value;if(ctx&&ctx.trim()) add('You',ctx.trim());return {E,p,item};}
 const IP_SYS=`You draft an issue paper with courses of action for senior military construction leaders. The writer advises; the decision belongs to leadership. Use ONLY the EVIDENCE. Every fact must cite the evidence IDs it comes from. Anything not in the evidence is an assumption and goes in assumptions. Give 2 to 4 distinct, realistic courses of action (include doing nothing or deferring when it is a real option), each with advantages, disadvantages, and cost, schedule and risk effects stated from the evidence or marked as unknown. State every figure exactly as it appears in the evidence. Plain language, short sentences. No references to AI.
+Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 Return ONLY JSON: {"title":"…","issue":"one or two sentences","bluf":"recommendation in one or two sentences","background":"short paragraph","facts":[{"text":"…","ev":["E1"]}],"assumptions":["…"],"coas":[{"name":"COA 1: …","summary":"…","pros":["…"],"cons":["…"],"cost":"…","schedule":"…","risk":"…"}],"recommend":{"coa":"COA 1","why":"…"},"decision":"the decision requested of leadership","coordination":["organization – what they must do or agree"]}`;
 function ipSources(){const r=P.reg?REG():null;const L=filtered();return (r?regOpen().filter(i=>i.kind==='decision').map(i=>['i:'+i.id,'Decision: '+i.text.slice(0,90)]):[]).concat(L.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>['p:'+p.id,'Project: '+p.name+(p.installation?' – '+p.installation:'')]));}
 function ipPanel(){const pp=P.paper;return '<div class="panel"><h2>Issue paper with courses of action</h2><p class="lead">Pick a pending decision or a project. PAULA gathers the evidence from every tool – requirement, alternatives, cost, funding, sequence, ranking, risks and open actions – and drafts an issue paper with courses of action and a recommendation. Every fact is tied to its source; anything else is listed as an assumption.</p>'+
@@ -1025,7 +1060,7 @@ async function ipDraft(){const sel=$('#ipSel').value;if(!sel) return $('#ipSel')
  catch(e){m.textContent='Could not draft the paper: '+e.message;$('#ipGo').disabled=false;}}
 function ipCheck(d,E,ev){const c=[];const ids=new Set(E.map(e=>e.id));(d.facts||[]).forEach(f=>{const bad=(f.ev||[]).filter(x=>!ids.has(x));if(!(f.ev||[]).length||bad.length) c.push('Fact without valid evidence: “'+String(f.text).slice(0,90)+'”');});
  const all=[d.issue,d.bluf,d.background,(d.facts||[]).map(f=>f.text).join(' '),(d.coas||[]).map(x=>[x.summary,x.cost,x.schedule,x.risk].concat(x.pros||[],x.cons||[]).join(' ')).join(' '),(d.recommend||{}).why,d.decision].join(' ');
- const nb=numBadW(all.replace(/\bCOA\s*\d+/gi,'COA'),ev+' '+(d.assumptions||[]).join(' '));if(nb.length) c.push('Figures not in the evidence: '+nb.join(', '));if(!(d.coas||[]).length) c.push('No courses of action');return c;}
+ const nb=numBadW(all.replace(/\bCOA\s*\d+/gi,'COA'),ev+' '+(d.assumptions||[]).join(' '));if(nb.length) c.push('Figures not in the evidence: '+nb.join(', '));if(!(d.coas||[]).length) c.push('No courses of action');statusBad(all,filtered()).forEach(x=>c.push(x));return c;}
 function ipDoc(pp){const d=pp.doc;const srcOf=ids=>[...new Set((ids||[]).map(i=>(pp.E.find(e=>e.id===i)||{}).src).filter(Boolean))].join(', ');
  let b=cdBand('Issue paper',d.title||'Issue paper',fd(pp.date)+(P.me?'  ·  '+P.me:'')+'  ·  For decision');
  b+=cdH('Issue')+cdP(esc(d.issue||''))+cdH('Bottom line')+cdP(esc(d.bluf||''));
@@ -1350,6 +1385,7 @@ function vSeq(){const v=$('#view');const I=depIssues();const iss=I.filter(x=>x.l
 // A project can't start before the projects it needs are finished. An outside dependency (utility capacity, a permit, labor)
 // that arrives after the date the project needs it pushes the project's finish by the difference.
 const SEQ_DUR=730;
+let _cpm=null,_cpmT=0;function cpmC(){if(!_cpm||Date.now()-_cpmT>400){_cpm=cpm();_cpmT=Date.now();}return _cpm;}
 function cpm(){const memo={},vis=new Set();
  const go=p=>{if(!p) return null;if(memo[p.id]) return memo[p.id];if(vis.has(p.id)) return null;vis.add(p.id);
   const S0=startOf(p),F0=finishOf(p);if(!S0&&!F0) return memo[p.id]={s:'',f:'',pf:'',slip:0,why:[],est:true};
@@ -1715,6 +1751,7 @@ function suiteFacts(p){const since=(lastUpd(p)||{}).date||addD(today(),-14);cons
  if(P.reg) regOpen().filter(i=>i.pid===p.id&&regLate(i)).forEach(i=>{F2.con.push('Late: '+i.text+' ('+(orgN(i.org)||'no owner')+', due '+fd(i.due)+').');F2.src.add('actions');});
  return F2;}
 const UPD_SYS=`You draft a construction project's biweekly status update for a program manager. Three short fields in plain language, one to three sentences each: what was done this period, what is next, and concerns or help needed. Use ONLY facts in FACTS and state figures exactly as given. If a field has no facts, write "Nothing reported." No references to AI.
+Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 Return ONLY JSON: {"done":"…","next":"…","concerns":"…"}`;
 function fillDraft(p){const F2=suiteFacts(p);const src=[...F2.src];const d=p.draft&&p.draft.date===today()?p.draft:{done:F2.done.join(' '),next:F2.next.join(' '),concerns:F2.con.join(' '),ai:false};
  [['u_done','done'],['u_next','next'],['u_con','concerns']].forEach(([id,k])=>{const el=$('#'+id);if(el&&!el.value) el.value=d[k]||'';});
@@ -1769,7 +1806,7 @@ function pagesDoc(){const L=filtered();const H=L.map(p=>({p,h:health(p)})).sort(
  pages.push(b+cdFoot('Prepared with Corbel PAULA  ·  page 1'));
  H.forEach((x,i)=>{const p=x.p,u=lastUpd(p)||{};const aw=N(p.award);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;
   let c=cdBand('Project status',(p.name||'(untitled)')+'  ('+LEVEL[x.h.overall].n+')',[p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.contractor].filter(Boolean).join('  ·  '));
-  c+=kTiles([['Health',hlD(x.h.overall)],['Estimate',M(est(p))+(base(p)?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+pct((est(p)-base(p))/base(p),1)+' vs authorized</span>':'')],['Complete',p.pct!==''?Math.round(N(p.pct))+'%':'–'],['Forecast completion',p.forecast_finish?fd(p.forecast_finish)+(sl!=null?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+(sl>0?sl+' days late':'on or ahead of baseline')+'</span>':''):'–'],['Expended',aw?pct(N(p.expended)/aw):'–']]);
+  c+=kTiles([['Health',hlD(x.h.overall)],['Estimate',M(est(p))+(base(p)?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+pct((est(p)-base(p))/base(p),1)+' vs '+baseLab(p)+'</span>':'')],['Complete',p.pct!==''?Math.round(N(p.pct))+'%':'–'],['Forecast completion',p.forecast_finish?fd(p.forecast_finish)+(sl!=null?'<br><span style="font-size:8pt;color:'+CD.mute+'">'+(sl>0?sl+' days late':'on or ahead of baseline')+'</span>':''):'–'],['Expended',aw?pct(N(p.expended)/aw):'–']]);
   c+=cdTable(['Done this period','Next period','Concerns'],[[esc(u.done||'–'),esc(u.next||'–'),esc(u.concerns||'–')]],['34%','33%','33%']);
   c+=cdH('Health')+cdTable(['Measure','Rating','Reason'],x.h.parts.filter(z=>z.l>=0).map(z=>[esc(z.dim),hlD(z.l),esc(z.r)]));
   if(p.decisions) c+=cdH('Decision needed')+cdP(esc(p.decisions));
