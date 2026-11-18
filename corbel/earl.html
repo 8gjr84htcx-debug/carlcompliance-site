@@ -155,7 +155,6 @@
 })();
 </script>
 
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>EARL – Economic Analysis and Recommendation Ledger</title>
@@ -690,7 +689,7 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
  const fac=p.fac!=null&&p.fac!==''?PD_.fac[Number(p.fac)]:null;
  if(mode==='build'&&(p.guc==null||p.guc==='')&&fac&&fac[3]&&Number(p.qty)){const q=Number(p.qty);
   // Infrastructure (fuel, piers, pavement, utility lines) has no UFS 3-730-01 Table 2 type: price it from the UFS 3-701-01 replacement unit cost for its FAC.
-  p.prv=fac[3];p.fac_code=fac[0];p.fac_name=fac[1];const ce=escF_(by,bm)/escF_(2026,4);const sup=Number(p.sup)||0;const base=q*fac[3]*L.acf*ce+sup;const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*(p.med?0.13:0.09);
+  p.prv=fac[3];p.fac_code=fac[0];p.fac_name=fac[1];p.fac_unit=fac[2];const ce=escF_(by,bm)/escF_(2026,4);const sup=Number(p.sup)||0;const base=q*fac[3]*L.acf*ce+sup;const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*(p.med?0.13:0.09);
   out.lines.push({cat:'design',label:'Planning and design, factor '+(p.med?'1.13':'1.09')+' (UFS 3-701-01 Eq 3-1)',amount:Math.round(des),start:1,end:''});
   out.lines.push({cat:'construction',label:'UFS 3-701-01 replacement unit cost: FAC '+fac[0]+' '+fac[1]+' '+$$(fac[3],2)+'/'+fac[2]+' × ACF '+L.acf+' × escalation '+ce.toFixed(3)+' × '+q.toLocaleString()+' '+fac[2]+(sup?' + supporting '+$$(sup):''),amount:Math.round(base/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
   out.lines.push({cat:'contingency',label:'Contingency 5% (UFS 3-730-01)',amount:Math.round(cont/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
@@ -713,7 +712,7 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
  if(mode==='renew'){const q=Number(p.qty)||0,sh=Number(p.share)||0;
   if(!fac||!q||!sh) out.notes.push('Pick the facility type (FAC), its size, and the share of the building being renewed.');
   else if(!fac[3]) out.notes.push('The pricing guide has no replacement value for FAC '+fac[0]+'. Enter costs by hand.');
-  else{p.prv=fac[3];p.fac_code=fac[0];p.fac_name=fac[1];const ce=escF_(by,bm)/escF_(2026,4);const base=q*fac[3]*L.acf*ce*(sh/100);const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*0.09;
+  else{p.prv=fac[3];p.fac_code=fac[0];p.fac_name=fac[1];p.fac_unit=fac[2];const ce=escF_(by,bm)/escF_(2026,4);const base=q*fac[3]*L.acf*ce*(sh/100);const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*0.09;
    out.lines.push({cat:'design',label:'Planning and design, factor 1.09 (UFS 3-701-01 Eq 3-1)',amount:Math.round(des),start:1,end:''});
    out.lines.push({cat:'construction',label:'UFS 3-701-01 PRV: FAC '+fac[0]+' '+$$(fac[3],2)+'/'+fac[2]+' × ACF '+L.acf+' × escalation '+ce.toFixed(3)+' × '+q.toLocaleString()+' '+fac[2]+' × '+sh+'% renewed',amount:Math.round(base/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
    out.lines.push({cat:'contingency',label:'Contingency 5%',amount:Math.round(cont/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
