@@ -37,6 +37,65 @@
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
+<script id="corbel-dt">/* Corbel dates: one date record per project, read the same way by every tool.
+   PAULA owns award, notice to proceed and the forecast; HANK owns the turnover actuals.
+   An actual date always beats a forecast. Where two tools disagree, both values are kept and flagged. */
+(function(){
+ if(window.CorbelDates) return;
+ var ORDER=[['v1391','1391 validated'],['award','Contract award'],['ntp','Notice to proceed'],['subst','Substantial completion'],['pis','Placed in service'],['final','Final acceptance'],['closeout','Financial close-out']];
+ var NAME={};ORDER.forEach(function(o){NAME[o[0]]=o[1];});NAME.possession='Government possession of part of the work';
+ var MS={v1391:'1391 validated',award:'Contract award',ntp:'Notice to proceed',pis:'Beneficial occupancy'};
+ var HK=['subst','possession','pis','final','closeout'];
+ var ISO=/^\d{4}-\d{2}-\d{2}/;
+ function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+ var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ function fd(s){if(!s) return '';var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?(+m[3])+' '+MON[+m[2]-1]+' '+m[1]:s;}
+ function load(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function hank(){return load('hank_portfolio')||{};}
+ function item(pid,H){return ((H||hank()).items||{})[pid]||null;}
+ // Every recorded value for each date, with where it came from. The owning tool's value is listed first.
+ function cands(p,H){var it=item(p.id,H)||{},d=it.dates||{},out={};
+  function add(k,date,src,own){if(!ISO.test(date||'')) return;(out[k]=out[k]||[]).push({date:String(date).slice(0,10),src:src,own:own});}
+  add('ntp',p.ntp,'PAULA project data','f:ntp');
+  HK.forEach(function(k){add(k,d[k],'HANK turnover dates','h:'+k);});
+  Object.keys(MS).forEach(function(k){var m=(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&m.actual) add(k,m.actual,'PAULA milestone “'+MS[k]+'”','m:'+MS[k]);});
+  return out;}
+ function read(p,H){H=H||hank();var c=cands(p,H),v={},conf=[];
+  Object.keys(c).forEach(function(k){var L=c[k];v[k]={date:L[0].date,src:L[0].src,n:NAME[k]};var u={};L.forEach(function(x){u[x.date]=1;});if(Object.keys(u).length>1) conf.push({k:k,n:NAME[k],vals:L});});
+  return {v:v,conf:conf};}
+ // The completion date every tool should use: an actual beats a projection, which beats the forecast.
+ function finish(p,H){var r=read(p,H).v;
+  if(r.subst) return {date:r.subst.date,kind:'actual',src:'Substantial completion, from HANK'};
+  if(r.pis) return {date:r.pis.date,kind:'actual',src:'Placed in service, from '+(r.pis.src.indexOf('HANK')===0?'HANK':'PAULA')};
+  if(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')) return {date:p.seq.finish,kind:'projected',src:'PAULA projected completion'};
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast'};
+  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish,kind:'baseline',src:'PAULA baseline'};
+  return null;}
+ // Dates that cannot all be true.
+ function check(p,H){H=H||hank();var R=read(p,H),v=R.v,out=[],t=today(),ph=+p.phase||0;
+  R.conf.forEach(function(c){out.push({k:c.k,kind:'conflict',text:c.n+' is recorded twice: '+c.vals.map(function(x){return fd(x.date)+' ('+x.src+')';}).join(' and '),vals:c.vals});});
+  var prev=null;ORDER.forEach(function(o){var x=v[o[0]];if(!x) return;if(prev&&x.date<prev.d) out.push({k:o[0],kind:'order',text:o[1]+' ('+fd(x.date)+') is before '+prev.n.toLowerCase()+' ('+fd(prev.d)+')'});if(!prev||x.date>prev.d) prev={d:x.date,n:o[1]};});
+  if(v.possession&&v.ntp&&v.possession.date<v.ntp.date) out.push({k:'possession',kind:'order',text:'Possession of part of the work ('+fd(v.possession.date)+') is before notice to proceed ('+fd(v.ntp.date)+')'});
+  Object.keys(v).forEach(function(k){if(v[k].date>t) out.push({k:k,kind:'future',text:NAME[k]+' is recorded as done on '+fd(v[k].date)+', which is still in the future'});});
+  var start=v.ntp&&v.ntp.date;
+  if(start&&ISO.test(p.forecast_finish||'')&&p.forecast_finish<start&&!v.subst) out.push({k:'forecast',kind:'order',text:'Forecast completion ('+fd(p.forecast_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(start&&ISO.test(p.baseline_finish||'')&&p.baseline_finish<start) out.push({k:'baseline',kind:'order',text:'Baseline completion ('+fd(p.baseline_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(ph>=8&&!v.subst&&!v.pis) out.push({k:'phase',kind:'phase',text:'The project is in close-out but has no substantial completion or placed-in-service date'});
+  if(ph&&ph<7&&(v.subst||v.pis)) out.push({k:'phase',kind:'phase',text:'Turnover dates are recorded, but the project is still at phase '+ph});
+  if(ph&&ph<6&&(v.ntp||v.award)&&!(+p.award>0)) out.push({k:'phase',kind:'phase',text:(v.ntp?'Notice to proceed':'Contract award')+' is recorded, but the project is still at phase '+ph});
+  return out;}
+ // Settle a conflict: write the chosen date to every place that holds a value for it.
+ // mem.paula / mem.hank are the calling tool's live objects; the other store is updated in this browser.
+ function pick(pid,k,date,mem){mem=mem||{};var PA=mem.paula||load('paula_project'),HA=mem.hank||load('hank_portfolio'),ch=[];
+  var p=PA&&(PA.projects||[]).filter(function(x){return x.id===pid;})[0];
+  if(p){if(k==='ntp'&&p.ntp!==date){p.ntp=date;ch.push('PAULA project data');}
+   var m=MS[k]&&(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&(m.actual||k==='ntp')&&m.actual!==date){m.actual=date;ch.push('PAULA milestone');}}
+  var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
+  try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
+  return ch;}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+})();
+</script>
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -369,6 +428,10 @@ function isAuth(p){if(p.prog_status&&EARLY.includes(p.prog_status)) return false
 const value=p=>money(p).tot||N(p.cwe)||N(p.award)||N(p.authorized)||N(p.programmed);
 function lastUpd(p){return p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date)).pop();}
 function spi(p,asOf){if(!p.ntp||!p.baseline_finish||p.pct==='') return null;const tot=dd(p.ntp,p.baseline_finish);const el=dd(p.ntp,asOf||today());if(tot<=0||el<=0) return null;const tp=Math.min(1,el/tot);if(tp<.1) return null;return {spi:(N(p.pct)/100)/tp,tp};}
+// One date record (shared with HANK and ADAM): an actual completion beats the forecast.
+function ffOf(p,asOf){const D=window.CorbelDates;if(D){const f=D.finish(p);if(f&&f.kind==='actual'&&(!asOf||f.date<=asOf)) return f.date;}return p.forecast_finish||'';}
+function ffAct(p){const D=window.CorbelDates;const f=D&&D.finish(p);return f&&f.kind==='actual'?f:null;}
+function dIss(p){return window.CorbelDates?CorbelDates.check(p):[];}
 function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(dim,l,r)=>parts.push({dim,l,r});
  const MN=money(p),b=base(p),e=est(p),hasE=MN.cmp,A=authConflict(p)?0:N(p.authorized);
  if(authConflict(p)) add('Legal authority',1,'An authorized amount ('+M(N(p.authorized))+') is recorded but the programming status is '+PROGN(p.prog_status)+'; confirm which is right before anyone briefs it');
@@ -394,7 +457,7 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  if(b&&hasE){const g=(e-b)/b;const on=' on the '+M(b)+' '+baseLab(p)+' (contract estimate against the '+MN.basis+', the rest of the request carried over)';
   if(g*100>T.costCrit) add('Cost',2,'Up '+pct(g,1)+on);else if(g*100>T.costWatch) add('Cost',1,'Up '+pct(g,1)+on);else add('Cost',0,(g>=0?'Up ':'Down ')+pct(Math.abs(g),1)+on);}
  else add('Cost',-1,b?'No newer contract estimate than the 1391 yet':'No programmed or authorized amount yet');
- if(N(p.phase)>=7&&p.baseline_finish&&p.forecast_finish){const s=dd(p.baseline_finish,p.forecast_finish);const sp=spi(p,now);let l=s>T.slipCrit?2:s>T.slipWatch?1:0;let r=s>0?s+' days late to baseline':'On or ahead of baseline';
+ const FF=ffOf(p,asOf),FA=!!ffAct(p)&&FF===ffAct(p).date;if(N(p.phase)>=7&&p.baseline_finish&&FF){const s=dd(p.baseline_finish,FF);const sp=FA?null:spi(p,now);let l=s>T.slipCrit?2:s>T.slipWatch?1:0;let r=(FA?'Finished ':'')+(s>0?s+' days late to baseline':'On or ahead of baseline')+(FA?' (actual completion '+fd(FF)+', from HANK)':'');
   if(sp&&N(p.phase)===7){const l2=sp.spi<T.spiCrit?2:sp.spi<T.spiWatch?1:0;if(l2>l){l=l2;}r+='; '+Math.round(N(p.pct))+'% complete at '+pct(sp.tp)+' of time';}add('Schedule',l,r);}
  else{const late=p.milestones.filter(m=>!m.actual&&(m.forecast||m.baseline)&&dd(m.baseline||m.forecast,now)>0);const worst=late.reduce((x,m)=>Math.max(x,dd(m.baseline||m.forecast,now)),0);
   add('Schedule',late.length?(worst>60?2:1):(p.milestones.length?0:-1),late.length?late.length+' milestone'+(late.length>1?'s':'')+' past due, worst '+worst+' days':(p.milestones.length?'Milestones on time':'No milestones recorded'));}
@@ -405,6 +468,7 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  if(typeof cpmC==='function'){const C=cpmC(),c=C[p.id];const xr=(p.ext||[]).filter(x=>(x.status||'open')==='risk'&&!x.expect);
   if(c&&c.slip>0){const mo_=Math.round(c.slip/30.4);add('Projected finish',c.slip>T.slipCrit?2:1,mo_+' month'+(mo_===1?'':'s')+' past the forecast once dependencies are counted: '+chainOf(p.id,C).join(' → '));}
   else if(xr.length) add('Projected finish',1,xr.length+' outside dependenc'+(xr.length>1?'ies':'y')+' at risk with no date from the provider');}
+ if(!asOf){const di=dIss(p);if(di.length) add('Dates',1,'Dates don’t add up: '+di[0].text+(di.length>1?' (and '+(di.length-1)+' more)':''));}
  const lu=lastUpd(p);const stale=!lu||dd(lu.date,today())>T.stale;
  let overall=parts.reduce((x,y)=>Math.max(x,y.l),-1);if(overall<0) overall=0;let ov=false;
  if(p.override&&p.override.level!==''){overall=N(p.override.level);ov=true;}
@@ -434,12 +498,12 @@ function coaExec(d,subj){const out=[];const L=filtered();(d.coas||[]).forEach(c=
   if(EXNO.test(String(c.name||'')+' '+String(c.summary||'').slice(0,80))&&!/\b(fund|award|execut)\w*\b[^.]{0,40}\b(now|immediately)\b/i.test(t)) return;
   ps.forEach(p=>{const x=execOf(p);if(!x) return;if(EXV.test(t)&&!EXOK.test(t)) out.push({coa:String(c.name||'').replace(/:.*$/,'').trim()||String(c.name||''),full:c.name,p,why:x.why});});});return out;}
 function numBad(t,src){const S=String(src).replace(/,/g,'');return [...new Set((String(t).match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
-function projFacts(p,h){const L=[].concat(execFacts(p));const b=base(p),e=est(p);const U=p.updates.slice().sort((a,c)=>a.date.localeCompare(c.date));const u=U[U.length-1];const ir=irmaFor(p),q=quinnFor(p);
+function projFacts(p,h){const L=[].concat(execFacts(p)).concat(dIss(p).map(x=>'DATE PROBLEM: '+x.text));const b=base(p),e=est(p);const U=p.updates.slice().sort((a,c)=>a.date.localeCompare(c.date));const u=U[U.length-1];const ir=irmaFor(p),q=quinnFor(p);
  L.push('PROJECT: '+[p.name,p.number,p.to&&('task order '+p.to),p.installation,p.service,'phase '+p.phase+' '+PHASES[p.phase],p.contractor&&('contractor '+p.contractor)].filter(Boolean).join('; '));
  L.push('HEALTH: '+LEVEL[h.overall].n+(h.override?' (override: '+p.override.reason+')':''));h.parts.forEach(z=>L.push('  '+z.dim+': '+(z.l<0?'not assessed':LEVEL[z.l].n)+' – '+z.r));
  L.push('PROGRAMMING STATUS: '+(PROGN(progOf(p))==='Not set'?'not set':PROGN(progOf(p)))+(isAuth(p)?'':' (NOT authorized: never call this project or its amount authorized)'));
  L.push('MONEY: '+baseLab(p)+' '+M(b)+', current total estimate on the same basis '+M(e)+', award '+M(N(p.award))+', obligated '+M(N(p.obligated))+', expended '+M(N(p.expended)));
- L.push('SCHEDULE: NTP '+(p.ntp||'–')+', baseline finish '+(p.baseline_finish||'–')+', forecast finish '+(p.forecast_finish||'–')+', '+(p.pct!==''?Math.round(N(p.pct))+'% complete':'percent complete not reported'));
+ L.push('SCHEDULE: NTP '+(p.ntp||'–')+', baseline finish '+(p.baseline_finish||'–')+', '+(ffAct(p)?'actual completion '+ffAct(p).date+' ('+ffAct(p).src+')':'forecast finish '+(p.forecast_finish||'–'))+', '+(p.pct!==''?Math.round(N(p.pct))+'% complete':'percent complete not reported'));
  if(u) L.push('LATEST UPDATE '+u.date+': done: '+(u.done||'')+' | next: '+(u.next||'')+' | concerns: '+(u.concerns||'none'));
  p.risks.filter(r=>r.status!=='closed').forEach(r=>L.push('OPEN RISK (score '+N(r.l)*N(r.i)+'): '+r.text+(r.response?'; response: '+r.response:'')));
  p.milestones.filter(m=>!m.actual).forEach(m=>L.push('MILESTONE: '+m.name+' baseline '+(m.baseline||'–')+' forecast '+(m.forecast||'–')));
@@ -638,11 +702,11 @@ function vOne(){const p=CUR;if(!p){VIEW='proj';return render();}const v=$('#view
  '<div class="tabs2">'+[['ov','Overview'],['edit','Project data'],['prog','Programming'],['ms','Milestones'],['risk','Risks'],['hist','Updates']].map(([k,t])=>'<button data-t="'+k+'" class="'+(PTAB===k?'on':'')+'">'+t+'</button>').join('')+'<button id="bUp" class="go" style="margin-left:auto">New status update</button></div><div id="pt"></div>';
  v.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{PTAB=b.dataset.t;vOne();});$('#bUp').onclick=()=>{VIEW='upd';UPD=p.id;render();};
  ({ov:pOv,edit:pEdit,prog:pProg,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);const bx=document.getElementById('bAIx');if(bx) bx.onclick=()=>aiExplain(p);}
-function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const sp=spi(p);const sl=p.baseline_finish&&p.forecast_finish?dd(p.baseline_finish,p.forecast_finish):null;const ir=irmaFor(p),q=quinnFor(p);
+function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const sp=spi(p);const FA=ffAct(p),FF=ffOf(p);const sl=p.baseline_finish&&FF?dd(p.baseline_finish,FF):null;const ir=irmaFor(p),q=quinnFor(p);
  const U=p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date));
  t.innerHTML='<div class="grid g-kpi"><div class="tile hero"><div class="lab">Current estimate</div><div class="val">'+M(e)+'</div><div class="sub">'+(b?((e-b)>=0?'+':'')+M(e-b)+' ('+pct((e-b)/b,1)+') against '+M(b)+' '+baseLab(p)+(money(p).cmp?'':' – no newer estimate yet'):'No programmed or authorized amount')+'</div></div>'+
  '<div class="tile"><div class="lab">Physical complete</div><div class="val">'+(p.pct!==''?Math.round(N(p.pct))+'%':'–')+'</div><div class="sub">'+(sp?pct(sp.tp)+' of time elapsed':'')+'</div></div>'+
- '<div class="tile"><div class="lab">Forecast completion</div><div class="val" style="font-size:20px">'+(p.forecast_finish||'–')+'</div><div class="sub">'+(sl!=null?(sl>0?sl+' days late':Math.abs(sl)+' days early')+' to baseline':'')+'</div></div>'+
+ '<div class="tile"><div class="lab">'+(FA?'Completed':'Forecast completion')+'</div><div class="val" style="font-size:20px">'+(FF||'–')+'</div><div class="sub">'+(sl!=null?(sl>0?sl+' days late':Math.abs(sl)+' days early')+' to baseline':'')+(FA?'<br>'+esc(FA.src):'')+'</div></div>'+
  '<div class="tile"><div class="lab">Obligated / expended</div><div class="val" style="font-size:20px">'+(aw?pct(N(p.obligated)/aw)+' / '+pct(N(p.expended)/aw):'–')+'</div><div class="meter"><b style="width:'+(aw?Math.min(100,N(p.obligated)/aw*100):0)+'%;background:var(--seq250)"></b><b style="width:'+(aw?Math.min(100,N(p.expended)/aw*100):0)+'%"></b></div></div>'+
  '<div class="tile"><div class="lab">RFIs and submittals</div><div class="val">'+(ir?ir.overdue:'–')+'</div><div class="sub">'+(ir?'past suspense of '+ir.open+' open (IRMA)':'Set the task order to link IRMA')+'</div></div>'+
  '<div class="tile"><div class="lab">Deficiencies</div><div class="val">'+(q?q.open:'–')+'</div><div class="sub">'+(q?q.aged+' open over 30 days · last inspection '+(q.last||'–')+' (QUINN)':'Set the task order to link QUINN')+'</div></div></div>'+
@@ -674,13 +738,19 @@ function pEdit(p){const t=$('#pt');
  '<div class="wide"><label class="f">Decisions needed from leadership</label><textarea data-k="decisions"></textarea></div>'+
  '<div><label class="f">Health override</label><select id="ovl"><option value="">None – use the health engine</option>'+LEVEL.map((L,i)=>'<option value="'+i+'" '+(String(p.override.level)===String(i)?'selected':'')+'>'+L.n+'</option>').join('')+'</select></div><div class="wide"><label class="f">Override reason (required, shown everywhere the health appears)</label><input id="ovr" value="'+esc(p.override.reason)+'"></div></div>'+
  '<div class="row"><button id="bDel">Delete project</button></div></div>';
- t.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;el.value=p[k]??'';el.oninput=el.onchange=()=>{p[k]=k==='phase'?N(el.value):el.value;if(k==='installation'&&!p.lat&&!p.lon){const g=locate(p.installation);if(g&&!p.country) p.country=g[2];}save();renderSteps();};});
+ t.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;el.value=p[k]??'';el.oninput=el.onchange=()=>{p[k]=k==='phase'?N(el.value):el.value;if(k==='ntp'){const m=p.milestones.find(x=>x.name==='Notice to proceed');if(m) m.actual=el.value;}if(k==='installation'&&!p.lat&&!p.lon){const g=locate(p.installation);if(g&&!p.country) p.country=g[2];}save();renderSteps();};});
  $('#ovl').onchange=e=>{if(e.target.value!==''&&!$('#ovr').value.trim()){alert('Give a reason for the override first.');e.target.value=p.override.level;return;}p.override.level=e.target.value;log('Health override',p.name+': '+(e.target.value===''?'cleared':LEVEL[e.target.value].n+' – '+p.override.reason));save();vOne();};
  $('#ovr').oninput=e=>{p.override.reason=e.target.value;save();};
  $('#bDel').onclick=()=>{if(!confirm('Delete '+(p.name||'this project')+' and all its updates? This cannot be undone.')) return;P.projects=P.projects.filter(x=>x!==p);log('Project deleted',p.name);CUR=null;VIEW='proj';save();render();};}
-function pMs(p){const t=$('#pt');
- t.innerHTML='<div class="panel"><p class="lead">Gates and key milestones. Before award these drive schedule health; after award the completion dates do.</p><table><thead><tr><th>Milestone</th><th>Baseline</th><th>Forecast</th><th>Actual</th><th></th></tr></thead><tbody id="mb"></tbody></table><div class="row"><button class="go" id="bAddM">Add milestone</button><button id="bStdM">Add standard MILCON milestones</button></div></div>';
- const tb=$('#mb');p.milestones.forEach(m=>{const tr=document.createElement('tr');tr.innerHTML='<td><input data-k="name"></td><td><input type="date" data-k="baseline"></td><td><input type="date" data-k="forecast"></td><td><input type="date" data-k="actual"></td><td><button class="sm" data-del>Remove</button></td>';tr.querySelectorAll('[data-k]').forEach(el=>{el.value=m[el.dataset.k]||'';el.onchange=el.oninput=()=>{m[el.dataset.k]=el.value;save();};});tr.querySelector('[data-del]').onclick=()=>{p.milestones=p.milestones.filter(x=>x!==m);save();pMs(p);};tb.appendChild(tr);});
+function datePanel(p){const D=window.CorbelDates;if(!D) return '';const R=D.read(p).v,I=D.check(p),fa=D.finish(p);
+ return '<div class="panel"><h3 style="margin-top:0">Key dates – one record with HANK and ADAM</h3><p class="small">PAULA owns award, notice to proceed and the forecast; HANK owns the turnover dates. An actual date beats a forecast everywhere.</p>'+
+  '<table class="ptable"><thead><tr><th>Date</th><th>Recorded</th><th>Source</th></tr></thead><tbody>'+D.ORDER.map(([k,n])=>'<tr><td>'+n+'</td><td>'+(R[k]?fd(R[k].date):'<span class="small">–</span>')+'</td><td class="small">'+(R[k]?esc(R[k].src):'')+'</td></tr>').join('')+
+  '<tr><td><b>Completion used by every tool</b></td><td><b>'+(fa?fd(fa.date):'–')+'</b></td><td class="small">'+(fa?esc(fa.src):'')+'</td></tr></tbody></table>'+
+  (I.length?'<div class="find" style="border-left:4px solid var(--watch);padding:8px 10px;margin-top:10px"><b>Dates don’t add up</b>'+I.map(x=>'<div style="margin-top:6px">'+esc(x.text)+(x.kind==='conflict'?'<div class="row" style="gap:6px;margin-top:4px">'+[...new Map(x.vals.map(v=>[v.date,v])).values()].map(v=>'<button class="sm" data-dpick="'+x.k+'|'+v.date+'">Use '+esc(fd(v.date))+' ('+esc(v.src)+')</button>').join('')+'</div>':'')+'</div>').join('')+'</div>':'<p class="small" style="margin-top:8px">✓ The dates are in order and every tool agrees.</p>')+'</div>';}
+function pMs(p){const t=$('#pt');t.dataset.ni=dIss(p).length;
+ t.innerHTML=datePanel(p)+'<div class="panel"><p class="lead">Gates and key milestones. Before award these drive schedule health; after award the completion dates do.</p><table><thead><tr><th>Milestone</th><th>Baseline</th><th>Forecast</th><th>Actual</th><th></th></tr></thead><tbody id="mb"></tbody></table><div class="row"><button class="go" id="bAddM">Add milestone</button><button id="bStdM">Add standard MILCON milestones</button></div></div>';
+ const tb=$('#mb');p.milestones.forEach(m=>{const tr=document.createElement('tr');tr.innerHTML='<td><input data-k="name"></td><td><input type="date" data-k="baseline"></td><td><input type="date" data-k="forecast"></td><td><input type="date" data-k="actual"></td><td><button class="sm" data-del>Remove</button></td>';tr.querySelectorAll('[data-k]').forEach(el=>{el.value=m[el.dataset.k]||'';el.onchange=el.oninput=()=>{m[el.dataset.k]=el.value;if(el.dataset.k==='actual'&&m.name==='Notice to proceed') p.ntp=el.value;save();};el.addEventListener('change',()=>{if(el.dataset.k==='actual'&&dIss(p).length!==(t.dataset.ni|0)) pMs(p);});});tr.querySelector('[data-del]').onclick=()=>{p.milestones=p.milestones.filter(x=>x!==m);save();pMs(p);};tb.appendChild(tr);});
+ t.querySelectorAll('[data-dpick]').forEach(b=>b.onclick=()=>{const [k,d]=b.dataset.dpick.split('|');const ch=CorbelDates.pick(p.id,k,d,{paula:P});log('Date settled',p.name+': '+CorbelDates.NAME[k]+' '+d+(ch.length?' ('+ch.join(', ')+')':''));save();pMs(p);});
  $('#bAddM').onclick=()=>{p.milestones.push({id:uid(),name:'',baseline:'',forecast:'',actual:''});save();pMs(p);};
  $('#bStdM').onclick=()=>{['Requirement validated','Economic analysis approved','1391 validated','Authorized and appropriated','35% design','Design complete','RFP released','Contract award','Notice to proceed','Beneficial occupancy','DD 1354 accepted'].forEach(n=>{if(!p.milestones.some(m=>m.name===n)) p.milestones.push({id:uid(),name:n,baseline:'',forecast:'',actual:''});});save();pMs(p);};}
 function pRisk(p){const t=$('#pt');
@@ -1030,7 +1100,10 @@ function sample(){let s=7;const rnd=()=>{s=(s*16807)%2147483647;return s/2147483
    p.updates.forEach(u=>{const q={...p,pct:u.pct,cwe:u.cwe,forecast_finish:u.forecast};u.health=health(q,u.date).overall;});}
   if(ph>=6&&ph<7){p.award=rnd()<.5?Math.round(N(p.authorized)*.93):'';}
   const msn=['Requirement validated','Economic analysis approved','1391 validated','Authorized and appropriated','35% design','Design complete','RFP released','Contract award','Notice to proceed','Beneficial occupancy'];
-  msn.forEach((m,k)=>{const off=(k-(ph+1))*75+Math.round(rnd()*40-20);const b=addD(today(),off);const late=rnd()<.25?Math.round(15+rnd()*80):0;p.milestones.push({id:uid(),name:m,baseline:b,forecast:addD(b,late),actual:off<-10?addD(b,late):''});});
+  msn.forEach((m,k)=>{const off=(k-(ph+1))*75+Math.round(rnd()*40-20);let b=addD(today(),off);let late=rnd()<.25?Math.round(15+rnd()*80):0;let act=off<-10?addD(b,late):'';
+   // awarded samples: the milestones line up with notice to proceed and completion, so the dates add up
+   if(ph>=7&&p.ntp){const aw=addD(p.ntp,-45);if(k<=7){b=addD(aw,-(7-k)*75);late=k<7?Math.min(late,40):0;act=addD(b,late);}else if(k===8){b=p.ntp;late=0;act=p.ntp;}else{b=p.baseline_finish;late=dd(p.baseline_finish,p.forecast_finish);act=ph===8?(p.forecast_finish<=today()?p.forecast_finish:addD(today(),-30)):'';}if(act>today()) act='';}
+   p.milestones.push({id:uid(),name:m,baseline:b,forecast:addD(b,late),actual:act});});
   const R=['Long-lead switchgear delivery','Typhoon season work stoppage','Host-nation permit timing','Off-island labor availability','Unforeseen subsurface conditions','Contaminated soil at the site','Cybersecurity authorization for control systems','Price escalation on steel'];
   const nr=Math.floor(rnd()*4);for(let k=0;k<nr;k++) p.risks.push({id:uid(),text:pick(R),l:1+Math.floor(rnd()*4),i:1+Math.floor(rnd()*4),response:pick(['Mitigate','Accept','Watch','Transfer']),owner:p.pm,status:rnd()<.85?'open':'closed'});
   if(rnd()<.2) p.decisions=pick(['Approve use of contingency for added AT/FP scope.','Decide whether to reprogram FY funds for the design-build award.','Approve host-nation cost-share proposal.']);
@@ -1043,7 +1116,8 @@ function ipEvidence(sel){const E=[];const add=(src,text)=>{if(text) E.push({id:'
  if(item){add('Action register',KIND.find(k=>k[0]===item.kind)[1]+' pending: '+item.text+(item.org?'. Owner: '+orgN(item.org):'')+(item.due?'. Due '+fd(item.due)+(regLate(item)?' (late)':''):''));if(item.notes) add('Action register','Notes: '+item.notes);}
  if(p){add('PAULA project record',p.name+' – '+[p.installation,p.service,p.fy?'FY'+p.fy:'','phase '+p.phase+' ('+PHASES[N(p.phase)||1]+')'].filter(Boolean).join(', '));
   add('PAULA project record','Programming status: '+(PROGN(progOf(p))==='Not set'?'not set':PROGN(progOf(p)))+(isAuth(p)?'':' (not authorized)')+'. Cost: programmed '+M(N(p.programmed))+(N(p.authorized)&&isAuth(p)?', authorized '+M(N(p.authorized)):'')+(N(p.award)?', awarded '+M(N(p.award)):'')+(est(p)?', current estimate '+M(est(p)):''));
-  if(p.forecast_finish) add('PAULA project record','Forecast completion '+fd(p.forecast_finish)+(p.baseline_finish?' against a baseline of '+fd(p.baseline_finish):''));
+  if(ffAct(p)) add('PAULA project record','Completed '+fd(ffAct(p).date)+' ('+ffAct(p).src+')'+(p.baseline_finish?' against a baseline of '+fd(p.baseline_finish):''));dIss(p).forEach(x=>add('Date check',x.text));
+  if(p.forecast_finish&&!ffAct(p)) add('PAULA project record','Forecast completion '+fd(p.forecast_finish)+(p.baseline_finish?' against a baseline of '+fd(p.baseline_finish):''));
   const h=health(p);add('PAULA health engine','Health '+LEVEL[h.overall].n+(h.parts.filter(z=>z.l>0).length?': '+h.parts.filter(z=>z.l>0).map(z=>z.dim+' – '+z.r).join('; '):''));
   const sp=stP(p);if(sp&&sp.tools){const n=sp.tools.nora;if(n){add('NORA',n.need_statement);(n.gaps||[]).slice(0,3).forEach(g=>add('NORA','Gap – '+[g.area,g.current&&'has '+g.current,g.required&&'needs '+g.required,g.impact].filter(Boolean).join('; ')));}
    const e=(sp.tools.record||{}).earl;if(e&&e.recommended){add('EARL',e.recommended.rationale||('Recommends '+e.recommended.name));(e.alternatives||[]).forEach(a=>add('EARL','Alternative '+a.name+': life-cycle cost '+M(N(a.npv))+(a.screened_out?' (screened out)':'')));}
@@ -1364,7 +1438,7 @@ const DEPT=[['utility','Needs utilities or infrastructure from it'],['site','Nee
 const pById=id=>P.projects.find(q=>q.id===id);
 function deps(p){return (p.deps||[]).filter(d=>pById(d.on));}
 function startOf(p){return p.ntp||(N(p.fy)?(N(p.fy))+'-06-01':'');}
-function finishOf(p){return p.forecast_finish||p.baseline_finish||'';}
+function finishOf(p){return ffOf(p)||p.baseline_finish||'';}
 function depIssues(){const L=filtered();const out=[];const r=P.prio?prRank():[];const rk={};r.forEach(x=>rk[x.p.id]=x);
  L.forEach(p=>deps(p).forEach(d=>{const q=pById(d.on);const ty=(DEPT.find(t=>t[0]===d.type)||DEPT[4])[1];
   const fs=finishOf(q),st=startOf(p);if(fs&&st&&fs>st&&!N(p.award)) out.push({lvl:2,p,q,d,kind:'slip',days:dd(st,fs),text:p.name+' is planned to start '+fd(st)+' but '+q.name+' finishes '+fd(fs)+': a '+dd(st,fs)+'-day knock-on slip.'});

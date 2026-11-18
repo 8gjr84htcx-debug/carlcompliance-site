@@ -37,6 +37,65 @@
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
+<script id="corbel-dt">/* Corbel dates: one date record per project, read the same way by every tool.
+   PAULA owns award, notice to proceed and the forecast; HANK owns the turnover actuals.
+   An actual date always beats a forecast. Where two tools disagree, both values are kept and flagged. */
+(function(){
+ if(window.CorbelDates) return;
+ var ORDER=[['v1391','1391 validated'],['award','Contract award'],['ntp','Notice to proceed'],['subst','Substantial completion'],['pis','Placed in service'],['final','Final acceptance'],['closeout','Financial close-out']];
+ var NAME={};ORDER.forEach(function(o){NAME[o[0]]=o[1];});NAME.possession='Government possession of part of the work';
+ var MS={v1391:'1391 validated',award:'Contract award',ntp:'Notice to proceed',pis:'Beneficial occupancy'};
+ var HK=['subst','possession','pis','final','closeout'];
+ var ISO=/^\d{4}-\d{2}-\d{2}/;
+ function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+ var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ function fd(s){if(!s) return '';var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?(+m[3])+' '+MON[+m[2]-1]+' '+m[1]:s;}
+ function load(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function hank(){return load('hank_portfolio')||{};}
+ function item(pid,H){return ((H||hank()).items||{})[pid]||null;}
+ // Every recorded value for each date, with where it came from. The owning tool's value is listed first.
+ function cands(p,H){var it=item(p.id,H)||{},d=it.dates||{},out={};
+  function add(k,date,src,own){if(!ISO.test(date||'')) return;(out[k]=out[k]||[]).push({date:String(date).slice(0,10),src:src,own:own});}
+  add('ntp',p.ntp,'PAULA project data','f:ntp');
+  HK.forEach(function(k){add(k,d[k],'HANK turnover dates','h:'+k);});
+  Object.keys(MS).forEach(function(k){var m=(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&m.actual) add(k,m.actual,'PAULA milestone “'+MS[k]+'”','m:'+MS[k]);});
+  return out;}
+ function read(p,H){H=H||hank();var c=cands(p,H),v={},conf=[];
+  Object.keys(c).forEach(function(k){var L=c[k];v[k]={date:L[0].date,src:L[0].src,n:NAME[k]};var u={};L.forEach(function(x){u[x.date]=1;});if(Object.keys(u).length>1) conf.push({k:k,n:NAME[k],vals:L});});
+  return {v:v,conf:conf};}
+ // The completion date every tool should use: an actual beats a projection, which beats the forecast.
+ function finish(p,H){var r=read(p,H).v;
+  if(r.subst) return {date:r.subst.date,kind:'actual',src:'Substantial completion, from HANK'};
+  if(r.pis) return {date:r.pis.date,kind:'actual',src:'Placed in service, from '+(r.pis.src.indexOf('HANK')===0?'HANK':'PAULA')};
+  if(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')) return {date:p.seq.finish,kind:'projected',src:'PAULA projected completion'};
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast'};
+  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish,kind:'baseline',src:'PAULA baseline'};
+  return null;}
+ // Dates that cannot all be true.
+ function check(p,H){H=H||hank();var R=read(p,H),v=R.v,out=[],t=today(),ph=+p.phase||0;
+  R.conf.forEach(function(c){out.push({k:c.k,kind:'conflict',text:c.n+' is recorded twice: '+c.vals.map(function(x){return fd(x.date)+' ('+x.src+')';}).join(' and '),vals:c.vals});});
+  var prev=null;ORDER.forEach(function(o){var x=v[o[0]];if(!x) return;if(prev&&x.date<prev.d) out.push({k:o[0],kind:'order',text:o[1]+' ('+fd(x.date)+') is before '+prev.n.toLowerCase()+' ('+fd(prev.d)+')'});if(!prev||x.date>prev.d) prev={d:x.date,n:o[1]};});
+  if(v.possession&&v.ntp&&v.possession.date<v.ntp.date) out.push({k:'possession',kind:'order',text:'Possession of part of the work ('+fd(v.possession.date)+') is before notice to proceed ('+fd(v.ntp.date)+')'});
+  Object.keys(v).forEach(function(k){if(v[k].date>t) out.push({k:k,kind:'future',text:NAME[k]+' is recorded as done on '+fd(v[k].date)+', which is still in the future'});});
+  var start=v.ntp&&v.ntp.date;
+  if(start&&ISO.test(p.forecast_finish||'')&&p.forecast_finish<start&&!v.subst) out.push({k:'forecast',kind:'order',text:'Forecast completion ('+fd(p.forecast_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(start&&ISO.test(p.baseline_finish||'')&&p.baseline_finish<start) out.push({k:'baseline',kind:'order',text:'Baseline completion ('+fd(p.baseline_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(ph>=8&&!v.subst&&!v.pis) out.push({k:'phase',kind:'phase',text:'The project is in close-out but has no substantial completion or placed-in-service date'});
+  if(ph&&ph<7&&(v.subst||v.pis)) out.push({k:'phase',kind:'phase',text:'Turnover dates are recorded, but the project is still at phase '+ph});
+  if(ph&&ph<6&&(v.ntp||v.award)&&!(+p.award>0)) out.push({k:'phase',kind:'phase',text:(v.ntp?'Notice to proceed':'Contract award')+' is recorded, but the project is still at phase '+ph});
+  return out;}
+ // Settle a conflict: write the chosen date to every place that holds a value for it.
+ // mem.paula / mem.hank are the calling tool's live objects; the other store is updated in this browser.
+ function pick(pid,k,date,mem){mem=mem||{};var PA=mem.paula||load('paula_project'),HA=mem.hank||load('hank_portfolio'),ch=[];
+  var p=PA&&(PA.projects||[]).filter(function(x){return x.id===pid;})[0];
+  if(p){if(k==='ntp'&&p.ntp!==date){p.ntp=date;ch.push('PAULA project data');}
+   var m=MS[k]&&(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&(m.actual||k==='ntp')&&m.actual!==date){m.actual=date;ch.push('PAULA milestone');}}
+  var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
+  try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
+  return ch;}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+})();
+</script>
 
 
 <meta charset="utf-8">
@@ -277,7 +336,7 @@ function vList(){const v=$('#view');const P=projects().filter(inClose).sort((a,b
  v.innerHTML='<div class="panel"><h2>Close-out and turnover</h2><p class="lead">Every project in construction or close-out: turnover dates, the DD Form 1354, the warranty clock and the close-out checklist. Open a project to work its close-out.</p>'+
   tiles([['Projects',String(P.length)],['Placed in service',String(P.filter(p=>rec(p).dates.pis).length)],['In warranty',String(W.filter(w=>w.left>=0||dd(today(),w.last.end)>=0).length)],['Warranty ending in '+G.warn+' days',String(ending),ending?'#9b2c2c':''],['Final DD 1354 done',String(fin)]])+
   (P.length?'<table class="ptable"><thead><tr><th>Project</th><th>Placed in service</th><th>Final acceptance</th><th>Warranty ends</th><th>DD Form 1354</th><th>Checklist</th></tr></thead><tbody>'+P.map(p=>{const r=rec(p);const w=warranty(r);const g=progress(p);
-   return '<tr class="clk" data-op="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc([p.number,p.installation,p.to].filter(Boolean).join(' · '))+'</div></td><td>'+(r.dates.pis?fd(r.dates.pis):'<span class="small">'+(p.forecast_finish?'Forecast '+fd(p.forecast_finish):'–')+'</span>')+'</td><td>'+(r.dates.final?fd(r.dates.final):'–')+'</td><td'+(w&&w.left>=0&&w.left<=G.warn?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(w?fd(w.first.end)+(w.left<0?' <span class="small">(ended)</span>':'<div class="small">'+w.left+' days</div>'):'–')+'</td><td>'+dd1354St(r)+'</td><td><div class="meter" style="margin-top:4px"><b style="width:'+Math.round(g.done/g.n*100)+'%"></b></div><div class="small">'+g.done+' of '+g.n+'</div></td></tr>';}).join('')+'</tbody></table>':'<p class="small">No projects in construction or close-out. Projects at phase 7 or 8 in PAULA, or with a contract award, appear here.</p>')+
+   return '<tr class="clk" data-op="'+p.id+'"><td><b>'+esc(p.name)+'</b>'+(window.CorbelDates&&CorbelDates.check(p,G).length?' <span class="small" style="color:#7a5200;font-weight:600" title="'+esc(CorbelDates.check(p,G).map(x=>x.text).join('\n'))+'">▲ Dates don’t add up</span>':'')+'<div class="small">'+esc([p.number,p.installation,p.to].filter(Boolean).join(' · '))+'</div></td><td>'+(r.dates.pis?fd(r.dates.pis):'<span class="small">'+(p.forecast_finish?'Forecast '+fd(p.forecast_finish):'–')+'</span>')+'</td><td>'+(r.dates.final?fd(r.dates.final):'–')+'</td><td'+(w&&w.left>=0&&w.left<=G.warn?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(w?fd(w.first.end)+(w.left<0?' <span class="small">(ended)</span>':'<div class="small">'+w.left+' days</div>'):'–')+'</td><td>'+dd1354St(r)+'</td><td><div class="meter" style="margin-top:4px"><b style="width:'+Math.round(g.done/g.n*100)+'%"></b></div><div class="small">'+g.done+' of '+g.n+'</div></td></tr>';}).join('')+'</tbody></table>':'<p class="small">No projects in construction or close-out. Projects at phase 7 or 8 in PAULA, or with a contract award, appear here.</p>')+
   '<div class="row" style="margin-top:10px"><select id="addP" style="width:auto;max-width:360px"><option value="">Add another project…</option>'+projects().filter(p=>!inClose(p)).map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('')+'</select></div></div>';
  v.querySelectorAll('[data-op]').forEach(t=>t.onclick=()=>{CUR=projects().find(p=>p.id===t.dataset.op);VIEW='one';TAB='dates';render();window.scrollTo(0,0);});
  $('#addP').onchange=e=>{if(!e.target.value) return;rec(projects().find(p=>p.id===e.target.value));log('Project added to close-out');save();vList();renderSteps();};}
@@ -285,11 +344,16 @@ function vOne(){const v=$('#view');const p=CUR;if(!p){VIEW='list';return render(
  v.innerHTML='<div class="panel" style="padding-bottom:12px"><h2 style="margin:0">'+esc(p.name)+'</h2><div class="small">'+esc([p.number,p.to,p.installation,p.service].filter(Boolean).join(' · '))+'</div><div class="meter" style="max-width:420px"><b style="width:'+Math.round(g.done/g.n*100)+'%"></b></div><div class="small">Close-out checklist '+g.done+' of '+g.n+'  ·  DD Form 1354: '+dd1354St(r)+'</div>'+
   '<div class="tabs2" style="margin-top:12px">'+[['dates','Turnover dates'],['chk','Checklist'],['dd','DD Form 1354'],['les','Lessons']].map(([k,t])=>'<button data-t="'+k+'" class="'+(TAB===k?'on':'')+'">'+t+'</button>').join('')+'</div></div><div id="pt"></div>';
  v.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{TAB=b.dataset.t;vOne();});({dates:tDates,chk:tChk,dd:tDD,les:tLes})[TAB](p,r);}
+function dPanel(p){const D=window.CorbelDates;if(!D) return p.forecast_finish?'<p class="small">PAULA forecast completion: '+fd(p.forecast_finish)+'.</p>':'';const R=D.read(p,G).v,I=D.check(p,G),fa=D.finish(p,G);
+ const pa=[['v1391','1391 validated'],['award','Contract award'],['ntp','Notice to proceed']].map(([k,n])=>n+' '+(R[k]?fd(R[k].date):'–')).join('  ·  ');
+ return '<p class="small" style="margin-top:12px">From PAULA: '+esc(pa)+(p.forecast_finish?'  ·  forecast completion '+fd(p.forecast_finish):'')+'. Completion every tool uses: <b>'+(fa?fd(fa.date)+' ('+esc(fa.src)+')':'–')+'</b>.</p>'+
+  (I.length?'<div class="find" style="border-left:4px solid #c98a00;padding:8px 10px;margin-top:8px;background:#fdf6e6"><b>Dates don’t add up</b>'+I.map(x=>'<div style="margin-top:6px">'+esc(x.text)+(x.kind==='conflict'?'<div class="row" style="gap:6px;margin-top:4px">'+[...new Map(x.vals.map(v=>[v.date,v])).values()].map(v=>'<button class="sm" data-dpick="'+x.k+'|'+v.date+'">Use '+esc(fd(v.date))+' ('+esc(v.src)+')</button>').join('')+'</div>':'')+'</div>').join('')+'</div>':'');}
 function tDates(p,r){const t=$('#pt');const w=warranty(r);const F=[['subst','Substantial completion',''],['possession','Government took possession of part of the work (before final acceptance)','Starts a one-year warranty on that part ('+SRC.war+' (b))'],['pis','Placed-in-service date (beneficial occupancy)','Block 7a of the DD Form 1354 ('+SRC.form+')'],['final','Final acceptance','Starts the one-year warranty on the work ('+SRC.war+' (b))'],['closeout','Financial close-out','']];
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Turnover dates</h3><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'+F.map(([k,l,h])=>'<div><label class="f">'+l+'</label><input type="date" data-dt="'+k+'" value="'+esc(r.dates[k]||'')+'">'+(h?'<div class="small">'+esc(h)+'</div>':'')+'</div>').join('')+'</div>'+
-  (p.forecast_finish?'<p class="small">PAULA forecast completion: '+fd(p.forecast_finish)+'.</p>':'')+'</div>'+
+  dPanel(p)+'</div>'+
   '<div class="panel"><h3 style="margin-top:0">Warranty</h3>'+(w?'<table class="ptable"><thead><tr><th>Covers</th><th>Starts</th><th>Ends</th><th>Days left</th></tr></thead><tbody>'+w.L.map(x=>'<tr><td>'+esc(x.what)+'</td><td>'+fd(x.start)+'</td><td>'+fd(x.end)+'</td><td'+(dd(today(),x.end)<=G.warn&&dd(today(),x.end)>=0?' style="color:#9b2c2c;font-weight:600"':'')+'>'+(dd(today(),x.end)<0?'Ended':dd(today(),x.end))+'</td></tr>').join('')+'</tbody></table><p class="small">'+SRC.war+' (b): the warranty runs one year from final acceptance; for any part the Government took possession of earlier, one year from possession. Work repaired or replaced under the warranty carries its own year from the repair ((d)). Check the contract for a different period.</p>':'<p class="small">Enter final acceptance or the possession date to start the clock.</p>')+'</div>'+
   '<div class="panel"><label class="f">Notes</label><textarea id="nt" rows="3">'+esc(r.notes||'')+'</textarea></div>';
+ t.querySelectorAll('[data-dpick]').forEach(b=>b.onclick=()=>{const [k,d]=b.dataset.dpick.split('|');const ch=CorbelDates.pick(p.id,k,d,{hank:G});log('Date settled',p.name+': '+CorbelDates.NAME[k]+' '+d+(ch.length?' ('+ch.join(', ')+')':''));save();CUR=projects().find(x=>x.id===p.id)||p;vOne();});
  t.querySelectorAll('[data-dt]').forEach(el=>el.onchange=()=>{r.dates[el.dataset.dt]=el.value;log('Turnover date set',p.name+': '+el.dataset.dt+' '+el.value);save();vOne();});$('#nt').onchange=e=>{r.notes=e.target.value;save();};}
 function tChk(p,r){const t=$('#pt');const dca=dcaFor(p);
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Close-out checklist</h3><p class="small">Each item has an owner and the source behind it. Items marked “worked out” are filled from the turnover dates, the DD Form 1354 tab, QUINN or the lessons list; set a status yourself to override.</p><table class="ptable"><thead><tr><th>Item</th><th>Owner</th><th>Status</th><th>Date</th><th>Source</th></tr></thead><tbody>'+
@@ -343,6 +407,7 @@ function report(){const P=projects().filter(inClose);const W=P.map(p=>({p,w:warr
  b+=cdH('Bottom line')+cdP((noAcc.length?noAcc.length+' project'+(noAcc.length>1?'s are':' is')+' in service without an accepted interim DD Form 1354, so '+(noAcc.length>1?'they are':'it is')+' not yet in the real property record: '+noAcc.slice(0,4).map(p=>esc(p.name)).join(', ')+'. ':'Every project in service has an accepted interim DD Form 1354. ')+(soon.length?soon.length+' warranty clock'+(soon.length>1?'s end':' ends')+' within '+G.warn+' days; schedule the warranty inspection'+(soon.length>1?'s':'')+' now.':''));
  b+=cdH('Projects')+cdTable(['Project','Placed in service','Final acceptance','Warranty ends','DD Form 1354','Checklist'],P.map(p=>{const r=rec(p),w=warranty(r),g=progress(p);return [esc(p.name)+'<br><span style="font-size:8pt;color:'+CD.mute+'">'+esc([p.number,p.installation].filter(Boolean).join('  ·  '))+'</span>',r.dates.pis?fd(r.dates.pis):'–',r.dates.final?fd(r.dates.final):'–',w?fd(w.first.end):'–',dd1354St(r),g.done+' of '+g.n];}));
  const open=P.flatMap(p=>{const r=rec(p);if(!r.dates.pis&&!r.dates.subst) return [];return CHK.filter(([k])=>!['done','na'].includes(chkState(p,r,k).st)).map(([k,n,o,src])=>[esc(p.name),esc(n),esc((r.chk[k]||{}).who||(o==='dca'?dcaFor(p):OWN[o])),esc(src)]);});
+ if(window.CorbelDates){const di=P.flatMap(p=>CorbelDates.check(p,G).map(x=>[esc(p.name),esc(x.text)]));if(di.length) b+=cdH('Dates that don’t add up')+cdP('Settle these on the project’s Turnover dates tab in HANK or the Milestones tab in PAULA; both tools read the same record.')+cdTable(['Project','Problem'],di);}
  if(open.length) b+=cdH('Open close-out items (projects past substantial completion)')+cdTable(['Project','Item','Owner','Source'],open);
  if(G.lessons.length) b+=cdH('Lessons learned')+cdTable(['Area','What happened','Do this next time'],G.lessons.map(l=>{const c=LCAT.find(x=>x[0]===l.cat)||LCAT[0];return [esc(c[1])+' ('+c[2]+')',esc(l.what),esc(l.rec)];}));
  b+=cdH('Sources')+cdP(esc(SRC.form)+' (block labels); '+esc(SRC.ufc)+' (draft, interim and final versions, who prepares and accepts); '+esc(SRC.war)+' (warranty period); '+esc(SRC.asof)+'. Service deadlines for the final DD Form 1354 follow each Service’s own timeline.','font-size:9pt');

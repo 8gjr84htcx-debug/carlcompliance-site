@@ -37,6 +37,67 @@
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
+<script id="corbel-dt">/* Corbel dates: one date record per project, read the same way by every tool.
+   PAULA owns award, notice to proceed and the forecast; HANK owns the turnover actuals.
+   An actual date always beats a forecast. Where two tools disagree, both values are kept and flagged. */
+(function(){
+ if(window.CorbelDates) return;
+ var ORDER=[['v1391','1391 validated'],['award','Contract award'],['ntp','Notice to proceed'],['subst','Substantial completion'],['pis','Placed in service'],['final','Final acceptance'],['closeout','Financial close-out']];
+ var NAME={};ORDER.forEach(function(o){NAME[o[0]]=o[1];});NAME.possession='Government possession of part of the work';
+ var MS={v1391:'1391 validated',award:'Contract award',ntp:'Notice to proceed',pis:'Beneficial occupancy'};
+ var HK=['subst','possession','pis','final','closeout'];
+ var ISO=/^\d{4}-\d{2}-\d{2}/;
+ function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+ var MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+ function fd(s){if(!s) return '';var m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s);return m?(+m[3])+' '+MON[+m[2]-1]+' '+m[1]:s;}
+ function load(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function hank(){return load('hank_portfolio')||{};}
+ function item(pid,H){return ((H||hank()).items||{})[pid]||null;}
+ // Every recorded value for each date, with where it came from. The owning tool's value is listed first.
+ function cands(p,H){var it=item(p.id,H)||{},d=it.dates||{},out={};
+  function add(k,date,src,own){if(!ISO.test(date||'')) return;(out[k]=out[k]||[]).push({date:String(date).slice(0,10),src:src,own:own});}
+  add('ntp',p.ntp,'PAULA project data','f:ntp');
+  HK.forEach(function(k){add(k,d[k],'HANK turnover dates','h:'+k);});
+  Object.keys(MS).forEach(function(k){var m=(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&m.actual) add(k,m.actual,'PAULA milestone “'+MS[k]+'”','m:'+MS[k]);});
+  return out;}
+ function read(p,H){H=H||hank();var c=cands(p,H),v={},conf=[];
+  Object.keys(c).forEach(function(k){var L=c[k];v[k]={date:L[0].date,src:L[0].src,n:NAME[k]};var u={};L.forEach(function(x){u[x.date]=1;});if(Object.keys(u).length>1) conf.push({k:k,n:NAME[k],vals:L});});
+  return {v:v,conf:conf};}
+ // The completion date every tool should use: an actual beats a projection, which beats the forecast.
+ function finish(p,H){var r=read(p,H).v;
+  if(r.subst) return {date:r.subst.date,kind:'actual',src:'Substantial completion, from HANK'};
+  if(r.pis) return {date:r.pis.date,kind:'actual',src:'Placed in service, from '+(r.pis.src.indexOf('HANK')===0?'HANK':'PAULA')};
+  if(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')) return {date:p.seq.finish,kind:'projected',src:'PAULA projected completion'};
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast'};
+  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish,kind:'baseline',src:'PAULA baseline'};
+  return null;}
+ // Dates that cannot all be true.
+ function check(p,H){H=H||hank();var R=read(p,H),v=R.v,out=[],t=today(),ph=+p.phase||0;
+  R.conf.forEach(function(c){out.push({k:c.k,kind:'conflict',text:c.n+' is recorded twice: '+c.vals.map(function(x){return fd(x.date)+' ('+x.src+')';}).join(' and '),vals:c.vals});});
+  var prev=null;ORDER.forEach(function(o){var x=v[o[0]];if(!x) return;if(prev&&x.date<prev.d) out.push({k:o[0],kind:'order',text:o[1]+' ('+fd(x.date)+') is before '+prev.n.toLowerCase()+' ('+fd(prev.d)+')'});if(!prev||x.date>prev.d) prev={d:x.date,n:o[1]};});
+  if(v.possession&&v.ntp&&v.possession.date<v.ntp.date) out.push({k:'possession',kind:'order',text:'Possession of part of the work ('+fd(v.possession.date)+') is before notice to proceed ('+fd(v.ntp.date)+')'});
+  Object.keys(v).forEach(function(k){if(v[k].date>t) out.push({k:k,kind:'future',text:NAME[k]+' is recorded as done on '+fd(v[k].date)+', which is still in the future'});});
+  var start=v.ntp&&v.ntp.date;
+  if(start&&ISO.test(p.forecast_finish||'')&&p.forecast_finish<start&&!v.subst) out.push({k:'forecast',kind:'order',text:'Forecast completion ('+fd(p.forecast_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(start&&ISO.test(p.baseline_finish||'')&&p.baseline_finish<start) out.push({k:'baseline',kind:'order',text:'Baseline completion ('+fd(p.baseline_finish)+') is before notice to proceed ('+fd(start)+')'});
+  if(ph>=8&&!v.subst&&!v.pis) out.push({k:'phase',kind:'phase',text:'The project is in close-out but has no substantial completion or placed-in-service date'});
+  if(ph&&ph<7&&(v.subst||v.pis)) out.push({k:'phase',kind:'phase',text:'Turnover dates are recorded, but the project is still at phase '+ph});
+  if(ph&&ph<6&&(v.ntp||v.award)&&!(+p.award>0)) out.push({k:'phase',kind:'phase',text:(v.ntp?'Notice to proceed':'Contract award')+' is recorded, but the project is still at phase '+ph});
+  return out;}
+ // Settle a conflict: write the chosen date to every place that holds a value for it.
+ // mem.paula / mem.hank are the calling tool's live objects; the other store is updated in this browser.
+ function pick(pid,k,date,mem){mem=mem||{};var PA=mem.paula||load('paula_project'),HA=mem.hank||load('hank_portfolio'),ch=[];
+  var p=PA&&(PA.projects||[]).filter(function(x){return x.id===pid;})[0];
+  if(p){if(k==='ntp'&&p.ntp!==date){p.ntp=date;ch.push('PAULA project data');}
+   var m=MS[k]&&(p.milestones||[]).filter(function(x){return x.name===MS[k];})[0];if(m&&(m.actual||k==='ntp')&&m.actual!==date){m.actual=date;ch.push('PAULA milestone');}}
+  var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
+  try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
+  return ch;}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+})();
+</script>
+
+
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
