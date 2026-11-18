@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -232,18 +232,29 @@ const has=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
 const set=(o,k,v)=>{if(has(v)) o[k]=v;};
 const MAP={
  nora:{skel:()=>({schema:'nora-1',project:{}}),
-  get:s=>({name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service],country:LOC[s.project?.location],need_date:s.project?.need_date,_src:'NORA',_ev:{'Requirement validated':s.validation?.service_date||s.validation?.installation_date||''}}),
+  get:s=>{const nd=noraNeed(s);return {name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service],country:LOC[s.project?.location],need_date:nd.v,_src:nd.src,_ev:{'Requirement validated':s.validation?.service_date||s.validation?.installation_date||''}};},
   put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);if(inv(SVC)[c.service]) s.project.service=inv(SVC)[c.service];if(inv(LOC)[c.country]) s.project.location=inv(LOC)[c.country];set(s.project,'need_date',c.need_date);}},
  earl:{skel:()=>({schema:'earl-1',project:{}}),
-  get:s=>({name:s.project?.name,installation:s.project?.installation,service:s.project?.service,scope:(()=>{const a=(s.alts||[]).find(x=>x.id===s.recommend?.alt);return a?scopeOf(a.type,a.name+' '+(a.desc||'')):undefined;})(),_src:'EARL recommendation',_ev:{'Economic analysis approved':s.recommend?.decision==='approved'?(s.recommend.date||today()):''}}),
+  get:s=>({name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service]||s.project?.service,scope:(()=>{const a=(s.alts||[]).find(x=>x.id===s.recommend?.alt);return a?scopeOf(a.type,a.name+' '+(a.desc||'')):undefined;})(),_src:'EARL recommendation',_ev:{'Economic analysis approved':s.recommend?.decision==='approved'?(s.recommend.date||today()):''}}),
   put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);set(s.project,'service',c.service);}},
  piper:{skel:()=>({schema:'piper-1',b:{},ex:{}}),
-  get:s=>({name:s.b?.title,installation:s.b?.installation,number:s.b?.project_no,fy:s.b?.fy,catcode:s.b?.catcode,service:s.b?.component==='Defense Health Agency'?'DHA':s.b?.component,authorized:s.ex?.auth,cwe:s.ex?.cwe,scope:(()=>{const pl=(s.prim||[]).map(x=>x.item||'').join(' ');return scopeOf('',pl)||(has(s.b?.title)?scopeOf('',s.b.title)||scopeOf('',[s.n?.desc,s.n?.project].join(' ')):undefined);})(),qty:(()=>{if(has(s.pf?.qty)&&has(s.pf?.guc_i)) return qtyStr(s.pf.qty,s.pf.um||'SF');const l=(s.prim||[]).find(x=>has(x.qty));return l?qtyStr(l.qty,l.um):undefined;})(),programmed:s.mode==='review'&&Number(String(s.review?.ext_total||'').replace(/[^\d.]/g,''))?Math.round(Number(String(s.review.ext_total).replace(/[^\d.]/g,''))*1000):undefined,_src:s.mode==='review'?'PIPER review (Service 1391)':'PIPER build',_ev:{'1391 validated':(s.versions||[]).length?'':''}}),
+  get:s=>({name:s.b?.title,installation:s.b?.installation,number:s.b?.project_no,fy:s.b?.fy,catcode:s.b?.catcode,service:s.b?.component==='Defense Health Agency'?'DHA':s.b?.component,authorized:s.ex?.auth,cwe:s.ex?.cwe,scope:(()=>{const pl=(s.prim||[]).map(x=>x.item||'').join(' ');return scopeOf('',pl)||(has(s.b?.title)?scopeOf('',s.b.title)||scopeOf('',[s.n?.desc,s.n?.project].join(' ')):undefined);})(),qty:(()=>{if(has(s.pf?.qty)&&has(s.pf?.guc_i)) return qtyStr(s.pf.qty,s.pf.um||'SF');const l=(s.prim||[]).find(x=>has(x.qty));return l?qtyStr(l.qty,l.um):undefined;})(),...piperReviewCost(s),_src:s.mode==='review'?'PIPER review (Service 1391)':'PIPER build',_ev:{'1391 validated':(s.versions||[]).length?'':''}}),
   put:(s,c)=>{s.b=s.b||{};s.ex=s.ex||{};set(s.b,'title',c.name);set(s.b,'installation',c.installation);set(s.b,'project_no',c.number);set(s.b,'fy',c.fy);set(s.b,'catcode',c.catcode);if(has(c.service)) s.b.component=PIPER_SVC[c.service]||c.service;set(s.ex,'auth',c.authorized);set(s.ex,'cwe',c.cwe);}},
  sophie:{skel:()=>({schema:'sophie-1',p:{}}),
   get:s=>({name:s.p?.title,installation:s.p?.installation,to:s.p?.contract,buildings:s.p?.buildings,_ev:{'SOW final':(s.sections||[]).length&&s.sections.every(x=>x.status==='final')?'@today':''}}),
   put:(s,c)=>{s.p=s.p||{};set(s.p,'title',c.name);set(s.p,'installation',c.installation);set(s.p,'contract',c.to);set(s.p,'buildings',c.buildings);}},
  record:{skel:()=>null,get:r=>({programmed:r?.piper?.mode==='review'?undefined:(r?.piper?.rounded||undefined),_src:'PIPER build'}),put:()=>{}}};
+// NORA's need date is the earliest date any must-have requirement (or the need statement) states, unless the "Needed by" field is earlier. The requirement that sets it is named.
+const MON={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+function datesIn(t){const out=[];String(t||'').replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(?:\d{1,2},\s*)?(20\d\d)\b/gi,(m,mo,y)=>{out.push(y+'-'+String(MON[mo.toLowerCase().slice(0,3)]).padStart(2,'0'));return m;});
+ String(t||'').replace(/\b(20\d\d)-(0[1-9]|1[0-2])\b/g,(m,y,mo)=>{out.push(y+'-'+mo);return m;});return out;}
+function noraNeed(s){const nb=has(s.project?.need_date)?String(s.project.need_date).slice(0,7):'';let best=nb,src='NORA (needed by)';
+ (s.requirements||[]).filter(r=>r&&r.status!=='withdrawn'&&(!r.priority||r.priority==='must')).forEach(r=>datesIn(r.text).forEach(d=>{if(!best||d<best){best=d;src='NORA ('+(r.id||'requirement')+': '+String(r.text||'').slice(0,60)+')';}}));
+ datesIn(s.need_statement).forEach(d=>{if(!best||d<best){best=d;src='NORA (need statement)';}});return {v:best||undefined,src:best?src:'NORA'};}
+// PIPER review: block 8 goes to the record only when it agrees with the form's own total. When PIPER flags it, the form total is offered and nothing is written until a person chooses.
+function piperReviewCost(s){if(s.mode!=='review') return {};const n=v=>Number(String(v||'').replace(/[^\d.]/g,''));const b8=n(s.review?.ext_total),b9=n(s.review?.ext_b9);if(!b8&&!b9) return {};
+ if(b8&&b9&&Math.abs(b8-b9)/Math.max(b8,b9)>0.002) return {programmed:Math.round(b9*1000),_ask:{programmed:'Block 8 on the Service 1391 is $'+(b8/1000).toFixed(1)+'M, which PIPER flags as must-fix: the form’s own block 9 total is $'+(b9/1000).toFixed(1)+'M. Offered here: the form total.'}};
+ return {programmed:Math.round((b8||b9)*1000)};}
 // ---- the facts one record owns: cost, scope basis, primary quantity with its unit, and need date ----
 // A tool fills an empty fact, or updates one it set itself; anything else waits in core.pending for a person to choose.
 const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date'};
@@ -251,7 +262,8 @@ function qtyStr(q,u){const n=Number(String(q).replace(/[^\d.]/g,''));if(!n) retu
 function scopeOf(type,text){const t=String(type||'').toLowerCase(),x=String(text||'').toLowerCase();if(/^(new|replace|addition)$/.test(t)) return 'New or replacement construction';if(/^(renovate|repair|modernize|alter|alteration)$/.test(t)) return 'Renovation or repair';if(t&&!/^(status_quo)$/.test(t)) return t.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
  if(/\b(renovat|repair|moderniz|upgrade|rehabilitat|restor|alter)/.test(x)) return 'Renovation or repair';if(/\b(replac|new |construct|addition|build)/.test(x)) return 'New or replacement construction';return undefined;}
 function ownEq(k,a,b){if(!has(a)||!has(b)) return !has(a)&&!has(b);if(k==='programmed') return Math.abs(Number(a)-Number(b))<1;if(k==='need_date') return String(a).slice(0,7)===String(b).slice(0,7);if(k==='qty'){const n=v=>String(v).replace(/[^\d.]/g,''),u=v=>String(v).replace(/[\d.,\s]/g,'').toUpperCase();return n(a)===n(b)&&u(a)===u(b);}return String(a).toLowerCase()===String(b).toLowerCase();}
-function ownSet(core,k,v,src,direct,tool){tool=tool||src;core.facts=core.facts||{};core.pending=core.pending||[];core.kept=core.kept||{};const cur=core[k];
+function ownSet(core,k,v,src,direct,tool,ask){tool=tool||src;core.facts=core.facts||{};core.pending=core.pending||[];core.kept=core.kept||{};const cur=core[k];
+ if(ask){if(ownEq(k,cur,v)&&has(cur)) return false;if(core.kept[k]&&core.kept[k].some(x=>ownEq(k,x,v))) return false;const i=core.pending.findIndex(p=>p.k===k&&(p.tool||p.src)===tool);const it={k,v,src,tool,at:today(),note:ask};if(i>=0){if(ownEq(k,core.pending[i].v,v)&&core.pending[i].note===ask) return false;core.pending[i]=it;}else core.pending.push(it);return true;}
  // the same source (PIPER build re-pricing its own 1391) updates freely; a different source, even in the same tool (PIPER review of a Service 1391), has to be chosen
  if(!has(cur)||direct||(core.facts[k]&&core.facts[k].src===src)){if(!ownEq(k,cur,v)||!core.facts[k]){core[k]=v;core.facts[k]={src,tool,at:today()};core.pending=core.pending.filter(p=>p.k!==k||!ownEq(k,p.v,v));return true;}return false;}
  if(ownEq(k,cur,v)) return false;if(core.kept[k]&&core.kept[k].some(x=>ownEq(k,x,v))) return false;
@@ -259,7 +271,12 @@ function ownSet(core,k,v,src,direct,tool){tool=tool||src;core.facts=core.facts||
  const i=core.pending.findIndex(p=>p.k===k&&(p.tool||p.src)===tool);const it={k,v,src,tool,at:today()};if(i>=0){if(ownEq(k,core.pending[i].v,v)&&core.pending[i].src===src) return false;core.pending[i]=it;}else core.pending.push(it);return true;}
 const PAULA_F=['scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
 const same=(a,b)=>(a&&typeof a==='object')||(b&&typeof b==='object')?JSON.stringify(a??null)===JSON.stringify(b??null):String(a??'')===String(b??'');
-function mergeCore(core,o,src,direct){if(!o) return false;let ch=false;const tool=src||'';src=o._src||src||'';for(const [k,v] of Object.entries(o)){if(k==='_ev'||k==='_src') continue;if(OWN.includes(k)){if(has(v)&&ownSet(core,k,v,src,direct,tool==='record'?'piper':tool)) ch=true;continue;}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
+// Cost and quantity belong to a scope. A cost priced for replacement cannot become the programmed cost of a renovation (or the reverse) without a person confirming the mismatch.
+const scClass=t=>/renovat|repair/i.test(String(t||''))?'reno':/new|replac/i.test(String(t||''))?'new':'';
+function mergeCore(core,o,src,direct){if(!o) return false;let ch=false;const tool=src||'';src=o._src||src||'';const ask=o._ask||{};
+ for(const [k,v] of Object.entries(o)){if(k==='_ev'||k==='_src'||k==='_ask') continue;if(OWN.includes(k)){if(!has(v)) continue;let a=ask[k]||'';
+   if(!direct&&!a&&['programmed','qty'].includes(k)&&has(o.scope)&&has(core.scope)&&scClass(o.scope)&&scClass(core.scope)&&scClass(o.scope)!==scClass(core.scope)) a='This '+(k==='programmed'?'cost':'quantity')+' is for '+o.scope+'; the record’s scope is '+core.scope+'. Use it only if the scope is changing.';
+   if(ownSet(core,k,v,src,direct,tool==='record'?'piper':tool,a)) ch=true;continue;}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
  core.events=core.events||{};for(const [k,v] of Object.entries(o._ev||{})){if(v==='@today'){if(!core.events[k]){core.events[k]=today();ch=true;}}else if(has(v)&&core.events[k]!==v){core.events[k]=v;ch=true;}}return ch;}
 
 // ---- startup: put the active project's state where the tool expects it ----
@@ -302,7 +319,7 @@ function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sampl
   const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o,'PAULA',true)) ch=true;});if(ch) saveStore(St);}
 
 // ---- public helpers ----
-window.MS={store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
+window.MS={propose:(id,k,v,src,note)=>{const s=loadStore();const p=s.projects[id];if(!p||!OWN.includes(k)||!has(v)) return false;const c=p.core;if(ownEq(k,c[k],v)) return false;const r=ownSet(c,k,v,src,false,src,note||(src+' differs from the record'));if(r) saveStore(s);return r;},store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
  pending:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?(p.core.pending||[]).map(x=>({...x,cur:p.core[x.k],curSrc:(p.core.facts||{})[x.k]?.src||''})):[];},
  facts:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?OWN.map(k=>({k,label:OWNL[k],v:p.core[k],src:(p.core.facts||{})[k]?.src||''})):[];},
  resolve:(id,k,src,use)=>{const s=loadStore();const p=s.projects[id||s.active];if(!p) return false;const c=p.core;const i=(c.pending||[]).findIndex(x=>x.k===k&&x.src===src);if(i<0) return false;const it=c.pending[i];c.pending.splice(i,1);
@@ -323,7 +340,7 @@ function refresh(){const d=document.getElementById('msbar');if(!d) return;const 
  const ids=Object.keys(s.projects).sort((a,b)=>(s.projects[a].core.name||'').localeCompare(s.projects[b].core.name||''));
  d.innerHTML='<span style="opacity:.8">Project<\/span><select id="mssel" style="width:auto;max-width:340px;font-size:13px;padding:3px 6px;border-radius:5px">'+ids.map(id=>'<option value="'+id+'" '+(id===s.active?'selected':'')+'>'+esc(s.projects[id].core.name||'(untitled)')+'<\/option>').join('')+'<\/select>'+
  '<button id="msnew" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">New project<\/button>'+
- '<span style="opacity:.85;flex:1;min-width:200px">'+esc([c.number,c.to,c.installation,c.service,c.fy?'FY'+c.fy:''].filter(has).join(' · ')||'Shared record: title, installation, task order and amounts are entered once and used by every tool')+'<\/span>'+
+ '<span style="opacity:.85;flex:1;min-width:200px">'+esc([c.number,c.to,c.installation,(window.CorbelID&&c.service?CorbelID.svc(c.service):c.service),c.fy?'FY'+c.fy:''].filter(has).join(' · ')||'Shared record: title, installation, task order and amounts are entered once and used by every tool')+'<\/span>'+
  '<span id="msnote" style="color:#F2B632"><\/span>'+(P&&(P.core.pending||[]).length?'<button id="mspend" style="font-size:12.5px;padding:3px 10px;background:#F2B632;color:#10303F;border:none;font-weight:600">'+P.core.pending.length+' conflicting value'+(P.core.pending.length>1?'s':'')+' to settle<\/button>':'')+
  '<button id="msmore" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">Projects…<\/button>';
  d.querySelector('#mssel').onchange=e=>sw(e.target.value);
@@ -333,7 +350,7 @@ function refresh(){const d=document.getElementById('msbar');if(!d) return;const 
 window.MSsettle=()=>settle();
 function settle(){const s=loadStore();const P=s.projects[s.active];if(!P) return;const L=MS.pending(P.id);const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:0;max-width:720px;width:94vw';
  dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Settle conflicting values<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">The project record holds one programmed cost, scope, primary quantity and need date for every tool. These tools disagree with it. Nothing changes until you choose.<\/p>'+
- L.map((x,i)=>'<div style="border:1px solid #c9d6d3;border-radius:8px;padding:10px 12px;margin-top:8px"><b>'+esc(OWNL[x.k])+'<\/b><div style="margin-top:4px">Record: <b>'+esc(MS.fmt(x.k,x.cur))+'<\/b> <span style="color:#4f6873">('+esc(x.curSrc||'record')+')<\/span><br>'+esc(x.src)+': <b>'+esc(MS.fmt(x.k,x.v))+'<\/b><\/div><div style="display:flex;gap:8px;margin-top:8px"><button data-r="'+i+'|1" style="font-size:13px">Replace '+esc(MS.fmt(x.k,x.cur))+' with '+esc(MS.fmt(x.k,x.v))+'<\/button><button data-r="'+i+'|0" style="font-size:13px">Keep '+esc(MS.fmt(x.k,x.cur))+'<\/button><\/div><\/div>').join('')+
+ L.map((x,i)=>'<div style="border:1px solid #c9d6d3;border-radius:8px;padding:10px 12px;margin-top:8px"><b>'+esc(OWNL[x.k])+'<\/b><div style="margin-top:4px">Record: <b>'+esc(MS.fmt(x.k,x.cur))+'<\/b> <span style="color:#4f6873">('+esc(x.curSrc||'record')+')<\/span><br>'+esc(x.src)+': <b>'+esc(MS.fmt(x.k,x.v))+'<\/b>'+(x.note?'<div style="margin-top:4px;color:#8A2B1E;font-size:13px">'+esc(x.note)+'<\/div>':'')+'<\/div><div style="display:flex;gap:8px;margin-top:8px"><button data-r="'+i+'|1" style="font-size:13px">'+(has(x.cur)?'Replace '+esc(MS.fmt(x.k,x.cur))+' with ':'Use ')+esc(MS.fmt(x.k,x.v))+'<\/button><button data-r="'+i+'|0" style="font-size:13px">'+(has(x.cur)?'Keep '+esc(MS.fmt(x.k,x.cur)):'Leave it empty')+'<\/button><\/div><\/div>').join('')+
  '<div style="margin-top:14px;text-align:right"><button id="msclose">Close<\/button><\/div><\/div>';document.body.appendChild(dlg);dlg.showModal();
  dlg.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [i,u]=b.dataset.r.split('|');const x=L[+i];MS.resolve(P.id,x.k,x.src,u==='1');dlg.close();dlg.remove();refresh();if(MS.pending(P.id).length) settle();});
  dlg.querySelector('#msclose').onclick=()=>{dlg.close();dlg.remove();};}
@@ -593,7 +610,7 @@ function vStake(){const v=$('#view');
  const tb=$('#sb');
  if(!P.stakeholders.length) tb.innerHTML='<tr><td colspan="9" class="empty">No stakeholders yet.</td></tr>';
  P.stakeholders.forEach(s=>{const tr=document.createElement('tr');
-  tr.innerHTML='<td><input data-k="name"></td><td><input data-k="title"></td><td><input data-k="org"></td><td><select data-k="role">'+optsArr(ROLES,s.role,'Select')+'</select></td><td><select data-k="authority">'+opts(AUTH,s.authority,'—')+'</select></td><td><select data-k="influence">'+opts({H:'High',M:'Med',L:'Low'},s.influence,'—')+'</select></td><td><select data-k="interest">'+opts({H:'High',M:'Med',L:'Low'},s.interest,'—')+'</select></td><td><input data-k="contact"></td><td><button class="sm" data-del>Remove</button></td>';
+  tr.innerHTML='<td><input data-k="name"></td><td><input data-k="title"></td><td><input data-k="org"></td><td><select data-k="role">'+optsArr(ROLES,s.role,'Select')+'</select></td><td><select data-k="authority">'+opts(AUTH,s.authority,'–')+'</select></td><td><select data-k="influence">'+opts({H:'High',M:'Med',L:'Low'},s.influence,'–')+'</select></td><td><select data-k="interest">'+opts({H:'High',M:'Med',L:'Low'},s.interest,'–')+'</select></td><td><input data-k="contact"></td><td><button class="sm" data-del>Remove</button></td>';
   bindAll(tr,s,()=>{quad();warn();renderSteps();});
   tr.querySelector('[data-del]').onclick=()=>{const used=P.requirements.some(r=>(r.sources||[]).includes(s.id));if(used&&!confirm('Requirements cite this stakeholder as a source. Remove anyway? The requirements keep the name as text.')) return;
    P.requirements.forEach(r=>{if((r.sources||[]).includes(s.id)){r.sources=r.sources.filter(x=>x!==s.id);r.source_names=(r.source_names||[]).concat(s.name);}});
@@ -601,7 +618,7 @@ function vStake(){const v=$('#view');
   tb.appendChild(tr);});
  $('#bAddS').onclick=()=>{P.stakeholders.push({id:uid(),name:'',title:'',org:'',role:'',authority:'',influence:'',interest:'',contact:''});save();vStake();renderSteps();setTimeout(()=>{const ins=document.querySelectorAll('#sb tr:last-child input');if(ins[0]) ins[0].focus();},0);};
  function quad(){const g={'Keep satisfied':[],'Manage closely':[],'Monitor':[],'Keep informed':[]};P.stakeholders.filter(s=>s.name).forEach(s=>g[quadrant(s)].push(s.name));
-  $('#quad').innerHTML=Object.entries(g).map(([k,a])=>'<div><b>'+k+'</b>'+(a.map(esc).join(', ')||'<span class="small">—</span>')+'</div>').join('');}
+  $('#quad').innerHTML=Object.entries(g).map(([k,a])=>'<div><b>'+k+'</b>'+(a.map(esc).join(', ')||'<span class="small">–</span>')+'</div>').join('');}
  function warn(){const w=stakeWarnings();$('#sw').innerHTML=w.length?'<div class="mentor">'+w.map(esc).join('<br>')+'</div>':'';}
  quad();warn();}
 
@@ -674,6 +691,10 @@ async function callAI(slot,sys,user){
  const txt=p==='anthropic'?(j.content||[]).map(c=>c.text||'').join(''):p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):(j.choices?.[0]?.message?.content||'');
  const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<0) throw new Error('No JSON in reply');return JSON.parse(txt.slice(a,b+1));}
 const norm=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
+// "Col A. Reyes", "A. Reyes" and "Colonel Reyes" are one person: rank, title and punctuation are dropped before names are compared.
+const RANKS=/\b(col|colonel|lt ?col|ltc|lieutenant colonel|maj|major|capt|cpt|captain|lt|1st lt|2nd lt|2d lt|lieutenant|gen|general|brig ?gen|cmsgt|smsgt|msgt|tsgt|ssgt|sgt|amn|mr|mrs|ms|dr|cdr|lcdr|cmdr|cdr|rdml|radm|vadm|adm|capt\.?|usaf|usn|usmc|usa|ret)\b\.?/gi;
+const pkey=n=>{const t=String(n||'').replace(RANKS,' ').replace(/[^A-Za-z' \-]/g,' ').trim().split(/\s+/).filter(Boolean);if(!t.length) return '';const last=t[t.length-1].toLowerCase();const first=t.length>1?t[0][0].toLowerCase():'';return last+'|'+first;};
+const samePerson=(a,b)=>{const A=pkey(a),B=pkey(b);if(!A||!B) return false;const [la,fa]=A.split('|'),[lb,fb]=B.split('|');return la===lb&&(!fa||!fb||fa===fb);};
 const verified=(src,q)=>{const n=norm(q);return n.length>=6&&norm(src).includes(n);};
 const toks=s=>new Set(norm(s).replace(/[^a-z0-9 ]/g,' ').split(' ').filter(w=>w.length>2&&!['the','shall','must','and','for','with','will','that','facility','need','needs'].includes(w)));
 function sim(a,b){const A=toks(a),B=toks(b);if(!A.size||!B.size) return 0;let i=0;A.forEach(x=>{if(B.has(x)) i++;});return i/Math.min(A.size,B.size);}
@@ -892,13 +913,25 @@ const KEYF={project:'field',stakeholders:'name',requirements:'statement',gaps:'a
 const QUOTEF=k=>k==='requirements'?'evidence':'quote';
 function srcText(){return P.sessions.filter(s=>(s.notes||'').trim()).map((s,i)=>'[S'+(i+1)+'] '+(s.title||SESSION_TYPES[s.type]||'Source')+' ('+(SESSION_TYPES[s.type]||s.type)+', '+(s.date||'')+')\n'+s.notes.trim()).join('\n\n').slice(0,150000);}
 function srcSession(q){const n=norm(q);return P.sessions.find(s=>n.length>=6&&norm(s.notes).includes(n));}
-function numsOk(item,all){const S=String(all).replace(/,/g,'');['qty_have','qty_need'].forEach(f=>{const v=String(item[f]??'').replace(/,/g,'').trim();if(v&&!S.includes(v)){item[f]='';item.numsCleared=true;}});}
+// A gap's numbers must come from the sources: a number written there (12, 2,400) or the sum of two numbers in one sentence (12 fighters + 4 tankers = 16).
+function srcNums(all){if(srcNums.k===all) return srcNums.v;const N=new Set();String(all).split(/(?<=[.!?;\n])\s+/).forEach(se=>{const L=(se.replace(/(\d),(\d{3})/g,'$1$2').match(/\d+(?:\.\d+)?/g)||[]).map(Number);L.forEach(x=>N.add(x));for(let i=0;i<L.length;i++) for(let j=i+1;j<L.length;j++) N.add(L[i]+L[j]);});
+ const W={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};String(all).toLowerCase().replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g,(m,w)=>{N.add(W[w]);return m;});srcNums.k=all;srcNums.v=N;return N;}
+function emptyAns(j){if(!j||typeof j!=='object') return true;return !Object.keys(KEYF).some(k=>Array.isArray(j[k])&&j[k].length)&&!(Array.isArray(j.conflicts)&&j.conflicts.length);}
+function numsOk(item,all){const N=srcNums(all);['qty_have','qty_need'].forEach(f=>{const raw=String(item[f]??'').replace(/,/g,'').trim();if(!raw) return;const m=raw.match(/\d+(?:\.\d+)?/);if(m&&N.has(Number(m[0]))) return;item[f]='';item.numsCleared=true;});}
 async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) so NORA can use AI, then reload this page.');return;}
  const all=allText();if(all.trim().length<40){alert('Add at least one document or some notes first.');return;}
  let CH=srcChunks();const skipped=Math.max(0,CH.length-MAXCH);CH=CH.slice(0,MAXCH);
+ // On a rebuild only the new sources are sent, with a short list of what the record already holds, so the request stays small and the readers can say where the new source disagrees.
+ const onlyNew=P.requirements.length&&P.sessions.some(s=>s.readAt)&&P.sessions.some(s=>!s.readAt&&(s.notes||'').trim());
+ const recCtx=onlyNew?'\n\nRECORD ALREADY HOLDS (for comparison only; do not re-extract):\n'+P.requirements.filter(r=>r.status!=='withdrawn').map(r=>(r.id||'')+' ['+(r.priority||'')+'] '+r.text).join('\n')+(P.project.need_date?'\nNeeded by: '+P.project.need_date:''):'';
+ const conflictsLocal=detectConflicts();
  const b=$('#bBuild'),st=$('#bStat');b.disabled=true;const say=t=>st.textContent=t;const runs=[];let err='';const failed=[];
  for(let c=0;c<CH.length;c++){say(CH.length>1?'Two readers are reading part '+(c+1)+' of '+CH.length+'…':'Two readers are reading your documents on their own…');
-  const [A,B]=await Promise.all([CARLAI.ask('claude',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message})),CARLAI.ask('gemini',EXTRACT_SYS(),'SOURCES:\n'+CH[c]).catch(e=>({err:e.message}))]);
+  const ask=w=>CARLAI.ask(w,EXTRACT_SYS(),'SOURCES:\n'+CH[c]+recCtx).then(j=>emptyAns(j)?{err:'empty answer'}:j).catch(e=>({err:e.message}));
+  let [A,B]=await Promise.all([ask('claude'),ask('gemini')]);
+  // Reader B is tried once more before NORA falls back to a single reading
+  if(B&&B.err){say('Reader B did not answer; trying once more…');B=await ask('gemini');}
+  if(A&&A.err){say('Reader A did not answer; trying once more…');A=await ask('claude');}
   [[A,'Reader A'],[B,'Reader B']].forEach(([j,w])=>{if(j&&!j.err) runs.push([j,w,c]);else{err=err||(j&&j.err);failed.push({who:w,part:c+1,err:String(j&&j.err||'no answer').slice(0,120)});}});}
  const readers=[...new Set(runs.map(r=>r[1]))];
  if(!runs.length){b.disabled=false;say('');alert('AI did not answer: '+err);return;}
@@ -908,7 +941,7 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
    it.ok=verified(all,it[qf]);
    if(!it.ok){const soft=(['assumptions','risks','measures'].includes(cat)||(cat==='project'&&it.field==='name'))&&!String(it[qf]||'').trim();if(!soft){rejected++;log('AI item rejected (quote not in your documents)',who+' · '+cat+': '+String(it[kf]).slice(0,80));return;}it[qf]='';}
    if(cat==='gaps') numsOk(it,all);
-   const m=pool.find(p=>cat==='project'?p.field===it.field:cat==='stakeholders'?norm(p.name)===norm(it.name):sim(p[kf],it[kf])>=.6);
+   const m=pool.find(p=>cat==='project'?p.field===it.field:cat==='stakeholders'?samePerson(p.name,it.name):sim(p[kf],it[kf])>=.6);
    if(m){if(!m.by.includes(who)) m.by.push(who);if(!m.ok&&it.ok) Object.assign(m,it,{by:m.by,id:m.id,keep:m.keep});else Object.keys(it).forEach(f=>{if((m[f]===''||m[f]==null)&&it[f]) m[f]=it[f];});}
    else pool.push({...it,id:uid(),by:[who],ch,keep:true});}));
   pool.forEach(p=>p.status=!p.ok?'suggestion':readers.length<2?'single':p.by.length>=2?'agreed':'single');
@@ -923,16 +956,41 @@ async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in
   out.requirements=out.requirements.filter(p=>p.status!=='dropped');}
  // Leave out what the record already holds.
  out.requirements=out.requirements.filter(k=>!P.requirements.some(r=>sim(r.text,k.statement)>=.85));
- out.stakeholders=out.stakeholders.filter(k=>!P.stakeholders.some(s=>norm(s.name)===norm(k.name)));
+ out.stakeholders=out.stakeholders.filter(k=>!P.stakeholders.some(s=>samePerson(s.name,k.name)));
  out.project=out.project.filter(k=>k.field in BLANK().project&&String(k.value||'').trim()&&pBlank(k.field));
  out.project.forEach(k=>{if(k.field==='service'&&!SERVICES[k.value]) k.keep=false;if(k.field==='location'&&!LOCS[k.value]) k.keep=false;if(k.field==='driver'&&!DRIVERS[k.value]) k.keep=false;});
  ['gaps','constraints','assumptions','risks','measures'].forEach(c=>out[c]=out[c].filter(k=>!P[c].some(x=>sim(x.text||x.area||'',k[KEYF[c]])>=.85)));
   // Conflicts between sources: both versions kept, quoted, until a person rules.
  const cf=[];runs.forEach(([j,who])=>(Array.isArray(j.conflicts)?j.conflicts:[]).forEach(x=>{if(!x||!x.what||!x.a||!x.b) return;if(!verified(all,x.quote_a)||!verified(all,x.quote_b)){rejected++;return;}if(cf.some(y=>sim(y.what+' '+y.a+' '+y.b,x.what+' '+x.a+' '+x.b)>=.6)) return;cf.push({id:uid(),what:String(x.what),a:String(x.a),quote_a:String(x.quote_a),src_a:x.src_a||'',b:String(x.b),quote_b:String(x.quote_b),src_b:x.src_b||'',by:who,status:'open'});}));
- P.build={at:new Date().toISOString(),items:out,ans:{},engines:readers,failed,conflicts:cf,rejected,parts:CH.length,skipped,applied:false};
+ conflictsLocal.forEach(x=>{if(!cf.some(y=>sim(y.what+' '+y.a+' '+y.b,x.what+' '+x.a+' '+x.b)>=.6)&&!(P.conflicts||[]).some(y=>y.key===x.key)) cf.push(x);});
+ P.sessions.forEach(s=>{if((s.notes||'').trim()&&!s.readAt&&runs.length) s.readAt=new Date().toISOString();});
+ P.build={at:new Date().toISOString(),items:out,ans:{},engines:readers,failed,single:readers.length<2,conflicts:cf,rejected,parts:CH.length,skipped,onlyNew:!!onlyNew,applied:false};
  if(failed.length) log('Build my requirement: a reader failed',failed.map(x=>x.who+(CH.length>1?' (part '+x.part+')':'')+': '+x.err).join('; '));
  log('Build my requirement: read',all.length+' characters from '+P.sessions.length+' sources'+(CH.length>1?' in '+CH.length+' parts':'')+(skipped?' ('+skipped+' more parts not read: too long)':'')+'; '+Object.entries(out).map(([k,v])=>v.length+' '+k).join(', ')+(rejected?'; '+rejected+' rejected for quotes not found':''));
  save();b.disabled=false;say('');vBuild();renderSteps();const rv=document.getElementById('rvw');if(rv) rv.scrollIntoView({block:'start'});}
+
+// Where a newer source disagrees with the record: a different number for the same subject, a correction word ("not", "instead of", "moved up", "changed to"), or a different completion date. Found without AI, each one blocks Gate 1 until ruled.
+function detectConflicts(){const out=[];const fresh=P.sessions.filter(s=>(s.notes||'').trim()&&!s.readAt);if(!fresh.length||!P.requirements.length&&!P.project.need_date) return out;
+ const nums=t=>(String(t).replace(/(\d),(\d{3})/g,'$1$2').match(/\b\d+(?:\.\d+)?\b/g)||[]).map(Number).filter(n=>!(n>=1990&&n<=2100));
+ const CUE=/\b(not|instead of|rather than|moved up|moved to|changed to|now|correction|actually|no longer)\b/i;
+ // number–subject pairs: "12 fighters", "at least 4 of its 8 hydrant outlets" (4 and 8 both count outlets), "2,400 SF"
+ const STOPN=new Set(['of','its','the','our','all','at','least','up','to','a','an','and','more','than','about','some','each','every','on','in','for','with','new','existing','total']);
+ const stem=w=>String(w).toLowerCase().replace(/(ies)$/,'y').replace(/(es|s)$/,'');
+ const pairs=tx=>{const T=String(tx).replace(/(\d),(\d{3})/g,'$1$2').toLowerCase().split(/[^a-z0-9.\-]+|(?<=\d)(?=[a-z])/).filter(Boolean);const P2=[];
+  T.forEach((w,i)=>{if(!/^\d+(\.\d+)?$/.test(w)) return;const n=Number(w);if(n>=1990&&n<=2100) return;const st=[];for(let k=i+1;k<T.length&&k<=i+6&&st.length<2;k++){const x=T[k];if(STOPN.has(x)||/^\d/.test(x)) continue;if(x.length<2) break;st.push(stem(x));}if(st.length) P2.push({n,st});});return P2;};
+ const MO={jan:1,feb:2,mar:3,apr:4,may:5,jun:6,jul:7,aug:8,sep:9,oct:10,nov:11,dec:12};
+ const dates=t=>{const o=[];String(t).replace(/\b(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\.?\s+(20\d\d)\b/gi,(m,a,y)=>{o.push(y+'-'+String(MO[a.toLowerCase().slice(0,3)]).padStart(2,'0'));return m;});return o;};
+ const spk=s=>{const m=String(s.title||'').match(/(?:with|–|-|:)\s*((?:col|lt ?col|maj|capt|cmsgt|mr|ms|dr|gen)\.?\s+[A-Z][\w.\- ]{1,30})/i);const who=m?m[1].trim():(s.title||'Source');const st=P.stakeholders.find(x=>samePerson(x.name,who));return who+(st&&st.authority?' ('+st.authority+(st.title?', '+st.title:'')+')':'');};
+ fresh.forEach(s=>{String(s.notes).split(/(?<=[.!?;\n])\s+/).forEach(se=>{const t=se.trim();if(t.length<12) return;const sn=nums(t),cue=CUE.test(t);
+  P.requirements.filter(r=>r.status!=='withdrawn').forEach(r=>{const RP=pairs(r.text),SP=pairs(t);if(!RP.length||!SP.length) return;
+   const ctx=[...toks(t)].filter(w=>toks(r.text).has(w)).map(stem).filter(w=>!RP.some(p=>p.st.includes(w))).length;
+   [...new Set(SP.flatMap(p=>p.st))].forEach(st=>{const rs=[...new Set(RP.filter(p=>p.st.includes(st)).map(p=>p.n))],ss=[...new Set(SP.filter(p=>p.st.includes(st)).map(p=>p.n))];if(!rs.length||!ss.length) return;
+    const differ=ss.some(n=>!rs.includes(n))||rs.some(n=>!ss.includes(n));if(!differ) return;if(!(cue||ctx>=1||ss.some(n=>!rs.includes(n)))) return;
+    const key='n|'+r.id+'|'+st+'|'+ss.join(',');if(out.some(o=>o.key.startsWith('n|'+r.id+'|')&&o.quote_b===t.slice(0,240))) return;
+    out.push({id:uid(),key,what:(r.id?r.id+' – ':'')+st+': '+String(r.text).slice(0,80),a:rs.join(' / ')+' '+st,quote_a:r.text,src_a:'Record ('+(r.id||'requirement')+')',b:ss.filter(n=>!(cue&&rs.includes(n)&&new RegExp('\\bnot\\s+'+n+'\\b','i').test(t))).join(' / ')+' '+st,quote_b:t.slice(0,240),src_b:spk(s)+' – '+(s.title||'source'),by:'NORA check',status:'open'});});});
+  const ds=dates(t);if(ds.length&&/\b(complete|completed|completion|need|needed|operational|ioc|ready|by)\b/i.test(t)){const have=String(P.project.need_date||'').slice(0,7);const d=ds[0];
+   if(have&&d!==have){const key='d|'+d+'|'+have;if(!out.some(o=>o.key===key)) out.push({id:uid(),key,what:'Need date',a:have,quote_a:'Needed by '+have+' (project record)',src_a:'Record',b:d,quote_b:t.slice(0,240),src_b:spk(s)+' – '+(s.title||'source'),by:'NORA check',status:'open'});}}});});
+ return out;}
 
 // What the documents did not answer, asked as plain questions.
 function pBlank(f){const v=String(P.project[f]||'').trim();return !v||(f==='name'&&/^new project$/i.test(v));}
@@ -949,7 +1007,8 @@ function buildQs(){const I=P.build.items,kept=c=>I[c].filter(x=>x.keep);const pv
  if(!sh.some(s=>/public works/.test(s.role||''))) Q.push(['pw','Who in installation public works was consulted? (name, title)','text']);
  return Q;}
 function pill(x){return x.status==='agreed'?'<span class="pill ok">Both readers</span>':x.status==='upheld'?'<span class="pill ok">Arbiter upheld</span>':x.status==='single'?'<span class="pill warn">One reader</span>':'<span class="pill warn">Suggestion – no source</span>';}
-function failNote(B){return B&&B.failed&&B.failed.length?'<div class="find warn" style="margin:8px 0"><b>'+[...new Set(B.failed.map(x=>x.who))].join(' and ')+' did not answer'+(B.parts>1?' (part '+[...new Set(B.failed.map(x=>x.part))].join(', ')+')':'')+'.</b> These results come from one reader only, so nothing was cross-checked. Press Build again: what already came back is reused and only the missing reader runs.</div>':'';}
+function B0single(){const B=P.build;if(!B||!B.single||!(B.failed||[]).length) return '';return [...new Set(B.failed.map(x=>x.who))].join(' and ')+' failed – single reading';}
+function failNote(B){return B&&B.failed&&B.failed.length?'<div class="find warn" style="margin:8px 0"><b>'+[...new Set(B.failed.map(x=>x.who))].join(' and ')+' failed – single reading'+(B.parts>1?' (part '+[...new Set(B.failed.map(x=>x.part))].join(', ')+')':'')+'.</b> These results come from one reader only, so nothing was cross-checked. Press Build again: what already came back is reused and only the missing reader runs.</div>':'';}
 function conflictPanel(){const L=(P.conflicts||[]);if(!L.length) return '';return '<div class="panel"><h3 style="margin-top:0">Sources disagree</h3><p class="small">Both versions are kept until you rule. Gate 1 stays open while any is unresolved.</p>'+L.map(x=>'<div class="card" style="margin-top:8px"><b>'+esc(x.what)+'</b>'+(x.status==='open'?'':' <span class="pill ok">'+esc(x.status==='a'?'Ruled: '+x.a:x.status==='b'?'Ruled: '+x.b:'Both stand')+'</span>')+'<div class="small" style="margin-top:4px">'+(x.src_a?esc(x.src_a)+': ':'')+'“'+esc(x.quote_a)+'”<br>'+(x.src_b?esc(x.src_b)+': ':'')+'“'+esc(x.quote_b)+'”</div>'+(x.status==='open'?'<div class="row" style="margin-top:6px;gap:6px"><button class="sm" data-cfr="'+x.id+'|a">Use '+esc(x.a)+'</button><button class="sm" data-cfr="'+x.id+'|b">Use '+esc(x.b)+'</button><button class="sm" data-cfr="'+x.id+'|both">Both stand (different things)</button></div>':'')+'</div>').join('')+'</div>';}
 document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-cfr]');if(!b) return;const [id,c]=b.dataset.cfr.split('|');const x=(P.conflicts||[]).find(y=>y.id===id);if(!x) return;x.status=c;x.ruled=new Date().toISOString();log('Conflict ruled',x.what+': '+(c==='a'?x.a:c==='b'?x.b:'both stand'));save();render();});
 function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&&CARLAI.state().ok;const docs=P.sessions.filter(s=>(s.notes||'').trim());
@@ -991,7 +1050,7 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
   P.stakeholders.push({id:uid(),name:name.trim(),title:t.join(',').trim(),org:'',role,authority:k==='decider'?'decides':'consulted',influence:k==='decider'?'H':'',interest:'H',contact:'',origin:'Your answer'});n.stakeholders=(n.stakeholders||0)+1;});
  const byName={};kept('stakeholders').forEach(x=>{const s={id:uid(),name:x.name,title:x.title||'',org:x.org||'',role:ROLES.includes(x.role)?x.role:'Other',authority:AUTH[x.authority]?x.authority:'',influence:x.influence==='H'?'H':x.influence==='L'?'L':'',interest:x.interest==='H'?'H':x.interest==='L'?'L':'',contact:x.contact||'',origin:'From '+(srcSession(x.quote)?.title||'your documents')};P.stakeholders.push(s);byName[norm(x.name)]=s.id;n.stakeholders=(n.stakeholders||0)+1;
   const ss=srcSession(x.quote);if(ss&&!ss.participants.includes(s.id)) ss.participants.push(s.id);});
- kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);let who=personFor(x.speaker,ss,x.evidence);if(!who&&String(x.speaker||'').trim()) who=addPerson(x.speaker,ss);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',rationale:x.rationale||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
+ kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);let who=personFor(x.speaker,ss,x.evidence);if(!who&&String(x.speaker||'').trim()) who=addPerson(x.speaker,ss);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',rationale:x.rationale||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status==='single'&&B0single()?B0single():x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
  // Nothing is added twice: an item that says the same thing as one already in the record is skipped.
  const dupOf=(L,t)=>L.some(y=>sameT(y.text||y.area||'',t));let skipped=0;
  kept('gaps').forEach(x=>{if(P.gaps.some(g=>sameT(g.area+' '+(g.required||''),x.area+' '+(x.required||'')))){skipped++;return;}const q=gapTotal(x);P.gaps.push({id:uid(),area:x.area,current:x.current||'',required:x.required||'',qty_have:String(x.qty_have??''),qty_need:String(q.need??''),unit:q.unit||x.unit||'',impact:x.impact||'',reqs:[],origin:(x.ok?'From your documents':'Suggestion')+(q.note?'; '+q.note:'')});n.gaps=(n.gaps||0)+1;});
@@ -1042,7 +1101,7 @@ async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in t
 
 // ---------- Long documents: read in parts ----------
 const CHUNK=120000,MAXCH=6;
-function srcBlocks(){const B=[];P.sessions.filter(s=>(s.notes||'').trim()).forEach((s,i)=>{const hd='[S'+(i+1)+'] '+(s.title||SESSION_TYPES[s.type]||'Source')+' ('+(SESSION_TYPES[s.type]||s.type)+', '+(s.date||'')+')';const t=s.notes.trim();
+function srcBlocks(){const B=[];const fresh=P.requirements.length&&P.sessions.some(s=>s.readAt)&&P.sessions.some(s=>!s.readAt&&(s.notes||'').trim());P.sessions.filter(s=>(s.notes||'').trim()).forEach((s,i)=>{if(fresh&&s.readAt) return;const hd='[S'+(i+1)+'] '+(s.title||SESSION_TYPES[s.type]||'Source')+' ('+(SESSION_TYPES[s.type]||s.type)+', '+(s.date||'')+')';const t=s.notes.trim();
   if(t.length<=CHUNK-500){B.push(hd+'\n'+t);return;}
   let part='',k=1;t.split(/\n{2,}/).forEach(pp=>{while(pp.length>CHUNK-500){if(part){B.push(hd+' part '+(k++)+'\n'+part);part='';}B.push(hd+' part '+(k++)+'\n'+pp.slice(0,CHUNK-500));pp=pp.slice(CHUNK-500);}
    if((part+pp).length>CHUNK-500){B.push(hd+' part '+(k++)+'\n'+part);part='';}part+=(part?'\n\n':'')+pp;});if(part) B.push(hd+' part '+k+'\n'+part);});return B;}
@@ -1263,7 +1322,7 @@ function pkgCorbel(){const p=P.project;const act=P.requirements.filter(r=>r.stat
  const kv=(k,v)=>cdP('<span style="'+CDK+'">'+esc(k)+'</span>&nbsp;&nbsp;'+(String(v||'').trim()?esc(v):TBP),'margin:0 0 5pt');const e=x=>esc(x??'');
  const cdTable0=cdTable;const cdTableT=(h,rows,w)=>cdTable0(h,rows.length?rows:[[TBP].concat(Array(h.length-1).fill(''))],w);
  const conf=r=>r.confirmed&&r.status!=='draft'?' – '+r.confirmed.by+', '+r.confirmed.date:'';const gi=gateItems();
- const body=cdBand('Requirement package',pname,[p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('  ·  '),'Prepared by '+(p.prepared_by||(window.CARLAI&&CARLAI.state().user)||'—')+'  ·  '+today())+
+ const body=cdBand('Requirement package',pname,[p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('  ·  '),'Prepared by '+(p.prepared_by||(window.CARLAI&&CARLAI.state().user)||'–')+'  ·  '+today())+
   cdLead('Prepared with Corbel. These are recommendations; validation authority rests with the installation and the Service. Every requirement traces to the person who stated it and the words they used.')+
   cdH('1   Need statement')+cdP(String(P.need_statement||'').trim()?hiN(e(P.need_statement)):TBP,'font-size:11pt;line-height:140%')+
   cdH('2   Mission and driver')+kv('Mission',p.mission)+kv('Driver',(DRIVERS[p.driver]||{}).t)+kv('Why now',p.driver_detail)+kv('Needed by',p.need_date)+
@@ -1335,7 +1394,7 @@ function vReqs(){const v=$('#view');
    '<textarea data-k="text" style="min-height:48px" placeholder="The facility shall…"></textarea><div class="flags" data-fl></div>'+
    '<div class="grid4" style="margin-top:8px"><div><label class="f">How it will be verified</label><input data-k="measure" placeholder="Measure, test, or acceptance criterion"></div><div><label class="f">Rationale</label><input data-k="rationale" placeholder="Why it is needed"></div>'+
    '<div><label class="f">Source stakeholders</label><div class="chips" data-srcbox>'+P.stakeholders.map(x=>'<label class="chip"><input type="checkbox" value="'+x.id+'" '+((r.sources||[]).includes(x.id)?'checked':'')+'>'+esc(x.name||'(unnamed)')+'</label>').join('')+'</div><input data-addp list="shl3'+r.id+'" placeholder="Add a person (name, title)" style="margin-top:4px"><datalist id="shl3'+r.id+'">'+P.stakeholders.filter(x=>!(r.sources||[]).includes(x.id)).map(x=>'<option value="'+esc(x.name+(x.title?', '+x.title:''))+'">').join('')+'</datalist>'+((r.source_names||[]).length?'<div class="small">Former: '+esc(r.source_names.join(', '))+'</div>':'')+'</div>'+
-   '<div><label class="f">Source session</label><select data-sess>'+'<option value="">—</option>'+P.sessions.map(x=>'<option value="'+x.id+'" '+(x.id===r.session?'selected':'')+'>'+esc((SESSION_TYPES[x.type]||'')+' '+x.date+' '+(x.title||''))+'</option>').join('')+'</select></div></div>'+
+   '<div><label class="f">Source session</label><select data-sess>'+'<option value="">–</option>'+P.sessions.map(x=>'<option value="'+x.id+'" '+(x.id===r.session?'selected':'')+'>'+esc((SESSION_TYPES[x.type]||'')+' '+x.date+' '+(x.title||''))+'</option>').join('')+'</select></div></div>'+
    (r.evidence?'<div class="small" style="margin-top:6px">Source words: <q class="ev" title="Show in source">'+esc(r.evidence)+'</q></div>':'')+(r.confirmed&&r.status!=='draft'?'<div class="small">Confirmed by '+esc(r.confirmed.by)+', '+esc(r.confirmed.date)+' ('+esc(HOW[r.confirmed.how]||r.confirmed.how)+')</div>':'')+
    (r.status==='withdrawn'?'<div style="margin-top:6px"><label class="f">Reason withdrawn</label><input data-k="withdrawn_reason"></div>':'');
    const fl=()=>d.querySelector('[data-fl]').innerHTML=quality(r).map(([c,t])=>'<span class="pill '+c+'">'+esc(t)+'</span>').join('');
@@ -1358,7 +1417,7 @@ function vGap(){const v=$('#view');
   '<div class="grid4" style="margin-top:8px"><div><label class="f">Quantity today</label><input type="number" data-k="qty_have"></div><div><label class="f">Quantity required</label><input type="number" data-k="qty_need"></div><div><label class="f">Unit</label><input data-k="unit" placeholder="SF, bays, beds, kW"></div><div><label class="f">Gap</label><div data-gap style="padding:6px 0;font-weight:600"></div></div></div>'+
   '<div style="margin-top:8px"><label class="f">Impact on the mission if the gap is not closed</label><textarea data-k="impact"></textarea></div>'+
   '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><div class="chips" data-rbox>'+act.map(r=>'<label class="chip" title="'+esc(r.text)+'"><input type="checkbox" value="'+r.id+'" '+(g.reqs.includes(r.id)?'checked':'')+'>'+esc(r.id+' '+r.text.slice(0,60)+(r.text.length>60?'…':''))+'</label>').join('')+'</div></div>';
-  const gp=()=>{const h=Number(g.qty_have),n=Number(g.qty_need);d.querySelector('[data-gap]').textContent=(g.qty_need!==''&&!isNaN(n))?((n-(isNaN(h)?0:h)).toLocaleString()+' '+(g.unit||'')):'—';};
+  const gp=()=>{const h=Number(g.qty_have),n=Number(g.qty_need);d.querySelector('[data-gap]').textContent=(g.qty_need!==''&&!isNaN(n))?((n-(isNaN(h)?0:h)).toLocaleString()+' '+(g.unit||'')):'–';};
   bindAll(d,g,gp);gp();
   d.querySelectorAll('[data-rbox] input').forEach(c=>c.onchange=()=>{g.reqs=[...d.querySelectorAll('[data-rbox] input:checked')].map(o=>o.value);save();});
   d.querySelector('[data-del]').onclick=()=>{P.gaps=P.gaps.filter(x=>x!==g);log('Gap removed',g.area);save();vGap();renderSteps();};
@@ -1437,9 +1496,9 @@ function regRows(){return [['Name','Title / office','Organization','Role','Autho
 function wordWrap(body){return body.replace('<html>','<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">');}
 function pkgHTML(print){const p=P.project;const act=P.requirements.filter(r=>r.status!=='withdrawn');const tb=(h,rows)=>'<table><tr>'+h.map(x=>'<th>'+esc(x)+'</th>').join('')+'</tr>'+rows.map(r=>'<tr>'+r.map(x=>'<td>'+esc(x)+'</td>').join('')+'</tr>').join('')+'</table>';
  return '<!DOCTYPE html><html><head><meta charset="utf-8"><title>'+esc(p.name||'Requirement package')+'</title><style>body{font:11pt Calibri,Arial,sans-serif;color:#111;max-width:7.5in;margin:0 auto;padding:.4in}h1{font-size:18pt;margin:0 0 4pt}h2{font-size:13pt;margin:16pt 0 6pt;border-bottom:1px solid #999}table{border-collapse:collapse;width:100%;font-size:9.5pt;margin:4pt 0}th,td{border:1px solid #999;padding:3pt 5pt;text-align:left;vertical-align:top}th{background:#e8eef0}.m{color:#444;font-size:10pt}.cui{text-align:center;font-weight:bold;font-size:10pt}</style></head><body>'+
- '<h1>Requirement Package: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(p.prepared_by||'—')+', '+today()+'. Prepared with NORA; recommendations only. Validation authority rests with the installation and the Service.</div>'+
+ '<h1>Requirement Package: '+esc(p.name||'(untitled)')+'</h1><div class="m">'+esc([p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join(' · '))+'<br>Prepared by '+esc(p.prepared_by||'–')+', '+today()+'. Prepared with NORA; recommendations only. Validation authority rests with the installation and the Service.</div>'+
  '<h2>1. Need statement</h2><p>'+esc(P.need_statement||'(not yet written)')+'</p>'+
- '<h2>2. Mission and driver</h2><p><b>Mission:</b> '+esc(p.mission||'—')+'</p><p><b>Driver:</b> '+esc(DRIVERS[p.driver]?.t||'—')+'. '+esc(p.driver_detail||'')+'</p>'+(p.need_date?'<p><b>Capability needed by:</b> '+esc(p.need_date)+'</p>':'')+
+ '<h2>2. Mission and driver</h2><p><b>Mission:</b> '+esc(p.mission||'–')+'</p><p><b>Driver:</b> '+esc(DRIVERS[p.driver]?.t||'–')+'. '+esc(p.driver_detail||'')+'</p>'+(p.need_date?'<p><b>Capability needed by:</b> '+esc(p.need_date)+'</p>':'')+
  '<h2>3. Stakeholders</h2>'+tb(['Name','Title / office','Organization','Role','Authority'],P.stakeholders.map(s=>[s.name,s.title,s.org,s.role,AUTH[s.authority]||'']))+
  '<h2>4. Requirements</h2>'+tb(['ID','Requirement','Type','Priority','Why it is needed','Verification','Source','Status'],act.map(r=>[r.id,r.text,RTYPES[r.type],PRIOR[r.priority],r.rationale||'',r.measure,srcNames(r)||(SS(r.session)?.title||''),RSTAT[r.status]+(r.confirmed&&r.status!=='draft'?' – '+r.confirmed.by+', '+r.confirmed.date:'')]))+
  '<h2>5. Gap analysis</h2>'+tb(['Capability','Today','Required','Gap','Impact if not closed'],P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [g.area,g.current+(g.qty_have!==''?' ('+g.qty_have+' '+g.unit+')':''),g.required+(g.qty_need!==''?' ('+g.qty_need+' '+g.unit+')':''),g.qty_need!==''?(n-(isNaN(h)?0:h))+' '+g.unit:'',g.impact];}))+

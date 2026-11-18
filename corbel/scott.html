@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -1034,18 +1034,20 @@ async function reconcile(){
  renderOut();
 }
 
-function renderOut(){
+// The last parse is kept for each project, so leaving SCOTT and coming back still shows it and Send to CORA still works.
+function keepParse(){try{const pid=(window.CorbelCCS&&CorbelCCS.pid())||'_';const all=JSON.parse(localStorage.getItem('scott_last')||'{}');all[pid]={at:Date.now(),state:STATE};localStorage.setItem('scott_last',JSON.stringify(all));}catch(e){}}
+function renderOut(){keepParse();
  const o=$('#out');const S=STATE;const eng=Object.keys(S.names).filter(e=>e===('offline')||engineList().some(x=>x.id===e));
  const cnt=s=>S.items.filter(i=>i.status===s).length;
  let h='<h2>Findings</h2><p class="lead">'+S.items.length+' triggers from '+S.engines.length+' reader'+(S.engines.length>1?'s':'')+': '+cnt('agree')+' agreed, '+cnt('single')+' found by one reader, '+cnt('unverified')+' rejected because the quoted text is not in the scope. Checked items go to the selector.</p>';
  h+='<div class="grp">Project basics</div><div class="basics" id="basics"></div>';
  h+='<div class="grp">Work elements</div><ul class="elements">'+(S.elements.length?S.elements.map(w=>'<li><b>'+esc(w.name)+'</b>'+(w.description?': '+esc(w.description):'')+(w.ok?'':' <span class="s-bad">(quote not found)</span>')+' '+(w.srcs||[w.src]).map(x=>'<span class="pill">'+esc(S.names[x]||x)+'</span>').join(' ')+'</li>').join(''):'<li class="small">None identified.</li>')+'</ul>';
- const groups=[['agree','Agreed by two or more readers','s-agree'],['single','Found by one reader — review','s-single'],['unverified','Rejected — quoted text not found in the scope','s-bad']];
+ const groups=[['agree','Agreed by two or more readers','s-agree'],['single','Found by one reader – review','s-single'],['unverified','Rejected – quoted text not found in the scope','s-bad']];
  const fields=['work_type','facility','systems','security','hazards','service','design_agent','country','delivery','funding','level','contract_type','solicitation','set_aside','seismic','historic','arctic','cui'];
  groups.forEach(([st,title,cls])=>{const it=S.items.filter(i=>i.status===st&&!['value','duration_days'].includes(i.field)).sort((a,b)=>fields.indexOf(a.field)-fields.indexOf(b.field));if(!it.length) return;
   const body=it.map(i=>{const k=S.items.indexOf(i);const src=eng.map(e=>'<span class="pill '+(i.by[e]==='y'?'y':i.by[e]==='bad'?'':'n')+'" title="'+(i.by[e]==='bad'?'quote not found':'')+'">'+esc(S.names[e])+'</span>').join('');
-   const evs=Object.entries(i.ev).filter(([e])=>i.by[e]==='y').map(([e,q])=>'<div class="ev">'+esc(S.names[e])+': <q>'+esc(q)+'</q>'+(i.why[e]&&i.why[e]!=='scalar'?' — '+esc(i.why[e]):'')+'</div>').join('')||Object.entries(i.ev).map(([e,q])=>'<div class="ev">'+esc(S.names[e])+' quoted: <q>'+esc(q)+'</q></div>').join('');
-   const votes=i.votes?Object.entries(i.votes).map(([e,v])=>'<div class="reason">'+esc(S.names[e])+' '+(e===arbiter()?.id?'ruling':'second look')+': '+(v.error?'failed':v.abstain?'no ruling'+(v.reason?' — '+esc(v.reason):''):(v.applies?'applies':'does not apply')+(v.reason?' — '+esc(v.reason):''))+'</div>').join(''):'';
+   const evs=Object.entries(i.ev).filter(([e])=>i.by[e]==='y').map(([e,q])=>'<div class="ev">'+esc(S.names[e])+': <q>'+esc(q)+'</q>'+(i.why[e]&&i.why[e]!=='scalar'?' – '+esc(i.why[e]):'')+'</div>').join('')||Object.entries(i.ev).map(([e,q])=>'<div class="ev">'+esc(S.names[e])+' quoted: <q>'+esc(q)+'</q></div>').join('');
+   const votes=i.votes?Object.entries(i.votes).map(([e,v])=>'<div class="reason">'+esc(S.names[e])+' '+(e===arbiter()?.id?'ruling':'second look')+': '+(v.error?'failed':v.abstain?'no ruling'+(v.reason?' – '+esc(v.reason):''):(v.applies?'applies':'does not apply')+(v.reason?' – '+esc(v.reason):''))+'</div>').join(''):'';
    return '<tr><td class="ck"><input type="checkbox" data-k="'+k+'" '+(i.use?'checked':'')+(st==='unverified'?' disabled':'')+'></td><td><b>'+esc(lab(i.value===true?i.field:i.value))+'</b> <span class="small">'+esc(Q[i.field]?Q[i.field].label:i.field)+'</span>'+(i.note?'<div class="reason">'+esc(i.note)+'</div>':'')+evs+votes+'</td><td><div class="src">'+src+'</div></td></tr>';}).join('');
   h+='<div class="grp '+cls+'">'+title+' ('+it.length+')</div><table><thead><tr><th></th><th>Trigger and evidence</th><th>Readers</th></tr></thead><tbody>'+body+'</tbody></table>';});
  const nAI=engineList().filter(e=>e.slot).length+(arbiter()?1:0);
@@ -1117,6 +1119,7 @@ $('#fFile').onchange=e=>{const f=e.target.files[0];if(f) f.text().then(t=>{$('#s
 function wc(){const n=$('#scope').value.trim().split(/\s+/).filter(Boolean).length;$('#wc').textContent=n?n+' words':'';}
 $('#scope').addEventListener('input',wc);
 renderEngines();
+try{const pid=(window.CorbelCCS&&CorbelCCS.pid())||'_';const k=JSON.parse(localStorage.getItem('scott_last')||'{}')[pid];if(k&&k.state&&k.state.items){STATE=k.state;$('#scope').value=STATE.scope||'';wc();renderOut();}}catch(e){}
 // Which project the findings go to: the active Corbel project. CORA keeps its answers for each project apart.
 (function(){const e=document.getElementById('scProj');const n=window.CorbelCCS&&CorbelCCS.name();if(e&&n){e.hidden=false;e.innerHTML='Project: <b>'+n.replace(/[<&]/g,'')+'</b>. Findings go to CORA for this project. Switch projects in any other Corbel tool.';}})();
 try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.text){localStorage.removeItem('sophie_to_scott');$('#scope').value=j.text;wc();const w=$('#dataWarn');w.hidden=false;w.dataset.keep='1';w.textContent='Loaded the statement of work from SOPHIE'+(j.title?' ('+j.title+')':'')+'. Parsing it now; check the findings, then send them to CORA.';

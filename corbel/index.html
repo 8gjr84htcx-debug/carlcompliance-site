@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -728,7 +728,7 @@
     var q=J('quinn_project');if(q&&to){var bl=(q.registry||[]).filter(function(r){return String(r.to||'').toLowerCase()===to;}).map(function(r){return r.building;});var rs=(q.records||[]).filter(function(r){return bl.indexOf(r.building)>=0;}),od=(q.issues||[]).filter(function(i){return bl.indexOf(i.building)>=0&&i.status!=='closed';});o.quinn=rs.length?rs.length+' inspection reports, '+od.length+' open deficienc'+(od.length===1?'y':'ies'):'No inspection reports yet';}else o.quinn=to?'No inspection reports yet':'Linked once the project has a task order';
     var ad=J('adam_portfolio');var ar=ad&&ad.reqs?ad.reqs.filter(function(r){return (r.links||[]).some(function(l){return l.pid===id;});}):[];o.adam=ar.length?'Serves '+ar.length+' posture requirement'+(ar.length===1?'':'s'):'Not linked to a posture requirement';
     var hk=J('hank_portfolio');var hr=hk&&hk.items?hk.items[id]:null;o.hank=hr?(hr.dd&&hr.dd.finalDate?'Final DD Form 1354 done':hr.dates&&hr.dates.final?'Final acceptance '+hr.dates.final:hr.dates&&hr.dates.pis?'Placed in service '+hr.dates.pis:'Close-out started'):'Not in close-out yet';
-    o.paula=c.priority?'Priority: '+c.priority:'Tracked in the portfolio';
+    o.paula=c.priority&&!/^\s*1 of 1\b|not scored/i.test(c.priority)?'Priority: '+c.priority:c.priority?'Not scored':'Tracked in the portfolio';
     var next=!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
     return {o:o,next:next,c:c};}
    function show(){var id=sel.value,s=status(id);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';

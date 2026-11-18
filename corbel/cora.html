@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -260,7 +260,7 @@ details summary{cursor:pointer;color:var(--mute);margin:10px 0}
 <style>@media(max-width:900px){main{display:block!important}main>*{min-width:0;max-width:100%;overflow-x:auto}header{flex-wrap:wrap}}</style></head>
 <body>
 <header>
- <div><a href="/corbel/" style="color:#7FB7B2;text-decoration:none;font-size:13px">Corbel</a><h1>CORA <span style="font-weight:400;font-size:14px;opacity:.8">Criteria Organizer and Regulatory Advisor</span></h1><div class="sub">UFC · UFGS · FAR/DFARS · EM 385-1-1 / OSHA — DoD MILCON, Indo-Pacific</div></div>
+ <div><a href="/corbel/" style="color:#7FB7B2;text-decoration:none;font-size:13px">Corbel</a><h1>CORA <span style="font-weight:400;font-size:14px;opacity:.8">Criteria Organizer and Regulatory Advisor</span></h1><div class="sub">UFC · UFGS · FAR/DFARS · EM 385-1-1 / OSHA – DoD MILCON, Indo-Pacific</div></div>
  <div class="sp"></div>
  <button id="bNew" title="Clear all answers">New</button>
  <button id="bOpen" title="Open a saved project file">Open…</button>
@@ -350,9 +350,9 @@ function chip(text,on,cb){const l=document.createElement('label');l.className='c
 
 // ---------- results ----------
 const NAMES={ufc:'UFC / FC / UFS',ufgs:'UFGS',clauses:'FAR / DFARS',safety:'EM 385-1-1 / OSHA'};
-const ST={ok:['Applies','b-ok'],sel:['Candidates — pick what fits the design','b-sel'],rev:['Needs a ruling','b-rev'],off:['Not triggered / removed (audit trail)','b-off']};
+const ST={ok:['Applies','b-ok'],sel:['Candidates – pick what fits the design','b-sel'],rev:['Needs a ruling','b-rev'],off:['Not triggered / removed (audit trail)','b-off']};
 let LAST=null;
-function update(){persist();LAST=run();renderResults();try{localStorage.setItem('cora_selection',JSON.stringify({at:Date.now(),_pid:(window.CorbelCCS&&CorbelCCS.pid())||'',items:selected().map(({mod,x})=>({mod,reg:x.r.reg||x.r.type||'',number:x.r.number||'',title:x.r.title,status:x.st}))}));}catch(e){}const h=document.getElementById('valHint');if(h){const v=Number(P.value);h.textContent=isNaN(v)?'':('$'+v.toLocaleString()+(v>D.thresholds.SAT?' — above SAT ($'+D.thresholds.SAT.toLocaleString()+')':' — at/below SAT'));}}
+function update(){persist();LAST=run();renderResults();try{localStorage.setItem('cora_selection',JSON.stringify({at:Date.now(),_pid:(window.CorbelCCS&&CorbelCCS.pid())||'',items:selected().map(({mod,x})=>({mod,reg:x.r.reg||x.r.type||'',number:x.r.number||'',title:x.r.title,status:x.st}))}));}catch(e){}const h=document.getElementById('valHint');if(h){const v=Number(P.value);h.textContent=isNaN(v)?'':('$'+v.toLocaleString()+(v>D.thresholds.SAT?' – above SAT ($'+D.thresholds.SAT.toLocaleString()+')':' – at/below SAT'));}}
 function renderResults(){
  const box=document.getElementById('results');box.innerHTML='';
  const tabs=document.createElement('div');tabs.className='tabs';
@@ -373,7 +373,7 @@ function renderResults(){
  function drawGroups(){gwrap.innerHTML='';const f=FILTER.toLowerCase();
   ['ok','rev','sel','off'].forEach(s=>{const items=L.filter(x=>x.st===s&&(!f||((x.r.number||'')+' '+x.r.title).toLowerCase().includes(f)));if(!items.length) return;
    const t=table(items,TAB);
-   if(s==='off'){const d=document.createElement('details');if(f) d.open=true;d.innerHTML='<summary>'+ST[s][0]+' — '+items.length+'</summary>';d.appendChild(t);gwrap.appendChild(d);}
+   if(s==='off'){const d=document.createElement('details');if(f) d.open=true;d.innerHTML='<summary>'+ST[s][0]+' – '+items.length+'</summary>';d.appendChild(t);gwrap.appendChild(d);}
    else{gwrap.insertAdjacentHTML('beforeend','<div class="grp"><span class="badge '+ST[s][1]+'">'+items.length+'</span>'+ST[s][0]+'</div>');gwrap.appendChild(t);}});}
  drawGroups();
 }
@@ -402,7 +402,7 @@ function selected(){const o=[];Object.keys(MODS).filter(k=>MODS[k]).forEach(k=>L
 function csv(){const rows=[['Module','Regulation','Number','Title','Status','Reason','Source','Date','Link']];
  selected().forEach(({mod,x})=>{const r=x.r;rows.push([mod,r.reg||r.type||'',r.number||'',r.title,({ok:'Applies',sel:'Candidate (selected)',rev:'Needs ruling',off:'Manually added'})[x.st],x.why||'',r.prescription||r.cite||'',r.date||'',r.url||'']);});
  const s=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');XL.save(projFile('Criteria','xlsx'),[{name:'Criteria',rows}]);}
-function sow(){const sel=selected();let s='APPLICABLE CRITERIA, SPECIFICATIONS, AND CONTRACT CLAUSES\nGenerated '+new Date().toLocaleDateString('en-CA')+' — recommendation for Government review\n';
+function sow(){const sel=selected();let s='APPLICABLE CRITERIA, SPECIFICATIONS, AND CONTRACT CLAUSES\nGenerated '+new Date().toLocaleDateString('en-CA')+' – recommendation for Government review\n';
  const grp={};sel.forEach(({mod,x})=>{(grp[mod]=grp[mod]||[]).push(x);});
  for(const m in grp){s+='\n'+m.toUpperCase()+'\n';grp[m].forEach(x=>{const r=x.r;
   if(m.startsWith('FAR')) s+='  '+r.reg+' '+r.number+'  '+r.title+(r.date?' ('+r.date+')':'')+'\n';
