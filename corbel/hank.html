@@ -153,12 +153,6 @@
 })();
 </script>
 
-
-
-
-
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HANK – Handover, Acceptance, and Notification Keeper</title>
@@ -365,8 +359,9 @@ const inClose=p=>N(p.phase)>=7||N(p.award)>0||!!G.items[p.id];
 function dcaFor(p){const svc=String(p.service||'').toLowerCase(),loc=String(p.installation||'').toLowerCase()+' '+String(p.country||'').toLowerCase();if(/guam|cnmi|tinian|saipan/.test(loc)||/navy|marine/.test(svc)) return 'NAVFAC Pacific';return 'USACE Pacific Ocean Division';}
 function rec(p){if(!G.items[p.id]) G.items[p.id]={pid:p.id,dates:{},chk:{},dd:{lines:[]},notes:''};const r=G.items[p.id];r.dates=r.dates||{};r.chk=r.chk||{};r.dd=r.dd||{lines:[]};r.dd.lines=r.dd.lines||[];return r;}
 // QUINN: open deficiencies on the project's task order.
-function quinnOpen(p){let q=null;try{q=JSON.parse(localStorage.getItem('quinn_project')||'null');}catch(e){}if(!q||!p.to) return null;const to=String(p.to).toLowerCase();
- const bl=(q.registry||[]).filter(r=>String(r.to||'').toLowerCase()===to).map(r=>r.building);if(!bl.length) return null;const iss=(q.issues||[]).filter(i=>bl.includes(i.building));return {open:iss.filter(i=>i.status!=='closed'),all:iss,buildings:bl};}
+function quinnOpen(p){let q=null;try{q=JSON.parse(localStorage.getItem('quinn_project')||'null');}catch(e){}if(!q) return null;const to=String(p.to||'').trim().toLowerCase();
+ // by task order, or by the suite project the QUINN entries were made under
+ const bl=(q.registry||[]).filter(r=>(to&&String(r.to||'').trim().toLowerCase()===to)||r.pid===p.id).map(r=>r.building);if(!bl.length&&!(q.issues||[]).some(i=>i.pid===p.id)) return null;const iss=(q.issues||[]).filter(i=>bl.includes(i.building)||i.pid===p.id);return {open:iss.filter(i=>i.status!=='closed'),all:iss,buildings:bl};}
 // Warranty: one year from final acceptance; a part the Government took possession of earlier runs one year from possession (FAR 52.246-21(b)).
 function warranty(r){const fa=r.dates.final,pos=r.dates.possession;if(!fa&&!pos) return null;const L=[];if(pos&&(!fa||pos<fa)) L.push({what:'Parts in Government possession from '+fd(pos),start:pos,end:addY(pos,1)});if(fa) L.push({what:'The work, from final acceptance',start:fa,end:addY(fa,1)});
  const first=L.slice().sort((a,b)=>a.end.localeCompare(b.end))[0];const last=L.slice().sort((a,b)=>b.end.localeCompare(a.end))[0];return {L,first,last,left:dd(today(),first.end)};}

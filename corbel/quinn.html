@@ -162,6 +162,7 @@
 
 
 
+
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QUINN – Quality, Unified Inspections, and Nonconformance Navigator</title>
@@ -239,6 +240,13 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   const T=p.tools||{},rc=T.record||{};const lv=[[1,'NORA',!!T.nora],[3,'EARL recommendation',!!(rc.earl&&rc.earl.recommended)],[3,'PIPER 1391',!!(rc.piper&&(rc.piper.rounded||rc.piper.contract))],[5,'SOPHIE SOW',!!(T.sophie&&(T.sophie.sections||[]).length)]].filter(x=>x[2]);
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
   if(rc.piper&&rc.piper.contract&&Number(pp.ecc)!==Number(rc.piper.contract)){pp.ecc=rc.piper.contract;ch=true;if(has(pp.cwe)&&!Number(pp.award)&&Number(pp.cwe)===Number(pp.ecc_was||rc.piper.contract)){pp.cwe='';}pp.ecc_was=rc.piper.contract;}
+  // NORA's risks reach PAULA's risk register (added once, never removed: close them in PAULA).
+  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase())) return;pp.risks.push({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA'});ch=true;});
+  // PIPER's block 12: delivery method, design percent and the planned design and award dates.
+  {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
+   if(dv&&!pp.delivery){pp.delivery=dv;pp.delivery_src='PIPER 1391 block 12';ch=true;}
+   const pc=Number(String(s12.pct||'').replace(/[^\d.]/g,''));if(String(s12.pct||'').trim()!==''&&!isNaN(pc)){pp.gates=pp.gates||{};const g=pp.gates.design||{};if(g.pct===undefined||g.pct===''||(g.src||'').indexOf('PIPER')===0&&Number(g.pct)!==pc){pp.gates.design={...g,pct:Math.max(0,Math.min(100,pc)),date:/^\d{4}-\d{2}/.test(s12.asof||'')?String(s12.asof).slice(0,7)+'-01':(g.date||''),src:'PIPER 1391 block 12'+(s12.asof?' (as of '+s12.asof+')':'')};ch=true;}}
+   [['35% design','d35'],['Design complete','dc'],['Contract award','award'],['Notice to proceed','start'],['Beneficial occupancy','complete']].forEach(([n,k])=>{const v=String(s12[k]||'');if(!/^\d{4}-\d{2}/.test(v)) return;const d=v.slice(0,7)+'-01';let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.forecast&&!m.actual){m.forecast=d;m.fsrc='PIPER 1391 block 12';ch=true;}});}
   for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]&&!pp.phase_manual){pp.phase=ph[n];pp.phase_src=n;ch=true;}}}
  if(ch) raw('paula_project',JSON.stringify(pa));}
 function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sample) return;let p=St.projects[pp.id];if(!p){if(!has(pp.name)) return;p=St.projects[pp.id]={id:pp.id,core:{},tools:{},created:today()};ch=true;}
@@ -280,6 +288,15 @@ function manage(){const s=loadStore();const dlg=document.createElement('dialog')
  dlg.querySelector('#msimp').onclick=()=>dlg.querySelector('#msf').click();
  dlg.querySelector('#msf').onchange=e=>{const f=e.target.files[0];if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='milcon-backup-1') throw new Error('Not a Corbel backup file');if(!confirm('Replace everything in this browser with the backup from '+(j.exported||'').slice(0,10)+'?')) return;raw('milcon_store',JSON.stringify(j.store));['irma','quinn','paula'].forEach(k=>{if(j[k]) raw(k+'_project',JSON.stringify(j[k]));});const a=j.store.projects[j.store.active];PER.forEach(t=>{const v=a&&a.tools[t];if(v) raw(PKEY[t],JSON.stringify(v));else ls.removeItem(PKEY[t]);});location.reload();}catch(err){alert('Could not import: '+err.message);}});};}
 
+// ---- IRMA and QUINN entries carry the suite project they were made under, so PAULA and HANK can attach them without a typed task order ----
+if(TOOL==='irma'||TOOL==='quinn'){const K=TOOL+'_project';const stamp=()=>{const s=loadStore();const a=s.active&&s.projects[s.active];if(!a) return;
+  // stamp the tool's live data too, so its next save keeps the link
+  let mem=null;try{mem=TOOL==='irma'?(typeof I!=='undefined'?I:null):(typeof Q!=='undefined'?Q:null);}catch(e){}
+  let v=mem;if(!v){try{v=JSON.parse(ls.getItem(K)||'null');}catch(e){return;}}if(!v) return;
+  const to=String(a.core.to||'').trim().toLowerCase();const L=TOOL==='irma'?(v.items||[]):[].concat(v.registry||[],v.issues||[],v.records||[]);let ch=false;
+  const other=new Set(Object.values(s.projects).filter(q=>q.id!==a.id).map(q=>String(q.core.to||'').trim().toLowerCase()).filter(Boolean));
+  L.forEach(x=>{if(x.pid) return;const xt=String(x.to||'').trim().toLowerCase();if(xt&&to&&xt!==to) return;if(xt&&!to&&other.has(xt)) return;x.pid=a.id;ch=true;});if(ch) raw(K,JSON.stringify(v));};
+ setTimeout(stamp,800);setInterval(stamp,4000);window.addEventListener('beforeunload',stamp);}
 // ---- task order suggestions in IRMA and QUINN ----
 function toList(){if(TOOL!=='irma'&&TOOL!=='quinn') return;const dl2=document.createElement('datalist');dl2.id='ms-to';dl2.innerHTML=window.MS.tos().map(t=>'<option value="'+esc(t)+'">').join('');document.body.appendChild(dl2);
  const tag=()=>document.querySelectorAll('input[data-k="to"]:not([list])').forEach(i=>i.setAttribute('list','ms-to'));new MutationObserver(tag).observe(document.body,{childList:true,subtree:true});tag();}
