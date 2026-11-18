@@ -97,10 +97,6 @@
 })();
 </script>
 
-
-
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SOPHIE – Scope Of work Preparation, Harmonization, Integration, and Editing</title>
@@ -395,7 +391,7 @@ const DEFAULT_RULES=[
  {id:'r4',on:true,set:'Clarity',pat:'\\band/or\\b|\\betc\\.?|\\bTBD\\b|\\bas required\\b|\\bas necessary\\b|\\bif necessary\\b|\\bas needed\\b|\\bwhere practical\\b|\\bapproximately\\b',flags:'gi',msg:'Vague or open-ended wording. State the requirement.',fix:'',sev:'warn'},
  {id:'r5',on:true,set:'Clarity',pat:'\\b(adequate|sufficient|appropriate|suitable|reasonable|good|proper|properly|high[- ]quality|state[- ]of[- ]the[- ]art|user[- ]friendly)\\b',flags:'gi',msg:'Subjective term. Replace with a measurable standard.',fix:'',sev:'warn'},
  {id:'r6',on:true,set:'Clarity',pat:'\\bmust\\b',flags:'gi',msg:'Use “shall” consistently for requirements.',fix:'',sev:'info'},
- {id:'r7',on:true,set:'Andersen roofing standards',pat:'\\b316(?!L)\\b',flags:'g',msg:'316L stainless steel only, never plain 316, in CX environments.',fix:'316L',sev:'bad'},
+ {id:'r7',on:true,set:'Andersen roofing standards',pat:'(?<!\\b(?:not|never|no|nor|plain|than|instead of|rather than|versus|vs\\.?|over)\\s+(?:plain\\s+|type\\s+)?)\\b316(?!L)\\b',flags:'g',msg:'316L stainless steel only, never plain 316, in CX environments.',fix:'316L',sev:'bad'},
  {id:'r8',on:true,set:'Andersen roofing standards',pat:'\\bgalvani[sz]\\w*',flags:'gi',msg:'Galvanized metal is not allowed on Andersen.',fix:'',sev:'bad'},
  {id:'r9',on:true,set:'Andersen roofing standards',pat:'\\bTPO\\b',flags:'g',msg:'TPO is excluded by the Andersen Installation Facilities Standards (check if this is a repair to existing TPO).',fix:'',sev:'warn'},
  {id:'r10',on:true,set:'Andersen roofing standards',pat:'\\bsealant\\b(?![^.]*C920)',flags:'gi',msg:'Sealants: specify ASTM C920 Class 50.',fix:'',sev:'info'}];
@@ -405,7 +401,9 @@ const DB_PRESCRIPTIVE=/\b(by means of|shall use (a|an|the)|manufactured by|model
 const BLANK=()=>({schema:'sophie-1',id:uid(),created:new Date().toISOString(),
  p:{title:'',installation:'',delivery:'db',contract:'',buildings:'',prepared_by:''},template:'house',custom:'',
  sections:[],reqs:[],criteria:[],rules:DEFAULT_RULES.map(r=>({...r})),versions:[],log:[]});
-let S=load()||BLANK();if(!S.sections.length) buildSections();let STEP=(S.built||S.review||S.sections.some(x=>x.text.trim()))?'done':'build';
+let S=load()||BLANK();if(!S.sections.length) buildSections();
+// The 316 auto-fix no longer touches a 316 that the text contrasts with 316L ("not plain 316").
+(S.rules||[]).forEach(r=>{if(r.pat==='\\b316(?!L)\\b') r.pat='(?<!\\b(?:not|never|no|nor|plain|than|instead of|rather than|versus|vs\\.?|over)\\s+(?:plain\\s+|type\\s+)?)\\b316(?!L)\\b';});let STEP=(S.built||S.review||S.sections.some(x=>x.text.trim()))?'done':'build';
 function load(){try{const j=JSON.parse(localStorage.getItem('sophie_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('sophie_project',JSON.stringify(S));
@@ -427,6 +425,11 @@ function buildSections(){const T=TEMPLATES[S.template];const old=S.sections||[];
 function nora(){try{const j=JSON.parse(localStorage.getItem('nora_project')||'null');return j&&j.schema==='nora-1'?j:null;}catch(e){return null;}}
 function piper(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&j.schema==='piper-1'?j:null;}catch(e){return null;}}
 function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
+function scott(){try{const j=JSON.parse(localStorage.getItem('ccs_project')||'null');return j&&typeof j==='object'&&!Array.isArray(j)?j:null;}catch(e){return null;}}
+const SCL={work_type:'Work type',facility:'Facility',systems:'Systems',hazards:'Hazardous activities',security:'Security'};
+const SCX={hazwoper:'contaminated soil or site work (HAZWOPER)',confined_space:'confined space entry',lead_asbestos_hazmat:'lead, asbestos or other hazardous material',hot_work:'hot work',electrical_energized:'energized electrical work',hazardous_energy_loto:'lockout/tagout of hazardous energy',airfield_ops:'work on or near an active airfield',excavation:'excavation',cranes_rigging:'cranes and rigging',critical_lift:'critical lifts',pressurized_systems:'pressurized systems',work_at_height:'work at height',roof_work:'roof work',night_work:'night work',traffic_control:'traffic control',environmental_hazmat:'hazardous material or contamination',db:'design-build',dbb:'design-bid-build'};
+const scLab=v=>SCX[v]||String(v).replace(/_/g,' ');
+function scottScope(){const c=scott();if(!c) return null;const o={};Object.keys(SCL).forEach(k=>{const v=[].concat(c[k]||[]).filter(Boolean);if(v.length) o[k]=v;});return Object.keys(o).length||c.delivery?{f:o,delivery:c.delivery||''}:null;}
 function coraSel(){try{return JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){return null;}}
 
 
@@ -520,7 +523,8 @@ function ctxText(){const n=nora(),p=piper(),e=earl(),L=[];if(n&&n.need_statement
  if(n) (n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+c.text));
  if(p&&p.n&&p.n.desc) L.push('1391 BLOCK 10: '+p.n.desc);{const Q=p1391Qty(p);if(Q) L.push('1391 PRIMARY FACILITY'+(Q.reno?' (RENOVATION OF AN EXISTING BUILDING, NOT NEW CONSTRUCTION)':'')+': '+Q.item+', '+Q.q.toLocaleString()+' '+Q.um);}
  if(p&&p.s12&&p.s12.acq) L.push('ACQUISITION STRATEGY (1391 BLOCK 12): '+p.s12.acq);
- const a=e&&e.alts.find(x=>x.id===e.recommend?.alt);if(a) L.push('SELECTED ALTERNATIVE (EARL): '+a.name+(a.desc?' – '+a.desc:''));return L.join('\n');}
+ const a=e&&e.alts.find(x=>x.id===e.recommend?.alt);if(a) L.push('SELECTED ALTERNATIVE (EARL): '+a.name+(a.desc?' – '+a.desc:''));
+ {const sc=scottScope();if(sc) Object.entries(sc.f).forEach(([k,v])=>L.push('SCOPE FROM SCOTT – '+SCL[k].toUpperCase()+': '+v.map(scLab).join('; ')+(k==='hazards'?'. The SOW must address each of these.':'')));}return L.join('\n');}
 const MAP_SYS=`You plan a U.S. Government construction statement of work. Assign every requirement to the section or sections whose text must answer it, using each section's purpose. A must-have requirement must land in at least one section. Return ONLY JSON: {"map":[{"section":"section key","reqs":["R-001"]}],"buildings":["building numbers named in CONTEXT, if any"]}`;
 async function pipeS(s){const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT (facts you may use):\n'+S.ctx:'');const prov={at:new Date().toISOString(),prev:s.text,steps:[]};
  const dj=await CARLAI.ask('reader-a',DRAFT_SYS(),src);let text=String(dj.text||'');prov.steps.push({role:'drafter',text,assumptions:dj.assumptions||[]});
@@ -528,17 +532,20 @@ async function pipeS(s){const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT (facts
   try{const aj=await CARLAI.ask('reviewer',ARB_SYS(),src+'\n\nDRAFT:\n'+text+'\n\nREVIEW:\n'+JSON.stringify({issues:rj.issues,missing:rj.missing,revised:rj.revised}));text=String(aj.text||text);prov.steps.push({role:'arbiter',rulings:aj.rulings||[]});}
   catch(e){if(rj.revised) text=String(rj.revised);}}catch(e){}
  const un=figuresUnverified(text.replace(/\{[^}]*\}/g,''),s);prov.unverified=un;s.ai=prov;s.text=text;s.status='reviewed';return un;}
-async function buildSOW(){if(!S.built&&!S.p.delivery_set){const d=dlvFromPiper();if(d) S.p.delivery=d;}const st=$('#sStat');const say=t=>{if(st) st.textContent=t;};const b=$('#sB');if(b) b.disabled=true;const made=[];
+async function buildSOW(){if(!S.built&&!S.p.delivery_set){const d=dlvFromPiper()||((scott()||{}).delivery==='db'||(scott()||{}).delivery==='dbb'?scott().delivery:'');if(d) S.p.delivery=d;}const st=$('#sStat');const say=t=>{if(st) st.textContent=t;};const b=$('#sB');if(b) b.disabled=true;const made=[];
  if(nora()){impNora();made.push(S.reqs.length+' requirements');}if(coraSel()){impCora();made.push(S.criteria.length+' criteria');}if(piper()) impPiper();if(earl()) impEarl();
- S.ctx=ctxText();
+ S.ctx=ctxText();impScott(made);{const pd=dlvFromPiper(),sd=(scott()||{}).delivery;if(pd&&(sd==='db'||sd==='dbb')&&pd!==sd) made.push('delivery method differs: PIPER block 12 says '+scLab(pd)+', SCOTT says '+scLab(sd)+'; this SOW uses '+scLab(S.p.delivery)+' – check it');}
  if(aiOnS()&&S.reqs.length){try{say('Matching requirements to sections…');const j=await CARLAI.ask('reviewer',MAP_SYS,'SECTIONS:\n'+S.sections.map(s=>s.key+' | '+s.title+' | '+s.guide).join('\n')+'\n\nREQUIREMENTS:\n'+S.reqs.map(r=>r.id+' ('+(r.priority||'')+'): '+r.text).join('\n')+'\n\nCONTEXT:\n'+S.ctx,null,{fresh:true});
    if(!S.p.buildings&&(j.buildings||[]).length){const B=j.buildings.map(String).filter(x=>S.ctx.includes(x));if(B.length){S.p.buildings=B.join(', ');buildSections();made.push('buildings '+S.p.buildings+' (from your record)');}}
    (j.map||[]).forEach(m=>{const ids=(m.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));S.sections.filter(s=>s.key===m.section||s.key.split(':')[0]===m.section).forEach(s=>{ids.forEach(id=>{if(!s.reqs.includes(id)) s.reqs.push(id);});});});
    made.push('requirements matched to sections');}catch(e){made.push('matching failed: '+e.message);}}
- const todo=S.sections.filter(s=>!s.text.trim());let n=0;const unv=[];
- for(const s of todo){const k=s.key.split(':')[0];if(k==='docs'||k==='safe'||!aiOnS()){s.text=assemble(s);if(s.text.trim()){s.status='draft';n++;}continue;}
-  say('Drafting '+s.title+' ('+(++n)+' of '+todo.length+')…');try{const u=await pipeS(s);if(u.length) unv.push(s.title+': '+u.join(', '));}catch(e){s.text=assemble(s);if(s.text.trim()) s.status='draft';}}
- made.push(n+' sections written');
+ const todo=S.sections.filter(s=>!s.text.trim());let n=0,done=0;const unv=[];
+ // Sections are drafted three at a time; a failed draft is tried once more, then built from the sources so no section is left empty.
+ const one=async s=>{const k=s.key.split(':')[0];if(k==='docs'||k==='safe'||!aiOnS()){s.text=assemble(s)||assembleAny(s);if(s.text.trim()){s.status='draft';n++;}return;}
+  for(let t=0;t<2&&!s.text.trim();t++){try{const u=await pipeS(s);if(u.length) unv.push(s.title+': '+u.join(', '));}catch(e){}}
+  if(!s.text.trim()){s.text=assemble(s)||assembleAny(s);if(s.text.trim()) s.status='draft';}if(s.text.trim()) n++;say('Drafting the sections ('+(++done)+' of '+todo.length+' done)…');};
+ say('Drafting '+todo.length+' sections…');const Q=todo.slice();await Promise.all([0,1,2].map(async()=>{while(Q.length) await one(Q.shift());}));
+ const empty=S.sections.filter(s=>!s.text.trim());made.push(n+' sections written'+(empty.length?'; '+empty.length+' still empty: '+empty.map(s=>s.title).join(', '):''));
  let fx=0;S.sections.forEach(s=>S.rules.filter(r=>ruleOn(r)&&r.fix).forEach(r=>{try{const re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');const c=(s.text.match(re)||[]).length;if(c){s.text=s.text.replace(re,r.fix);fx+=c;}}catch(e){}}));if(fx) made.push(fx+' automatic style fixes');
  if(aiOnS()){say('Running the AI review…');await aiReviewS(true);}
  S.built={at:new Date().toISOString(),sig:sigS(),made,unv};log('Build my SOW',made.join('; '));save();say('');STEP='done';render();window.scrollTo(0,0);}
@@ -767,6 +774,18 @@ function assemble(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const notes
  const parts=[];if(notes) parts.push(notes.replace(/\n+/g,' ').trim());if(R.length) parts.push('The work shall meet these requirements: '+R.map(r=>r.text.replace(/\.$/,'')+' {'+r.id+'}').join('; ')+'.');
  return parts.join('\n\n');}
 
+// Last resort so no section is left blank: every requirement with how it is verified, then SCOTT's hazards.
+function assembleAny(s){const k=s.key.split(':')[0];const R=S.reqs.length?S.reqs:[];const sc=scottScope();const L=[];
+ if(/iac|qc/.test(k)) R.filter(r=>r.measure).forEach(r=>L.push('Verify that '+r.text.replace(/\.$/,'').replace(/^./,c=>c.toLowerCase())+' by '+r.measure.replace(/\.$/,'').replace(/^./,c=>c.toLowerCase())+'; submit the record. {'+r.id+'}'));
+ else if(s.num) R.forEach(r=>L.push(toItem(r.text)+' {'+r.id+'}'));
+ if(sc&&sc.f.hazards&&/iac|qc|safe|work|req/.test(k)) L.push('Submit an Activity Hazard Analysis before starting each of these activities, and do not start until it is accepted: '+sc.f.hazards.map(scLab).join('; ')+'.');
+ if(!L.length&&R.length) L.push('The work shall meet these requirements: '+R.map(r=>r.text.replace(/\.$/,'')+' {'+r.id+'}').join('; ')+'.');
+ return s.num?L.map((t,i)=>(i+1)+'. '+t).join('\n'):L.join('\n\n');}
+// SCOTT's parsed scope reaches the sections that must answer it.
+function impScott(made){const sc=scottScope();if(!sc) return;const hz=sc.f.hazards||[];if(!hz.length) return;
+ const tgt=S.sections.find(s=>s.key==='safe')||S.sections.find(s=>s.key.split(':')[0]==='iac')||S.sections.find(s=>s.key==='work')||S.sections.find(s=>s.num);if(!tgt) return;
+ const line='Submit an Activity Hazard Analysis for each hazardous activity SCOTT found in the scope, and start none of them until it is accepted: '+hz.map(scLab).join('; ')+'.';if(!(tgt.notes||'').includes('activity SCOTT found')) tgt.notes=[tgt.notes,line].filter(Boolean).join('\n');if(made) made.push(hz.length+' hazardous activities from SCOTT');}
+
 // ---------- AI ----------
 const PROVIDERS={anthropic:'Anthropic (Claude)',openai:'OpenAI-compatible (OpenAI, GenAI.mil if OpenAI-style, Ask Sage, Azure, local)',gemini:'Google Gemini',custom:'Custom endpoint (OpenAI request format)'};
 const SLOT_DEF={provider:'anthropic',label:'',role:'reader',base:'',model:'',key:'',header:'Authorization',prefix:'Bearer ',enabled:false};
@@ -782,12 +801,13 @@ async function callAI(slot,sys,user){const p=slot.provider;let url,headers={'Con
  const txt=p==='anthropic'?(j.content||[]).map(c=>c.text||'').join(''):p==='gemini'?(j.candidates?.[0]?.content?.parts||[]).map(x=>x.text||'').join(''):(j.choices?.[0]?.message?.content||'');
  const a=txt.indexOf('{'),b=txt.lastIndexOf('}');if(a<0||b<0) throw new Error('No JSON in reply');return JSON.parse(txt.slice(a,b+1));}
 function styleBrief(){return ['Write U.S. Government construction statement-of-work text.','Use "shall" for every contractor obligation. Never use em dashes; use en dashes.','Never refer to the Contracting Officer.',
- S.p.delivery==='db'?'Design-build: state outcomes and performance standards; do not prescribe means and methods, products or brands.':'State requirements clearly and measurably.',
+ S.p.delivery==='db'?'Design-build: the contractor provides design and construction. State outcomes and performance standards; do not prescribe means and methods, products or brands.':S.p.delivery==='dbb'?'Design-bid-build: the Government furnishes the completed design; the contractor provides construction only. Never ask the contractor for design services. State requirements clearly and measurably.':'State requirements clearly and measurably.',
+ 'A requirement and its opposite must never appear together (for example “X, not X”).',
  'Numbered sections: one action per item, each item starts with an imperative verb (Provide, Remove, Install, Test, Submit).','No vague words (adequate, appropriate, as required, and/or, etc., TBD).','Define each acronym at first use.',
  'Locked standards that must be respected: '+S.rules.filter(r=>ruleOn(r)&&r.set!=='House style'&&r.set!=='Clarity').map(r=>r.msg).join(' ')].join('\n');}
 function sourcesFor(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const c=S.criteria.slice(0,80).map(x=>(x.number?x.number+' ':'')+x.title).join('; ');
  return 'PROJECT: '+S.p.title+' at '+S.p.installation+(bldgs().length?' (buildings: '+bldgs().join(', ')+')':'')+'\nSECTION: '+s.title+'\nSECTION PURPOSE: '+s.guide+(s.num?'\nFORMAT: numbered list':'\nFORMAT: paragraphs')+
- '\nREQUIREMENTS (trace each item to these IDs):\n'+(R.map(r=>r.id+': '+r.text+(r.measure?' (verify by: '+r.measure+')':'')).join('\n')||'none linked')+'\nAUTHOR NOTES:\n'+(s.notes||'none')+(c?'\nAPPLICABLE CRITERIA (from CORA): '+c:'');}
+ '\nREQUIREMENTS (trace each item to these IDs):\n'+(R.map(r=>r.id+': '+r.text+(r.measure?' (verify by: '+r.measure+')':'')).join('\n')||'none linked')+'\nAUTHOR NOTES:\n'+(s.notes||'none')+(c?'\nAPPLICABLE CRITERIA (from CORA): '+c:'')+(()=>{const sc=scottScope();return sc?'\nSCOPE FROM SCOTT (what the work involves): '+Object.entries(sc.f).map(([k,v])=>SCL[k]+': '+v.map(scLab).join(', ')).join('; '):'';})();}
 const DRAFT_SYS=()=>styleBrief()+'\n\nReturn ONLY JSON: {"text":"the section text. End each numbered item or paragraph with the requirement IDs it satisfies in braces, e.g. {R-003}. Use {NOTE} for text drawn only from author notes.","assumptions":["anything you had to assume"]}\nUse only facts, numbers and standards found in the sources. Do not invent quantities, dates, products or standards.';
 const REVIEW_SYS=()=>styleBrief()+'\n\nYou review a draft section against its sources and the style rules. Return ONLY JSON: {"issues":[{"quote":"exact text from the draft","problem":"what is wrong","fix":"replacement text"}],"missing":["requirement IDs not covered"],"revised":"your full corrected section text, keeping the {ID} trace tags"}';
 const ARB_SYS=()=>styleBrief()+'\n\nYou are the arbiter between a drafter and a reviewer. Produce the final section. Accept a reviewer fix only if it is supported by the sources and the style rules. Return ONLY JSON: {"text":"final section text with {ID} trace tags","rulings":["one line per reviewer issue: accepted or rejected and why"]}';
@@ -812,14 +832,20 @@ async function aiDraft(s,d){const eng=d.querySelector('[data-eng]');const rd=SET
 function checkText(t,s){const F=[];if(!t) return F;const plain=t.replace(/\{[^}]*\}/g,'');
  S.rules.filter(r=>ruleOn(r)).forEach(r=>{let re;try{re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');}catch(e){return;}const m=[...plain.matchAll(re)];if(m.length) F.push({sev:r.sev,msg:r.msg+(m.length>1?' ('+m.length+')':''),hit:ctx(plain,m[0].index,m[0][0].length),rule:r});});
  if(s&&s.num) plain.split(/\n/).forEach(l=>{const m=l.match(/^\s*\d+[.)]\s+(.*)/);if(m&&(NOUN_START.test(m[1])||!new RegExp('^('+VERBS+')\\b','i').test(m[1]))) F.push({sev:'warn',msg:'Numbered item does not start with a verb.',hit:m[1].slice(0,80)});});
+ {const re=/\b((?:[\w\/-]+\s+){0,4}[\w\/-]+)\s*,?\s+(?:and\s+|but\s+)?not\s+(?:a\s+|an\s+|plain\s+|regular\s+|standard\s+)*\1\b/gi;const m=[...plain.matchAll(re)].filter(x=>/[a-z0-9]{3}/i.test(x[1]));if(m.length) F.push({sev:'bad',msg:'Contradiction: requires something and forbids the same thing (“'+m[0][1]+'”).',hit:ctx(plain,m[0].index,m[0][0].length)});}
+ if(S.p.delivery==='dbb'){const m=[...plain.matchAll(/\bdesign(?:\s+and\s+construction)?\s+services\b|\bdesign-build\b|\bthe contractor shall (?:design|prepare (?:the )?design)/gi)];if(m.length) F.push({sev:'bad',msg:'Design-bid-build: the Government furnishes the design, so the contractor cannot be asked for design or design-build services.',hit:ctx(plain,m[0].index,m[0][0].length)});}
+ if(S.p.delivery==='db'){const m=[...plain.matchAll(/\bdesign-bid-build\b/gi)];if(m.length) F.push({sev:'warn',msg:'The project is design-build, but the text says design-bid-build.',hit:ctx(plain,m[0].index,m[0][0].length)});}
  if(S.p.delivery==='db'){const m=[...plain.matchAll(DB_PRESCRIPTIVE)];if(m.length) F.push({sev:'warn',msg:'Prescribes means or products in a design-build scope.',hit:ctx(plain,m[0].index,m[0][0].length)});}
  return F;}
 function ctx(t,i,n){const a=Math.max(0,i-35),b=Math.min(t.length,i+n+35);return (a?'…':'')+t.slice(a,b).replace(/\s+/g,' ')+(b<t.length?'…':'');}
 function acronyms(){const full=S.sections.map(s=>s.text.replace(/\{[^}]*\}/g,'')).join('\n');const defd=new Set([...full.matchAll(/\(([A-Z][A-Z0-9\/&]{1,7})\)/g)].map(m=>m[1]));const seen=new Set();const out=[];
  for(const m of full.matchAll(/\b[A-Z][A-Z0-9&\/]{1,7}\b/g)){const a=m[0];if(seen.has(a)) continue;seen.add(a);if(ACRO_OK.has(a)||defd.has(a)||/^\d/.test(a)||/^[A-Z]\d/.test(a)||/^(I|II|III|IV|V|VI|A|B)$/.test(a)) continue;out.push(a);}return out;}
 // Site standards apply only where they belong: the Andersen set runs on Andersen projects unless you set it yourself.
-const SITE_SETS={'Andersen roofing standards':/andersen|\baafb\b/i};
-function siteAuto(set){const re=SITE_SETS[set];return re?re.test(S.p.installation||''):true;}
+// A house standard set runs only where it belongs: the Andersen roofing set needs an Andersen project AND roofing in the scope.
+const SITE_SETS={'Andersen roofing standards':{inst:/andersen|\baafb\b/i,scope:/\broof(?:s|ing)?\b|\breroof|\broof_work\b|\bmembrane\b|\bflashing\b|\bgutters?\b/i,what:'roofing'}};
+function scopeText(){const sc=scott(),p=piper();return [S.p.title,S.ctx||'',sc?[].concat(sc.work_type||[],sc.facility||[],sc.systems||[],sc.hazards||[]).join(' '):'',p&&p.b?p.b.title:'',p&&p.n?p.n.desc:''].join(' ');}
+function siteWhy(set){const d=SITE_SETS[set];if(!d) return '';const i=d.inst.test(S.p.installation||''),c=d.scope.test(scopeText());return i&&c?'installation and '+d.what+' scope match':!i?'installation does not match':'no '+d.what+' in the scope';}
+function siteAuto(set){const d=SITE_SETS[set];return d?d.inst.test(S.p.installation||'')&&d.scope.test(scopeText()):true;}
 function ruleOn(r){if(!r.on) return false;if(!SITE_SETS[r.set]) return true;const m=(S.std_mode||{})[r.set]||'auto';return m==='on'?true:m==='off'?false:siteAuto(r.set);}
 function allFindings(){const F=[];S.sections.forEach(s=>checkText(s.text,s).forEach(f=>F.push({...f,sec:s})));acronyms().forEach(a=>F.push({sev:'info',msg:'Acronym not defined at first use: '+a,sec:null}));return F;}
 function vStyle(){const v=$('#view');const F=allFindings();
@@ -827,7 +853,7 @@ function vStyle(){const v=$('#view');const F=allFindings();
  '<div class="row" style="margin-top:0"><button class="go" id="bFix">Apply automatic fixes</button><span class="small">Replaces em dashes with en dashes and any other rule that has a fix.</span></div>'+
  (F.length?F.map(f=>'<div class="find '+f.sev+'"><b>'+(f.sec?esc(f.sec.title)+': ':'')+esc(f.msg)+'</b> '+(f.hit?'<q class="ev">'+esc(f.hit)+'</q>':'')+'</div>').join(''):'<div class="find ok"><b>No findings.</b></div>')+'</div>'+
  '<div class="panel"><h2>Rules</h2><p class="lead">Pattern is a regular expression. Severity “bad” blocks the Final status check on the Outputs step. Site standards apply only where they belong. The contract always governs: a site standard never overrides the contract documents.</p>'+
- Object.keys(SITE_SETS).map(set=>{const m=(S.std_mode||{})[set]||'auto';return '<div class="row" style="margin-top:0"><b>'+esc(set)+':</b> <select data-std="'+esc(set)+'" style="width:auto"><option value="auto" '+(m==='auto'?'selected':'')+'>Automatic – on for '+(siteAuto(set)?'this project (installation matches)':'matching installations only; off for this project')+'</option><option value="on" '+(m==='on'?'selected':'')+'>Always on for this project</option><option value="off" '+(m==='off'?'selected':'')+'>Off for this project</option></select></div>';}).join('')+
+ Object.keys(SITE_SETS).map(set=>{const m=(S.std_mode||{})[set]||'auto';return '<div class="row" style="margin-top:0"><b>'+esc(set)+':</b> <select data-std="'+esc(set)+'" style="width:auto"><option value="auto" '+(m==='auto'?'selected':'')+'>Automatic – '+(siteAuto(set)?'on for this project ('+siteWhy(set)+')':'off for this project ('+siteWhy(set)+')')+'</option><option value="on" '+(m==='on'?'selected':'')+'>Always on for this project</option><option value="off" '+(m==='off'?'selected':'')+'>Off for this project</option></select></div>';}).join('')+
  '<table class="rule"><thead><tr><th>On</th><th>Set</th><th>Pattern</th><th>Message</th><th>Auto-fix</th><th>Severity</th><th></th></tr></thead><tbody id="rb"></tbody></table><div class="row"><button id="bAddR">Add rule</button><button id="bResetR">Restore default rules</button></div></div>';
  v.querySelectorAll('[data-std]').forEach(el=>el.onchange=()=>{S.std_mode=S.std_mode||{};S.std_mode[el.dataset.std]=el.value;log('Site standards',el.dataset.std+': '+el.value);save();vStyle();});
  $('#bFix').onclick=()=>{let k=0;S.sections.forEach(s=>S.rules.filter(r=>ruleOn(r)&&r.fix).forEach(r=>{try{const re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');const n=(s.text.match(re)||[]).length;if(n){s.text=s.text.replace(re,r.fix);k+=n;}}catch(e){}}));log('Automatic fixes applied',k+' changes');save();vStyle();renderSteps();};
