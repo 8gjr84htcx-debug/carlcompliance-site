@@ -153,16 +153,6 @@
 })();
 </script>
 
-
-
-
-
-
-
-
-
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>QUINN – Quality, Unified Inspections, and Nonconformance Navigator</title>
@@ -433,13 +423,17 @@ const today=()=>new Date().toLocaleDateString('en-CA');
 const MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
 
 // AF IMT 1477 narrative convention: sections A–J inside the two free-text fields
-const SECS={A:'Project',B:'Building / facility',C:'Project-level activities',D:'Work accomplished or in progress',E:'Tests performed',F:'Safety observations',G:'Quality observations',H:'Environmental observations',I:'Specific code references',J:'Notes'};
+const SECS={A:'Project',B:'Building / facility',C:'Project-level activities',D:'Work accomplished or in progress',E:'Tests performed',F:'Safety observations',G:'Quality observations',H:'Environmental observations',W:'Weather and site conditions',I:'Specific code references',J:'Notes'};
 const LEGACY=[[/work (accomplished|performed)|in progress/i,'D'],[/test/i,'E'],[/safety/i,'F'],[/quality|deficien|issue|nonconform/i,'G'],[/environment/i,'H'],[/code|reference|criteria/i,'I'],[/schedul|look ?ahead|planned/i,'S'],[/remark|note|delay/i,'J'],[/project[- ]level|meeting|activit/i,'C']];
-const SEC_ORDER=['D','E','C','F','G','H','S','I','J'];
+const SEC_ORDER=['D','E','C','F','G','H','W','S','I','J'];
+// Weather is not an environmental observation: lines in section H that only report weather are filed under Weather.
+const WEATHER=/\b(weather|rain(?:y|fall|ed)?|showers?|sunny|cloudy|overcast|clear skies|partly cloudy|winds?|gusts?|typhoon|tropical storm|storm|humid(?:ity)?|temperature|°\s?f|degrees|heat index|lightning)\b/i;
+const ENVWORDS=/\b(spill|silt|erosion|storm ?water|swppp|bmp|hazardous|waste|dust|runoff|contamina|asbestos|lead|fuel|oil|sediment|wildlife|turtle|bird|nesting|archaeolog|culvert)\b/i;
+function splitWeather(secs){if(!secs||!secs.H) return secs;const keep=[],w=[];secs.H.forEach(l=>{(WEATHER.test(l)&&!ENVWORDS.test(l)?w:keep).push(l);});if(w.length){secs.H=keep;secs.W=(secs.W||[]).concat(w);if(!keep.length) delete secs.H;}return secs;}
 const SEC_NAME={...SECS,S:'Scheduled'};
 
 const BLANK=()=>({schema:'quinn-1',created:new Date().toISOString(),records:[],registry:[],issues:[],fieldmap:{date:'',building:'',project:'',inspector:'',contract:''},log:[]});
-let Q=load()||BLANK();let STEP='load';const MSG={load:''};
+let Q=load()||BLANK();(Q.records||[]).forEach(r=>{if(r.secs) splitWeather(r.secs);});let STEP='load';const MSG={load:''};
 function load(){try{return JSON.parse(localStorage.getItem('quinn_project')||'null');}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('quinn_project',JSON.stringify(Q));const rec=JSON.parse(localStorage.getItem('milcon_record')||'{}');
@@ -495,7 +489,7 @@ function sections(t){const out={};let cur=null;const lines=t.split('\n');
   if(m&&(SECS[m[1]])){cur=m[1];if(m[3]&&m[3].trim()) (out[cur]=out[cur]||[]).push(m[3].trim());return;}
   m=s.match(LEG);if(m&&s===s.toUpperCase()&&s.length<60){const L=LEGACY.find(([re])=>re.test(m[2]));if(L){cur=L[1];return;}}
   if(cur) (out[cur]=out[cur]||[]).push(s.trim());else (out._pre=out._pre||[]).push(s.trim());});
- return out;}
+ return splitWeather(out);}
 function bldgFrom(...ss){for(const s of ss){const m=String(s||'').match(/\b(?:B(?:ldg|uilding)?\.?\s*#?\s*)(\d{3,5}[A-Z]?)\b/i)||String(s||'').match(/\bB(\d{3,5}[A-Z]?)\b/);if(m) return 'B'+m[1].toUpperCase();}return '';}
 async function ingest(files){const pdfs=files.filter(f=>/\.pdf$/i.test(f.name));let added=0,dup=0,fail=0;
  for(const [i,f] of pdfs.entries()){MSG.load='Reading '+(i+1)+' of '+pdfs.length+': '+f.name;const st=$('#lstat');if(st) st.textContent=MSG.load;
@@ -511,9 +505,11 @@ async function ingest(files){const pdfs=files.filter(f=>/\.pdf$/i.test(f.name));
 // ---------- issues ----------
 const TAG=/\[(NEW|CONT|CLOSED)\]/i;
 function harvestIssues(rec){(rec.secs.G||[]).concat(rec.secs.F||[]).forEach(line=>{const m=line.match(TAG);if(!m) return;const text=line.replace(TAG,'').replace(/^[\s\-•*\d.)]+/,'').trim();if(text.length<4) return;const kind=(rec.secs.F||[]).includes(line)?'Safety':'Quality';
-  const key=norm(text).slice(0,60);let it=Q.issues.find(i=>i.building===rec.building&&(i.key===key||sim(i.text,text)>=.6));
-  const tag=m[1].toUpperCase();
-  if(!it&&tag!=='CLOSED'){it={id:uid(),key,building:rec.building,kind,text,first:rec.date,last:rec.date,status:'open',closed:'',action:'',ref:(rec.secs.I||[]).join('; ').slice(0,200),history:[]};Q.issues.push(it);}
+  const key=norm(text).slice(0,60);const tag=m[1].toUpperCase();let it=Q.issues.find(i=>i.building===rec.building&&(i.key===key||sim(i.text,text)>=.6));
+  // A [CONT] or [CLOSED] item continues an earlier deficiency even when the inspector words it differently: take the closest open one of the same kind in the building.
+  if(!it&&tag!=='NEW'){const C=Q.issues.filter(i=>i.building===rec.building&&i.kind===kind&&(i.status!=='closed'||tag==='CLOSED')&&(!rec.date||!i.first||i.first<=rec.date)).map(i=>({i,s:sim(i.text,text)})).sort((a,b)=>b.s-a.s);
+   if(C.length&&(C[0].s>=.35||C.filter(c=>c.i.status!=='closed').length===1)) it=C[0].i;}
+  if(!it&&tag!=='CLOSED'){it={id:uid(),key,building:rec.building,kind,text,first:rec.date,last:rec.date,status:'open',closed:'',action:'',ref:(rec.secs.I||[]).join('; ').slice(0,200),history:[],noNew:tag==='CONT'};Q.issues.push(it);}
   if(!it) return;it.history.push({date:rec.date,tag,file:rec.file});if(rec.date&&(!it.last||rec.date>it.last)) it.last=rec.date;if(rec.date&&(!it.first||rec.date<it.first)) it.first=rec.date;
   if(tag==='CLOSED'){it.status='closed';it.closed=rec.date;}else if(it.status==='closed'&&it.closed&&rec.date>it.closed){it.status='open';it.closed='';}});}
 const norm=s=>String(s||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
@@ -637,7 +633,7 @@ function issuesHTML(bs){const I=Q.issues.filter(i=>bs.includes(i.building)&&((i.
 function reportFor(scope,key){const bs=buildingsIn(scope,key);const title=scope==='portfolio'?'Portfolio':scope==='to'?'Task order '+key:key+(proj(key)?' – '+proj(key):'');
  const f=d=>{const x=new Date(d+'T00:00');return x.getDate()+' '+MON[x.getMonth()]+' '+x.getFullYear();};
  let h='<h3 style="text-align:center">CONSTRUCTION INSPECTION SUMMARY</h3><p style="text-align:center"><b>'+esc(title)+'</b><br>'+f(R.from)+' – '+f(R.to)+'</p>';
- const allRecs=bs.flatMap(recsFor);h+='<p>Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(bs.length>1?' across '+bs.length+' buildings':'')+'. The signed records remain the official copy; this summary is a derived working product.</p>';
+ const allRecs=bs.flatMap(recsFor);const rb=bs.filter(b=>recsFor(b).length);h+='<p>Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(rb.length>1?' across '+rb.length+' buildings':rb.length===1?' for '+rb[0]:'')+'. The signed records remain the official copy; this summary is a derived working product.</p>';
  const sm=sumGet(scope,key);if(sm) h+='<h3>Summary</h3>'+sm.text.split(/\n\s*\n/).map(p=>'<p>'+esc(p.trim())+'</p>').join('');
  h+='<h3>Coverage</h3>'+coverageHTML(bs);const zero=bs.filter(b=>!recsFor(b).length);if(zero.length) h+='<p><b>No inspection records in the period:</b> '+zero.map(esc).join(', ')+'.</p>';
  h+='<h3>Deficiencies and nonconformances</h3>'+issuesHTML(bs);
@@ -649,7 +645,7 @@ function reportDoc(scope,key){const bs=buildingsIn(scope,key);const f=d=>{const 
  const title=scope==='portfolio'?'Portfolio':scope==='to'?'Task order '+key:key;const sub=(scope==='building'&&proj(key)?proj(key)+'  ·  ':'')+(scope==='building'&&to(key)?to(key)+'  ·  ':'')+f(R.from)+' – '+f(R.to);
  const allRecs=bs.flatMap(recsFor);const sm=sumGet(scope,key);const wd=workdays();
  let b=cdBand('Inspection summary',title,sub,'Derived working product  ·  '+dmy(today()));
- b+=cdLead('Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(bs.length>1?' across '+bs.length+' buildings':'')+'. The signed records remain the official copy.');
+ {const rb=bs.filter(b=>recsFor(b).length);b+=cdLead('Compiled from '+allRecs.length+' AF IMT 1477 Construction Inspection Record'+(allRecs.length===1?'':'s')+(rb.length>1?' across '+rb.length+' buildings':rb.length===1?' for '+rb[0]:'')+'. The signed records remain the official copy.');}
  if(sm) b+=cdH('Summary')+sm.text.split(/\n\s*\n/).map(p=>cdP(esc(p.trim()))).join('');
  b+=cdH('Coverage')+cdTable(['Building','Task order','Reports','Workdays covered','Unsigned','Open deficiencies'],bs.map(x=>{const rs=recsFor(x);const days=new Set(rs.map(r=>r.date)).size;return [esc(x),esc(to(x)||'–'),String(rs.length),(rs.length?'':'<b style="color:#9b2c2c">')+days+' of '+wd+(rs.length?'':'</b>'),String(rs.filter(r=>!r.signed).length),String(Q.issues.filter(i=>i.building===x&&i.status!=='closed').length)];}));
  const zero=bs.filter(x=>!recsFor(x).length);if(zero.length) b+=cdP('<b>No inspection records in the period:</b> '+zero.map(esc).join(', ')+'.');

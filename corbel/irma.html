@@ -153,16 +153,6 @@
 })();
 </script>
 
-
-
-
-
-
-
-
-
-
-
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>IRMA – Information Request Management Assistant</title>
@@ -466,7 +456,7 @@ function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setIt
  localStorage.setItem('milcon_record',JSON.stringify(rec));$('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){console.warn(e);$('#saved').textContent='Not saved – use Save file (large PDFs may exceed browser storage)';}},300);}
 function log(it,w,d){(it?it.log:I.log).push({at:new Date().toISOString(),what:w,detail:d||''});}
 const num=x=>(x.kind==='rfi'?'RFI ':'SUB ')+x.no+'.'+String(x.rev||0).padStart(2,'0');
-const suspense=x=>addDays(x.received,x.kind==='rfi'?Number(I.settings.rfi_days):Number(I.settings.sub_days));
+const suspense=x=>x.due||addDays(x.received,x.kind==='rfi'?Number(I.settings.rfi_days):Number(I.settings.sub_days));
 const pmDue=x=>addDays(x.received,Number(I.settings.pm_days));
 
 // ---------- nav ----------
@@ -498,8 +488,8 @@ function vReg(){const v=$('#view');
    return '<tr class="'+cl+'" data-id="'+x.id+'"><td><b>'+esc(num(x))+'</b></td><td>'+esc(x.title)+'</td><td>'+esc(x.to)+'</td><td>'+esc(x.spec)+'</td><td>'+esc(x.received)+'</td><td>'+esc(pmDue(x))+'</td><td>'+esc(suspense(x))+(x.status!=='closed'&&d!==null?' <span class="small">('+(d<0?-d+' days over':d+' days')+')</span>':'')+'</td><td>'+esc(STATUS[x.status])+(x.disp?' – '+esc(DISP_S[x.disp]||DISP_R[x.disp]):'')+'</td><td class="num">'+(x.intake_returns||0)+((x.intake_returns||0)>=Number(I.settings.intake_flag)?' <span class="pill bad">QC agenda</span>':'')+'</td><td class="num">'+(x.minutes||0)+' min</td></tr>';}).join(''):'<tr><td colspan="10" class="empty">Nothing here. Add a submittal or RFI.</td></tr>';
   tb.querySelectorAll('[data-id]').forEach(r=>r.onclick=()=>{CUR=I.items.find(x=>x.id===r.dataset.id);VIEW='item';TAB='docs';startTimer(CUR);render();window.scrollTo(0,0);});}}
 function newItem(kind){const n=I.items.filter(x=>x.kind===kind).reduce((m,x)=>Math.max(m,Number(x.no)||0),0)+1;
- const x={id:uid(),kind,no:String(n),rev:0,title:'',to:recTO(),spec:'',received:today(),status:'received',disp:'',intake_returns:0,intake:{},sme:[],docs:[],elements:[],rec:'',email:'',minutes:0,log:[]};
- I.items.push(x);log(x,'Created');log(null,'Item created',num(x));CUR=x;VIEW='item';TAB='docs';startTimer(x);save();render();}
+ const x={id:uid(),kind,no:String(n),rev:0,title:'',to:recTO(),spec:'',received:today(),auto:{},status:'received',disp:'',intake_returns:0,intake:{},sme:[],docs:[],elements:[],rec:'',email:'',minutes:0,log:[]};
+ x.auto={no:x.no,to:x.to,received:x.received};I.items.push(x);log(x,'Created');log(null,'Item created',num(x));CUR=x;VIEW='item';TAB='docs';startTimer(x);save();render();}
 
 // ---------- references ----------
 function vRefs(){const v=$('#view');const sop=sophieText(),cs=coraSel();
@@ -645,7 +635,26 @@ async function groundOne(x,e){const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec
  else if(ok.length===2&&ar&&(good.length||!sameV)){try{const j=check(await callAI(ar,ARB_SYS,user+'\n\nREADER A: '+JSON.stringify(ok[0])+'\n\nREADER B: '+JSON.stringify(ok[1])),ar.label);
    out=j.cites.some(c=>c.verified)&&!/not addressed/i.test(j.verdict)?{label:'ver',verdict:j.verdict,answer:j.answer,refs:j.cites.filter(c=>c.verified),how:'Readers disagreed; arbiter ruled with a verified quote'}:{label:/not addressed/i.test(j.verdict)?'ung':'nr',verdict:j.verdict,answer:j.answer,refs:j.cites,how:'Arbiter could not ground a ruling'};}catch(err){out=null;}}
  if(!out){const g=good[0];out=g?{label:'nr',verdict:g.verdict,answer:g.answer,refs:g.cites,how:ok.length<2?'One reader only':'Readers disagree'}:{label:'ung',verdict:ok[0]?.verdict||'',answer:ok[0]?.answer||'',refs:[],how:'No reader produced a verified quote'};}
+ // A verified quote can still be about the wrong thing (an electrical maintenance-hole cover for a fuel hydrant pit): the passage must name what the element is about.
+ if(out.refs&&out.refs.length&&['conf','ver'].includes(out.label)){const off=offTopic(e,out.refs,cands);if(off){out.label='nr';out.how='The cited passage does not mention '+off+'; it may be about a different item. Check the citation before using it.';out.offTopic=off;}}
  out.cands=cands;out.readers=ok;e.result=out;log(x,'Element grounded',(e.text||'').slice(0,60)+' → '+LABELS[out.label][0]);}
+const GENERIC=new Set('shall provide provided contractor government requirement requirements required require requires rated rating ratings load loads loading cover covers covered system systems install installed installation design designed material materials minimum maximum accordance comply complies compliance contract section sections drawing drawings specification specifications submittal submittals request information question project work item items proposed propose approve approval standard standards criteria traffic heavy pounds capacity type types existing location area areas level levels number please confirm whether which there their these those other where would should could being given based using under above below between within about after before during'.split(' '));
+function topicTerms(e){return [...new Set(String((e.text||'')+' '+(e.quote||'')).toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>=3&&!GENERIC.has(w)&&!STOP3.has(w)&&!/^\d+$/.test(w)))];}
+const STOP3=new Set('the and for are any all per not but its can may was has had you our use one two six ten lbs psi via etc must will also each what when this that with from have does been than then into only same such very'.split(' '));
+function offTopic(e,refs,cands){const T=topicTerms(e);if(!T.length) return '';const stem=w=>w.replace(/(ings|ing|es|s)$/,'');
+ // the passage must name at least half of what the element is about (the item and its system), not just the shared context words
+ let best=null;refs.forEach(r=>{const p=(cands||[]).find(c=>c.src===r.src&&(!r.page||c.page===r.page))||{};const txt=String((p.src||r.src||'')+' '+(p.text||'')+' '+(r.quote||'')).toLowerCase();const miss=T.filter(w=>!new RegExp('\\b'+stem(w)).test(txt));if(!best||miss.length<best.length) best=miss;});
+ const hits=best?T.length-best.length:T.length;return best&&(T.length<=2?hits<1:hits*2<=T.length)?best.slice(0,3).join(', '):'';}
+// Material check: a submittal that offers a different material than the SOW requires for the same item.
+const MATS=[['316L stainless steel',/\b316l\b/i],['316 stainless steel',/\b316(?!l)\b(?:\s*stainless)?/i],['304 stainless steel',/\b304l?\b(?:\s*stainless)?/i],['carbon steel',/\bcarbon steel\b|\bblack (?:steel|iron) pipe\b|\bastm a53\b|\bastm a106\b/i],['galvanized steel',/\bgalvani[sz]ed\b/i],['ductile iron',/\bductile iron\b/i],['PVC',/\bpvc\b/i],['HDPE',/\bhdpe\b/i],['copper',/\bcopper\b/i],['aluminum',/\balumin(?:i)?um\b/i],['fiberglass',/\bfiberglass\b|\bfrp\b/i]];
+function matsIn(t){return MATS.filter(([n,re])=>re.test(t)).map(m=>m[0]);}
+function matConflicts(x,docText){const sow=I.refs.filter(r=>r.kind==='sow');if(!sow.length) return [];const out=[];
+ const req=[];sow.forEach(r=>r.pages.join('\n').split(/(?<=[.;])\s+|\n+/).forEach(sn=>{if(!/\bshall\b|\brequired?\b|\bonly\b/i.test(sn)) return;const m=matsIn(sn.replace(/\bnot\s+(?:plain\s+)?[^.,;]{0,25}/gi,''));if(m.length) req.push({sn:sn.trim(),m,ref:r.name});}));
+ if(!req.length) return [];const offered=docText.split(/(?<=[.;])\s+|\n+/).map(sn=>({sn:sn.trim(),m:matsIn(sn)})).filter(o=>o.m.length);
+ offered.forEach(o=>{req.forEach(q=>{const word=w=>w.length>3&&!GENERIC.has(w);const qa=new Set(q.sn.toLowerCase().replace(/[^a-z ]/g,' ').split(' ').filter(word)),oa=o.sn.toLowerCase().replace(/[^a-z ]/g,' ').split(' ').filter(word);
+   const shared=oa.filter(w=>qa.has(w)&&!/steel|stainless/.test(w));if(!shared.length) return;const bad=o.m.filter(mm=>!q.m.includes(mm)&&!(q.m.includes('316L stainless steel')&&mm==='316 stainless steel'&&/316l/i.test(o.sn)));
+   if(bad.length&&!o.m.some(mm=>q.m.includes(mm))) out.push({offer:o.sn,req:q.sn,ref:q.ref,need:q.m[0],got:bad[0],about:shared.slice(0,2).join(' ')});});});
+ const seen=new Set();return out.filter(c=>{const k=c.need+'|'+c.got+'|'+c.about;if(seen.has(k)) return false;seen.add(k);return true;}).slice(0,5);}
 function dedupe(a){const s=new Set();return a.filter(c=>{const k=c.src+'|'+norm(c.quote);if(s.has(k)) return false;s.add(k);return true;});}
 
 // ---------- reviewers ----------
@@ -685,18 +694,22 @@ function tLog(){const x=CUR;$('#tab').innerHTML='<div class="panel"><h3 style="m
 let AUTO=false;
 const HDR_RE=/^(request for information|rfi\s*(no\.?|number|#)|submittal\s*(no\.?|number|#)|transmittal|date\s*:|contract\s*(no\.?|number)?\s*:|project\s*:|spec(ification)?\s*(section)?\s*:|submitted by|from\s*:|to\s*:|page \d)/i;
 function lt(iso){const d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
-function recTO(){try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];const c=(pr&&(pr.core||pr))||{};const so=JSON.parse(localStorage.getItem('sophie_project')||'null');return String(c.to||c.number||(so&&so.p&&so.p.contract)||'');}catch(e){return '';}}
+function recTO(){try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];const c=(pr&&(pr.core||pr))||{};const so=JSON.parse(localStorage.getItem('sophie_project')||'null');return String(c.to||(so&&so.p&&so.p.contract)||'');}catch(e){return '';}}
 function fileName(x,k,ext){return num(x).replace(/\s+/g,'_')+(x.title?'_'+x.title.replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,40):'')+'_'+k+'_'+today()+'.'+ext;}
-const HDR_SYS=`You read the header of a construction RFI or submittal transmittal. Return ONLY JSON {"no":"the RFI or submittal number as written, digits and dots only","title":"a short title, 3 to 10 words, from the subject or question","to":"contract or task order number as written","spec":"specification section number as written, e.g. 07 54 23","received":"date the document is dated, YYYY-MM-DD","by":"name and role of who submitted it"}. Leave a field empty when the document does not show it. Never invent.`;
+const HDR_SYS=`You read the header of a construction RFI or submittal transmittal. Return ONLY JSON {"no":"the RFI or submittal number as written, digits and dots only","title":"a short title, 3 to 10 words, from the subject or question","to":"contract or task order number as written","spec":"specification section number as written, e.g. 07 54 23","received":"date the document is dated, YYYY-MM-DD","due":"the response due date or suspense written on the document, YYYY-MM-DD, or empty","by":"name and role of who submitted it"}. Leave a field empty when the document does not show it. Never invent.`;
 function hdrRules(t){const g=re=>{const m=t.match(re);return m?m[1].trim():'';};const d=g(/\bdate\s*:?\s*([0-9]{1,2}\s+[A-Za-z]{3,9}\s+[0-9]{4}|[0-9]{4}-[0-9]{2}-[0-9]{2}|[0-9]{1,2}\/[0-9]{1,2}\/[0-9]{2,4})/i);
  return {no:g(/\b(?:rfi|submittal)\s*(?:no\.?|number|#)\s*:?\s*([0-9][0-9.\-]*)/i),to:g(/\bcontract\s*(?:no\.?|number)?\s*:?\s*([A-Z0-9][A-Z0-9\-]{6,})/i),spec:g(/\bspec(?:ification)?\s*(?:section)?\s*:?\s*([0-9]{2}\s?[0-9]{2}\s?[0-9]{2}(?:\.[0-9]+)?)/i),received:d,title:g(/\b(?:subject|title)\s*:\s*([^\n]{3,80})/i)};}
 function isoDate(v){if(!v) return '';if(/^\d{4}-\d{2}-\d{2}$/.test(v)) return v;const d=new Date(v);if(isNaN(d)) return '';const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate());}
-async function readHeader(x,t){const H=hdrRules(t);const rd=readers();if(rd.length){try{const j=await callAI(rd[0],HDR_SYS,t.slice(0,6000));['no','title','to','spec','received','by'].forEach(k=>{const v=String(j[k]||'').trim();if(!v) return;
+async function readHeader(x,t){const H=hdrRules(t);const rd=readers();if(rd.length){try{const j=await callAI(rd[0],HDR_SYS,t.slice(0,6000));['no','title','to','spec','received','due','by'].forEach(k=>{const v=String(j[k]||'').trim();if(!v) return;
    // a value must appear in the document, except the title, which may be a short restatement
-   if(k==='title'||k==='received'||norm(t).includes(norm(v))) H[k]=H[k]||v;});}catch(e){log(x,'Header read by AI failed',e.message);}}
- const set=[];if(H.no&&(!x.no||x.no===String(I.items.filter(z=>z.kind===x.kind).length))){x.no=String(H.no).replace(/^0+(?=\d)/,'');set.push('number');}
- if(H.title&&!x.title){x.title=H.title.slice(0,90);set.push('title');}if(H.to&&!x.to){x.to=H.to;set.push('contract');}if(H.spec&&!x.spec){x.spec=H.spec;set.push('spec section');}
- const dd=isoDate(H.received);if(dd&&x.received===today()&&dd<=today()){x.received=dd;set.push('date');}if(H.by&&!x.by){x.by=H.by;set.push('submitted by');}
+   if(k==='title'||k==='received'||k==='due'||norm(t).includes(norm(v))) H[k]=H[k]||v;});}catch(e){log(x,'Header read by AI failed',e.message);}}
+ // What the document says wins over what IRMA filled in when the item was created; anything you typed yourself is kept.
+ const A=x.auto||{};const pre=(k,legacy)=>!x[k]||x[k]===A[k]||(A[k]===undefined&&legacy);const set=[];
+ if(H.no&&pre('no',x.no===String(I.items.filter(z=>z.kind===x.kind).length))){const nv=String(H.no).replace(/^0+(?=\d)/,'');if(nv!==x.no){x.no=nv;set.push('number');}A.no=x.no;}
+ if(H.title&&!x.title){x.title=H.title.slice(0,90);set.push('title');}
+ if(H.to&&pre('to',x.to===recTO())&&norm(H.to)!==norm(x.to)){x.to=H.to;A.to=x.to;set.push('contract');}if(H.spec&&!x.spec){x.spec=H.spec;set.push('spec section');}
+ const dd=isoDate(H.received);if(dd&&dd<=today()&&pre('received',x.received===today())&&dd!==x.received){x.received=dd;A.received=dd;set.push('date');}
+ const du=isoDate(H.due);if(du&&!x.due){x.due=du;set.push('suspense');}x.auto=A;if(H.by&&!x.by){x.by=H.by;set.push('submitted by');}
  if(set.length) log(x,'Header read from the document',set.join(', '));return set;}
 function autoRefs(x){if(I.refs.length) return [];const a=[];const sop=sophieText(),cs=coraSel();
  if(sop){I.refs.push({id:uid(),name:'SOW – '+(sop.title||'from SOPHIE'),kind:'sow',pages:[sop.text],added:today()});a.push('the SOW from SOPHIE');}
@@ -709,6 +722,8 @@ async function reviewIt(x,again){if(!x||!x.docs.length) return;if(again&&x.eleme
   say('Finding what needs an answer…');await decompose(x,docText,true);
   if(!x.elements.length){say('Nothing that needs an answer was found. Add elements by hand on the Elements tab.');save();vItem();return;}
   await groundAll(x,true,(k,n)=>say('Grounding '+k+' of '+n+'…'));
+  if(x.kind==='submittal'){const mc=matConflicts(x,docText);mc.forEach(c=>{if(x.elements.some(e=>e.matKey===c.need+'|'+c.got)) return;x.elements.push({id:uid(),include:true,matKey:c.need+'|'+c.got,kind:'product',text:'Material: the SOW requires '+c.need+' for the '+c.about+'; the submittal shows '+c.got+'.',quote:c.offer.slice(0,300),qok:true,by:'Material check',disc:discOf(c.req),
+    result:{label:'ver',verdict:'does not comply',answer:'The submittal shows '+c.got+' where the SOW requires '+c.need+'. Resubmit with '+c.need+', or request a deviation with the basis.',refs:[{src:c.ref,quote:c.req.slice(0,300),verified:true,by:'Material check'}],how:'Material check: the SOW requirement and the submitted material quoted word for word'}});});if(mc.length) log(x,'Material conflicts with the SOW',mc.map(c=>c.got+' vs '+c.need).join('; '));}
   x.email=buildEmail(x);if(x.kind==='submittal'&&!x.rec) x.rec=recFor(x);
   if(x.kind==='submittal') preIntake(x,docText);
   if(x.status==='received') x.status=x.kind==='rfi'?'technical':'intake';

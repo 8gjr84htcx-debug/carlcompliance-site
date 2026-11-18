@@ -914,18 +914,25 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
 
 // The need statement, written from the record, with every number checked.
 const NEED_SYS=`You write the need statement for a DoD military construction requirement: one paragraph of 120 to 200 words a busy reviewer can read in a minute. Say who needs what capability, why now, and what happens to the mission without it. State the need, not a solution (say "covered maintenance space for two aircraft", not "a new hangar"). Use ONLY facts in RECORD; where a fact the paragraph needs is missing, write [NEEDED: what]. Plain words, active voice, no acronyms without spelling them out once, no references to AI or to this record.
+Describe today's condition only from the GAP "today" entries and the notes. A REQUIREMENT is something needed, not proof that it is missing today: never write that the existing facility lacks, has no or cannot do something unless RECORD says so about today.
 Return ONLY JSON: {"need":"..."}`;
 function needRecord(){const p=P.project,L=[];L.push('PROJECT: '+[p.name,p.installation,LOCS[p.location],SERVICES[p.service],p.unit].filter(Boolean).join('; '));
  if(p.mission) L.push('MISSION: '+p.mission);if(p.driver) L.push('DRIVER: '+(DRIVERS[p.driver]||{}).t+(p.driver_detail?' – '+p.driver_detail:''));if(p.need_date) L.push('NEEDED BY: '+p.need_date);
  P.requirements.filter(r=>r.status!=='withdrawn').forEach(r=>L.push('REQUIREMENT ('+(PRIOR[r.priority]||r.priority)+'): '+r.text));
  P.gaps.forEach(g=>L.push('GAP: '+g.area+'; today: '+(g.current||'')+(g.qty_have!==''?' ('+g.qty_have+' '+(g.unit||'')+')':'')+'; needed: '+(g.required||'')+(g.qty_need!==''?' ('+g.qty_need+' '+(g.unit||'')+')':'')+'; impact: '+(g.impact||'')));
  P.constraints.forEach(c=>L.push('CONSTRAINT: '+c.text));return L.join('\n');}
+// Claims about today's condition ("lacks X", "has no X") must rest on a GAP's "today" entry or the notes saying so, not on a requirement for X.
+function curClaims(t){const NEG=/\b(no|not|lack\w*|without|missing|none|cannot|can't|doesn't|does not|inadequate|deficient|insufficient|unable|absent|only)\b/i;const src=[].concat(P.gaps.map(g=>g.area+' '+(g.current||'')),P.sessions.map(s=>s.notes||'')).join('\n').split(/(?<=[.!?;])\s+|\n+/);
+ const STOP=new Set('the and for with that this from have current existing facility facilities system systems capability capabilities provide adequate'.split(' '));const out=[];
+ for(const m of String(t).matchAll(/\b(lacks?|lacking|has no|have no|does not have|do not have|without|cannot|can ?not|is unable to|are unable to|no existing|absence of|missing)\s+([^.,;]{3,70})/gi)){for(const part of m[2].split(/\s+(?:and|or|nor)\s+|,\s*/)){const what=part.toLowerCase().replace(/[^a-z0-9 ]/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w));if(!what.length) continue;
+  const ok=src.some(sn=>{const l=sn.toLowerCase();return NEG.test(l)&&what.filter(w=>l.includes(w.replace(/s$/,''))).length>=Math.min(2,what.length);});if(!ok) out.push((m[1]+' '+part).trim().slice(0,70));}}
+ return [...new Set(out)];}
 function numCheck(text,src){const S=String(src).replace(/,/g,'');return [...new Set((String(text).replace(/\b\d+(?:st|nd|rd|th)\b/gi,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
 async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return;}
  const b=$('#bAINeed');if(b){b.disabled=true;b.textContent='Writing…';}const rec=needRecord();
  try{const j=await CARLAI.ask('claude',NEED_SYS,'RECORD:\n'+rec,null,{fresh:true});const t=String(j.need||'').trim();if(!t) throw new Error('Nothing returned');
   P.need_statement=t;P.need_sig=needSig();const bad=numCheck(t,rec+'\n'+P.sessions.map(s=>s.notes).join('\n'));const gaps=(t.match(/\[NEEDED:[^\]]*\]/g)||[]).length;
-  P.need_check=(bad.length?'Check these numbers; they are not in the record: '+bad.join(', ')+'. ':'Every number traces to the record. ')+(gaps?gaps+' [NEEDED] gap'+(gaps>1?'s':'')+' to fill.':'');
+  const cur=curClaims(t);P.need_check=(bad.length?'Check these numbers; they are not in the record: '+bad.join(', ')+'. ':'Every number traces to the record. ')+(cur.length?'Not stated as today’s condition in the notes or gaps: '+cur.map(c=>'“'+c+'”').join(', ')+'. Fix or confirm these. ':'')+(gaps?gaps+' [NEEDED] gap'+(gaps>1?'s':'')+' to fill.':'');
   log('Need statement written with AI',P.need_check);save();}
  catch(e){alert('Could not write the need statement: '+e.message);}
  if(STEP==='out') vOut();renderSteps();}
