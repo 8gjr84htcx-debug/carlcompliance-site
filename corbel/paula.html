@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -1206,7 +1208,7 @@ function vData(){const v=$('#view');
  '<div class="panel"><h2>Health thresholds</h2><p class="lead">The health engine takes the worst of legal authority, funds, scope, cost, schedule, risk and actions. Change the thresholds to match JPMO’s rules; every chart and report follows.</p><div class="form">'+
  [['costWatch','Cost growth for watch (%)'],['costCrit','Cost growth for critical (%)'],['slipWatch','Schedule slip for watch (days)'],['slipCrit','Schedule slip for critical (days)'],['spiWatch','Progress ratio for watch (percent complete ÷ percent time)'],['spiCrit','Progress ratio for critical'],['riskWatch','Risk score for watch (likelihood × impact)'],['riskCrit','Risk score for critical'],['actWatch','Overdue actions for watch'],['actCrit','Overdue actions for critical'],['stale','Days before a project is flagged as not updated'],['fundsWatch','Funds headroom for watch (%)'],['umc','Minor construction ceiling used for 2853 ($): $9M by statute; up to $14M where the location-adjusted figure applies']].map(([k,l])=>'<div><label class="f">'+l+'</label><input type="number" step="any" data-t="'+k+'" value="'+P.t[k]+'"></div>').join('')+
  '<div class="wide small">Statutory figures ('+esc(LAW.asof)+'): '+['umc','umcCap','costPct','scopeCut','scopeUp','report','bigCap'].map(k=>LAW[k].what+' – '+LAW[k].cite).join('; ')+'. PAULA flags; the Service and its counsel decide.</div><div><label class="f">Your name (on updates and reports)</label><input id="me" value="'+esc(P.me)+'"></div></div><div class="row"><button id="bResetT">Restore defaults</button></div></div>'+
- '<div class="panel"><h2>Log</h2><div class="small">'+(P.log.slice().reverse().slice(0,150).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
+ '<div class="panel"><h2>Log</h2><div class="small">'+(P.log.slice().reverse().slice(0,150).map(l=>'<div>'+esc(window.CorbelDates?CorbelDates.lt(l.at):l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
  v.querySelectorAll('[data-t]').forEach(i=>i.onchange=()=>{P.t[i.dataset.t]=Number(i.value);log('Threshold changed',i.dataset.t+' = '+i.value);save();});$('#me').oninput=e=>{P.me=e.target.value;save();};
  $('#bResetT').onclick=()=>{P.t={...DEF_T};save();vData();};
  $('#bBakAll').onclick=()=>{if(!window.CorbelPF) return alert('Open PAULA from carlcompliance.com/corbel to back up every tool.');const n=CorbelPF.backup();log('All-tool backup downloaded',n+' tool records');save();};

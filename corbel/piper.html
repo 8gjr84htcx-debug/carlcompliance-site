@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,

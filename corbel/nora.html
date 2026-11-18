@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -788,7 +790,7 @@ Return ONLY JSON:
 {"project":[{"field":"name|installation|service|location|unit|driver|driver_detail|mission|need_date","value":"...","quote":"...","src":"S1"}],
 "stakeholders":[{"name":"person's name as written","title":"","org":"","contact":"phone or email if written, else empty","role":"<one of ROLES>","authority":"decides|approves|validates|consulted|informed","influence":"H|L","interest":"H|L","quote":"...","src":"S1"}],
 "requirements":[{"statement":"The facility shall … (one need, measurable where the source gives a number)","type":"<type id>","priority":"must|should|could|wont","measure":"how it will be verified","measure_basis":"stated|proposed","speaker":"who said or wrote it, as the source shows (interviewee, email sender, workshop speaker); empty if not shown","rationale":"why it is needed, in the source's words, or empty","evidence":"...","src":"S1"}],
-"gaps":[{"area":"capability","current":"what exists today","required":"what is needed","qty_have":"number only or empty","qty_need":"number only or empty","unit":"SF, bays, beds, kW…","impact":"what happens to the mission without it","quote":"...","src":"S1"}],
+"gaps":[{"area":"capability","current":"what exists today","required":"what is needed","qty_have":"number only or empty","qty_need":"number only or empty; when the need is stated in parts (12 fighters plus 4 tankers) give the total (16)","unit":"SF, bays, beds, kW…","impact":"what happens to the mission without it","quote":"...","src":"S1"}],
 "constraints":[{"text":"","basis":"","quote":"","src":""}],
 "assumptions":[{"text":"","owner":"who should confirm it","quote":"","src":""}],
 "risks":[{"text":"","l":1-5,"i":1-5,"response":"","owner":"","quote":"","src":""}],
@@ -902,16 +904,28 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
  const byName={};kept('stakeholders').forEach(x=>{const s={id:uid(),name:x.name,title:x.title||'',org:x.org||'',role:ROLES.includes(x.role)?x.role:'Other',authority:AUTH[x.authority]?x.authority:'',influence:x.influence==='H'?'H':x.influence==='L'?'L':'',interest:x.interest==='H'?'H':x.interest==='L'?'L':'',contact:x.contact||'',origin:'From '+(srcSession(x.quote)?.title||'your documents')};P.stakeholders.push(s);byName[norm(x.name)]=s.id;n.stakeholders=(n.stakeholders||0)+1;
   const ss=srcSession(x.quote);if(ss&&!ss.participants.includes(s.id)) ss.participants.push(s.id);});
  kept('requirements').forEach(x=>{const ss=srcSession(x.evidence);let who=personFor(x.speaker,ss,x.evidence);if(!who&&String(x.speaker||'').trim()) who=addPerson(x.speaker,ss);const r=newReq({text:String(x.statement).trim(),type:RTYPES[x.type]?x.type:'functional',priority:PRIOR[x.priority]?x.priority:'should',session:ss?ss.id:'',sources:who?[who]:ss?[...ss.participants]:[],evidence:x.evidence,measure:x.measure||'',rationale:x.rationale||'',origin:'AI: '+x.by.join(', ')+' ('+(x.status==='agreed'?'both readers':x.status)+')'+(x.measure&&x.measure_basis==='proposed'?'; measure proposed':'')});n.requirements=(n.requirements||0)+1;});
- kept('gaps').forEach(x=>{P.gaps.push({id:uid(),area:x.area,current:x.current||'',required:x.required||'',qty_have:String(x.qty_have??''),qty_need:String(x.qty_need??''),unit:x.unit||'',impact:x.impact||'',reqs:[],origin:x.ok?'From your documents':'Suggestion'});n.gaps=(n.gaps||0)+1;});
- kept('constraints').forEach(x=>{P.constraints.push({id:uid(),text:x.text,basis:x.basis||(x.ok?'“'+x.quote+'”':'')});n.constraints=(n.constraints||0)+1;});
- kept('assumptions').forEach(x=>{P.assumptions.push({id:uid(),text:x.text,owner:x.owner||'',confirmed:'no'});n.assumptions=(n.assumptions||0)+1;});
- kept('risks').forEach(x=>{const c=v=>String(Math.max(1,Math.min(5,Math.round(Number(v)||3))));P.risks.push({id:uid(),text:x.text,l:c(x.l),i:c(x.i),response:x.response||'',owner:x.owner||''});n.risks=(n.risks||0)+1;});
- kept('measures').forEach(x=>{P.measures.push({id:uid(),text:x.text,target:x.target||'',how:x.how||''});n.measures=(n.measures||0)+1;});
+ // Nothing is added twice: an item that says the same thing as one already in the record is skipped.
+ const dupOf=(L,t)=>L.some(y=>sameT(y.text||y.area||'',t));let skipped=0;
+ kept('gaps').forEach(x=>{if(P.gaps.some(g=>sameT(g.area+' '+(g.required||''),x.area+' '+(x.required||'')))){skipped++;return;}const q=gapTotal(x);P.gaps.push({id:uid(),area:x.area,current:x.current||'',required:x.required||'',qty_have:String(x.qty_have??''),qty_need:String(q.need??''),unit:q.unit||x.unit||'',impact:x.impact||'',reqs:[],origin:(x.ok?'From your documents':'Suggestion')+(q.note?'; '+q.note:'')});n.gaps=(n.gaps||0)+1;});
+ kept('constraints').forEach(x=>{if(dupOf(P.constraints,x.text)){skipped++;return;}P.constraints.push({id:uid(),text:x.text,basis:x.basis||(x.ok?'“'+x.quote+'”':'')});n.constraints=(n.constraints||0)+1;});
+ kept('assumptions').forEach(x=>{if(dupOf(P.assumptions,x.text)){skipped++;return;}P.assumptions.push({id:uid(),text:x.text,owner:x.owner||'',confirmed:'no'});n.assumptions=(n.assumptions||0)+1;});
+ kept('risks').forEach(x=>{if(dupOf(P.risks,x.text)){skipped++;return;}const c=v=>String(Math.max(1,Math.min(5,Math.round(Number(v)||3))));P.risks.push({id:uid(),text:x.text,l:c(x.l),i:c(x.i),response:x.response||'',owner:x.owner||''});n.risks=(n.risks||0)+1;});
+ kept('measures').forEach(x=>{if(dupOf(P.measures,x.text)){skipped++;return;}P.measures.push({id:uid(),text:x.text,target:x.target||'',how:x.how||''});n.measures=(n.measures||0)+1;});
  if(!String(P.project.prepared_by||'').trim()&&window.CARLAI&&CARLAI.state().user){P.project.prepared_by=CARLAI.state().user;}
- B.applied=true;B.summary='Added '+(Object.entries(n).map(([k,v])=>v+' '+(k==='project'?'project fields':k)).join(', ')||'nothing new')+'.';
+ {const ins=instGuess();if(ins&&!String(P.project.installation||'').trim()){P.project.installation=ins.inst;P.project.inst_src='Suggested from “'+ins.clue+'” in your notes – check it';n.project=(n.project||0)+1;log('Installation suggested',ins.inst+' from “'+ins.clue+'”');}}
+ B.applied=true;B.summary='Added '+(Object.entries(n).map(([k,v])=>v+' '+(k==='project'?'project fields':k)).join(', ')||'nothing new')+(skipped?'; '+skipped+' duplicate'+(skipped>1?'s':'')+' skipped':'')+'.';
  log('Build my requirement: applied',B.summary);save();STEP='out';render();window.scrollTo(0,0);
  if(window.CARLAI&&CARLAI.state().ok){(async()=>{if(!(P.need_statement||'').trim()) await aiNeed();await aiMeasures(true);})();}}
 
+// Same thing said twice: most of the meaningful words of one appear in the other.
+function sameT(a,b){const w=t=>[...new Set(String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(x=>x.length>2&&!/^(the|and|for|with|are|was|will|that|this|from|into|not)$/.test(x)))];const A=w(a),B=w(b);if(!A.length||!B.length) return false;const S=A.length<=B.length?A:B,L=new Set(A.length<=B.length?B:A);return S.filter(x=>L.has(x)).length/S.length>=.8;}
+// A gap stated in parts ("12 fighters plus 4 tankers") needs the total (16), not the first number.
+function gapTotal(x){const q=String(x.quote||'')+' '+String(x.required||'');const need=String(x.qty_need??'').replace(/[^\d.]/g,'');const parts=[...q.matchAll(/(\d+)\s+([a-z][a-z\-]+(?:\s[a-z\-]+)?)\s*(?:,|plus|and|\+|&)\s*(\d+)\s+([a-z][a-z\-]+)/gi)];
+ for(const m of parts){const a=+m[1],b=+m[3];if(need&&(+need===a||+need===b)&&a+b!==+need) return {need:String(a+b),unit:(x.unit?x.unit+' ':'')+'('+a+' '+m[2]+' + '+b+' '+m[4]+')',note:'total of '+a+' + '+b+' from the source, not '+need};}
+ return {need:x.qty_need??'',unit:x.unit||''};}
+// Units and places that identify an installation when the notes never name it.
+const UNIT_INST=[[/\b36(?:th)?\s*(?:wing|wg|mxg|msg|ces|lrs|mxs|amxs|ops?\s*group|og|sfs|cs)\b|\bandersen\b|\baafb\b|\bnorthwest field\b/i,'Andersen AFB, Guam'],[/\b18(?:th)?\s*(?:wing|wg|mxg|msg|ces|og)\b|\bkadena\b/i,'Kadena AB, Okinawa'],[/\b374(?:th)?\s*(?:aw|airlift wing|msg|ces)\b|\byokota\b/i,'Yokota AB, Japan'],[/\b35(?:th)?\s*(?:fw|fighter wing|msg|ces)\b|\bmisawa\b/i,'Misawa AB, Japan'],[/\b51(?:st)?\s*(?:fw|fighter wing|msg|ces)\b|\bosan\b/i,'Osan AB, Korea'],[/\b8(?:th)?\s*(?:fw|fighter wing)\b|\bkunsan\b/i,'Kunsan AB, Korea'],[/\b15(?:th)?\s*(?:wing|wg)\b|\bhickam\b|\bpearl harbor\b/i,'JB Pearl Harbor-Hickam, Hawaii'],[/\b354(?:th)?\s*(?:fw|fighter wing)\b|\beielson\b/i,'Eielson AFB, Alaska'],[/\b3(?:rd)?\s*wing\b|\b673(?:rd)?\s*abw\b|\bjber\b|\belmendorf\b/i,'JB Elmendorf-Richardson, Alaska'],[/\bcamp blaz\b|\bmcb camp blaz\b/i,'Camp Blaz, Guam'],[/\bnaval base guam\b|\bapra harbor\b|\bnbg\b/i,'Naval Base Guam'],[/\btinian\b/i,'Tinian, CNMI'],[/\biwakuni\b|\bmag[- ]?12\b/i,'MCAS Iwakuni, Japan'],[/\bhumphreys\b/i,'Camp Humphreys, Korea']];
+function instGuess(){const t=(P.sessions||[]).map(s=>s.notes||'').join('\n');for(const [re,inst] of UNIT_INST){const m=t.match(re);if(m) return {inst,clue:m[0]};}return null;}
 // The need statement, written from the record, with every number checked.
 const NEED_SYS=`You write the need statement for a DoD military construction requirement: one paragraph of 120 to 200 words a busy reviewer can read in a minute. Say who needs what capability, why now, and what happens to the mission without it. State the need, not a solution (say "covered maintenance space for two aircraft", not "a new hangar"). Use ONLY facts in RECORD; where a fact the paragraph needs is missing, write [NEEDED: what]. Plain words, active voice, no acronyms without spelling them out once, no references to AI or to this record.
 Describe today's condition only from the GAP "today" entries and the notes. A REQUIREMENT is something needed, not proof that it is missing today: never write that the existing facility lacks, has no or cannot do something unless RECORD says so about today.

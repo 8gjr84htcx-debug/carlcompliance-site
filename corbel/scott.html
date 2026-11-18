@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -584,7 +586,9 @@ details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
     "pressurized_systems",
     "night_work",
     "traffic_control",
-    "heavy_equipment"
+    "heavy_equipment",
+    "radiography",
+    "occupied_area"
    ]
   },
   {
@@ -667,7 +671,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
 "use strict";
 const SCHEMA=JSON.parse(document.getElementById('schema').textContent);
 const Q={};SCHEMA.questions.forEach(q=>Q[q.id]=q);
-const LBL={af:'Air Force',ussf:'Space Force',usmc:'USMC',navy:'Navy',army:'Army',dha:'DHA',usace:'USACE',navfac:'NAVFAC',afcec:'AFCEC',us_state:'U.S. State',us_territory:'U.S. territory',host_nation:'Host nation',us_hawaii:'Hawaii',us_alaska:'Alaska',cnmi:'CNMI',fsm:'FSM',om_services:'O&M services',study_design_only:'Study / design only',planning_1391:'Planning / DD1391',closeout_transfer:'Closeout / transfer',dbb:'Design-bid-build',db:'Design-build',ae_services:'A-E services',ffp:'Firm-fixed-price',cost_reimb:'Cost-reimbursement',milcon:'MILCON',om_frsm:'O&M / FSRM',c5isr:'C5ISR',ecf_acp:'ECF / ACP',atc_airops:'ATC / air ops',cdc:'Child development center',ddc_controls:'DDC controls',umcs:'UMCS',hvac:'HVAC',ict_telecom:'ICT / telecom',ess:'Electronic security',ev_charging:'EV charging',batteries_ups:'Batteries / UPS',stormwater_lid:'Stormwater / LID',scif_sapf:'SCIF / SAPF',risk_cat_v:'Risk Category V',cbr_protection:'CBR protection',hemp:'HEMP',rf_shielding:'RF / TEMPEST shielding',lead_asbestos_hazmat:'Lead / asbestos / hazmat',hazwoper:'HAZWOPER',uas_drones:'UAS / drones',hazardous_energy_loto:'Hazardous energy / LOTO',electrical_energized:'Energized electrical work',non_permanent_ops:'Non-permanent (military ops)'};
+const LBL={af:'Air Force',ussf:'Space Force',usmc:'USMC',navy:'Navy',army:'Army',dha:'DHA',usace:'USACE',navfac:'NAVFAC',afcec:'AFCEC',us_state:'U.S. State',us_territory:'U.S. territory',host_nation:'Host nation',us_hawaii:'Hawaii',us_alaska:'Alaska',cnmi:'CNMI',fsm:'FSM',om_services:'O&M services',study_design_only:'Study / design only',planning_1391:'Planning / DD1391',closeout_transfer:'Closeout / transfer',dbb:'Design-bid-build',db:'Design-build',ae_services:'A-E services',ffp:'Firm-fixed-price',cost_reimb:'Cost-reimbursement',milcon:'MILCON',om_frsm:'O&M / FSRM',c5isr:'C5ISR',ecf_acp:'ECF / ACP',atc_airops:'ATC / air ops',cdc:'Child development center',ddc_controls:'DDC controls',umcs:'UMCS',hvac:'HVAC',ict_telecom:'ICT / telecom',ess:'Electronic security',ev_charging:'EV charging',batteries_ups:'Batteries / UPS',stormwater_lid:'Stormwater / LID',scif_sapf:'SCIF / SAPF',risk_cat_v:'Risk Category V',cbr_protection:'CBR protection',hemp:'HEMP',rf_shielding:'RF / TEMPEST shielding',lead_asbestos_hazmat:'Lead / asbestos / hazmat',hazwoper:'HAZWOPER',radiography:'Radiographic testing (X-ray or gamma)',occupied_area:'Work in an occupied or active facility or area',uas_drones:'UAS / drones',hazardous_energy_loto:'Hazardous energy / LOTO',electrical_energized:'Energized electrical work',non_permanent_ops:'Non-permanent (military ops)'};
 const lab=v=>LBL[v]||String(v).replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
 const MULTI=['work_type','phase','facility','systems','security','hazards','service'];
 const SCALAR=['service','design_agent','location','country','level','delivery','contract_type','funding','solicitation','set_aside','value','duration_days','seismic','historic','arctic','cui'];
@@ -841,6 +845,8 @@ const K=[
  ['hazards','night_work','\\b(night work|nighttime|night shift|after hours)\\b'],
  ['hazards','traffic_control','\\b(traffic control|lane closure|road closure|detour)\\b'],
  ['hazards','heavy_equipment','\\b(heavy equipment|excavator|dozer|loader|grader|paver|roller|crane)\\b'],
+  ['hazards','radiography','\\b(radiograph\\w*|x-?ray(?:ed)? (?:the )?(?:welds?|joints?)|weld x-?rays?|gamma (?:ray|source)|ionizing radiation)\\b'],
+  ['hazards','occupied_area','\\b(occupied (?:building|facility|space|area)s?|while (?:the )?(?:building|facility|airfield|apron|system) (?:is |remains )?(?:occupied|in use|in service|operational|active)|remains? (?:in )?(?:operation|service)|active (?:apron|airfield|ramp|flightline|flight line|fuel system|facility|work area)|continuity of operations|without (?:interrupting|disrupting) (?:operations|the mission))\\b'],
  // services / agents / location
  ['service','af','\\b(Air Force|USAF|AFB|wing|CES)\\b'],
  ['service','ussf','\\b(Space Force|USSF|SFB)\\b'],
@@ -929,8 +935,9 @@ function merge(scope,results){
  for(const [src,r] of Object.entries(results)){if(!r||r.error) continue;(r.triggers||[]).forEach(t=>add(src,t));
   if(r.scalars){for(const [f,v] of Object.entries(r.scalars)){if(v===null||v===false||v===undefined) continue;add(src,{field:f,value:v,evidence:(r.scalars_evidence||{})[f]||'',reason:'scalar'});}}}
  const engines=Object.keys(results).filter(k=>results[k]&&!results[k].error);
- const items=[...map.values()].map(e=>{const yes=Object.values(e.by).filter(x=>x==='y').length;const bad=Object.values(e.by).filter(x=>x==='bad').length;
-  let status=yes>=2?'agree':yes===1?'single':'unverified';
+ const items=[...map.values()].map(e=>{const yes=Object.values(e.by).filter(x=>x==='y').length;const bad=Object.values(e.by).filter(x=>x==='bad').length;const ai=Object.entries(e.by).filter(([k,x])=>k!=='offline'&&x==='y').length;
+  // agreement means two independent AI readers; the keyword reader supports a finding but never makes agreement on its own
+  let status=ai>=2?'agree':yes>=1?'single':'unverified';
   if(['value','duration_days'].includes(e.field)&&!yes&&bad) status='single';
   return {...e,yes,status,use:status==='agree'||(status==='single'&&e.by.offline==='y')};});
  return {engines,items};

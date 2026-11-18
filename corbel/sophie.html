@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -152,12 +154,6 @@
  window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
 })();
 </script>
-
-
-
-
-
-
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -505,7 +501,7 @@ function piper(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'
 function earl(){try{const j=JSON.parse(localStorage.getItem('earl_project')||'null');return j&&j.schema==='earl-1'?j:null;}catch(e){return null;}}
 function scott(){try{const j=JSON.parse(localStorage.getItem('ccs_project')||'null');return j&&typeof j==='object'&&!Array.isArray(j)?j:null;}catch(e){return null;}}
 const SCL={work_type:'Work type',facility:'Facility',systems:'Systems',hazards:'Hazardous activities',security:'Security'};
-const SCX={hazwoper:'contaminated soil or site work (HAZWOPER)',confined_space:'confined space entry',lead_asbestos_hazmat:'lead, asbestos or other hazardous material',hot_work:'hot work',electrical_energized:'energized electrical work',hazardous_energy_loto:'lockout/tagout of hazardous energy',airfield_ops:'work on or near an active airfield',excavation:'excavation',cranes_rigging:'cranes and rigging',critical_lift:'critical lifts',pressurized_systems:'pressurized systems',work_at_height:'work at height',roof_work:'roof work',night_work:'night work',traffic_control:'traffic control',environmental_hazmat:'hazardous material or contamination',db:'design-build',dbb:'design-bid-build'};
+const SCX={hazwoper:'contaminated soil or site work (HAZWOPER)',confined_space:'confined space entry',lead_asbestos_hazmat:'lead, asbestos or other hazardous material',hot_work:'hot work',electrical_energized:'energized electrical work',hazardous_energy_loto:'lockout/tagout of hazardous energy',airfield_ops:'work on or near an active airfield',excavation:'excavation',cranes_rigging:'cranes and rigging',critical_lift:'critical lifts',pressurized_systems:'pressurized systems',work_at_height:'work at height',roof_work:'roof work',night_work:'night work',radiography:'radiographic testing (ionizing radiation)',occupied_area:'work in an occupied or active facility or area',traffic_control:'traffic control',environmental_hazmat:'hazardous material or contamination',db:'design-build',dbb:'design-bid-build'};
 const scLab=v=>SCX[v]||String(v).replace(/_/g,' ');
 function scottScope(){const c=scott();if(!c) return null;const o={};Object.keys(SCL).forEach(k=>{const v=[].concat(c[k]||[]).filter(Boolean);if(v.length) o[k]=v;});return Object.keys(o).length||c.delivery?{f:o,delivery:c.delivery||''}:null;}
 function coraSel(){try{return JSON.parse(localStorage.getItem('cora_selection')||'null');}catch(e){return null;}}

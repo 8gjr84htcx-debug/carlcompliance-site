@@ -93,7 +93,9 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd};
+ // A logged time in this computer's local time zone (logs are stored in UTC).
+ function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -152,12 +154,6 @@
  window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
 })();
 </script>
-
-
-
-
-
-
 
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -364,9 +360,17 @@ function missionFor(pid){const P=projects();let best=null;A.reqs.forEach(r=>(r.l
   const why=(l.role==='supports'?'Supports':'Required for')+' “'+r.name+'” ('+t[1]+(r.need?', needed '+fm(r.need):'')+')'+(e.bind&&e.bind.l.pid===pid&&l.role!=='supports'?'; this project sets its capability date'+(e.gap>0?', '+e.gap+' months after the need date':''):'');
   if(!best||v>best.v) best={v,why:'ADAM: '+why,src:'adam'};}));return best;}
 // ---------- link suggestions: same installation, or a project tagged with the same posture program ----------
+// Suggestions weigh what the project is (its title against the capability), not only where it is.
+const SW=new Set('the and for with from that this into new add added facility facilities project projects capability capabilities support supports supporting construct construction replace replacement phase force forces base installation aircraft mission missions operations operational military joint'.split(' '));
+const swords=t=>[...new Set(String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!SW.has(w)))];
+function overlap(a,b){const A=swords(a),B=swords(b);if(!A.length||!B.length) return [];return A.filter(w=>B.some(x=>x===w||(w.length>5&&x.length>5&&(x.startsWith(w.slice(0,6))||w.startsWith(x.slice(0,6))))));}
 function suggest(r,P){const loc=locate(r.location);const have=new Set((r.links||[]).map(l=>l.pid));
- return (P||projects()).filter(p=>!have.has(p.id)).map(p=>{const why=[];const pl=locate(p.installation);if(loc&&pl&&loc.k===pl.k&&loc.k!=='guam') why.push('same installation');
-  if(r.program&&p.posture&&p.posture.program===r.program) why.push('tagged '+r.program);return {p,why};}).filter(x=>x.why.length).slice(0,8);}
+ return (P||projects()).filter(p=>!have.has(p.id)).map(p=>{const why=[];let sc=0;const pl=locate(p.installation);const same=loc&&pl&&loc.k===pl.k;
+  const ov=overlap(r.name+' '+(r.effect||''),p.name+' '+((p.posture||{}).program||''));if(ov.length){why.push('matches “'+ov.slice(0,3).join(', ')+'”');sc+=2*ov.length;}
+  if(same){why.push('same '+(loc.k==='guam'?'island':'installation'));sc+=loc.k==='guam'?1:2;}
+  if(r.component&&p.posture&&p.posture.component===r.component){why.push(r.component);sc+=1;}
+  if(r.program&&p.posture&&p.posture.program===r.program){why.push('tagged '+r.program);sc+=3;}
+  return {p,why,sc,ov:ov.length,same};}).filter(x=>x.ov||(x.same&&x.sc>=3)||x.why.some(w=>/^tagged/.test(w))).sort((a,b)=>b.sc-a.sc).slice(0,8);}
 // ---------- screens ----------
 const VIEWS=[['req','Requirements'],['aln','Alignment'],['prj','Projects'],['rep','Reports'],['data','Data and settings']];
 function renderSteps(){const nav=$('#steps');const E=A.reqs.map(r=>evalReq(r));const late=E.filter(e=>e.st==='late').length;
@@ -415,7 +419,7 @@ async function pdfLib(){if(PDFJS) return PDFJS;const r=await fetch('irma.html',{
  const u=URL.createObjectURL(new Blob([grab('pdfjs')],{type:'text/javascript'}));const w=URL.createObjectURL(new Blob([grab('pdfw')],{type:'text/javascript'}));PDFJS=await import(u);PDFJS.GlobalWorkerOptions.workerSrc=w;return PDFJS;}
 async function fileText(f){if(!/\.pdf$/i.test(f.name)) return await f.text();const lib=await pdfLib();const doc=await lib.getDocument({data:new Uint8Array(await f.arrayBuffer())}).promise;const out=[];
  for(let i=1;i<=Math.min(doc.numPages,120);i++){const tc=await (await doc.getPage(i)).getTextContent();out.push('[Page '+i+']\n'+tc.items.map(x=>x.str).join(' ').replace(/\s+/g,' '));}return out.join('\n\n');}
-const READ_SYS=`You read a publicly released U.S. defense posture document (for example a combatant command posture statement, a budget overview or a congressional report) and list the force posture requirements it states that military construction would deliver: a capability needed at a place, by a date where the document gives one. Return ONLY JSON {"reqs":[{"name":"the capability, short","location":"installation or island as written","need":"YYYY-MM or empty","component":"PACFLT|PACAF|USARPAC|MARFORPAC|SOCPAC|Other|","program":"","effect":"what it gives the commander, one sentence from the document","quote":"exact words from the document that state it","page":0}]}
+const READ_SYS=`You read a publicly released U.S. defense posture document (for example a combatant command posture statement, a budget overview or a congressional report) and list the force posture requirements it states that military construction would deliver: a capability needed at a place, by a date where the document gives one. Return ONLY JSON {"reqs":[{"name":"the capability, short","location":"installation or island as written","need":"YYYY-MM or empty; when the document gives only a year (\"by 2030\"), use December of that year (2030-12); for a fiscal year, September (FY2030 is 2030-09)","need_basis":"month|year only|fiscal year|","component":"PACFLT|PACAF|USARPAC|MARFORPAC|SOCPAC|Other|","program":"","effect":"what it gives the commander, one sentence from the document","quote":"exact words from the document that state it","page":0}]}
 At most 15, most specific first. Use only what the document states; leave need empty unless a date is written. Never infer or add classified detail.`;
 const nz=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
 let RD=null;
@@ -424,10 +428,13 @@ function readBox(){const b=$('#rdBox');const on=!!(window.CARLAI&&CARLAI.state()
  if(!on) return;$('#rdPick').onclick=()=>$('#rdF').click();$('#rdF').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f) return;const st=$('#rdSt');
   try{st.textContent='Reading '+f.name+'…';const t=await fileText(f);if((t.match(/\S+/g)||[]).length<80) throw new Error('Too little text found');st.textContent='Finding requirements…';
    const j=await CARLAI.ask('claude',READ_SYS,t.slice(0,150000),null,{fresh:true});const nt=nz(t);
-   RD={file:f.name,items:(j.reqs||[]).filter(x=>x&&x.name&&x.quote&&nt.includes(nz(x.quote))).map(x=>({...x,need:/^\d{4}-\d{2}$/.test(String(x.need||''))&&nt.includes(String(x.need).slice(0,4))?x.need:'',component:COMPONENTS.includes(x.component)?x.component:'',program:POSTURE_PROGRAMS.includes(x.program)?x.program:''}))};
+   RD={file:f.name,items:(j.reqs||[]).filter(x=>x&&x.name&&x.quote&&nt.includes(nz(x.quote))).map(x=>({...x,need:(()=>{let n=/^\d{4}-\d{2}$/.test(String(x.need||''))&&nt.includes(String(x.need).slice(0,4))?x.need:'';if(!n) return '';const y=n.slice(0,4),q=String(x.quote||'');
+     // "By 2030" with no month written is the end of that year, never January.
+     const monthWritten=new RegExp('(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)[a-z]*\\.?\\s+(\\d{1,2},?\\s+)?'+y,'i').test(q)||new RegExp('\\b\\d{1,2}/(\\d{1,2}/)?'+y).test(q);const fyW=new RegExp('\\bFY\\s?(20)?'+y.slice(2)+'\\b|fiscal year '+y,'i').test(q);
+     if(!monthWritten) n=y+(fyW?'-09':'-12');return n;})(),need_basis:x.need&&!new RegExp('(jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)','i').test(String(x.quote||''))?(new RegExp('\\bFY','i').test(String(x.quote||''))?'Fiscal year only: end of the fiscal year (September) assumed':'Year only: end of the calendar year assumed'):'',component:COMPONENTS.includes(x.component)?x.component:'',program:POSTURE_PROGRAMS.includes(x.program)?x.program:''}))};
    RD.dropped=(j.reqs||[]).length-RD.items.length;st.textContent='';log('Posture document read',f.name+': '+RD.items.length+' requirements');rdShow();}catch(err){st.textContent='';alert('Could not read the document: '+err.message);}};}
 function rdShow(){const o=$('#rdOut');if(!o||!RD) return;o.innerHTML=(RD.items.length?'<table class="ptable" style="margin-top:8px"><thead><tr><th></th><th>Requirement</th><th>Location</th><th>Needed</th><th>From the document</th></tr></thead><tbody>'+RD.items.map((x,i)=>'<tr><td><input type="checkbox" data-rk="'+i+'" style="width:auto" checked></td><td><b>'+esc(x.name)+'</b>'+(x.component?'<div class="small">'+esc(x.component)+'</div>':'')+'</td><td>'+esc(x.location)+'</td><td>'+(x.need?fm(x.need):'–')+'</td><td class="small">“'+esc(x.quote)+'”'+(x.page?' (p. '+x.page+')':'')+'</td></tr>').join('')+'</tbody></table><div class="row"><button class="go sm" id="rdAdd">Add the ticked requirements</button></div>':'<p class="small">No requirements found that the document states outright.</p>')+(RD.dropped?'<p class="small">'+RD.dropped+' suggestion'+(RD.dropped>1?'s were':' was')+' dropped because the quote is not in the document.</p>':'');
- if($('#rdAdd')) $('#rdAdd').onclick=()=>{const pick=RD.items.filter((x,i)=>document.querySelector('[data-rk="'+i+'"]').checked);pick.forEach(x=>A.reqs.push({id:uid(),name:x.name,location:x.location||'',component:x.component,program:x.program,need:x.need||'',tier:'high',effect:x.effect||'',source:RD.file+(x.page?', p. '+x.page:'')+' – “'+x.quote+'”',links:[]}));log('Requirements added from a document',pick.length+' from '+RD.file);RD=null;save();vReq();};}
+ if($('#rdAdd')) $('#rdAdd').onclick=()=>{const pick=RD.items.filter((x,i)=>document.querySelector('[data-rk="'+i+'"]').checked);pick.forEach(x=>A.reqs.push({id:uid(),name:x.name,location:x.location||'',component:x.component,program:x.program,need:x.need||'',need_basis:x.need_basis||'',tier:'high',effect:x.effect||'',source:RD.file+(x.page?', p. '+x.page:'')+' – “'+x.quote+'”'+(x.need_basis?' ('+x.need_basis+')':''),links:[]}));log('Requirements added from a document',pick.length+' from '+RD.file);RD=null;save();vReq();};}
 // ---------- alignment ----------
 function vAln(){const v=$('#view');const P=projects();const E=A.reqs.map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k).length;
  const order={late:0,risk:1,unk:2,noneed:2,none:3,ok:4};E.sort((a,b)=>order[a.e.st]-order[b.e.st]||(b.e.gap||0)-(a.e.gap||0));
@@ -482,7 +489,7 @@ function vData(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Data and
  '<div><label class="f">At risk up to this many months late</label><input type="number" min="0" max="36" id="tR" value="'+N(A.t.risk)+'"></div>'+
  '<div><label class="f">Your name (on reports)</label><input id="me" value="'+esc(A.me)+'"></div></div>'+
  '<p class="small">Completion dates come from PAULA: the forecast, else the baseline. Projects with neither use the fiscal year plus the months to build above, and every report says so.</p></div>'+
- '<div class="panel"><h2>Log</h2><div class="small">'+(A.log.slice().reverse().slice(0,100).map(l=>'<div>'+esc(l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
+ '<div class="panel"><h2>Log</h2><div class="small">'+(A.log.slice().reverse().slice(0,100).map(l=>'<div>'+esc(window.CorbelDates?CorbelDates.lt(l.at):l.at.slice(0,16).replace('T',' '))+' – '+esc(l.what)+(l.detail?': '+esc(l.detail):'')+'</div>').join('')||'Nothing yet.')+'</div></div>';
  $('#tB').onchange=e=>{A.t.build=Math.max(6,N(e.target.value));log('Months to build set',String(A.t.build));save();};$('#tR').onchange=e=>{A.t.risk=Math.max(0,N(e.target.value));log('At-risk window set',String(A.t.risk));save();};$('#me').oninput=e=>{A.me=e.target.value;save();};}
 // ---------- file ----------
 $('#bSave').onclick=()=>{dl('ADAM_'+today()+'.json',JSON.stringify(A,null,1),'application/json');};
