@@ -470,12 +470,14 @@ const KEYQ=['location','country','service','design_agent','funding','level','wor
  const RB=recBasics();Object.entries(RB).forEach(([k,x])=>{if(!known.has(k)||(Array.isArray(P[k])&&!P[k].length)){P[k]=x.v;src[k]=x.src;known.add(k);}});
  // The Service and the new-or-existing scope are project facts. An answer that adds another Service (Navy FCs on an Air Force project) or treats new work as existing (FC 3-401-02N) gives way to the record, and the change is shown.
  window.__recFix=[];const LB=v=>(Array.isArray(v)?v:[v]).map(z=>(typeof LBL!=='undefined'&&LBL[z])||z).join(', ');
- ['service','work_type'].forEach(k=>{const x=RB[k];if(!x||!Array.isArray(P[k])||!P[k].length) return;const want=new Set(x.v);const extra=P[k].filter(z=>!want.has(z));if(!extra.length) return;
+ ['service','work_type'].forEach(k=>{const x=RB[k];if(!x||!Array.isArray(P[k])||!P[k].length) return;if((P._noRec||[]).includes(k)) return;const want=new Set(x.v);const extra=P[k].filter(z=>!want.has(z));if(!extra.length) return;
   if(k==='work_type'&&extra.every(z=>!['new','addition','alteration','repair'].includes(z))) return;
   // Work type: when the answer holds both the record's kind and the other kind, the other goes; when it holds only the other kind, it stays as you set it and the difference is shown.
-  if(k==='work_type'&&!P[k].some(z=>want.has(z))){window.__recFix.push('Work type is '+LB(P[k])+', but the '+x.src+' says '+LB(x.v)+'. Check it: criteria for existing buildings and for new work differ.');return;}
-  const keep=k==='work_type'?P[k].filter(z=>want.has(z)||!['new','addition','alteration','repair'].includes(z)):[];const nv=[...new Set(x.v.concat(keep))];
-  window.__recFix.push((k==='service'?'Service':'Work type')+': '+LB(P[k])+' changed to '+LB(nv)+' to match the '+x.src+'.');P[k]=nv;src[k]=x.src;known.add(k);});
+  // Work type is the union of the record's scope and what is already answered (SCOTT's triggers from the SOW): a project that is new construction can still repair 9,000 SY of apron. Nothing is taken away.
+  if(k==='work_type'){const nv=[...new Set(P[k].concat(x.v))];if(nv.length===P[k].length) return;window.__recUndo=window.__recUndo||[];window.__recUndo.push({k,prev:P[k].slice(),src:src[k]});
+   window.__recFix.push('Work type: added '+LB(x.v.filter(z=>!P[k].includes(z)))+' from the '+x.src+'; kept '+LB(P[k])+'. Now '+LB(nv)+'.');P[k]=nv;known.add(k);return;}
+  const keep=[];const nv=[...new Set(x.v.concat(keep))];window.__recUndo=window.__recUndo||[];window.__recUndo.push({k,prev:P[k].slice(),src:src[k]});
+  window.__recFix.push('Service: '+LB(P[k])+' changed to '+LB(nv)+' to match the '+x.src+'.');P[k]=nv;src[k]=x.src;known.add(k);});
  P._known=[...known];P._src=src;persist();})();
 function projFile(k,ext){let n='';try{const st=JSON.parse(localStorage.getItem('milcon_store')||'null');const pr=st&&st.projects&&st.projects[st.active];n=String((pr&&(pr.core||pr).name)||'');}catch(e){}
  return ((n||'Project').replace(/[^\w\-]+/g,'-').replace(/-+/g,'-').slice(0,50))+'_'+k+'_'+new Date().toLocaleDateString('en-CA')+'.'+ext;}
@@ -498,7 +500,8 @@ function criteriaDoc(){const sel=selected();const grp={};sel.forEach(({mod,x})=>
  dl(projFile('Criteria-List','doc'),cdDoc('Applicable criteria',[body]),'application/msword');}
 
 renderForm();update();
-if(window.__recFix&&__recFix.length){const b=document.createElement('div');b.className='disc';b.style.margin='16px 16px 0';b.innerHTML='<b>Checked against the project record.</b> '+__recFix.map(t=>t.replace(/[<&]/g,'')).join(' ');document.querySelector('main').before(b);}
+if(window.__recFix&&__recFix.length){const b=document.createElement('div');b.className='disc';b.style.margin='16px 16px 0';b.innerHTML='<b>Checked against the project record.</b> '+__recFix.map(t=>t.replace(/[<&]/g,'')).join(' ')+(window.__recUndo&&__recUndo.length?' <button type="button" id="recUndo" style="margin-left:8px">Undo</button>':'');document.querySelector('main').before(b);
+ const u=document.getElementById('recUndo');if(u) u.onclick=()=>{(window.__recUndo||[]).forEach(x=>{P[x.k]=x.prev;P._noRec=[...new Set((P._noRec||[]).concat([x.k]))];if(P._src){if(x.src) P._src[x.k]=x.src;else delete P._src[x.k];}});window.__recUndo=[];persist();renderForm();update();b.innerHTML='<b>Undone.</b> Your answers are back as they were; the project record is unchanged.';};}
 </script>
 <script id="cora-rec">/* CORA's appropriation writes back to the shared project record */
 (function(){const si=Storage.prototype.setItem;Storage.prototype.setItem=function(k,v){si.call(this,k,v);if(this!==localStorage||k!=='ccs_project') return;
