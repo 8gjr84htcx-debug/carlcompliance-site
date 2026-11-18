@@ -191,38 +191,54 @@ const has=v=>v!==undefined&&v!==null&&String(v).trim()!=='';
 const set=(o,k,v)=>{if(has(v)) o[k]=v;};
 const MAP={
  nora:{skel:()=>({schema:'nora-1',project:{}}),
-  get:s=>({name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service],country:LOC[s.project?.location],need_date:s.project?.need_date,_ev:{'Requirement validated':s.validation?.service_date||s.validation?.installation_date||''}}),
+  get:s=>({name:s.project?.name,installation:s.project?.installation,service:SVC[s.project?.service],country:LOC[s.project?.location],need_date:s.project?.need_date,_src:'NORA',_ev:{'Requirement validated':s.validation?.service_date||s.validation?.installation_date||''}}),
   put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);if(inv(SVC)[c.service]) s.project.service=inv(SVC)[c.service];if(inv(LOC)[c.country]) s.project.location=inv(LOC)[c.country];set(s.project,'need_date',c.need_date);}},
  earl:{skel:()=>({schema:'earl-1',project:{}}),
-  get:s=>({name:s.project?.name,installation:s.project?.installation,service:s.project?.service,_ev:{'Economic analysis approved':s.recommend?.decision==='approved'?(s.recommend.date||today()):''}}),
+  get:s=>({name:s.project?.name,installation:s.project?.installation,service:s.project?.service,scope:(()=>{const a=(s.alts||[]).find(x=>x.id===s.recommend?.alt);return a?scopeOf(a.type,a.name+' '+(a.desc||'')):undefined;})(),_src:'EARL recommendation',_ev:{'Economic analysis approved':s.recommend?.decision==='approved'?(s.recommend.date||today()):''}}),
   put:(s,c)=>{s.project=s.project||{};set(s.project,'name',c.name);set(s.project,'installation',c.installation);set(s.project,'service',c.service);}},
  piper:{skel:()=>({schema:'piper-1',b:{},ex:{}}),
-  get:s=>({name:s.b?.title,installation:s.b?.installation,number:s.b?.project_no,fy:s.b?.fy,catcode:s.b?.catcode,service:s.b?.component==='Defense Health Agency'?'DHA':s.b?.component,authorized:s.ex?.auth,cwe:s.ex?.cwe,_ev:{'1391 validated':(s.versions||[]).length?'':''}}),
+  get:s=>({name:s.b?.title,installation:s.b?.installation,number:s.b?.project_no,fy:s.b?.fy,catcode:s.b?.catcode,service:s.b?.component==='Defense Health Agency'?'DHA':s.b?.component,authorized:s.ex?.auth,cwe:s.ex?.cwe,scope:(()=>{const pl=(s.prim||[]).map(x=>x.item||'').join(' ');return scopeOf('',pl)||(has(s.b?.title)?scopeOf('',s.b.title)||scopeOf('',[s.n?.desc,s.n?.project].join(' ')):undefined);})(),qty:(()=>{if(has(s.pf?.qty)&&has(s.pf?.guc_i)) return qtyStr(s.pf.qty,s.pf.um||'SF');const l=(s.prim||[]).find(x=>has(x.qty));return l?qtyStr(l.qty,l.um):undefined;})(),programmed:s.mode==='review'&&Number(String(s.review?.ext_total||'').replace(/[^\d.]/g,''))?Math.round(Number(String(s.review.ext_total).replace(/[^\d.]/g,''))*1000):undefined,_src:s.mode==='review'?'PIPER review (Service 1391)':'PIPER build',_ev:{'1391 validated':(s.versions||[]).length?'':''}}),
   put:(s,c)=>{s.b=s.b||{};s.ex=s.ex||{};set(s.b,'title',c.name);set(s.b,'installation',c.installation);set(s.b,'project_no',c.number);set(s.b,'fy',c.fy);set(s.b,'catcode',c.catcode);if(has(c.service)) s.b.component=PIPER_SVC[c.service]||c.service;set(s.ex,'auth',c.authorized);set(s.ex,'cwe',c.cwe);}},
  sophie:{skel:()=>({schema:'sophie-1',p:{}}),
   get:s=>({name:s.p?.title,installation:s.p?.installation,to:s.p?.contract,buildings:s.p?.buildings,_ev:{'SOW final':(s.sections||[]).length&&s.sections.every(x=>x.status==='final')?'@today':''}}),
   put:(s,c)=>{s.p=s.p||{};set(s.p,'title',c.name);set(s.p,'installation',c.installation);set(s.p,'contract',c.to);set(s.p,'buildings',c.buildings);}},
- record:{skel:()=>null,get:r=>({programmed:r?.piper?.rounded||undefined}),put:()=>{}}};
-const PAULA_F=['priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
+ record:{skel:()=>null,get:r=>({programmed:r?.piper?.mode==='review'?undefined:(r?.piper?.rounded||undefined),_src:'PIPER build'}),put:()=>{}}};
+// ---- the facts one record owns: cost, scope basis, primary quantity with its unit, and need date ----
+// A tool fills an empty fact, or updates one it set itself; anything else waits in core.pending for a person to choose.
+const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date'};
+function qtyStr(q,u){const n=Number(String(q).replace(/[^\d.]/g,''));if(!n) return undefined;return n.toLocaleString('en-US')+' '+String(u||'').trim().toUpperCase();}
+function scopeOf(type,text){const t=String(type||'').toLowerCase(),x=String(text||'').toLowerCase();if(/^(new|replace|addition)$/.test(t)) return 'New or replacement construction';if(/^(renovate|repair|modernize|alter|alteration)$/.test(t)) return 'Renovation or repair';if(t&&!/^(status_quo)$/.test(t)) return t.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
+ if(/\b(renovat|repair|moderniz|upgrade|rehabilitat|restor|alter)/.test(x)) return 'Renovation or repair';if(/\b(replac|new |construct|addition|build)/.test(x)) return 'New or replacement construction';return undefined;}
+function ownEq(k,a,b){if(!has(a)||!has(b)) return !has(a)&&!has(b);if(k==='programmed') return Math.abs(Number(a)-Number(b))<1;if(k==='need_date') return String(a).slice(0,7)===String(b).slice(0,7);if(k==='qty'){const n=v=>String(v).replace(/[^\d.]/g,''),u=v=>String(v).replace(/[\d.,\s]/g,'').toUpperCase();return n(a)===n(b)&&u(a)===u(b);}return String(a).toLowerCase()===String(b).toLowerCase();}
+function ownSet(core,k,v,src,direct,tool){tool=tool||src;core.facts=core.facts||{};core.pending=core.pending||[];core.kept=core.kept||{};const cur=core[k];
+ // the same source (PIPER build re-pricing its own 1391) updates freely; a different source, even in the same tool (PIPER review of a Service 1391), has to be chosen
+ if(!has(cur)||direct||(core.facts[k]&&core.facts[k].src===src)){if(!ownEq(k,cur,v)||!core.facts[k]){core[k]=v;core.facts[k]={src,tool,at:today()};core.pending=core.pending.filter(p=>p.k!==k||!ownEq(k,p.v,v));return true;}return false;}
+ if(ownEq(k,cur,v)) return false;if(core.kept[k]&&core.kept[k].some(x=>ownEq(k,x,v))) return false;
+ // one waiting value per tool and fact: a tool's newer value replaces its older one
+ const i=core.pending.findIndex(p=>p.k===k&&(p.tool||p.src)===tool);const it={k,v,src,tool,at:today()};if(i>=0){if(ownEq(k,core.pending[i].v,v)&&core.pending[i].src===src) return false;core.pending[i]=it;}else core.pending.push(it);return true;}
+const PAULA_F=['scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
 const same=(a,b)=>(a&&typeof a==='object')||(b&&typeof b==='object')?JSON.stringify(a??null)===JSON.stringify(b??null):String(a??'')===String(b??'');
-function mergeCore(core,o){if(!o) return false;let ch=false;for(const [k,v] of Object.entries(o)){if(k==='_ev') continue;if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
+function mergeCore(core,o,src,direct){if(!o) return false;let ch=false;const tool=src||'';src=o._src||src||'';for(const [k,v] of Object.entries(o)){if(k==='_ev'||k==='_src') continue;if(OWN.includes(k)){if(has(v)&&ownSet(core,k,v,src,direct,tool==='record'?'piper':tool)) ch=true;continue;}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
  core.events=core.events||{};for(const [k,v] of Object.entries(o._ev||{})){if(v==='@today'){if(!core.events[k]){core.events[k]=today();ch=true;}}else if(has(v)&&core.events[k]!==v){core.events[k]=v;ch=true;}}return ch;}
 
 // ---- startup: put the active project's state where the tool expects it ----
 let S=loadStore();
-if(!Object.keys(S.projects).length&&PER.some(t=>ls.getItem(PKEY[t]))){const id=uid();const p={id,core:{},tools:{},created:today()};PER.forEach(t=>{const v=get(PKEY[t]);if(v){p.tools[t]=v;mergeCore(p.core,MAP[t].get(v));}});p.core.name=p.core.name||'Project 1';S.projects[id]=p;S.active=id;saveStore(S);}
+if(!Object.keys(S.projects).length&&PER.some(t=>ls.getItem(PKEY[t]))){const id=uid();const p={id,core:{},tools:{},created:today()};PER.forEach(t=>{const v=get(PKEY[t]);if(v){p.tools[t]=v;mergeCore(p.core,MAP[t].get(v),t);}});p.core.name=p.core.name||'Project 1';S.projects[id]=p;S.active=id;saveStore(S);}
 if(PER.includes(TOOL)){
  if(!S.active||!S.projects[S.active]){const first=Object.keys(S.projects)[0];if(first) S.active=first;else{const id=uid();S.projects[id]={id,core:{name:'New project'},tools:{},created:today()};S.active=id;}saveStore(S);}
  const P=S.projects[S.active];
  PER.forEach(t=>{let v=P.tools[t];if(!v&&t===TOOL) v=MAP[t].skel();if(v){if(t!=='record') MAP[t].put(v,P.core);raw(PKEY[t],JSON.stringify(v));}else ls.removeItem(PKEY[t]);});
 }
+// Saved work: facts already in the record keep their value (source "existing record"); every tool's current value is compared with them and any difference waits for a choice.
+(function factScan(){const St=loadStore();let ch=false;Object.values(St.projects).forEach(P=>{const c=P.core;c.facts=c.facts||{};OWN.forEach(k=>{if(has(c[k])&&!c.facts[k]){c.facts[k]={src:'existing record',at:today()};ch=true;}});
+  Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
 if(TOOL==='paula') paulaIn();
 
 // ---- every save flows back into the record ----
 Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('Corbel record',e);}};
 function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) return;const St=loadStore();
  if(t==='paula'){paulaOut(St,JSON.parse(v));return;}
- if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val));P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
+ if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val),t);P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
 
 // ---- PAULA: one PAULA project per record project, same id ----
 function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',created:new Date().toISOString(),projects:[],t:{},me:'',log:[]};let ch=false;
@@ -242,13 +258,18 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   for(const [n,d] of Object.entries(p.core.events||{})){if(!d) continue;let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.actual){m.actual=d;ch=true;}if(ph[n]&&Number(pp.phase||1)<ph[n]&&!pp.phase_manual){pp.phase=ph[n];pp.phase_src=n;ch=true;}}}
  if(ch) raw('paula_project',JSON.stringify(pa));}
 function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sample) return;let p=St.projects[pp.id];if(!p){if(!has(pp.name)) return;p=St.projects[pp.id]={id:pp.id,core:{},tools:{},created:today()};ch=true;}
-  const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o)) ch=true;});if(ch) saveStore(St);}
+  const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o,'PAULA',true)) ch=true;});if(ch) saveStore(St);}
 
 // ---- public helpers ----
-window.MS={store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],
+window.MS={store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
+ pending:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?(p.core.pending||[]).map(x=>({...x,cur:p.core[x.k],curSrc:(p.core.facts||{})[x.k]?.src||''})):[];},
+ facts:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?OWN.map(k=>({k,label:OWNL[k],v:p.core[k],src:(p.core.facts||{})[k]?.src||''})):[];},
+ resolve:(id,k,src,use)=>{const s=loadStore();const p=s.projects[id||s.active];if(!p) return false;const c=p.core;const i=(c.pending||[]).findIndex(x=>x.k===k&&x.src===src);if(i<0) return false;const it=c.pending[i];c.pending.splice(i,1);
+  if(use){c[k]=it.v;c.facts=c.facts||{};c.facts[k]={src:it.src,at:today(),chosen:true};c.pending=c.pending.filter(p=>!(p.k===k&&ownEq(k,p.v,it.v)));}else{c.kept=c.kept||{};(c.kept[k]=c.kept[k]||[]).push(it.v);}p.log=(p.log||[]).concat([{at:new Date().toISOString(),what:(use?'Used ':'Kept the record over ')+it.src+' for '+OWNL[k],v:it.v}]);saveStore(s);S=s;return true;},
+ fmt:(k,v)=>!has(v)?'–':k==='programmed'?'$'+(Number(v)/1e6).toFixed(1)+'M':k==='need_date'?String(v).slice(0,7):String(v),
  openIn:(id,tool)=>{const s=loadStore();if(!s.projects[id]) return;flush(s);s.active=id;saveStore(s);location.href=tool+'.html';},
  tos:()=>[...new Set(Object.values(loadStore().projects).map(p=>p.core.to).filter(has))].sort()};
-function flush(s){const P=s.projects[s.active];if(!P||!PER.includes(TOOL)) return;PER.forEach(t=>{const v=get(PKEY[t]);if(v){P.tools[t]=v;mergeCore(P.core,MAP[t].get(v));}});}
+function flush(s){const P=s.projects[s.active];if(!P||!PER.includes(TOOL)) return;PER.forEach(t=>{const v=get(PKEY[t]);if(v){P.tools[t]=v;mergeCore(P.core,MAP[t].get(v),t);}});}
 function sw(id){const s=loadStore();flush(s);s.active=id;saveStore(s);location.reload();}
 function dl(name,data){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type:'application/json'}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
 function note(t){const n=document.getElementById('msnote');if(n) n.textContent=t;}
@@ -262,11 +283,19 @@ function refresh(){const d=document.getElementById('msbar');if(!d) return;const 
  d.innerHTML='<span style="opacity:.8">Project<\/span><select id="mssel" style="width:auto;max-width:340px;font-size:13px;padding:3px 6px;border-radius:5px">'+ids.map(id=>'<option value="'+id+'" '+(id===s.active?'selected':'')+'>'+esc(s.projects[id].core.name||'(untitled)')+'<\/option>').join('')+'<\/select>'+
  '<button id="msnew" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">New project<\/button>'+
  '<span style="opacity:.85;flex:1;min-width:200px">'+esc([c.number,c.to,c.installation,c.service,c.fy?'FY'+c.fy:''].filter(has).join(' · ')||'Shared record: title, installation, task order and amounts are entered once and used by every tool')+'<\/span>'+
- '<span id="msnote" style="color:#F2B632"><\/span>'+
+ '<span id="msnote" style="color:#F2B632"><\/span>'+(P&&(P.core.pending||[]).length?'<button id="mspend" style="font-size:12.5px;padding:3px 10px;background:#F2B632;color:#10303F;border:none;font-weight:600">'+P.core.pending.length+' conflicting value'+(P.core.pending.length>1?'s':'')+' to settle<\/button>':'')+
  '<button id="msmore" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">Projects…<\/button>';
  d.querySelector('#mssel').onchange=e=>sw(e.target.value);
  d.querySelector('#msnew').onclick=()=>{const n=prompt('Name of the new project');if(!n) return;const s2=loadStore();flush(s2);const id=uid();s2.projects[id]={id,core:{name:n.trim()},tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
- d.querySelector('#msmore').onclick=manage;}
+ d.querySelector('#msmore').onclick=manage;const pb=d.querySelector('#mspend');if(pb) pb.onclick=settle;}
+// One place to settle what two tools disagree on: the record's value, the other tool's value, choose one.
+window.MSsettle=()=>settle();
+function settle(){const s=loadStore();const P=s.projects[s.active];if(!P) return;const L=MS.pending(P.id);const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:0;max-width:720px;width:94vw';
+ dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Settle conflicting values<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">The project record holds one programmed cost, scope, primary quantity and need date for every tool. These tools disagree with it. Nothing changes until you choose.<\/p>'+
+ L.map((x,i)=>'<div style="border:1px solid #c9d6d3;border-radius:8px;padding:10px 12px;margin-top:8px"><b>'+esc(OWNL[x.k])+'<\/b><div style="margin-top:4px">Record: <b>'+esc(MS.fmt(x.k,x.cur))+'<\/b> <span style="color:#4f6873">('+esc(x.curSrc||'record')+')<\/span><br>'+esc(x.src)+': <b>'+esc(MS.fmt(x.k,x.v))+'<\/b><\/div><div style="display:flex;gap:8px;margin-top:8px"><button data-r="'+i+'|1" style="font-size:13px">Replace '+esc(MS.fmt(x.k,x.cur))+' with '+esc(MS.fmt(x.k,x.v))+'<\/button><button data-r="'+i+'|0" style="font-size:13px">Keep '+esc(MS.fmt(x.k,x.cur))+'<\/button><\/div><\/div>').join('')+
+ '<div style="margin-top:14px;text-align:right"><button id="msclose">Close<\/button><\/div><\/div>';document.body.appendChild(dlg);dlg.showModal();
+ dlg.querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const [i,u]=b.dataset.r.split('|');const x=L[+i];MS.resolve(P.id,x.k,x.src,u==='1');dlg.close();dlg.remove();refresh();if(MS.pending(P.id).length) settle();});
+ dlg.querySelector('#msclose').onclick=()=>{dlg.close();dlg.remove();};}
 function manage(){const s=loadStore();const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:0;max-width:760px;width:94vw';
  const rows=Object.values(s.projects).sort((a,b)=>(a.core.name||'').localeCompare(b.core.name||''));
  dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Projects<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">Every project lives in this browser’s shared record. Each tool keeps its own work for each project. Export everything to move to another computer or to keep a backup.<\/p>'+
@@ -553,6 +582,8 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  if(typeof cpmC==='function'){const C=cpmC(),c=C[p.id];const xr=(p.ext||[]).filter(x=>(x.status||'open')==='risk'&&!x.expect);
   if(c&&c.slip>0){const mo_=Math.round(c.slip/30.4);add('Projected finish',c.slip>T.slipCrit?2:1,mo_+' month'+(mo_===1?'':'s')+' past the forecast once dependencies are counted: '+chainOf(p.id,C).join(' → '));}
   else if(xr.length) add('Projected finish',1,xr.length+' outside dependenc'+(xr.length>1?'ies':'y')+' at risk with no date from the provider');}
+ if(p.need_date){const FF=ffOf(p,asOf)||p.forecast_finish;const nd=String(p.need_date).slice(0,7);if(FF&&FF.slice(0,7)>nd){const lag=dd(nd+'-01',FF.slice(0,7)+'-01');add('Need date',lag>180?2:1,'Finishes '+FF.slice(0,7)+', after the need date '+nd+' ('+Math.round(lag/30.4)+' months late)');}else if(FF) add('Need date',0,'Finishes by the need date '+nd);}
+ if(!asOf){const pc=recPend(p);if(pc.length) add('Record',1,pc.length+' value'+(pc.length>1?'s':'')+' in dispute between tools: '+pc.map(x=>MS.OWNL[x.k]+' '+MS.fmt(x.k,x.cur)+' vs '+MS.fmt(x.k,x.v)+' ('+x.src+')').join('; '));}
  if(!asOf){const di=dIss(p);if(di.length) add('Dates',1,'Dates don’t add up: '+di[0].text+(di.length>1?' (and '+(di.length-1)+' more)':''));}
  const lu=lastUpd(p);const stale=!lu||dd(lu.date,today())>T.stale;
  let overall=parts.reduce((x,y)=>Math.max(x,y.l),-1);if(overall<0) overall=0;let ov=false;
@@ -786,7 +817,13 @@ function vOne(){const p=CUR;if(!p){VIEW='proj';return render();}const v=$('#view
  v.innerHTML='<div class="panel" style="padding-bottom:12px"><div class="row" style="margin-top:0;justify-content:space-between"><div><h2 style="margin:0">'+esc(p.name||'(untitled project)')+'</h2><div class="small">'+esc([p.number,p.to,p.installation,p.service,'Phase '+p.phase+' – '+PHASES[p.phase],p.pm].filter(Boolean).join(' · '))+'</div></div><div>'+chip(h.overall,h.override?' (override)':'')+(h.stale?' <span class="chip n">No update in '+P.t.stale+' days</span>':'')+(window.MS&&MS.has(p.id)?'<div class="noprint" style="margin-top:6px;text-align:right"><span class="small">Open in </span>'+['nora','earl','piper','sophie'].map(t=>'<button class="sm" onclick="MS.openIn(\''+p.id+'\',\''+t+'\')">'+t.toUpperCase()+'</button>').join(' ')+'</div>':'')+'</div></div></div>'+
  '<div class="tabs2">'+[['ov','Overview'],['edit','Project data'],['prog','Programming'],['ms','Milestones'],['risk','Risks'],['hist','Updates']].map(([k,t])=>'<button data-t="'+k+'" class="'+(PTAB===k?'on':'')+'">'+t+'</button>').join('')+'<button id="bUp" class="go" style="margin-left:auto">New status update</button></div><div id="pt"></div>';
  v.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{PTAB=b.dataset.t;vOne();});$('#bUp').onclick=()=>{VIEW='upd';UPD=p.id;render();};
- ({ov:pOv,edit:pEdit,prog:pProg,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);const bx=document.getElementById('bAIx');if(bx) bx.onclick=()=>aiExplain(p);}
+ ({ov:pOv,edit:pEdit,prog:pProg,ms:pMs,risk:pRisk,hist:pHist})[PTAB](p,h);if(PTAB==='ov') recMount(p);const bx=document.getElementById('bAIx');if(bx) bx.onclick=()=>aiExplain(p);}
+// The one project record (shared with every Corbel tool): cost, scope, primary quantity and need date, with where each came from and anything waiting to be settled.
+function recMount(p){if(!window.MS||!MS.has||!MS.has(p.id)) return;const t=$('#pt');const F=MS.facts(p.id),L=MS.pending(p.id);const d=document.createElement('div');d.className='panel';
+ d.innerHTML='<h3 style="margin-top:0">Project record</h3><p class="small">One value for every tool. A tool that disagrees waits here until you choose.</p><table class="ptable"><tbody>'+F.map(x=>'<tr><td>'+esc(x.label)+'</td><td><b>'+esc(MS.fmt(x.k,x.v))+'</b></td><td class="small">'+esc(x.src||'')+'</td></tr>').join('')+'</tbody></table>'+
+  (L.length?'<div class="find" style="border-left:4px solid var(--watch);padding:8px 10px;margin-top:10px"><b>Tools disagree with the record</b>'+L.map((x,i)=>'<div style="margin-top:8px">'+esc(MS.OWNL[x.k])+': record '+esc(MS.fmt(x.k,x.cur))+(x.curSrc?' ('+esc(x.curSrc)+')':'')+'; '+esc(x.src)+' says <b>'+esc(MS.fmt(x.k,x.v))+'</b><div class="row" style="gap:6px;margin-top:4px"><button class="sm" data-rs="'+i+'|1">Replace '+esc(MS.fmt(x.k,x.cur))+' with '+esc(MS.fmt(x.k,x.v))+'</button><button class="sm" data-rs="'+i+'|0">Keep '+esc(MS.fmt(x.k,x.cur))+'</button></div></div>').join('')+'</div>':'');
+ t.prepend(d);d.querySelectorAll('[data-rs]').forEach(b=>b.onclick=()=>{const [i,u]=b.dataset.rs.split('|');const x=L[+i];MS.resolve(p.id,x.k,x.src,u==='1');if(u==='1'){p[x.k]=x.v;if(x.k==='programmed') log('Programmed cost replaced',p.name+': '+MS.fmt(x.k,x.cur)+' → '+MS.fmt(x.k,x.v)+' ('+x.src+')');}save();vOne();});}
+function recPend(p){return window.MS&&MS.has&&MS.has(p.id)?MS.pending(p.id):[];}
 function pOv(p,h){const t=$('#pt');const b=base(p),e=est(p),aw=N(p.award);const sp=spi(p);const FA=ffAct(p),FF=ffOf(p);const sl=p.baseline_finish&&FF?dd(p.baseline_finish,FF):null;const ir=irmaFor(p),q=quinnFor(p);
  const U=p.updates.slice().sort((a,b)=>a.date.localeCompare(b.date));
  t.innerHTML='<div class="grid g-kpi"><div class="tile hero"><div class="lab">Current estimate</div><div class="val">'+M(e)+'</div><div class="sub">'+(b?((e-b)>=0?'+':'')+M(e-b)+' ('+pct((e-b)/b,1)+') against '+M(b)+' '+baseLab(p)+(money(p).cmp?'':' – no newer estimate yet'):'No programmed or authorized amount')+'</div></div>'+
@@ -1170,17 +1207,20 @@ function csvPreview(file,t){const rows=parseCSV(t);if(!rows.length) return alert
  if(!used.includes('name')&&!used.includes('number')) return alert('Nothing imported. '+file+' has no project name or project number column, so PAULA cannot tell which project each row is.\n\nColumns found: '+head.join(', ')+'\n\nUse the template, or name a column “Project” or “Project number”.');
  const plan=[];rows.forEach((r,ri)=>{if(!r.some(x=>String(x).trim())) return;const o={};map.forEach((k,i)=>{if(!k) return;let v=String(r[i]??'').trim();if(CSVMONEY.includes(k)) v=v.replace(/[$,\s]/g,'');if(k==='service'&&ID) v=ID.svc(v);if(k==='installation'&&ID) v=ID.inst(v);if(v!=='') o[k]=v;});
   if(!o.name&&!o.number){plan.push({row:ri+2,o,act:'skip',why:'no name and no number'});return;}
-  const p=(o.number&&P.projects.find(x=>(ID?ID.num(x.number):x.number)===(ID?ID.num(o.number):o.number)))||(o.name&&!o.number&&P.projects.find(x=>nzI(x.name)===nzI(o.name)&&(!o.installation||!ID||ID.sameInst(x.installation,o.installation))));
-  plan.push({row:ri+2,o,act:p?'update':'add',p});});
+  // Same project by number; otherwise by the same name at the same installation (either side may lack a number or an installation). Re-importing a file updates, it never adds twice.
+  const numEq=x=>o.number&&x.number&&(ID?ID.num(x.number):x.number)===(ID?ID.num(o.number):o.number);const nmEq=x=>o.name&&nzI(x.name)===nzI(o.name)&&(!o.installation||!x.installation||!ID||ID.sameInst(x.installation,o.installation))&&!(o.number&&x.number&&!numEq(x));
+  const p=P.projects.find(numEq)||P.projects.find(nmEq);if(!p){const tw=plan.find(y=>y.act==='add'&&y.np&&(numEq(y.np)||nmEq(y.np)));if(tw){plan.push({row:ri+2,o,act:'skip',why:'same project as row '+tw.row});return;}}
+  const rp=p?Object.entries(o).filter(([k,v])=>String(p[k]??'').trim()!==''&&String(p[k])!==String(v)&&!(k==='programmed'&&Math.abs(N(p[k])-N(v))<1)).map(([k,v])=>({k,old:p[k],v})):[];plan.push({row:ri+2,o,act:p?'update':'add',p,rp,np:p?null:o});});
  const n=k=>plan.filter(x=>x.act===k).length;const d=document.createElement('dialog');d.style.cssText='border:none;border-radius:12px;padding:20px 22px;max-width:760px;width:94vw;font:14px Segoe UI,system-ui,sans-serif';
  d.innerHTML='<h3 style="margin:0 0 6px">Import '+esc(file)+'</h3><p class="small">Nothing is written until you confirm.</p>'+
   '<p><b>Columns PAULA will use:</b> '+head.map((h,i)=>map[i]?esc(h)+(csvCol(h)!==String(h).trim().toLowerCase()?' → '+map[i]:''):'').filter(Boolean).join(', ')+'</p>'+
   (unk.length?'<div class="find" style="border-left:4px solid var(--watch);padding:7px 10px;margin:6px 0"><b>Not imported – unknown columns:</b> '+unk.map(esc).join(', ')+'. Rename them to template columns to bring them in.</div>':'')+
   '<p>'+n('add')+' to add · '+n('update')+' to update · '+n('skip')+' skipped</p><div style="max-height:300px;overflow:auto"><table class="ptable" style="font-size:12.5px"><thead><tr><th>Row</th><th>Project</th><th>Number</th><th>Installation</th><th>What happens</th></tr></thead><tbody>'+
-  plan.map(x=>'<tr><td>'+x.row+'</td><td>'+esc(x.o.name||'–')+'</td><td>'+esc(x.o.number||'')+'</td><td>'+esc(x.o.installation||'')+'</td><td>'+(x.act==='add'?'Add new':x.act==='update'?'Update '+esc(x.p.name||''):'<span style="color:#9b2c2c">Skip – '+esc(x.why)+'</span>')+'</td></tr>').join('')+'</tbody></table></div>'+
+  plan.map(x=>'<tr><td>'+x.row+'</td><td>'+esc(x.o.name||'–')+'</td><td>'+esc(x.o.number||'')+'</td><td>'+esc(x.o.installation||'')+'</td><td>'+(x.act==='add'?'Add new':x.act==='update'?'Update '+esc(x.p.name||'')+(x.rp.length?'<div class="small" style="color:#7a5600">Would replace: '+x.rp.map(r=>esc(r.k)+' '+esc(r.k==='programmed'?M(N(r.old)):r.old)+' → '+esc(r.k==='programmed'?M(N(r.v)):r.v)).join('; ')+'</div>':''):'<span style="color:#9b2c2c">Skip – '+esc(x.why)+'</span>')+'</td></tr>').join('')+'</tbody></table></div>'+
+  (plan.some(x=>x.rp&&x.rp.length)?'<label style="display:block;margin-top:10px"><input type="checkbox" id="cvRep"> Replace the values listed above. Unticked, PAULA only fills fields that are empty and never moves a project to an earlier phase.</label>':'')+
   '<div class="row" style="margin-top:14px"><button class="go" id="cvGo"'+(n('add')+n('update')?'':' disabled')+'>Import '+(n('add')+n('update'))+' row'+(n('add')+n('update')===1?'':'s')+'</button><button id="cvNo">Cancel</button></div>';
  document.body.appendChild(d);d.showModal();d.querySelector('#cvNo').onclick=()=>{d.close();d.remove();};
- d.querySelector('#cvGo').onclick=()=>{let a=0,u=0;plan.forEach(x=>{if(x.act==='skip') return;if(x.act==='update'){Object.entries(x.o).forEach(([k,v])=>{x.p[k]=v;});u++;}else{const p=Object.assign(blankProj(),x.o);p.phase=N(p.phase)||1;P.projects.push(p);a++;}});
+ d.querySelector('#cvGo').onclick=()=>{let a=0,u=0;plan.forEach(x=>{if(x.act==='skip') return;if(x.act==='update'){const rep_=!!(d.querySelector('#cvRep')||{}).checked;Object.entries(x.o).forEach(([k,v])=>{const cur=String(x.p[k]??'').trim();if(cur!==''&&!rep_) return;if(k==='phase'&&N(v)<N(x.p.phase)&&!rep_) return;x.p[k]=(k==='phase'||CSVMONEY.includes(k))?N(v):v;});u++;}else{const p=Object.assign(blankProj(),x.o);p.phase=N(p.phase)||1;P.projects.push(p);a++;}});
   d.close();d.remove();log('Projects imported from CSV',file+': '+a+' added, '+u+' updated, '+n('skip')+' skipped'+(unk.length?'; columns not imported: '+unk.join(', '):''));save();renderSteps();vData();const m=$('#dm');if(m) m.textContent=a+' added, '+u+' updated'+(n('skip')?', '+n('skip')+' skipped':'')+'.';};}
 // ---- possible duplicates ----
 function dupGroups(){const ID=window.CorbelID;const G=[];const seen=new Set();const key=p=>[ID?ID.num(p.number):numI(p.number),nzI(p.name)+'|'+(ID?ID.inst(p.installation):p.installation).toLowerCase()];
