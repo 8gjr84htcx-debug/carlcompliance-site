@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -170,6 +170,20 @@
  window.alert=function(m){show(m);};
  document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
  document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
+
+// CORA's answers (ccs_project) and its criteria list (cora_selection) belong to one project. When the active project changes, the other project's copies are parked in ccs_by_pid and this project's come back, on whichever Corbel page opens first.
+(function(){function J(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function sync(){try{var st=J('milcon_store');var pid=st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';if(!pid) return '';
+  var cur=J('ccs_project');var sel=localStorage.getItem('cora_selection');var owner=cur&&cur._pid;
+  if(cur&&!owner){cur._pid=pid;localStorage.setItem('ccs_project',JSON.stringify(cur));return '';}
+  if(!cur){var B0=J('ccs_by_pid')||{};if(B0[pid]){localStorage.setItem('ccs_project',JSON.stringify(B0[pid].ccs));if(B0[pid].sel) localStorage.setItem('cora_selection',B0[pid].sel);delete B0[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B0));return 'restored';}
+   if(sel){var so=null;try{so=JSON.parse(sel);}catch(e){}if(so&&so._pid&&so._pid!==pid) localStorage.removeItem('cora_selection');}return '';}
+  if(owner===pid) return '';
+  var B=J('ccs_by_pid')||{};B[owner]={ccs:cur,sel:sel,at:Date.now()};var mine=B[pid];delete B[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B));
+  if(mine){localStorage.setItem('ccs_project',JSON.stringify(mine.ccs));if(mine.sel) localStorage.setItem('cora_selection',mine.sel);else localStorage.removeItem('cora_selection');return 'restored';}
+  localStorage.removeItem('ccs_project');localStorage.removeItem('cora_selection');return 'new';}catch(e){return '';}}
+ window.CorbelCCS={sync:sync,pid:function(){var st=J('milcon_store');return st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';},name:function(){var st=J('milcon_store');var p=st&&st.active&&st.projects&&st.projects[st.active];return p?String((p.core||{}).name||''):'';}};
+ window.__ccsSync=sync();})();
 </script>
 
 <meta charset="utf-8">
@@ -502,7 +516,10 @@ const BLANK=()=>({schema:'piper-1',id:uid(),created:new Date().toISOString(),mod
  n:{desc:'',um:'SF',req:'',adqt:'',substd:'',project:'',requirement:'',current:'',impact:'',additional:'',joint:''},
  s12:{acq:'',ds:'',pct:'',asof:'',d35:'',dc:'',dcost:'',energy:'',std:'',award:'',start:'',complete:'',fci:''},
  versions:[],qa:[],ex:{auth:'',approp:'',cwe:'',ige:'',scope_auth:'',scope_now:'',umc:'',umc_src:''},review:{ext:false,ext_total:'',ext_qty:'',ext_prim:'',ext_sup:'',ext_cont:'',ext_sioh:''},log:[]});
-let P=load()||BLANK();let STEP=(P.built||(P.review&&P.review.src))?'done':(!N(P.pf.qty)&&!P.sup.length)?'build':'done';
+let P=load()||BLANK();
+if(P.mode==='review'&&P.review&&N(P.review.ext_sioh)&&P.sioh_override===''){P.sioh_override=String(N(P.review.ext_sioh));}
+// Saved work from before: a location shown as the cost-factor row name ("NSA ANDERSEN – ANDY SOUTH") reads as the installation, with the row kept beside it.
+if(P.loc&&P.loc.name&&!/area cost factor row/.test(P.loc.name)&&window.CorbelID&&P.b&&P.b.installation&&CorbelID.sameInst(P.b.installation,P.loc.name)&&CorbelID.inst(P.b.installation)!==P.loc.name){P.loc.row=P.loc.row||P.loc.name;P.loc.name=CorbelID.inst(P.b.installation)+' (area cost factor row: '+P.loc.row+')';}let STEP=(P.built||(P.review&&P.review.src))?'done':(!N(P.pf.qty)&&!P.sup.length)?'build':'done';
 function load(){try{const j=JSON.parse(localStorage.getItem('piper_project')||'null');return j&&window.MSfill?MSfill(BLANK(),j):j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('piper_project',JSON.stringify(P));const C=calc();
@@ -710,6 +727,8 @@ function apply1391(){const j=XR.j;P.mode='review';P.auto={};P.ai_rev=[];['compon
   if(l.group==='primary'&&P.pf.guc_i!==''&&(nz(l.item).includes(nz(P.pf.guc_name).split(' ')[0])||(N(l.qty)&&Math.abs(N(String(l.qty).replace(/,/g,''))-N(P.pf.qty))/N(P.pf.qty)<.02))) return;(l.group==='primary'?P.prim:P.sup).push(it);});
  if(P.b.installation){const a=locFind(P.b.installation);if(a){setLoc(a,'matched from installation name');P.auto.loc='Matched from the installation on the form; check it';}}
  P.review.ext=true;P.review.ext_total=String(j.block8||'').replace(/[,$]/g,'');P.review.ext_b9=String(j.total_request||'').replace(/[,$]/g,'');P.review.ext_lines=(j.lines||[]).reduce((a,l)=>a+N(String(l.cost||'').replace(/[,$]/g,'')),0);P.review.ext_cont=String(j.cont||'').replace('%','');P.review.ext_sioh=String(j.sioh||'').replace('%','');if(N(j.design)) P.db=String(N(j.design));
+ // The Service's SIOH stays as submitted on the review copy and its export; the difference from the fixed OASD(EI&E) rate is a finding, not a silent swap.
+ if(N(j.sioh)&&P.sioh_override===''){P.sioh_override=String(N(j.sioh));log('SIOH kept as submitted',N(j.sioh)+'%');}
  const ss={file:XR.file,read:new Date().toISOString(),bad:XR.bad};P.review.src=ss;P.review.text=XR.text.slice(0,200000);log('1391 applied for review',XR.file);XR=null;save();
  (async()=>{if(aiOn()) await aiReview(true);STEP='done';render();window.scrollTo(0,0);})();}
 
@@ -870,7 +889,7 @@ function vBlocks(){const v=$('#view');const n=nora(),e=earl();
  const q=$('#locq'),L=$('#locl');q.value=P.loc.name||'';
  q.oninput=()=>{const t=q.value.trim().toLowerCase();if(t.length<2){L.hidden=true;return;}const hits=D.acf.filter(a=>(a[0]+' '+a[3]+' '+a[1]).toLowerCase().includes(t)).slice(0,60);
   L.innerHTML=hits.map((a,i)=>'<div data-i="'+D.acf.indexOf(a)+'">'+esc(a[0])+(a[3]&&a[3]!==a[0]?' – '+esc(a[3]):'')+' <span class="small">('+esc(a[1])+')</span> <b>'+a[2].toFixed(3)+'</b></div>').join('')||'<div class="small">No match. Enter the factor by hand.</div>';L.hidden=false;
-  L.querySelectorAll('[data-i]').forEach(d=>d.onclick=()=>{const a=D.acf[d.dataset.i];P.loc.name=a[0]+(a[3]&&a[3]!==a[0]?' – '+a[3]:'');P.loc.acf=a[2];P.loc.country=a[1];P.loc.conus=a[4]===1&&!['Hawaii','Alaska'].includes(a[1]);log('Location set',P.loc.name+' ACF '+a[2]);save();vBlocks();renderSteps();});};
+  L.querySelectorAll('[data-i]').forEach(d=>d.onclick=()=>{const a=D.acf[d.dataset.i];setLoc(a,'chosen from the area cost factor table');log('Location set',P.loc.name+' ACF '+a[2]);save();vBlocks();renderSteps();});};
  q.onblur=()=>setTimeout(()=>L.hidden=true,200);
  function sc(){const c=sClass();$('#sc').innerHTML='<b>'+SIOH[c][0]+'</b> '+SIOH[c][1]+'%';}sc();
  if($('#bImp')) $('#bImp').onclick=()=>{importPrior();vBlocks();renderSteps();};}

@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -170,6 +170,20 @@
  window.alert=function(m){show(m);};
  document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
  document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
+
+// CORA's answers (ccs_project) and its criteria list (cora_selection) belong to one project. When the active project changes, the other project's copies are parked in ccs_by_pid and this project's come back, on whichever Corbel page opens first.
+(function(){function J(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function sync(){try{var st=J('milcon_store');var pid=st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';if(!pid) return '';
+  var cur=J('ccs_project');var sel=localStorage.getItem('cora_selection');var owner=cur&&cur._pid;
+  if(cur&&!owner){cur._pid=pid;localStorage.setItem('ccs_project',JSON.stringify(cur));return '';}
+  if(!cur){var B0=J('ccs_by_pid')||{};if(B0[pid]){localStorage.setItem('ccs_project',JSON.stringify(B0[pid].ccs));if(B0[pid].sel) localStorage.setItem('cora_selection',B0[pid].sel);delete B0[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B0));return 'restored';}
+   if(sel){var so=null;try{so=JSON.parse(sel);}catch(e){}if(so&&so._pid&&so._pid!==pid) localStorage.removeItem('cora_selection');}return '';}
+  if(owner===pid) return '';
+  var B=J('ccs_by_pid')||{};B[owner]={ccs:cur,sel:sel,at:Date.now()};var mine=B[pid];delete B[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B));
+  if(mine){localStorage.setItem('ccs_project',JSON.stringify(mine.ccs));if(mine.sel) localStorage.setItem('cora_selection',mine.sel);else localStorage.removeItem('cora_selection');return 'restored';}
+  localStorage.removeItem('ccs_project');localStorage.removeItem('cora_selection');return 'new';}catch(e){return '';}}
+ window.CorbelCCS={sync:sync,pid:function(){var st=J('milcon_store');return st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';},name:function(){var st=J('milcon_store');var p=st&&st.active&&st.projects&&st.projects[st.active];return p?String((p.core||{}).name||''):'';}};
+ window.__ccsSync=sync();})();
 </script>
 
 

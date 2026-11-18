@@ -22,7 +22,7 @@
    if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -170,6 +170,20 @@
  window.alert=function(m){show(m);};
  document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
  document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
+
+// CORA's answers (ccs_project) and its criteria list (cora_selection) belong to one project. When the active project changes, the other project's copies are parked in ccs_by_pid and this project's come back, on whichever Corbel page opens first.
+(function(){function J(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+ function sync(){try{var st=J('milcon_store');var pid=st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';if(!pid) return '';
+  var cur=J('ccs_project');var sel=localStorage.getItem('cora_selection');var owner=cur&&cur._pid;
+  if(cur&&!owner){cur._pid=pid;localStorage.setItem('ccs_project',JSON.stringify(cur));return '';}
+  if(!cur){var B0=J('ccs_by_pid')||{};if(B0[pid]){localStorage.setItem('ccs_project',JSON.stringify(B0[pid].ccs));if(B0[pid].sel) localStorage.setItem('cora_selection',B0[pid].sel);delete B0[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B0));return 'restored';}
+   if(sel){var so=null;try{so=JSON.parse(sel);}catch(e){}if(so&&so._pid&&so._pid!==pid) localStorage.removeItem('cora_selection');}return '';}
+  if(owner===pid) return '';
+  var B=J('ccs_by_pid')||{};B[owner]={ccs:cur,sel:sel,at:Date.now()};var mine=B[pid];delete B[pid];localStorage.setItem('ccs_by_pid',JSON.stringify(B));
+  if(mine){localStorage.setItem('ccs_project',JSON.stringify(mine.ccs));if(mine.sel) localStorage.setItem('cora_selection',mine.sel);else localStorage.removeItem('cora_selection');return 'restored';}
+  localStorage.removeItem('ccs_project');localStorage.removeItem('cora_selection');return 'new';}catch(e){return '';}}
+ window.CorbelCCS={sync:sync,pid:function(){var st=J('milcon_store');return st&&st.active&&st.projects&&st.projects[st.active]?st.active:'';},name:function(){var st=J('milcon_store');var p=st&&st.active&&st.projects&&st.projects[st.active];return p?String((p.core||{}).name||''):'';}};
+ window.__ccsSync=sync();})();
 </script>
 
 
@@ -257,6 +271,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
  <section class="panel">
   <h2>Scope of work</h2>
   <p class="lead">Paste the scope, SOW, or DD1391 description. The parser finds work elements and triggers, shows the text that justifies each one, and sends the result to CORA.</p>
+  <p class="lead" id="scProj" hidden></p>
   <textarea id="scope" placeholder="Paste scope text here, or open a .txt file."></textarea>
   <div class="row">
    <button class="go" id="bParse">Parse scope</button>
@@ -993,7 +1008,13 @@ async function parse(){
  if(arbiter()&&STATE.items.some(i=>i.status==='single'&&!['value','duration_days'].includes(i.field))){STATE.arbStatus=status;await reconcile();}
 }
 function collectElements(){const els=[];for(const [src,r] of Object.entries(STATE.results)){if(src==='offline'||!r||r.error) continue;(r.work_elements||[]).forEach(w=>els.push({...w,src,ok:verified(STATE.scope,w.evidence)}));}
- const seen=new Set();for(let i=els.length-1;i>=0;i--){const k=els[i].name.toLowerCase();if(seen.has(k)){const keep=els.find(x=>x.name.toLowerCase()===k);if(!keep.srcs) keep.srcs=[keep.src];keep.srcs.push(els[i].src);els.splice(i,1);}else seen.add(k);}
+ // Two readers naming the same work in different words are one element: same name, the same quoted text, or mostly the same words.
+ const nz=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();const STW=new Set('the and of for at to in on a an all new existing work system systems install installation provide replace replacement construct construction renovate renovation repair'.split(' '));
+ const ws=t=>new Set(nz(t).split(' ').filter(w=>w.length>2&&!STW.has(w)).map(w=>w.replace(/(ies|es|s|ing|ed)$/,'')));
+ const same=(a,b)=>{if(nz(a.name)===nz(b.name)) return true;const ea=nz(a.evidence),eb=nz(b.evidence);if(ea.length>=20&&eb.length>=20&&(ea.includes(eb)||eb.includes(ea))) return true;
+  const A=ws(a.name+' '+(a.description||'')),B=ws(b.name+' '+(b.description||''));if(!A.size||!B.size) return false;let h=0;A.forEach(w=>{if(B.has(w)) h++;});const nA=ws(a.name),nB=ws(b.name);let hn=0;nA.forEach(w=>{if(nB.has(w)) hn++;});
+  return h/Math.min(A.size,B.size)>=.6&&hn/Math.max(1,Math.min(nA.size,nB.size))>=.5;};
+ for(let i=0;i<els.length;i++) for(let j=els.length-1;j>i;j--){if(els[i].src===els[j].src||!same(els[i],els[j])) continue;const keep=els[i];if(!keep.srcs) keep.srcs=[keep.src];if(!keep.srcs.includes(els[j].src)) keep.srcs.push(els[j].src);if(!keep.ok&&els[j].ok){keep.evidence=els[j].evidence;keep.ok=true;}els.splice(j,1);}
  if(!els.length){const groups={};STATE.items.filter(i=>i.field==='systems'&&i.by.offline==='y').forEach(i=>groups[i.value]=i);Object.values(groups).forEach(i=>els.push({name:lab(i.value),description:i.ctx||'',evidence:i.ev.offline,src:'offline',ok:true}));}
  return els;}
 
@@ -1067,7 +1088,7 @@ function project(){const P={};const S=STATE;
  const RB=S.rec||recBasics();P._src=Object.assign({},S.bsrc||{});['service','work_type'].forEach(f=>{if((!P[f]||!P[f].length)&&RB[f]){P[f]=RB[f].v;P._src[f]=RB[f].src;}});
  if(!P.work_type.length) delete P.work_type;
  return P;}
-function send(){const P=project();if(!P.work_type&&!confirm('No work type (new, repair, alteration…) was selected. The selector will default to New construction. Continue?')) return;try{localStorage.setItem('ccs_project',JSON.stringify(P));localStorage.setItem('ccs_import',JSON.stringify({at:Date.now(),items:STATE.items.filter(i=>i.use).length}));}catch(e){download();alert('This browser blocked local storage. A project file was downloaded instead; open it in the selector with Open….');return;}
+function send(){const P=project();if(!P.work_type&&!confirm('No work type (new, repair, alteration…) was selected. The selector will default to New construction. Continue?')) return;try{if(window.CorbelCCS){CorbelCCS.sync();const pid=CorbelCCS.pid();if(pid) P._pid=pid;}localStorage.setItem('ccs_project',JSON.stringify(P));localStorage.setItem('ccs_import',JSON.stringify({at:Date.now(),items:STATE.items.filter(i=>i.use).length,pid:P._pid||''}));}catch(e){download();alert('This browser blocked local storage. A project file was downloaded instead; open it in the selector with Open….');return;}
  location.href='cora.html';}
 function download(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify({answers:project(),source:'scope-parser',scope:STATE.scope.slice(0,20000)},null,1)],{type:'application/json'}));a.download='project-from-scope.json';document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
 
@@ -1096,6 +1117,8 @@ $('#fFile').onchange=e=>{const f=e.target.files[0];if(f) f.text().then(t=>{$('#s
 function wc(){const n=$('#scope').value.trim().split(/\s+/).filter(Boolean).length;$('#wc').textContent=n?n+' words':'';}
 $('#scope').addEventListener('input',wc);
 renderEngines();
+// Which project the findings go to: the active Corbel project. CORA keeps its answers for each project apart.
+(function(){const e=document.getElementById('scProj');const n=window.CorbelCCS&&CorbelCCS.name();if(e&&n){e.hidden=false;e.innerHTML='Project: <b>'+n.replace(/[<&]/g,'')+'</b>. Findings go to CORA for this project. Switch projects in any other Corbel tool.';}})();
 try{const j=JSON.parse(localStorage.getItem('sophie_to_scott')||'null');if(j&&j.text){localStorage.removeItem('sophie_to_scott');$('#scope').value=j.text;wc();const w=$('#dataWarn');w.hidden=false;w.dataset.keep='1';w.textContent='Loaded the statement of work from SOPHIE'+(j.title?' ('+j.title+')':'')+'. Parsing it now; check the findings, then send them to CORA.';
   window.addEventListener('load',()=>{const go=()=>{try{parse();}catch(e){}};if(window.CARLAI&&CARLAI.ready) CARLAI.ready(()=>setTimeout(go,50));else setTimeout(go,50);});}}catch(e){}
 </script>
