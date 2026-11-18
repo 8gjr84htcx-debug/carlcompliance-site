@@ -789,7 +789,7 @@ async function groundOne(x,e){const sj=subjOf((e.text||'')+' '+(e.quote||'')+' '
  // a passage from another discipline's criteria supports the answer only by analogy
  if(sj&&out.refs&&out.refs.length){out.refs.forEach(r=>{const sr=String(r.src||'');const other=SUBJ.find(z=>z!==sj&&z.docs.test(sr));if(other&&!sj.docs.test(sr)) r.analogy=other.id;});
   if(out.refs.every(r=>r.analogy)&&out.label!=='ung'){out.label='nr';out.how='Cited by analogy only: '+out.refs.map(r=>r.src).join('; ')+' is '+({elec:'electrical',roof:'roofing',fire:'fire protection',pave:'pavement',fuel:'fuel'}[out.refs[0].analogy]||'another discipline')+' criteria. For this item cite '+sj.cite+'.';out.analogy=true;}}
- citeGuard(sj,out);
+ citeGuard(sj,out,cands,e);
  out.cands=cands;out.readers=ok;e.result=out;log(x,'Element grounded',(e.text||'').slice(0,60)+' → '+LABELS[out.label][0]);}
 // Citation guard, applied after every AI answer. Each UFC or UFGS number the answer names is checked against CORA's criteria list (CRIT_T):
 // a document the AI renamed is rejected, and a document outside the subject's governing set may appear only as "Analogy (not governing)", never in a requirement.
@@ -799,18 +799,27 @@ function critTitle(k){const T=window.CRIT_T||{};if(T[k]) return T[k];const b=k.r
 function titleOK(given,off){const w=t=>String(t).toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(x=>x.length>2&&!['and','the','for','design','criteria','with'].includes(x));const g=w(given),o=new Set(w(off));if(!g.length) return true;return g.filter(x=>o.has(x)).length>=Math.ceil(g.length*0.6);}
 function govOf(sj,k){if(!sj) return true;const re=GOV[sj.id];return re?re.test(k):true;}
 const REQ_RE=/\b(require[sd]?|requirements?|shall|must|mandat\w*|per|in accordance with|governs?|governing|complies?|compliance)\b/i;
-function citeGuard(sj,out){if(!out) return;const txt=String(out.answer||'');const RE=/\b(UFC|UFGS)\s*(\d-\d{3}-\d{2}[A-Z]?|\d{2}\s?\d{2}\s?\d{2}(?:\.\d{2})?)(\s*\(([^)]{3,100})\))?/gi;
+// a figure with a unit (100,000 lb, 250 psi) must come from the governing criteria, the packet or the question; one found only in another discipline's criteria is that criteria's requirement, not this item's
+const UNITN=/\b(\d{1,3}(?:,\d{3})+|\d+(?:\.\d+)?)\s*(lb|lbs|pounds?|kg|kips?|psi|mpa|kpa|percent|%|gpm|gallons?|ft|feet|in|inch(?:es)?|mm|sf|sy|tons?)\b/gi;
+function unitNums(t){const o=new Set();String(t||'').replace(UNITN,(m,n)=>{o.add(n.replace(/,/g,''));return m;});return o;}
+function citeGuard(sj,out,cands,el){if(!out) return;const txt=String(out.answer||'');const RE=/\b(UFC|UFGS)\s*(\d-\d{3}-\d{2}[A-Z]?|\d{2}\s?\d{2}\s?\d{2}(?:\.\d{2})?)(\s*\(([^)]{3,100})\))?/gi;
  const notes=[];const analog=new Map();let changed=false;const KRE=/\b(UFC|UFGS)\s*(\d-\d{3}-\d{2}[A-Z]?|\d{2}\s?\d{2}\s?\d{2}(?:\.\d{2})?)/i;
  const quoted=new Set((out.refs||[]).filter(r=>r.verified!==false).map(r=>{const mm=String(r.src||'').match(KRE);return mm?critKey(mm[1],mm[2]):'';}).filter(Boolean));const qb=new Set([...quoted].map(k=>k.replace(/\.\d\d$/,'')));
  // split into sentences and clauses, keeping the separators, so one bad clause does not take a good one with it
- const bits=txt.split(/([.;!?]\s+|,\s+(?:and|while|whereas)\s+(?=(?:per\s+)?(?:UFC|UFGS)\b))/);const sents=[];for(let i=0;i<bits.length;i+=2) sents.push({t:bits[i],sep:bits[i+1]||''});
- const kept=sents.filter(o=>{const snt=o.t;if(!snt.trim()) return false;let drop=false;let m;RE.lastIndex=0;while((m=RE.exec(snt))){const k=critKey(m[1],m[2]);const off=critTitle(k);const given=m[4]||'';
+ const bits=txt.split(/([.;!?]\s+|,\s+(?:and|while|whereas)\s+)/);const sents=[];for(let i=0;i<bits.length;i+=2) sents.push({t:bits[i],sep:bits[i+1]||''});
+ const govTxt=[],anaTxt=[];(cands||[]).forEach(p=>{const mm=String(p.src||'').match(/\b(UFC|UFGS)\s*(\d-\d{3}-\d{2}[A-Z]?|\d{2}\s?\d{2}\s?\d{2}(?:\.\d{2})?)/i);if(mm&&!govOf(sj,critKey(mm[1],mm[2]))) anaTxt.push(p.text);else govTxt.push(p.text);});
+ const okN=unitNums(govTxt.join(' ')+' '+(el?(el.text||'')+' '+(el.quote||''):'')),anaN=unitNums(anaTxt.join(' '));
+ let dropPrev=false;
+ const kept=sents.filter(o=>{const snt=o.t;if(!snt.trim()) return false;
+  // a sentence that only points back at one just removed ("This governs …") goes with it
+  if(dropPrev&&/^\s*(this|that|these|those|it|such|which)\b/i.test(snt)){changed=true;return false;}dropPrev=false;
+  const stray=[...unitNums(snt)].filter(n=>!okN.has(n)&&anaN.has(n));if(stray.length){notes.push('figures '+stray.join(', ')+' come only from criteria that do not govern this item');changed=true;dropPrev=true;return false;}let drop=false;let m;RE.lastIndex=0;while((m=RE.exec(snt))){const k=critKey(m[1],m[2]);const off=critTitle(k);const given=m[4]||'';
    if(!off){notes.push(k+' is not in the criteria list');drop=true;continue;}
    if(given&&!titleOK(given,off)){notes.push('the AI called '+k+' “'+given.trim()+'”; the criteria list title is '+off);drop=true;continue;}
    if(!govOf(sj,k)){analog.set(k,off);if(REQ_RE.test(snt)) drop=true;}
    else if(REQ_RE.test(snt)&&!quoted.has(k)&&!qb.has(k.replace(/\.\d\d$/,''))){notes.push(k+' was cited as a requirement without a verified passage from it');drop=true;}}
-  if(drop) changed=true;return !drop;});
- let ans=kept.map((o,i)=>o.t+(i<kept.length-1?(/^,/.test(o.sep)?'; ':o.sep):(/[.;!?]/.test(o.sep)?o.sep.trim():''))).join('').replace(/;\s*$/,'.').trim();if(ans&&!/[.!?]$/.test(ans)) ans+='.';ans=ans.replace(/(^|[.;]\s+)([a-z])/g,(a,b,c)=>b+c.toUpperCase());
+  if(drop){changed=true;dropPrev=true;}return !drop;});
+ let ans=kept.map((o,i)=>{const nx=kept[i+1];const adj=nx&&sents.indexOf(nx)===sents.indexOf(o)+1;return o.t+(nx?(adj?o.sep:(/^,/.test(o.sep)?'; ':o.sep)):(/[.;!?]/.test(o.sep)?o.sep.trim():''));}).join('').replace(/;\s*$/,'.').trim();if(ans&&!/[.!?]$/.test(ans)) ans+='.';ans=ans.replace(/(^|[.!?]\s+)([a-z])/g,(a,b,c)=>b+c.toUpperCase());
  // a non-governing document left in a descriptive sentence is labelled where it appears
  ans=ans.replace(RE,(all,kd,nm)=>{const k=critKey(kd,nm);return analog.has(k)?k+' ('+analog.get(k)+'; analogy, not governing)':all;});
  // the refs: non-governing documents are analogies and go after the governing ones
