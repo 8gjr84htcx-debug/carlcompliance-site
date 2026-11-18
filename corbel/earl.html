@@ -794,6 +794,9 @@ function ratIssues(){const t=String(E.recommend.rationale||'').trim();const rec=
  const sents=t.split(/(?<=[.!?])\s+/).filter(x=>/recommend/i.test(x));if(rec&&(!nameIn(t,rec.name)||(sents.length&&!sents.some(x=>nameIn(x,rec.name))))) I.push('It does not say that '+rec.name+' is the recommended alternative.');
  if(E.recommend.sig&&E.recommend.sig!==recSig()) I.push('The ranking or costs changed after it was written.');
  const bad=ratNums(t,ratSrc());if(bad.length) I.push('Numbers not found in the analysis: '+bad.join(', ')+'.');
+ // never a rationale that assumes a step that did not run
+ const screenedAny=E.alts.some(a=>E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]));if(!screenedAny&&/\bscreen\w*|\bmeets? (?:all|every|each)\b|\bclos(?:es|ed|ing) the gap\b|\bfully (?:meets|satisfies)\b/i.test(t)) I.push('It relies on screening, but screening did not run in the build: no alternative has been checked against the must-have requirements yet.');
+ {const R0=results();const gapW=/\bclos(?:es|ed|ing) the (?:capability )?gap\b|\bmeets (?:all|every) (?:must-have )?requirement/i.test(t);const rec=E.alts.find(a=>a.id===E.recommend.alt);const part=rec?E.reqs.filter(q=>q.must&&E.cells[rec.id+'|'+q.id]==='partial'):[];if(gapW&&part.length) I.push('It says the recommendation closes the gap, but '+rec.name+' only partly meets '+part.length+' must-have requirement'+(part.length>1?'s':'')+': '+part.map(q=>q.text).join('; ')+'.');}
  // Claims the analysis must back: "screened out", "lowest cost", "across all discount rates".
  const R=results();const S=(()=>{try{return sensitivity();}catch(e){return null;}})();const ss=t.split(/(?<=[.!?])\s+/);
  E.alts.forEach(a=>{ss.filter(x=>nameIn(x,a.name)&&/screened out|eliminated|did not (?:pass|survive) (?:the )?screening|fails? (?:the )?screening/i.test(x)&&!/not screened out/i.test(x)).forEach(()=>{if(feasible(a)) I.push(a.name+' is described as screened out, but it passed screening'+(R.rows.find(r=>r.a===a&&r.unpriced)?'; it is only not costed yet':'')+'.');});});
@@ -806,7 +809,8 @@ async function aiRationale(quiet){if(!aiReady()) return;const R=results();const 
  if(!rec){alert('Pick the recommended alternative first.');return;}
  if(!quiet&&E.recommend.rationale&&!confirm('Replace the rationale with an AI draft?')) return;
  const L=earlSources();L.push('BASIS: period of analysis '+period()+' years, '+rate().toFixed(2)+'% '+(E.dollars==='nominal'?'nominal':'real')+' discount rate, base FY'+E.base_fy);
- R.rows.forEach(r=>L.push('ALTERNATIVE: '+r.a.name+' ('+ATYPES[r.a.type]+')'+(r.ok?' – rank '+r.rank+', NPV of cost '+$$(r.npv)+', non-cost score '+r.ws.toFixed(2):r.unpriced?' – PASSED SCREENING BUT NOT COSTED, so not ranked; do not call it screened out or compare its cost':' – screened out'+(r.a.screen_reason?': '+r.a.screen_reason:''))+(r.a.desc?'; '+r.a.desc:'')));if(R.ok.length<2) L.push('ONLY '+R.ok.length+' ALTERNATIVE'+(R.ok.length===1?' IS':'S ARE')+' COSTED: do not call any alternative the lowest cost.');
+ R.rows.forEach(r=>L.push('ALTERNATIVE: '+r.a.name+' ('+ATYPES[r.a.type]+')'+(r.ok?' – rank '+r.rank+', NPV of cost '+$$(r.npv)+', non-cost score '+r.ws.toFixed(2):r.unpriced?' – PASSED SCREENING BUT NOT COSTED, so not ranked; do not call it screened out or compare its cost':' – screened out'+(r.a.screen_reason?': '+r.a.screen_reason:''))+(r.a.desc?'; '+r.a.desc:'')));{const sa=E.alts.some(a=>E.reqs.some(q=>q.must&&E.cells[a.id+'|'+q.id]));if(!sa) L.push('SCREENING HAS NOT BEEN DONE: do not say any alternative passed or failed screening, meets the must-have requirements, or closes the gap.');const rec=E.alts.find(a=>a.id===E.recommend.alt);if(rec){const part=E.reqs.filter(q=>q.must&&E.cells[rec.id+'|'+q.id]==='partial');if(part.length) L.push('THE RECOMMENDED ALTERNATIVE ONLY PARTLY MEETS: '+part.map(q=>q.text).join('; ')+'. Say so; do not say it closes the gap.');}}
+ if(R.ok.length<2) L.push('ONLY '+R.ok.length+' ALTERNATIVE'+(R.ok.length===1?' IS':'S ARE')+' COSTED: do not call any alternative the lowest cost.');
  L.push('RECOMMENDED: '+rec.name);if(R.lead&&R.second) L.push('DIFFERENCE BETWEEN RANK 1 AND RANK 2: '+$$(R.second.npv-R.lead.npv));
  try{const S=sensitivity();if(S){S.rows.forEach(x=>L.push('SENSITIVITY: '+x.lbl+' – lowest cost: '+x.leader+(x.changes?' (RANKING CHANGES)':'')));if(S.be!=null) L.push('BREAK-EVEN: the leader stays lowest cost until its investment costs rise '+S.be.toFixed(0)+'%');}}catch(e){}
  const src=ratSrc();const b=$('#bAIr')||$('#dAI');if(b){b.disabled=true;b.textContent='Writing…';}
@@ -909,7 +913,7 @@ function vBuild(){const v=$('#view');const B=E.build;const n=noraData();const si
   '<div class="mentor">'+(n?'NORA: <b>'+esc(n.project.name||'(untitled)')+'</b> \u2013 '+(n.requirements||[]).filter(r=>r.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gap'+((n.gaps||[]).length===1?'':'s')+', '+(n.sessions||[]).length+' session'+((n.sessions||[]).length===1?'':'s')+'.':'No NORA project in this browser; EARL will work from the objective on step 1.')+' Location: '+(E.price&&E.price.loc?esc(E.price.loc.label):(guessLoc_()?esc(siteLabel_(guessLoc_())):'<b>not found</b> \u2013 set it on step 3'))+'. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use this.</b>')+'</div>'+
   '<div class="row"><button class="go" id="bBuild" '+(signed?'':'disabled')+'>'+(B?'Build again':'Build my AoA')+'</button><span class="small" id="bStat"></span></div></div>'+
   (B?'<div class="panel" id="rvw"><h2>Review the courses of action</h2><p class="lead">Keep or drop each one, fix the facility type or size where EARL guessed, then apply. Labels show where each came from: your own notes (with the words it rests on), the standard DoD list, or an AI suggestion to consider.</p>'+
-   (B.judgeErr?'<div class="find warn"><b>Screening and scoring did not run:</b> '+esc(B.judgeErr)+'. You can still apply and screen by hand.</div>':'')+
+   (B.judgeErr?'<div class="find warn"><b>Screening and scoring did not run:</b> '+esc(B.judgeErr)+'. Press Build again: the courses of action already proposed are reused and only screening runs again. You can also apply and screen by hand.</div>':'')+
    B.coas.map((c,i)=>{const g=c.guc!=null?PD_.guc[c.guc]:null;const fails=(B.judge.cells||[]).filter(x=>x.coa===c.id&&x.v==='fail');const mode=PMODE[c.type]||'none';
     return '<div class="card" style="margin:10px 0;padding:12px 14px;border:1px solid var(--line);border-radius:8px"><label style="font-weight:600"><input type="checkbox" data-i="'+i+'" data-f="keep" '+(c.keep?'checked':'')+' style="width:auto"> '+esc(c.name)+'</label> '+badge(c)+' <span class="small">'+esc(ATYPES[c.type])+(c.from?' \u00b7 proposed by '+(c.from.includes(',')?'both planners':'one planner'):'')+'</span>'+
      '<p style="margin:6px 0">'+esc(c.desc)+'</p>'+(c.quote?'<p class="small">'+(c.quoteOk?'Rests on: ':'Quote not found in your notes, so treated as a suggestion: ')+'<q>'+esc(c.quote)+'</q></p>':'')+(c.reason?'<p class="small">'+esc(c.reason)+'</p>':'')+
@@ -1534,20 +1538,24 @@ const PX=(function(){
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
   var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
- async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ // A dropped connection, a timeout or a busy server is tried twice more (after 1.5 and 4 seconds) before the tool is told it failed.
+ async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
+ async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
-  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+  if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
+ // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
+ function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
  // Engines are named for their job on screen; which service runs each stays here.
  var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
  async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
   var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
-  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return noEm(c);}}
   if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
   var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
   if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
-  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+  var res=noEm(j.result);useAdd('ai',j.usage,false);cPut(key,res);return res;}
  // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
  async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}

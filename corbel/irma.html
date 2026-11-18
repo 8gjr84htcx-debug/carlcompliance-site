@@ -579,7 +579,7 @@ const discOf=t=>Object.entries(DISC).filter(([k,re])=>re.test(t)).map(([k])=>k);
 function vItem(){const x=CUR;if(!x){VIEW='reg';return render();}const v=$('#view');
  v.innerHTML='<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">'+esc(num(x))+' <span style="font-weight:400">'+esc(x.title||'(untitled)')+'</span></h2><span class="small">'+(x.minutes||0)+' min logged</span></div>'+
  '<div class="form" style="margin-top:10px"><div><label class="f">Number</label><input data-k="no"></div><div><label class="f">Revision</label><input data-k="rev" type="number" min="0"></div><div class="wide"><label class="f">Title</label><input data-k="title"></div>'+
- '<div><label class="f">Task order / contract</label><input data-k="to"></div><div><label class="f">Spec section</label><input data-k="spec" placeholder="07 57 13"></div><div><label class="f">Received</label><input type="date" data-k="received"></div><div><label class="f">Submitted by</label><input data-k="by"></div>'+
+ '<div><label class="f">Task order / contract</label><input data-k="to"></div><div><label class="f">Spec section</label><input data-k="spec" placeholder="07 57 13"></div><div><label class="f">Received</label><input type="date" data-k="received">'+(x.dateNote&&x.received>today()?'<div class="mut" style="font-size:12px;color:#9a5b00">'+esc(x.dateNote)+'</div>':'')+'</div><div><label class="f">Submitted by</label><input data-k="by"></div>'+
  '<div><label class="f">Status</label><select data-k="status">'+opts(STATUS,x.status)+'</select></div><div><label class="f">Disposition</label><select data-k="disp">'+opts(x.kind==='rfi'?DISP_R:DISP_S,x.disp,'—')+'</select></div>'+
  '<div><label class="f">PM due / suspense</label><div style="padding:6px 0">'+esc(pmDue(x))+' / '+esc(suspense(x))+'</div></div></div></div>'+
  '<div class="tabs2">'+[['docs','Documents'],x.kind==='submittal'?['intake','Intake check']:null,['elem','Elements and grounding'],['sme','Reviewers'],['resp','Response'],['log','Log']].filter(Boolean).map(([k,t])=>'<button data-t="'+k+'" class="'+(TAB===k?'on':'')+'">'+t+'</button>').join('')+'</div><div id="tab"></div>';
@@ -631,7 +631,7 @@ function tElem(){const x=CUR;const t=$('#tab');const docText=x.docs.map(d=>d.pag
   const ans=d.querySelector('[data-ans]');if(ans) ans.oninput=()=>{e.result.answer=ans.value;save();};
   box.appendChild(d);});}
 function resultHTML(e){const r=e.result;return '<div style="margin-top:8px"><label class="f">Finding</label><textarea data-ans style="min-height:56px">'+esc(r.answer||'')+'</textarea>'+(r.verdict?'<div class="small">Verdict: <b>'+esc(r.verdict)+'</b> · '+esc(r.how||'')+'</div>':'<div class="small">'+esc(r.how||'')+'</div>')+
- (r.refs||[]).map(f=>'<div class="ev">'+esc(f.src)+(f.page?', page '+f.page:'')+': <q>'+esc(f.quote)+'</q> '+(f.verified?'<span class="pill ok">quote verified</span>':'<span class="pill bad">quote not found</span>')+(f.by?' <span class="pill">'+esc(f.by)+'</span>':'')+'</div>').join('')+
+ (r.refs||[]).map(f=>'<div class="ev">'+esc(f.src)+(f.page?', page '+f.page:'')+': <q>'+esc(f.quote)+'</q> '+(f.verified?'<span class="pill ok">quote verified</span>':'<span class="pill bad">quote not found</span>')+(f.by?' <span class="pill">'+esc(f.by)+'</span>':'')+(f.analogy?' <span class="pill warn" title="Another discipline\u2019s criteria; supports the answer by analogy only">analogy</span>':'')+'</div>').join('')+
  (r.label!=='conf'&&r.label!=='ver'&&r.cands&&r.cands.length?'<details'+(r.label==='ung'?' open':'')+'><summary>Closest passages – select one that answers this element</summary>'+r.cands.map((p,i)=>'<div class="passage"><b>'+esc(p.src)+(p.page?' p.'+p.page:'')+'</b>\n'+esc(p.text.slice(0,700))+'\n<button class="sm" data-pick="'+i+'">This answers it</button></div>').join('')+'</details>':'')+'</div>';}
 const Q_RE=/\?|\b(request(s|ed)?|propose[sd]?|proposal|substitut\w*|in lieu of|alternate|alternative|deviat\w*|clarif\w*|confirm|please advise|conflict\w*|discrepan\w*|cannot|unable to|not feasible|recommend\w*)\b/i;
 const CLAIM_RE=/\b(per (the )?(spec|specification|contract|sow|drawings?|ufc|ufgs)|in accordance with|complies with|meets|as required by|section \d|\d{2} \d{2} \d{2})\b/i;
@@ -653,7 +653,14 @@ const ARB_SYS=`You are the arbiter between two reviewers who disagreed about a c
 // CARL's library: the governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR), searched on CARL's server.
 function carlOn(){return !!(window.CARLAI&&CARLAI.state().ok);}
 async function libCands(x,q){if(!carlOn()) return [];try{const L=await CARLAI.library(q,5);return L.map((p,i)=>({id:'lib:'+i,src:'CARL library – '+p.src+(p.section?' '+p.section:''),kind:'library',page:p.page||null,text:String(p.text||'')}));}catch(err){log(x,'CARL library search failed',err.message);return [];}}
-async function groundOne(x,e){const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec||'');const P=passages();let cands=search(q,8,P);
+// Citation discipline: each subject has its own criteria. A fuel-facility question is answered from UFC 3-460-01 and the UFGS 33 52 43 sections first; a passage from another discipline is an analogy, never Strong.
+const SUBJ=[{id:'fuel',re:/\b(hydrant|fuel(?:ing)?|pol\b|petroleum|jp-?[58]|f-24|refuel|hot[- ]?pit|fuel pit|pit cover|valve pit|filter separator|defuel)/i,docs:/\b3-460-01\b|\b33\s?52\s?43|\b33\s?56\b|\b33\s?52\b|\bfuels?\b/i,cite:'UFC 3-460-01 (Petroleum Fuel Facilities) and UFGS 33 52 43.xx',bias:'UFC 3-460-01 petroleum fuel facilities UFGS 33 52 43'},
+ {id:'elec',re:/\b(electrical|transformer|switchgear|feeder|duct bank|manhole|handhole|grounding|conductor|panelboard)\b/i,docs:/\b3-550-01\b|\b3-520-01\b|\b26\s?\d\d|\belectric/i,cite:'UFC 3-550-01 / 3-520-01 and UFGS Division 26',bias:'UFC 3-550-01 exterior electrical'},
+ {id:'roof',re:/\broof(?:ing)?\b|\bmembrane\b|\bflashing\b/i,docs:/\b3-110-03\b|\b07\s?\d\d|\broof/i,cite:'UFC 3-110-03 and UFGS Division 07',bias:'UFC 3-110-03 roofing'},
+ {id:'fire',re:/\bsprinkler|fire (?:alarm|protection|suppression)|standpipe\b/i,docs:/\b3-600-01\b|\b21\s?\d\d|\b28\s?31|\bfire/i,cite:'UFC 3-600-01 and UFGS Divisions 21 and 28',bias:'UFC 3-600-01 fire protection'},
+ {id:'pave',re:/\bpavement|apron|taxiway|runway|asphalt|pcc\b/i,docs:/\b3-260-0[12]\b|\b32\s?1[0-3]|\bpavement|airfield/i,cite:'UFC 3-260-01 / 3-260-02 and UFGS 32 1x',bias:'UFC 3-260-02 airfield pavement'}];
+function subjOf(t){return SUBJ.find(x=>x.re.test(t))||null;}
+async function groundOne(x,e){const sj=subjOf((e.text||'')+' '+(e.quote||'')+' '+(x.title||''));const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec||'')+(sj?' '+sj.bias:'');const P=passages();let cands=search(q,8,P);
  const lib=await libCands(x,q);if(lib.length) cands=cands.slice(0,Math.max(3,8-lib.length)).concat(lib);const rd=readers().slice(0,2);const ar=arbiter();
  if(!rd.length||!cands.length){e.result={label:cands.length?'nr':'ung',answer:e.result?.answer||'',refs:[],cands,how:cands.length?'Built-in search found '+cands.length+' passages; select the one that answers this element':'No passage in the loaded references matches this element'};return;}
  const pblock=cands.map((p,i)=>'['+'P'+(i+1)+'] '+p.src+(p.page?' p.'+p.page:'')+'\n'+p.text).join('\n\n');const user='ELEMENT: '+e.text+(e.quote?'\nPACKET TEXT: '+e.quote:'')+'\n\nPASSAGES:\n'+pblock;
@@ -668,6 +675,9 @@ async function groundOne(x,e){const q=(e.text||'')+' '+(e.quote||'')+' '+(x.spec
  if(!out){const g=good[0];out=g?{label:'nr',verdict:g.verdict,answer:g.answer,refs:g.cites,how:ok.length<2?'One reader only':'Readers disagree'}:{label:'ung',verdict:ok[0]?.verdict||'',answer:ok[0]?.answer||'',refs:[],how:'No reader produced a verified quote'};}
  // A verified quote can still be about the wrong thing (an electrical maintenance-hole cover for a fuel hydrant pit): the passage must name what the element is about.
  if(out.refs&&out.refs.length&&['conf','ver'].includes(out.label)){const off=offTopic(e,out.refs,cands);if(off){out.label='nr';out.how='The cited passage does not mention '+off+'; it may be about a different item. Check the citation before using it.';out.offTopic=off;}}
+ // a passage from another discipline's criteria supports the answer only by analogy
+ if(sj&&out.refs&&out.refs.length){out.refs.forEach(r=>{const sr=String(r.src||'');const other=SUBJ.find(z=>z!==sj&&z.docs.test(sr));if(other&&!sj.docs.test(sr)) r.analogy=other.id;});
+  if(out.refs.every(r=>r.analogy)&&out.label!=='ung'){out.label='nr';out.how='Cited by analogy only: '+out.refs.map(r=>r.src).join('; ')+' is '+({elec:'electrical',roof:'roofing',fire:'fire protection',pave:'pavement',fuel:'fuel'}[out.refs[0].analogy]||'another discipline')+' criteria. For this item cite '+sj.cite+'.';out.analogy=true;}}
  out.cands=cands;out.readers=ok;e.result=out;log(x,'Element grounded',(e.text||'').slice(0,60)+' → '+LABELS[out.label][0]);}
 const GENERIC=new Set('shall provide provided contractor government requirement requirements required require requires rated rating ratings load loads loading cover covers covered system systems install installed installation design designed material materials minimum maximum accordance comply complies compliance contract section sections drawing drawings specification specifications submittal submittals request information question project work item items proposed propose approve approval standard standards criteria traffic heavy pounds capacity type types existing location area areas level levels number please confirm whether which there their these those other where would should could being given based using under above below between within about after before during'.split(' '));
 function topicTerms(e){return [...new Set(String((e.text||'')+' '+(e.quote||'')).toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>=3&&!GENERIC.has(w)&&!STOP3.has(w)&&!/^\d+$/.test(w)))];}
@@ -739,9 +749,9 @@ async function readHeader(x,t){const H=hdrRules(t);const rd=readers();if(rd.leng
  if(H.no&&pre('no',x.no===String(I.items.filter(z=>z.kind===x.kind).length))){const nv=String(H.no).replace(/^0+(?=\d)/,'');if(nv!==x.no){x.no=nv;set.push('number');}A.no=x.no;}
  if(H.title&&!x.title){x.title=H.title.slice(0,90);set.push('title');}
  if(H.to&&pre('to',x.to===recTO())&&norm(H.to)!==norm(x.to)){x.to=H.to;A.to=x.to;set.push('contract');}if(H.spec&&!x.spec){x.spec=H.spec;set.push('spec section');}
- const dd=isoDate(H.received);if(dd&&dd<=today()&&pre('received',x.received===today())&&dd!==x.received){x.received=dd;A.received=dd;set.push('date');}
+ const dd=isoDate(H.received);if(dd&&pre('received',x.received===today())&&dd!==x.received){x.received=dd;A.received=dd;set.push('date');if(dd>today())x.dateNote='Received date '+dd+' is later than today; taken from the document as written. Check it.';}
  const du=isoDate(H.due);if(du&&!x.due){x.due=du;set.push('suspense');}x.auto=A;if(H.by&&!x.by){x.by=H.by;set.push('submitted by');}
- if(set.length) log(x,'Header read from the document',set.join(', '));return set;}
+ if(x.dateNote&&set.includes('date')) log(x,x.dateNote);if(set.length) log(x,'Header read from the document',set.join(', '));return set;}
 function autoRefs(x){if(I.refs.length) return [];const a=[];const sop=sophieText(),cs=coraSel();
  if(sop){I.refs.push({id:uid(),name:'SOW – '+(sop.title||'from SOPHIE'),kind:'sow',pages:[sop.text],added:today()});a.push('the SOW from SOPHIE');}
  if(cs&&cs.items&&cs.items.length){I.refs.push({id:uid(),name:'CORA criteria selection '+today(),kind:'crit',pages:[cs.items.map(z=>[z.mod,z.number,z.title].filter(Boolean).join(' ')).join('\n')],added:today()});a.push('the CORA criteria list');}
@@ -1230,20 +1240,24 @@ const PX=(function(){
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
   var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
- async function post(path,body){var r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ // A dropped connection, a timeout or a busy server is tried twice more (after 1.5 and 4 seconds) before the tool is told it failed.
+ async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
+ async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
-  if(!r.ok) throw new Error(j.error||('CARL HTTP '+r.status));return j;}
+  if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
+ // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
+ function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
  // Engines are named for their job on screen; which service runs each stays here.
  var ENG={'reader-a':'claude','reader-b':'gemini','reviewer':'claude'};
  async function ask(engine,sys,user,images,opt){opt=opt||{};engine=ENG[engine]||engine;engine=/gemini/i.test(engine)?'gemini':/fast/i.test(engine)?'fast':'claude';
   var key=h(engine+'\u0001'+(sys||'')+'\u0001'+(user||'')+'\u0001'+((images||[]).join('').length));
-  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return c;}}
+  if(!opt.fresh){var c=cGet(key);if(c){useAdd('ai',null,true);return noEm(c);}}
   if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');
   var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
   if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
-  useAdd('ai',j.usage,false);cPut(key,j.result);return j.result;}
+  var res=noEm(j.result);useAdd('ai',j.usage,false);cPut(key,res);return res;}
  // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
  async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
