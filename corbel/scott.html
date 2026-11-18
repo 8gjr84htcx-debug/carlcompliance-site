@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -151,8 +151,25 @@
  function titleSim(a,b){var A=words(a),B=words(b);if(!A.length||!B.length) return 0;
   var dA=A.filter(function(w){return /^\d+$/.test(w);}).sort().join(','),dB=B.filter(function(w){return /^\d+$/.test(w);}).sort().join(',');if(dA!==dB) return 0;
   var S=A.length<=B.length?A:B,L=A.length<=B.length?B:A;var hit=S.filter(function(w){return L.some(function(x){return x===w||(w.length>4&&x.length>4&&(x.indexOf(w)===0||w.indexOf(x)===0));});}).length;return hit/S.length;}
- window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
+ // Form and criteria numbers are names, not figures: number checkers drop them before comparing ("AF IMT 1477", "DD Form 1391", "UFC 4-010-01", "FC 3-401-02N", "UFGS 33 52 43.14", "ICD 705", "EM 385-1-1").
+ var REFRE=[/\b(?:UFGS\s*)?\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi,/\b(?:AF|DAF|DD|SF|AETC|DA|NAVFAC|OPNAV)\s*(?:IMT|Form|Fm\.?)?\s*\d{2,5}[A-Z]?(?:-\d+)?\b/gi,/\bForm\s+\d{2,5}[A-Z]?\b/gi,
+  /\b(?:UFC|UFS|UFGS|FC|DoDI|DoDD|DoDM|EM|ER|EP|AFI|DAFI|DAFMAN|AFMAN|OPNAVINST|NAVFACINST|ICD|ICS|NFPA|ASTM|ASCE|ACI|IBC|IEEE|ANSI|ASHRAE|UL|MIL-STD|MIL-HDBK|FAR|DFARS|U\.?S\.?C\.?)\s*[A-Z]?\d[\d.\-]*[A-Z]?\b/gi,
+  /\b\d-\d{3}-\d{2}[A-Z]{0,2}\b/g,/\b\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi];
+ function stripRefs(t){t=String(t==null?'':t);REFRE.forEach(function(re){t=t.replace(re,' ');});return t;}
+ window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST,stripRefs:stripRefs};
 })();
+
+// Messages show in the page, not in a browser pop-up: a notice at the top that stays until you close it (Esc or Close). Questions that need a yes or no still ask.
+(function(){if(window.__corbelNote) return;window.__corbelNote=1;var Q=[];
+ function host(){var h=document.getElementById('corbel-notes');if(!h){h=document.createElement('div');h.id='corbel-notes';h.setAttribute('aria-live','assertive');h.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;display:flex;flex-direction:column;gap:8px;width:min(560px,calc(100vw - 28px))';document.body.appendChild(h);}return h;}
+ function show(msg){if(!document.body){Q.push(msg);return;}var h=host();while(h.children.length>=3) h.firstChild.remove();
+  var d=document.createElement('div');d.className='corbel-note';d.setAttribute('role','alertdialog');d.style.cssText='background:#fff;color:#1A1410;border:1px solid #C9B998;border-left:5px solid #1B2F4E;border-radius:6px;box-shadow:0 6px 22px rgba(15,30,54,.22);padding:12px 14px;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;display:flex;gap:12px;align-items:flex-start';
+  var t=document.createElement('div');t.style.cssText='flex:1;white-space:pre-wrap;max-height:50vh;overflow:auto';t.textContent=String(msg==null?'':msg);
+  var b=document.createElement('button');b.type='button';b.textContent='Close';b.style.cssText='flex:none;border:1px solid #1B2F4E;background:#1B2F4E;color:#fff;border-radius:4px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer';b.onclick=function(){d.remove();};
+  d.appendChild(t);d.appendChild(b);h.appendChild(d);try{b.focus({preventScroll:true});}catch(e){}}
+ window.alert=function(m){show(m);};
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
+ document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
 </script>
 
 

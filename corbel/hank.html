@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -151,8 +151,25 @@
  function titleSim(a,b){var A=words(a),B=words(b);if(!A.length||!B.length) return 0;
   var dA=A.filter(function(w){return /^\d+$/.test(w);}).sort().join(','),dB=B.filter(function(w){return /^\d+$/.test(w);}).sort().join(',');if(dA!==dB) return 0;
   var S=A.length<=B.length?A:B,L=A.length<=B.length?B:A;var hit=S.filter(function(w){return L.some(function(x){return x===w||(w.length>4&&x.length>4&&(x.indexOf(w)===0||w.indexOf(x)===0));});}).length;return hit/S.length;}
- window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
+ // Form and criteria numbers are names, not figures: number checkers drop them before comparing ("AF IMT 1477", "DD Form 1391", "UFC 4-010-01", "FC 3-401-02N", "UFGS 33 52 43.14", "ICD 705", "EM 385-1-1").
+ var REFRE=[/\b(?:UFGS\s*)?\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi,/\b(?:AF|DAF|DD|SF|AETC|DA|NAVFAC|OPNAV)\s*(?:IMT|Form|Fm\.?)?\s*\d{2,5}[A-Z]?(?:-\d+)?\b/gi,/\bForm\s+\d{2,5}[A-Z]?\b/gi,
+  /\b(?:UFC|UFS|UFGS|FC|DoDI|DoDD|DoDM|EM|ER|EP|AFI|DAFI|DAFMAN|AFMAN|OPNAVINST|NAVFACINST|ICD|ICS|NFPA|ASTM|ASCE|ACI|IBC|IEEE|ANSI|ASHRAE|UL|MIL-STD|MIL-HDBK|FAR|DFARS|U\.?S\.?C\.?)\s*[A-Z]?\d[\d.\-]*[A-Z]?\b/gi,
+  /\b\d-\d{3}-\d{2}[A-Z]{0,2}\b/g,/\b\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi];
+ function stripRefs(t){t=String(t==null?'':t);REFRE.forEach(function(re){t=t.replace(re,' ');});return t;}
+ window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST,stripRefs:stripRefs};
 })();
+
+// Messages show in the page, not in a browser pop-up: a notice at the top that stays until you close it (Esc or Close). Questions that need a yes or no still ask.
+(function(){if(window.__corbelNote) return;window.__corbelNote=1;var Q=[];
+ function host(){var h=document.getElementById('corbel-notes');if(!h){h=document.createElement('div');h.id='corbel-notes';h.setAttribute('aria-live','assertive');h.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;display:flex;flex-direction:column;gap:8px;width:min(560px,calc(100vw - 28px))';document.body.appendChild(h);}return h;}
+ function show(msg){if(!document.body){Q.push(msg);return;}var h=host();while(h.children.length>=3) h.firstChild.remove();
+  var d=document.createElement('div');d.className='corbel-note';d.setAttribute('role','alertdialog');d.style.cssText='background:#fff;color:#1A1410;border:1px solid #C9B998;border-left:5px solid #1B2F4E;border-radius:6px;box-shadow:0 6px 22px rgba(15,30,54,.22);padding:12px 14px;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;display:flex;gap:12px;align-items:flex-start';
+  var t=document.createElement('div');t.style.cssText='flex:1;white-space:pre-wrap;max-height:50vh;overflow:auto';t.textContent=String(msg==null?'':msg);
+  var b=document.createElement('button');b.type='button';b.textContent='Close';b.style.cssText='flex:none;border:1px solid #1B2F4E;background:#1B2F4E;color:#fff;border-radius:4px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer';b.onclick=function(){d.remove();};
+  d.appendChild(t);d.appendChild(b);h.appendChild(d);try{b.focus({preventScroll:true});}catch(e){}}
+ window.alert=function(m){show(m);};
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
+ document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
 </script>
 
 <meta charset="utf-8">
@@ -566,11 +583,31 @@ function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0"
 const XL=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
  const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -615,11 +652,31 @@ const XL=(function(){
 const DX=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
  const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -833,11 +890,31 @@ const DX=(function(){
 const PX=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});}
  const X=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');

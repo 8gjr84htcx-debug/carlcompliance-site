@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_cache:1,carl_ai_admin:1};
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -151,8 +151,25 @@
  function titleSim(a,b){var A=words(a),B=words(b);if(!A.length||!B.length) return 0;
   var dA=A.filter(function(w){return /^\d+$/.test(w);}).sort().join(','),dB=B.filter(function(w){return /^\d+$/.test(w);}).sort().join(',');if(dA!==dB) return 0;
   var S=A.length<=B.length?A:B,L=A.length<=B.length?B:A;var hit=S.filter(function(w){return L.some(function(x){return x===w||(w.length>4&&x.length>4&&(x.indexOf(w)===0||w.indexOf(x)===0));});}).length;return hit/S.length;}
- window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST};
+ // Form and criteria numbers are names, not figures: number checkers drop them before comparing ("AF IMT 1477", "DD Form 1391", "UFC 4-010-01", "FC 3-401-02N", "UFGS 33 52 43.14", "ICD 705", "EM 385-1-1").
+ var REFRE=[/\b(?:UFGS\s*)?\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi,/\b(?:AF|DAF|DD|SF|AETC|DA|NAVFAC|OPNAV)\s*(?:IMT|Form|Fm\.?)?\s*\d{2,5}[A-Z]?(?:-\d+)?\b/gi,/\bForm\s+\d{2,5}[A-Z]?\b/gi,
+  /\b(?:UFC|UFS|UFGS|FC|DoDI|DoDD|DoDM|EM|ER|EP|AFI|DAFI|DAFMAN|AFMAN|OPNAVINST|NAVFACINST|ICD|ICS|NFPA|ASTM|ASCE|ACI|IBC|IEEE|ANSI|ASHRAE|UL|MIL-STD|MIL-HDBK|FAR|DFARS|U\.?S\.?C\.?)\s*[A-Z]?\d[\d.\-]*[A-Z]?\b/gi,
+  /\b\d-\d{3}-\d{2}[A-Z]{0,2}\b/g,/\b\d{2}\s\d{2}\s\d{2}(?:\.\d{1,2})?\b/g,/\b\d{1,2}\s?U\.?S\.?C\.?\s?\d{3,4}\b/gi];
+ function stripRefs(t){t=String(t==null?'':t);REFRE.forEach(function(re){t=t.replace(re,' ');});return t;}
+ window.CorbelID={svc:svc,inst:inst,sameInst:sameInst,num:num,numsIn:numsIn,titleSim:titleSim,tcase:tcase,INST:INST,stripRefs:stripRefs};
 })();
+
+// Messages show in the page, not in a browser pop-up: a notice at the top that stays until you close it (Esc or Close). Questions that need a yes or no still ask.
+(function(){if(window.__corbelNote) return;window.__corbelNote=1;var Q=[];
+ function host(){var h=document.getElementById('corbel-notes');if(!h){h=document.createElement('div');h.id='corbel-notes';h.setAttribute('aria-live','assertive');h.style.cssText='position:fixed;top:14px;left:50%;transform:translateX(-50%);z-index:2147483000;display:flex;flex-direction:column;gap:8px;width:min(560px,calc(100vw - 28px))';document.body.appendChild(h);}return h;}
+ function show(msg){if(!document.body){Q.push(msg);return;}var h=host();while(h.children.length>=3) h.firstChild.remove();
+  var d=document.createElement('div');d.className='corbel-note';d.setAttribute('role','alertdialog');d.style.cssText='background:#fff;color:#1A1410;border:1px solid #C9B998;border-left:5px solid #1B2F4E;border-radius:6px;box-shadow:0 6px 22px rgba(15,30,54,.22);padding:12px 14px;font:14px/1.45 system-ui,-apple-system,Segoe UI,sans-serif;display:flex;gap:12px;align-items:flex-start';
+  var t=document.createElement('div');t.style.cssText='flex:1;white-space:pre-wrap;max-height:50vh;overflow:auto';t.textContent=String(msg==null?'':msg);
+  var b=document.createElement('button');b.type='button';b.textContent='Close';b.style.cssText='flex:none;border:1px solid #1B2F4E;background:#1B2F4E;color:#fff;border-radius:4px;padding:4px 10px;font:inherit;font-size:13px;cursor:pointer';b.onclick=function(){d.remove();};
+  d.appendChild(t);d.appendChild(b);h.appendChild(d);try{b.focus({preventScroll:true});}catch(e){}}
+ window.alert=function(m){show(m);};
+ document.addEventListener('keydown',function(e){if(e.key==='Escape'){var h=document.getElementById('corbel-notes');if(h&&h.lastChild){h.lastChild.remove();}}});
+ document.addEventListener('DOMContentLoaded',function(){Q.splice(0).forEach(show);});})();
 </script>
 
 <meta charset="utf-8">
@@ -1221,7 +1238,7 @@ function csvPreview(file,t){const rows=parseCSV(t);if(!rows.length) return alert
   '<div class="row" style="margin-top:14px"><button class="go" id="cvGo"'+(n('add')+n('update')?'':' disabled')+'>Import '+(n('add')+n('update'))+' row'+(n('add')+n('update')===1?'':'s')+'</button><button id="cvNo">Cancel</button></div>';
  document.body.appendChild(d);d.showModal();d.querySelector('#cvNo').onclick=()=>{d.close();d.remove();};
  d.querySelector('#cvGo').onclick=()=>{let a=0,u=0;plan.forEach(x=>{if(x.act==='skip') return;if(x.act==='update'){const rep_=!!(d.querySelector('#cvRep')||{}).checked;Object.entries(x.o).forEach(([k,v])=>{const cur=String(x.p[k]??'').trim();if(cur!==''&&!rep_) return;if(k==='phase'&&N(v)<N(x.p.phase)&&!rep_) return;x.p[k]=(k==='phase'||CSVMONEY.includes(k))?N(v):v;});u++;}else{const p=Object.assign(blankProj(),x.o);p.phase=N(p.phase)||1;P.projects.push(p);a++;}});
-  d.close();d.remove();log('Projects imported from CSV',file+': '+a+' added, '+u+' updated, '+n('skip')+' skipped'+(unk.length?'; columns not imported: '+unk.join(', '):''));save();renderSteps();vData();const m=$('#dm');if(m) m.textContent=a+' added, '+u+' updated'+(n('skip')?', '+n('skip')+' skipped':'')+'.';};}
+  d.close();d.remove();log('Projects imported from CSV',file+': '+a+' added, '+u+' updated, '+n('skip')+' skipped'+(unk.length?'; columns not imported: '+unk.join(', '):''));const am=autoMerge();save();renderSteps();vData();const m=$('#dm');if(m) m.textContent=a+' added, '+u+' updated'+(n('skip')?', '+n('skip')+' skipped':'')+(am.length?'; '+am.length+' duplicate'+(am.length>1?'s':'')+' merged':'')+'.';};}
 // ---- possible duplicates ----
 function dupGroups(){const ID=window.CorbelID;const G=[];const seen=new Set();const key=p=>[ID?ID.num(p.number):numI(p.number),nzI(p.name)+'|'+(ID?ID.inst(p.installation):p.installation).toLowerCase()];
  P.projects.forEach((p,i)=>{if(seen.has(p.id)) return;const [n1,k1]=key(p);const same=P.projects.filter((q,j)=>j>i&&!seen.has(q.id)&&(()=>{const [n2,k2]=key(q);return (n1&&n1===n2)||(k1===k2&&nzI(p.name))||(ID&&ID.sameInst(p.installation,q.installation)&&ID.titleSim(p.name,q.name)>=.9&&(!n1||!n2||n1===n2));})());if(same.length){same.forEach(q=>seen.add(q.id));G.push([p].concat(same));}});return G;}
@@ -1235,7 +1252,7 @@ function mergeProj(a,b){const S=storeIds();if(S.includes(b.id)&&!S.includes(a.id
  P.projects=P.projects.filter(x=>x!==b);const s=JSON.stringify(P).split('"'+b.id+'"').join('"'+a.id+'"');const j=JSON.parse(s);Object.keys(P).forEach(k=>delete P[k]);Object.assign(P,j);
  ['hank_portfolio','adam_portfolio'].forEach(k=>{try{const v=localStorage.getItem(k);if(v&&v.includes(b.id)){const o=JSON.parse(v);if(o.items&&o.items[b.id]&&!o.items[a.id]){o.items[a.id]=o.items[b.id];}if(o.items) delete o.items[b.id];localStorage.setItem(k,JSON.stringify(o).split('"'+b.id+'"').join('"'+a.id+'"'));}}catch(e){}});
  log('Duplicate projects merged',(a.name||'')+' kept; '+(b.name||'')+(b.number?' ('+b.number+')':'')+' merged into it');_cpm=null;save();}
-function dupPanel(){const G=dupGroups();if(!G.length) return '';return '<div class="panel"><h2>Possible duplicates</h2><p class="lead">These records look like the same project: same project number, or the same name at the same installation. Merging keeps every update, funding line, milestone and risk from both.</p>'+
+function dupPanel(){const G=dupGroups();const AM=(P.autoMerged||[]).slice(-5);const amH=AM.length?'<div class="panel"><h2>Merged automatically</h2><p class="lead">Same project number, or the same name at the same installation. Every update, funding line and milestone was kept.</p>'+AM.map(x=>'<div class="small">'+esc(x.at)+' – '+esc(x.t)+'</div>').join('')+'</div>':'';if(!G.length) return amH;return amH+'<div class="panel"><h2>Possible duplicates</h2><p class="lead">These records look alike: a similar name at the same installation, or a shared name or number with something that does not match. Check them before merging. Merging keeps every update, funding line, milestone and risk from both.</p>'+
  G.map(g=>'<div class="card2" style="margin-top:8px">'+g.map((p,i)=>'<div class="row" style="margin-top:'+(i?4:0)+'px;align-items:center"><b>'+esc(p.name||'(no name)')+'</b><span class="small">'+esc([p.number,p.installation,p.service,p.fy?'FY'+p.fy:''].filter(Boolean).join(' · '))+' · '+(p.updates||[]).length+' updates</span>'+(i?'<button class="sm" data-mrg="'+g[0].id+'|'+p.id+'" style="margin-left:auto">Merge into “'+esc(g[0].name||'')+'”</button>':'')+'</div>').join('')+'</div>').join('')+'</div>';}
 function vData(){const v=$('#view');
  v.innerHTML=dupPanel()+'<div class="panel"><h2>Data</h2><div class="outs">'+
@@ -1415,14 +1432,19 @@ function vReg(){const v=$('#view');const r=REG();const S=regSuggest();const L=fi
  $('#rgAdd').onclick=()=>{const t=$('#rgT').value.trim();if(!t) return $('#rgT').focus();r.items.push({id:uid(),kind:$('#rgK').value,text:t,pid:$('#rgP').value,org:$('#rgO').value,due:$('#rgD').value,poc:'',notes:'',status:'open',created:today(),src:'you'});log('Action added',t);sv();};
  $('#rgAI').onclick=rgFromNotes;
  function t(l,val,c){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px'+(c?';color:'+c:'')+'">'+val+'</div></div>';}}
-const RG_SYS=`You pull decisions, actions and requests for information out of military construction meeting notes. Use ONLY what the notes say. For each item give: kind (decision, action or ask), a short imperative text, the owner organization if the notes name one (match it to the ORGANIZATIONS list when you can), the project if one from the PROJECTS list is named, and a due date (YYYY-MM-DD) only if the notes give one. Do not invent owners or dates.
-Return ONLY JSON: {"items":[{"kind":"action","text":"…","owner":"…","project":"<project id or empty>","due":"","quote":"the words in the notes this comes from"}]}`;
+const RG_SYS=`You pull decisions, actions and requests for information out of military construction meeting notes. Use ONLY what the notes say. For each item give: kind (decision, action, ask or risk), a short imperative text (for a risk, the risk as a plain statement), the owner organization if the notes name one (match it to the ORGANIZATIONS list when you can), the project if one from the PROJECTS list is named, and a due date (YYYY-MM-DD) only if the notes give one. Do not invent owners or dates.
+Kinds: a line marked "Decision needed", "Decision:", "needs a decision" or "for decision", or anything someone must approve or choose, is a decision, not an action. Something that could go wrong ("risk", "could delay", "may slip", "concern that") is a risk; give likelihood and impact 1–5 only if the notes say how likely or how bad.
+Return ONLY JSON: {"items":[{"kind":"action","text":"…","owner":"…","project":"<project id or empty>","due":"","likelihood":"","impact":"","quote":"the words in the notes this comes from"}]}`;
+// The notes' own labels win over the reader's guess: "Decision needed" is a decision, "Risk:" is a risk.
+function rgKind(x){const t=String(x.quote||'')+' '+String(x.text||'');if(/\bdecision (?:needed|required|point)\b|\bdecision:|\bneeds? (?:a )?decision\b|\bfor decision\b/i.test(t)) return 'decision';if(/\brisks?\s*[:\-–]/i.test(String(x.quote||''))) return 'risk';return ['decision','action','ask','tasker','risk'].includes(x.kind)?x.kind:'action';}
 async function rgFromNotes(){const r=REG();const n=$('#rgN').value.trim();if(!n) return $('#rgN').focus();const m=$('#rgMsg');m.textContent='Reading the notes…';
  try{const j=await CARLAI.ask('claude',RG_SYS,'TODAY: '+today()+'\nORGANIZATIONS: '+r.orgs.map(o=>o.name).join('; ')+'\nPROJECTS:\n'+filtered().map(p=>p.id+' | '+p.name+' | '+(p.installation||'')).join('\n')+'\n\nNOTES:\n'+n);
-  const its=(j.items||[]).filter(x=>x&&x.text).map(x=>({kind:KIND.some(k=>k[0]===x.kind)?x.kind:'action',text:String(x.text).slice(0,200),org:orgBy(x.owner)||'',owner:x.owner||'',pid:pById(x.project)?x.project:'',due:/^\d{4}-\d{2}-\d{2}$/.test(x.due||'')?x.due:'',quote:String(x.quote||'').slice(0,200)}));
-  m.textContent=its.length?its.length+' found. Check each one against the notes, then add it.':'No decisions, actions or requests found in these notes.';
-  $('#rgOut').innerHTML=its.map((x,i)=>'<div class="find" style="display:flex;gap:10px;align-items:center;padding:7px 10px;margin:6px 0"><span style="flex:1"><b>'+KIND.find(k=>k[0]===x.kind)[1]+':</b> '+esc(x.text)+' <span class="small">· '+esc(orgN(x.org)||x.owner||'no owner named')+(x.due?' · due '+fd(x.due):'')+(x.pid?' · '+esc(pById(x.pid).name):'')+'</span>'+(x.quote?'<br><span class="small">“'+esc(x.quote)+'”</span>':'')+'</span><button class="sm go" data-nadd="'+i+'">Add</button></div>').join('');
-  $('#rgOut').querySelectorAll('[data-nadd]').forEach(b=>b.onclick=()=>{const x=its[+b.dataset.nadd];r.items.push({id:uid(),kind:x.kind,text:x.text,pid:x.pid,org:x.org,due:x.due,poc:'',notes:x.quote?'From notes: “'+x.quote+'”':'',status:'open',created:today(),src:'notes'});save();b.textContent='Added';b.disabled=true;});}
+  const its=(j.items||[]).filter(x=>x&&x.text).map(x=>({kind:rgKind(x),l:Math.min(5,Math.max(1,N(x.likelihood)||3)),i:Math.min(5,Math.max(1,N(x.impact)||3)),text:String(x.text).slice(0,200),org:orgBy(x.owner)||'',owner:x.owner||'',pid:pById(x.project)?x.project:'',due:/^\d{4}-\d{2}-\d{2}$/.test(x.due||'')?x.due:'',quote:String(x.quote||'').slice(0,200)}));
+  m.textContent=its.length?its.length+' found. Check each one against the notes, then add it. Risks go to the project’s risk register.':'No decisions, actions, requests or risks found in these notes.';
+  $('#rgOut').innerHTML=its.map((x,i)=>'<div class="find" style="display:flex;gap:10px;align-items:center;padding:7px 10px;margin:6px 0"><span style="flex:1"><b>'+(x.kind==='risk'?'Risk':KIND.find(k=>k[0]===x.kind)[1])+':</b> '+esc(x.text)+' <span class="small">· '+esc(orgN(x.org)||x.owner||'no owner named')+(x.due?' · due '+fd(x.due):'')+(x.pid?' · '+esc(pById(x.pid).name):'')+'</span>'+(x.quote?'<br><span class="small">“'+esc(x.quote)+'”</span>':'')+'</span>'+(x.kind==='risk'&&!x.pid?'<select class="sm" data-npid="'+i+'"><option value="">Which project?</option>'+filtered().map(p=>'<option value="'+p.id+'">'+esc(p.name)+'</option>').join('')+'</select>':'')+'<button class="sm go" data-nadd="'+i+'">Add</button></div>').join('');
+  $('#rgOut').querySelectorAll('[data-nadd]').forEach(b=>b.onclick=()=>{const x=its[+b.dataset.nadd];
+   if(x.kind==='risk'){const sp=$('#rgOut').querySelector('[data-npid="'+b.dataset.nadd+'"]');const p=pById(x.pid||(sp&&sp.value));if(!p){m.textContent='Pick the project this risk belongs to, then add it.';if(sp) sp.focus();return;}(p.risks=p.risks||[]).push({id:uid(),text:x.text,l:x.l,i:x.i,response:'',owner:orgN(x.org)||x.owner||'',status:'open',src:'meeting notes',notes:x.quote?'From notes: “'+x.quote+'”':''});log('Risk added from meeting notes',p.name+': '+x.text);save();b.textContent='Added to '+p.name;b.disabled=true;return;}
+   r.items.push({id:uid(),kind:x.kind,text:x.text,pid:x.pid,org:x.org,due:x.due,poc:'',notes:x.quote?'From notes: “'+x.quote+'”':'',status:'open',created:today(),src:'notes'});save();b.textContent='Added';b.disabled=true;});}
  catch(e){m.textContent='Could not read the notes: '+e.message;}}
 function regRows(){const r=REG();return [{name:'Register',rows:[['Type','Item','Project','Owner','Point of contact','Due','Status','Days late','Closed','Notes','Source']].concat(r.items.map(i=>[KIND.find(k=>k[0]===i.kind)[1],i.text,(pById(i.pid)||{}).name||'',orgN(i.org),i.poc||'',i.due||'',i.status==='closed'?'Closed':regLate(i)?'Late':'Open',regLate(i)?dd(i.due,today()):'',i.closed||'',i.notes||'',{suite:'Suggested by the suite',notes:'From meeting notes',you:'Entered'}[i.src]||'']))},
  {name:'Stakeholders',rows:[['Organization','Type','Point of contact','Role','Open items','Late items']].concat(r.orgs.map(o=>[o.name,o.type,o.poc||'',o.role||'',regOpen().filter(i=>i.org===o.id).length,regOpen().filter(i=>i.org===o.id&&regLate(i)).length]))}];}
@@ -1901,6 +1923,8 @@ function adamMission(p){let A;try{A=JSON.parse(localStorage.getItem('adam_portfo
   if(!best||v>best.v) best={v,src:'adam',why:(l.role==='supports'?'Supports':'Required for')+' “'+r.name+'” ('+t[1]+(r.need?', needed '+r.need:'')+') in ADAM'};}));return best;}
 function prScore(p,c){const r=PR();const o=(r.s[p.id]||{})[c];if(c==='mission'&&(!o||o.src==='auto'||o.src==='ai')){const a=adamMission(p);if(a) return a;}if(c==='exec'&&(!o||o.src==='auto')) return prExec(p);if(c==='value'&&(!o||o.src==='auto')) return earlVfm(p);if(c==='prog'&&(!o||o.src==='auto')) return prProg(p);if(c==='fund'&&(!o||o.src==='auto')) return prFund(p);return o||null;}
 // Score over the criteria that are rated only; unscored criteria are left out, and the range shows what they could do.
+// A score needs something to stand on: the phase-based execution rating alone (a blank project) is not a score.
+function prScored(p){return CRIT.some(([c])=>c!=='exec'&&prScore(p,c));}
 function prTotal(p,w){w=w||PR().w;let a=0,tw=0;CRIT.forEach(([c])=>{const s=prScore(p,c);if(s&&N(w[c])){a+=N(s.v)*N(w[c]);tw+=N(w[c]);}});return tw?a/tw*20:0;}
 function prRange(p,w){w=w||PR().w;const T=CRIT.reduce((a,[c])=>a+N(w[c]),0)||1;let lo=0,hi=0,u=0;CRIT.forEach(([c])=>{const s=prScore(p,c);const k=N(w[c]);if(s){lo+=N(s.v)*k;hi+=N(s.v)*k;}else if(k){lo+=k;hi+=5*k;u++;}});return {lo:lo/T*20,hi:hi/T*20,u};}
 function bKey(){const r=PR();return (r.fy||'all')+(r.acct?'|'+r.acct:'');}
@@ -1942,7 +1966,7 @@ function vPri(){prSync();save();const v=$('#view');const r=PR();const L=prRank()
  if($('#prAI')) $('#prAI').onclick=()=>prAI(!un.length);bindPrRows();
  function tile(l,val){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px">'+val+'</div></div>';}}
 function prSync(){const r=PR();const L=prRank();const st=prStable();const B=N(r.budget[bKey()]??r.budget[r.fy||'all']);const ids=new Set(L.map(x=>x.p.id));const tag=(r.fy?'FY'+String(r.fy).slice(-2)+' ':'')+'ranking';
- L.forEach(x=>{const f=st[x.p.id];x.p.priority=x.rank+' of '+L.length+' in the '+tag+(B?', '+(x.must?'must fund':x.fill?'funded, fills the gap':x.above?'above the funding line':'below the funding line')+(f!=null&&f>.1&&f<.9&&!x.must&&!x.fill?' (on the margin)':''):'')+', score '+Math.round(x.t)+', '+fd(today());x.p.priority_rank=x.rank;});
+ L.forEach(x=>{const f=st[x.p.id];if(!prScored(x.p)){x.p.priority='Not scored yet';x.p.priority_rank='';return;}x.p.priority=x.rank+' of '+L.length+' in the '+tag+(B?', '+(x.must?'must fund':x.fill?'funded, fills the gap':x.above?'above the funding line':'below the funding line')+(f!=null&&f>.1&&f<.9&&!x.must&&!x.fill?' (on the margin)':''):'')+', score '+Math.round(x.t)+', '+fd(today());x.p.priority_rank=x.rank;});
  P.projects.forEach(p=>{if(!ids.has(p.id)&&p.priority){p.priority='Not in the current ranking';p.priority_rank='';}});}
 function prRows(L,st,B){let h='',drawn=false;const used=L.filter(x=>x.above).reduce((a,x)=>a+x.c,0);
  L.forEach(x=>{if(B&&!drawn&&(x.above===false||x.fill||x.blocked)){drawn=true;h+='<tr><td colspan="8" style="border-top:3px solid var(--crit);background:#fbeeee;font-weight:600;color:#9b2c2c">Funding line – '+M(used)+' of '+M(B)+' funded'+(B-used>0?', '+M(B-used)+' left':'')+(L.some(y=>y.fill)?'. Lower-ranked projects marked “fills the gap” fit in the money left above the line.':'')+'</td></tr>';}
@@ -2112,6 +2136,14 @@ $('#bOpen').onclick=()=>$('#fOpen').click();
 $('#fOpen').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{try{const j=JSON.parse(t);if(j.schema!=='paula-1') throw new Error('Not a PAULA file');P=Object.assign(BLANK(),j);P.t={...DEF_T,...j.t};CUR=null;VIEW='port';log('File opened',f.name);save();render();}catch(err){alert('Could not open: '+err.message);}});};
 if(window.MSfill) P.projects=P.projects.map(p=>MSfill(blankProj(),p));
 P.projects.forEach(p=>{if(!p.country&&p.installation){const g=locate(p.installation);if(g){p.country=g[2];if(!p.lat){p.lat=g[0];p.lon=g[1];}}}});
+// Sure duplicates merge on their own: same project number at the same installation, or the same name (any case or punctuation) at the same installation with no conflicting number. Look-alikes stay in the Possible duplicates panel for you to decide.
+function sureDup(p,q){const ID=window.CorbelID;const n=x=>ID?ID.num(x):numI(x);const si=(ID&&ID.sameInst)?ID.sameInst(p.installation,q.installation):String(p.installation||'').toLowerCase()===String(q.installation||'').toLowerCase();const instOk=si||!p.installation||!q.installation;const n1=n(p.number),n2=n(q.number);
+ if(n1&&n2) return n1===n2&&instOk;return !!nzI(p.name)&&nzI(p.name)===nzI(q.name)&&si;}
+function autoMerge(){const S=storeIds();const done=[];let again=true;while(again){again=false;
+ for(let i=0;i<P.projects.length&&!again;i++) for(let j=i+1;j<P.projects.length;j++){const a=P.projects[i],b=P.projects[j];if(!sureDup(a,b)||(S.includes(a.id)&&S.includes(b.id))) continue;
+  done.push((b.name||'')+(b.number?' ('+b.number+')':'')+' into '+(a.name||'')+(a.number?' ('+a.number+')':''));mergeProj(a,b);again=true;break;}}
+ if(done.length){P.autoMerged=(P.autoMerged||[]).concat(done.map(t=>({t,at:today()}))).slice(-20);save();}return done;}
+autoMerge();
 render();
 // Keep each project's projected finish current for ADAM and the other tools.
 {const sig=()=>JSON.stringify(P.projects.map(p=>p.seq?[p.seq.finish,p.seq.slip]:0));const b0=sig();seqStamp();if(sig()!==b0) save();}
@@ -2159,11 +2191,31 @@ function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0"
 const XL=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
  const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -2208,11 +2260,31 @@ const XL=(function(){
 const DX=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type});}
  const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -2426,11 +2498,31 @@ const DX=(function(){
 const PX=(function(){
  const enc=new TextEncoder();let CRC=null;
  function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&0xFF]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db);const h=new DataView(new ArrayBuffer(30));
-   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,0,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,db.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
-   parts.push(new Uint8Array(h.buffer),nb,db);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,0,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,db.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
-   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+db.length;});
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
   const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
   return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.presentationml.presentation'});}
  const X=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])).replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'');
