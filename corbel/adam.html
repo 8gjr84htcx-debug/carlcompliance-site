@@ -480,7 +480,7 @@ let RD=null;
 function readBox(){const b=$('#rdBox');const on=!!(window.CARLAI&&CARLAI.state().ok);
  b.innerHTML='<div class="sug" style="margin:0 0 12px"><b>Read a posture document</b><p class="small" style="margin:4px 0">A posture statement, budget overview or congressional report as PDF or text. ADAM lists the requirements it states; each must quote the document. Nothing is added until you pick it.</p>'+(on?'<button class="go sm" id="rdPick">Choose a file</button><input type="file" id="rdF" accept=".pdf,.txt" hidden> <span class="small" id="rdSt"></span>':'<span class="small">Sign in to CARL to use this.</span>')+'<div id="rdOut"></div></div>';
  if(!on) return;$('#rdPick').onclick=()=>$('#rdF').click();$('#rdF').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f) return;const st=$('#rdSt');
-  try{st.textContent='Reading '+f.name+'…';const t=await fileText(f);if((t.match(/\S+/g)||[]).length<80) throw new Error('Too little text found');st.textContent='Finding requirements…';
+  try{st.textContent='Reading '+f.name+'…';const t=await fileText(f);if((t.match(/\S+/g)||[]).length<30) throw new Error('Too little text found');st.textContent='Finding requirements…';
    const j=await CARLAI.ask('claude',READ_SYS,t.slice(0,150000),null,{fresh:true});const nt=nz(t);
    RD={file:f.name,items:(j.reqs||[]).filter(x=>x&&x.name&&x.quote&&nt.includes(nz(x.quote))).map(x=>({...x,need:(()=>{let n=/^\d{4}-\d{2}$/.test(String(x.need||''))&&nt.includes(String(x.need).slice(0,4))?x.need:'';if(!n) return '';const y=n.slice(0,4),q=String(x.quote||'');
      // "By 2030" with no month written is the end of that year, never January.

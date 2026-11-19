@@ -422,8 +422,12 @@ function esc(s){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','
 
 // ---------- outputs ----------
 function selected(){const o=[];Object.keys(MODS).filter(k=>MODS[k]).forEach(k=>LAST[k].filter(x=>x.use).forEach(x=>o.push({mod:NAMES[k],x})));return o;}
+// candidates the scope's own systems point to (aviation fuel piping for a hydrant job) go in the outputs too, marked not yet selected, so they are not lost
+function sysOf(w,o){o=o||[];if(!w||typeof w!=='object') return o;if(Array.isArray(w)){w.forEach(v=>sysOf(v,o));return o;}if(Array.isArray(w.has)&&w.has[0]==='systems') o.push(w.has[1]);Object.values(w).forEach(v=>{if(v&&typeof v==='object') sysOf(v,o);});return o;}
+function scopeCands(){const S=new Set([].concat(P.systems||[]));const o=[];if(!S.size) return o;Object.keys(MODS).filter(k=>MODS[k]).forEach(k=>LAST[k].filter(x=>!x.use&&x.st==='sel'&&sysOf(x.r.when).some(v=>S.has(v))).forEach(x=>o.push({mod:NAMES[k],x})));return o;}
 function csv(){const rows=[['Module','Regulation','Number','Title','Status','Reason','Source','Date','Link']];
  selected().forEach(({mod,x})=>{const r=x.r;rows.push([mod,r.reg||r.type||'',r.number||'',r.title,({ok:'Applies',sel:'Candidate (selected)',rev:'Needs ruling',off:'Manually added'})[x.st],x.why||'',r.prescription||r.cite||'',r.date||'',r.url||'']);});
+ scopeCands().forEach(({mod,x})=>{const r=x.r;rows.push([mod,r.reg||r.type||'',r.number||'',r.title,'Candidate for this scope, not yet selected',x.why||'',r.prescription||r.cite||'',r.date||'',r.url||'']);});
  const s=rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');XL.save(projFile('Criteria','xlsx'),[{name:'Criteria',rows}]);}
 function sow(){const sel=selected();let s='APPLICABLE CRITERIA, SPECIFICATIONS, AND CONTRACT CLAUSES\nGenerated '+new Date().toLocaleDateString('en-CA')+' – recommendation for Government review\n';
  const grp={};sel.forEach(({mod,x})=>{(grp[mod]=grp[mod]||[]).push(x);});
@@ -496,6 +500,7 @@ function criteriaDoc(){const sel=selected();const grp={};sel.forEach(({mod,x})=>
  const body=cdBand('Applicable criteria',n||'Criteria list','Recommendation for Government review  ·  '+new Date().toLocaleDateString('en-CA'),'')+
   cdLead('Clause selection is the Contracting Officer’s decision; criteria applicability is confirmed by the design agent. Every item shows why it was included.')+
   Object.keys(grp).map(m=>cdH(m+' ('+grp[m].length+')')+cdTable(['Number','Title','Status','Why','Date'],rows(m),['14%','34%','11%','31%','10%'])).join('')+
+  (()=>{const C=scopeCands();if(!C.length) return '';return cdH('Candidates for this scope, not yet selected ('+C.length+')')+cdLead('These match the systems in this scope. The designer selects the ones the work uses.')+cdTable(['Number','Title','Status','Why','Date'],C.map(({x})=>{const r=x.r;return [e((r.reg?r.reg+' ':'')+(r.number||'')),e(r.title||''),'Candidate',e(x.why||''),e(r.date?String(r.date).slice(0,7):'')];}),['14%','34%','11%','31%','10%']);})()+
   cdFoot('Prepared with Corbel CORA');
  dl(projFile('Criteria-List','doc'),cdDoc('Applicable criteria',[body]),'application/msword');}
 
