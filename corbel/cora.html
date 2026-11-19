@@ -986,8 +986,8 @@ const PX=(function(){
   var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
   if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
   var res=noEm(j.result);useAdd('ai',j.usage,false);cPut(key,res);return res;}
- // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
- async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank,tier,doc}]. o.collection 'programming' searches the programming store (statutes, FMR, budget books) instead of the inspection library.
+ async function library(query,k,o){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var b={query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()};if(o&&o.collection) b.collection=o.collection;var j=await post('/api/library',b);useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
  function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
   if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);

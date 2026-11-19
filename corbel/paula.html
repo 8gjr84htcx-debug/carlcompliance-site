@@ -353,18 +353,95 @@ function note(t){const n=document.getElementById('msnote');if(n) n.textContent=t
 
 // ---- project bar ----
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+// ================= CorbelLaw: the one rulebook every tool reads =================
+// Each figure carries its citation, the library file it was read from, and the date it was checked.
+// Statutes: Cornell LII copies in the MILCON Mastery Reference Library (retrieved 18 Nov 2026; amendments through Pub. L. 119-60, 18 Dec 2025).
+// FMR: DoW 7000.14-R Volumes 2 and 3, September 2026. Where the FMR and the statute differ, the statute governs and both are shown.
+const LAWCHK='19 Nov 2026';
+const USC='Statute text, MILCON Mastery Reference Library (Cornell LII, through Pub. L. 119-60); checked '+LAWCHK;
+const FMR3='DoW FMR Vol 3, Sep 2026; checked '+LAWCHK, FMR2='DoW FMR Vol 2, Sep 2026; checked '+LAWCHK;
+const LAWR={
+ umc:{v:9e6,cite:'10 U.S.C. 2805(a)(2)',what:'Unspecified minor construction ceiling (approved cost)',src:USC},
+ umcCap:{v:14e6,cite:'10 U.S.C. 2805(f)(1)',what:'Highest any 2805 limit can reach after the yearly location adjustment',src:USC},
+ umcApprove:{v:75e4,cite:'10 U.S.C. 2805(b)(1)',what:'Minor construction above this needs the Secretary concerned’s approval in advance',src:USC},
+ umcNotify:{v:6e6,cite:'10 U.S.C. 2805(b)(2)',what:'Minor construction above this: notify the committees within 90 days after obligating funds',src:USC,
+  note:'FMR Vol 3 §15.10.4 (Sep 2026) still says $2 million; the statute was raised and governs.'},
+ umcOM:{v:4e6,cite:'10 U.S.C. 2805(c)',what:'Most that O&M funds can pay for an unspecified minor construction project',src:USC},
+ repair:{v:75e5,cite:'10 U.S.C. 2811(b), (d)',what:'O&M repair above this needs the Secretary’s advance approval and a report to the committees (all phases counted)',src:USC},
+ repair75:{v:75,cite:'10 U.S.C. 2811(d)(2)',what:'Repair estimate above this percent of a replacement project’s cost must be explained in the report',src:USC},
+ repairNoNew:{cite:'10 U.S.C. 2811(c)',what:'No new facilities or additions under the repair authority',src:USC},
+ emerg:{v:5e7,cite:'10 U.S.C. 2803(c)(1)',what:'Emergency construction: most a Secretary may obligate per fiscal year',src:USC},
+ natEmerg:{v:5e8,cite:'10 U.S.C. 2808(c)(1)',what:'National emergency construction: total for all projects during the emergency ($100M if only inside the US)',src:USC},
+ ae:{v:5e6,cite:'10 U.S.C. 2807(b)',what:'Architect-engineer and design above this: notify the committees',src:USC},
+ restoreOM:{v:3e8,cite:'10 U.S.C. 2854(b)(3)',what:'O&M for replacing damaged facilities: most per fiscal year',src:USC},
+ energyOM:{v:1e8,cite:'10 U.S.C. 2914(c)(3)',what:'O&M for energy resilience projects: most per fiscal year',src:USC},
+ costPct:{v:25,cite:'10 U.S.C. 2853(a)',what:'Cost variation: 25% of authorized cost or 200% of the 2805(a) ceiling, whichever is less',src:USC},
+ scopeCut:{v:25,cite:'10 U.S.C. 2853(b)(1)',what:'Scope reduction without waiver; facility must stay complete and usable',src:USC},
+ scopeUp:{v:10,cite:'10 U.S.C. 2853(b)(2), (d)',what:'No scope increase without a waiver and 14-day notice; never more than 10%',src:USC},
+ report:{v:4e7,cite:'10 U.S.C. 2853(c)(1)(E)',what:'Projects over $40M with a cost increase of 25% or more: additional report under 2853(f)',src:USC},
+ bigCap:{v:5e8,cite:'10 U.S.C. 2853(c)(1)(D)',what:'No waiver above 50% on projects over $500M',src:USC},
+ reprog:{v:6e6,pct:25,cite:'DoW FMR Vol 3 §7.2.2',what:'Reprogramming needs prior congressional approval when a cost increase exceeds 25% of the project base or $6M, whichever is less',src:FMR3},
+ pdOut:{cite:'DoW FMR Vol 3 §15.10.5',what:'Planning and design costs are left out when testing a project against the 2805 ceiling',src:FMR3},
+ noSplit:{cite:'DoW FMR Vol 3 §15.10.3, §15.6.1; Vol 2 §2.1.21.2',what:'No incremental construction through a series of minor projects; work on one facility for one purpose is one project',src:FMR3},
+ equip:{cite:'DoW FMR Vol 3 §15.6',what:'Only installed equipment that becomes part of the real property is MILCON; movable and production equipment are not',src:FMR3},
+ fullFund:{cite:'DoW FMR Vol 2 §2.1.3.2',what:'A construction project is fully funded in the year it is procured',src:FMR2},
+ mconYrs:{v:5,cite:'DoW FMR Vol 3 (period of availability)',what:'MILCON appropriations are available for obligation for 5 years',src:FMR3},
+ purpose:{cite:'31 U.S.C. 1301(a)',what:'Funds may be used only for the purposes they were appropriated for',src:USC},
+ time:{cite:'31 U.S.C. 1502(a)',what:'Funds with a fixed period pay only for needs of that period or contracts made in it',src:USC},
+ ada:{cite:'31 U.S.C. 1341(a)',what:'No obligation or spending beyond the amount available (Antideficiency Act)',src:USC}};
+const lawM=n=>'$'+(n>=1e6?(+(n/1e6).toFixed(2))+'M':Math.round(n).toLocaleString());
+const lawN=v=>Number(String(v??'').replace(/[^\d.]/g,''))||0;
+// Findings for one shared-record project. Each: [level 0 info, 1 watch, 2 stop, text, rule id]. Facts in, rules out; no AI.
+function lawCheck(c){const F=[];if(!c) return F;const a=String(c.authority||'');const L=Array.isArray(c.funds)?c.funds:[];
+ const key=l=>String(l.src||'');const isOM=l=>/^(OM|FSRM)$/.test(key(l));const isPD=l=>/^(PD|P&D)$/.test(key(l));
+ const pd=L.filter(isPD).reduce((s,l)=>s+lawN(l.amt),0);
+ const cost=lawN(c.cwe)||lawN(c.authorized)||lawN(c.programmed);const cMin=Math.max(0,cost-pd);
+ const work=/addition|expan|extend|new|replac|construct/i.test(String(c.scope||''))&&!/repair|renovat/i.test(String(c.scope||''))?'new':/repair|renovat/i.test(String(c.scope||''))?'repair':'';
+ const omAmt=L.filter(isOM).reduce((s,l)=>s+lawN(l.amt),0);
+ if(a==='2805'&&cost){
+  if(cMin>LAWR.umc.v) F.push([2,'Cost '+lawM(cMin)+(pd?' (planning and design left out)':'')+' is above the '+lawM(LAWR.umc.v)+' minor construction ceiling. Only a location-adjusted ceiling (never above '+lawM(LAWR.umcCap.v)+') could keep it under 2805; record that figure and its source, or change the authority.','umc']);
+  else{if(cMin>LAWR.umcApprove.v) F.push([0,'Above '+lawM(LAWR.umcApprove.v)+': the Secretary concerned must approve it in advance.','umcApprove']);
+  if(cMin>LAWR.umcNotify.v) F.push([1,'Above '+lawM(LAWR.umcNotify.v)+': notify the committees within 90 days after obligating funds.','umcNotify']);}
+  if(omAmt&&cMin>LAWR.umcOM.v) F.push([2,'O&M funding on a '+lawM(cMin)+' minor construction project: O&M may pay only for projects up to '+lawM(LAWR.umcOM.v)+'.','umcOM']);
+  if(pd) F.push([0,'Planning and design ('+lawM(pd)+') is left out of the ceiling test.','pdOut']);}
+ if(a==='2811'){
+  if(work==='new') F.push([2,'The scope reads as new construction or an addition; the repair authority cannot be used for that.','repairNoNew']);
+  if(cost>LAWR.repair.v) F.push([1,'Repair above '+lawM(LAWR.repair.v)+': the Secretary’s advance approval and a report to the committees are required. Count every phase of a multi-year repair to the facility.','repair']);
+  if(L.some(l=>/^MCON|^MILCON|^UMC/.test(key(l)))) F.push([1,'10 U.S.C. 2811 is an O&M repair authority, but there are MILCON funding lines.','purpose']);}
+ if(a==='2803'&&cost>LAWR.emerg.v) F.push([2,'Emergency construction is limited to '+lawM(LAWR.emerg.v)+' per Secretary per fiscal year; this project alone is '+lawM(cost)+'.','emerg']);
+ if(!a&&omAmt&&work==='new'&&cost>LAWR.umcOM.v) F.push([1,'O&M funding on new work above '+lawM(LAWR.umcOM.v)+': O&M cannot pay for construction above that amount. Record the construction authority.','umcOM']);
+ if(pd>LAWR.ae.v) F.push([0,'Design funding above '+lawM(LAWR.ae.v)+': the committees must be notified before the design work.','ae']);
+ const auth=lawN(c.authorized),e=lawN(c.cwe);
+ if(auth&&e>auth){const g=e-auth,lim=Math.min(auth*LAWR.reprog.pct/100,LAWR.reprog.v);if(g>lim) F.push([1,'Increase of '+lawM(g)+' over the authorized '+lawM(auth)+' exceeds '+lawM(lim)+' (25% or $6M, whichever is less): a reprogramming needs prior congressional approval.','reprog']);}
+ return F;}
+function lawFindingsHTML(F,src){if(!F.length) return '<p style="margin:6px 0">No rule findings for this project from the facts recorded.<\/p>';
+ return F.map((f,i)=>{const r=LAWR[f[2]]||{};return '<div style="border-left:4px solid '+['#7a8a99','#C98A00','#9b2c2c'][f[0]]+';padding:6px 10px;margin:6px 0"><div>'+esc(f[1])+'<\/div><div style="font-size:12px;color:#4f6873">'+esc(r.cite||'')+(r.note?' – '+esc(r.note):'')+(src&&window.CARLAI?' <button data-lawsrc="'+f[2]+'" style="font-size:11.5px;padding:1px 8px;margin-left:6px">Source text<\/button>':'')+'<\/div><div class="lawsrc" id="lawsrc-'+f[2]+'"><\/div><\/div>';}).join('');}
+// The exact passage behind a rule, from CARL's programming collection. Context documents are labelled as background, never authority.
+async function lawSource(id,box){const r=LAWR[id]||{};box.innerHTML='<div style="font-size:12px;color:#4f6873;margin-top:4px">Searching CARL…<\/div>';
+ try{const L=await window.CARLAI.library(r.cite+' '+r.what,4,{collection:'programming'});const want=String(r.cite||'').match(/(\d+) U\.S\.C\. (\d+)|FMR Vol (\d+)/);const key=want?(want[1]?want[1]+'_USC_'+want[2]:'Volume_0'+want[3]):'';
+  const G=L.filter(p=>p.tier==='governing'),M=key?G.filter(p=>String(p.doc||p.src).includes(key)):G;const show=(M.length?M:G).slice(0,2),ctx=L.filter(p=>p.tier==='context').slice(0,1);
+  box.innerHTML=(show.length?show.map(p=>'<blockquote style="margin:6px 0;padding:6px 10px;background:#f4f7f6;border-left:3px solid #1F5566;font-size:12.5px;white-space:pre-wrap">'+esc(String(p.text).slice(0,900))+'<div style="font-size:11.5px;color:#4f6873;margin-top:4px">'+esc(p.src)+(p.page?', page '+p.page:'')+' – governing<\/div><\/blockquote>').join(''):'<div style="font-size:12px;color:#9b2c2c;margin-top:4px">CARL returned no governing passage for this rule. The rulebook figure stands on the citation above; check the source before relying on it.<\/div>')+
+   ctx.map(p=>'<div style="font-size:11.5px;color:#4f6873;margin-top:2px">Background, not authority: '+esc(p.src)+(p.page?', page '+p.page:'')+'<\/div>').join('');}
+ catch(e){box.innerHTML='<div style="font-size:12px;color:#9b2c2c;margin-top:4px">'+esc(/not set up/i.test(String(e.message))?'CARL’s programming collection is not set up yet.':'Could not reach CARL: '+e.message)+'<\/div>';}}
+window.CorbelLaw={rules:LAWR,checked:LAWCHK,v:k=>(LAWR[k]||{}).v,cite:k=>(LAWR[k]||{}).cite,check:lawCheck,html:lawFindingsHTML,
+ asof:'Statutes as amended through Pub. L. 119-60 and DoW FMR Sep 2026, checked '+LAWCHK};
 function bar(){if(!PER.includes(TOOL)) return;const h=document.querySelector('header');if(!h) return;const d=document.createElement('div');d.id='msbar';
  d.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 28px;background:#1F5566;color:#fff;font:13px "Segoe UI",system-ui,sans-serif';h.after(d);refresh();}
+function lawDlg(){const s=loadStore();const P=s.projects[s.active];const c=P?P.core:{};const F=lawCheck(c);const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:20px 22px;max-width:640px;width:92vw;font:14px "Segoe UI",system-ui,sans-serif;color:#10303F';
+ dlg.innerHTML='<h3 style="margin:0 0 4px;font:600 17px Bahnschrift,Segoe UI,sans-serif">Rule checks – '+esc(c.name||'(untitled)')+'<\/h3><p style="margin:0 0 8px;color:#4f6873;font-size:13px">From the recorded authority ('+esc(c.authority?'10 U.S.C. '+c.authority:'not set')+'), funding lines and amounts. Each finding cites the statute or regulation. Corbel flags; the Service and its lawyers decide.<\/p>'+lawFindingsHTML(F,true)+
+ '<details style="margin-top:10px"><summary style="cursor:pointer">The rulebook ('+Object.keys(LAWR).length+' rules)<\/summary><table style="width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px">'+Object.values(LAWR).map(r=>'<tr><td style="border-top:1px solid #dde5e3;padding:4px 6px;white-space:nowrap;vertical-align:top">'+esc(r.cite)+'<\/td><td style="border-top:1px solid #dde5e3;padding:4px 6px">'+esc(r.what)+(r.v!==undefined&&r.v>100?' ('+lawM(r.v)+')':'')+(r.note?'<br><i>'+esc(r.note)+'<\/i>':'')+'<\/td><\/tr>').join('')+'<\/table><p style="font-size:12px;color:#4f6873">'+esc(window.CorbelLaw.asof)+'.<\/p><\/details>'+
+ '<div style="text-align:right;margin-top:12px"><button id="lawx">Close<\/button><\/div>';document.body.appendChild(dlg);dlg.querySelector('#lawx').onclick=()=>{dlg.close();dlg.remove();};dlg.querySelectorAll('[data-lawsrc]').forEach(b=>b.onclick=()=>{b.disabled=true;lawSource(b.dataset.lawsrc,dlg.querySelector('#lawsrc-'+b.dataset.lawsrc));});dlg.showModal();}
 function refresh(){const d=document.getElementById('msbar');if(!d) return;const s=loadStore();const P=s.projects[s.active];const c=P?P.core:{};
  const ids=Object.keys(s.projects).sort((a,b)=>(s.projects[a].core.name||'').localeCompare(s.projects[b].core.name||''));
  d.innerHTML='<span style="opacity:.8">Project<\/span><select id="mssel" style="width:auto;max-width:340px;font-size:13px;padding:3px 6px;border-radius:5px">'+ids.map(id=>'<option value="'+id+'" '+(id===s.active?'selected':'')+'>'+esc(s.projects[id].core.name||'(untitled)')+'<\/option>').join('')+'<\/select>'+
  '<button id="msnew" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">New project<\/button>'+
  '<span style="opacity:.85;flex:1;min-width:200px">'+esc([c.number,c.to,c.installation,(window.CorbelID&&c.service?CorbelID.svc(c.service):c.service),c.fy?'FY'+c.fy:''].filter(has).join(' · ')||'Shared record: title, installation, task order and amounts are entered once and used by every tool')+'<\/span>'+
  '<span id="msnote" style="color:#F2B632"><\/span>'+(()=>{const nn=P?(P.core.pending||[]).length+(P.id===s.active?noraOpen().length:0):0;return nn?'<button id="mspend" style="font-size:12.5px;padding:3px 10px;background:#F2B632;color:#10303F;border:none;font-weight:600">'+nn+' conflicting value'+(nn>1?'s':'')+' to settle<\/button>':'';})()+
+ (()=>{const F=P?lawCheck(P.core):[];const n=F.filter(f=>f[0]>0).length;return '<button id="mslaw" title="Statutory and FMR checks on this project" style="font-size:12.5px;padding:3px 10px;'+(n?'background:#fff;color:#10303F;border:none;font-weight:600':'background:transparent;color:#fff;border-color:rgba(255,255,255,.4)')+'">'+(n?n+' rule flag'+(n>1?'s':''):'Rules')+'<\/button>';})()+
  '<button id="msmore" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">Projects…<\/button>';
  d.querySelector('#mssel').onchange=e=>sw(e.target.value);
  d.querySelector('#msnew').onclick=()=>{const n=prompt('Name of the new project');if(!n) return;const s2=loadStore();flush(s2);const id=uid();s2.projects[id]={id,core:{name:n.trim()},tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
- d.querySelector('#msmore').onclick=manage;const pb=d.querySelector('#mspend');if(pb) pb.onclick=settle;}
+ d.querySelector('#msmore').onclick=manage;const lb=d.querySelector('#mslaw');if(lb) lb.onclick=lawDlg;const pb=d.querySelector('#mspend');if(pb) pb.onclick=settle;}
 // One place to settle what two tools disagree on: the record's value, the other tool's value, choose one.
 window.MSsettle=()=>settle();
 // NORA's open "sources disagree" items belong in the same settlement prompt, with both speakers and their authority.
@@ -615,16 +692,9 @@ const INST={'andersen':[13.58,144.93,'Guam'],'naval base guam':[13.44,144.65,'Gu
 function locate(inst){const t=String(inst||'').toLowerCase();const k=Object.keys(INST).sort((a,b)=>b.length-a.length).find(k=>t.includes(k));return k?INST[k]:null;}
 
 // ---------- state ----------
-const DEF_T={costWatch:5,costCrit:10,slipWatch:30,slipCrit:90,spiWatch:.9,spiCrit:.8,riskWatch:8,riskCrit:15,actWatch:1,actCrit:3,stale:30,umc:9000000,fundsWatch:3};
-// Statutory figures the checks rely on, each with its source. Checked against the U.S. Code (Cornell LII) on 16 Nov 2026.
-const LAW={asof:'U.S. Code as published by Cornell LII, checked 16 Nov 2026',
- umc:{v:9000000,cite:'10 U.S.C. 2805(a)(2)',what:'Unspecified minor construction ceiling'},
- umcCap:{v:14000000,cite:'10 U.S.C. 2805(f)(1)',what:'Highest ceiling after the yearly area cost index adjustment by location'},
- costPct:{v:25,cite:'10 U.S.C. 2853(a)',what:'Cost variation: 25% of authorized cost or 200% of the 2805(a) ceiling, whichever is less'},
- scopeCut:{v:25,cite:'10 U.S.C. 2853(b)(1)',what:'Scope reduction without waiver; facility must stay complete and usable'},
- scopeUp:{v:10,cite:'10 U.S.C. 2853(b)(2), (d)',what:'No scope increase without a waiver and 14-day notice; never more than 10%'},
- report:{v:40000000,cite:'10 U.S.C. 2853(c)(1)(E)',what:'Projects over $40M with a cost increase of 25% or more: additional report under 2853(f)'},
- bigCap:{v:500000000,cite:'10 U.S.C. 2853(c)(1)(D)',what:'No waiver above 50% on projects over $500M'}};
+const DEF_T={costWatch:5,costCrit:10,slipWatch:30,slipCrit:90,spiWatch:.9,spiCrit:.8,riskWatch:8,riskCrit:15,actWatch:1,actCrit:3,stale:30,umc:window.CorbelLaw.v('umc'),fundsWatch:3};
+// Statutory figures come from the shared rulebook (CorbelLaw in the shared record script), so every tool uses the same numbers.
+const LAW=(()=>{const R=window.CorbelLaw.rules;const o={asof:window.CorbelLaw.asof};['umc','umcCap','costPct','scopeCut','scopeUp','report','bigCap'].forEach(k=>o[k]=R[k]);return o;})();
 const BLANK=()=>({schema:'paula-1',created:new Date().toISOString(),projects:[],t:{...DEF_T},me:'',log:[]});
 let P=load()||BLANK();
 // One Service and installation name per project (shared with every Corbel tool).
@@ -687,10 +757,10 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  else add('Funds',-1,F?'No current estimate yet':'Funds available not recorded');
  // 3 Scope: against the 1391 justification data (10 U.S.C. 2853(b), (d)).
  const sa=N(p.scope_auth),sn=N(p.scope_now),su=p.scope_unit||'';if(sa&&sn){const g=(sn-sa)/sa*100;
-  if(g<-LAW.scopeCut.v) add('Scope',2,'Cut '+Math.abs(g).toFixed(1)+'% – beyond the 25% limit of '+LAW.scopeCut.cite+'; needs a waiver and notice');
-  else if(g>LAW.scopeUp.v) add('Scope',2,'Up '+g.toFixed(1)+'% – no waiver can approve more than 10% ('+LAW.scopeUp.cite+')');
+  if(g<-LAW.scopeCut.v) add('Scope',2,'Cut '+Math.abs(g).toFixed(1)+'% – beyond the '+LAW.scopeCut.v+'% limit of '+LAW.scopeCut.cite+'; needs a waiver and notice');
+  else if(g>LAW.scopeUp.v) add('Scope',2,'Up '+g.toFixed(1)+'% – no waiver can approve more than '+LAW.scopeUp.v+'% ('+LAW.scopeUp.cite+')');
   else if(g>0) add('Scope',1,'Up '+g.toFixed(1)+'% – needs a waiver and 14-day congressional notice ('+LAW.scopeUp.cite+')');
-  else if(g<0) add('Scope',0,'Cut '+Math.abs(g).toFixed(1)+'%, within 25% – facility must stay complete and usable');
+  else if(g<0) add('Scope',0,'Cut '+Math.abs(g).toFixed(1)+'%, within '+LAW.scopeCut.v+'% – facility must stay complete and usable');
   else add('Scope',0,'As in the 1391: '+sn.toLocaleString()+' '+su);}
  else if(p.scope||p.qty) add('Scope',0,'Project record: '+[p.scope,p.qty].filter(Boolean).join(', ')+'. Enter the authorized and current scope quantities to check growth against '+LAW.scopeUp.cite.split(',')[0]+'.');
   else add('Scope',-1,'Scope not recorded');
@@ -1923,7 +1993,7 @@ function seqRows(){const L=filtered();const I=depIssues();return [{name:'Depende
  {name:'Bundling candidates',rows:[['Installation','Projects','Combined cost','Why']].concat(bundles().map(b=>[b.site,b.ps.map(q=>q.name+' (FY'+q.fy+')').join('; '),Math.round(b.cost),b.why]))}];}
 
 // ================= FUNDING, AUTHORITY, PROGRAMMING AND READINESS (shared record, schema 2) =================
-const CHECKED='18 Nov 2026';
+const CHECKED=window.CorbelLaw.checked;
 const MCA='MILCON appropriations acts make funds available until 30 Sep of FY+4 (FY25 act, checked '+CHECKED+')';
 // Accounts: key, label, path (us = US appropriation pipeline, hn = host-nation path), years available for obligation (null = not verified), basis
 const ACCTS=[['MCON-A','MILCON, Army','us',5,MCA],['MCON-N','MILCON, Navy and Marine Corps','us',5,MCA],['MCON-AF','MILCON, Air Force','us',5,MCA],['MCON-DW','MILCON, Defense-Wide','us',5,MCA],
@@ -1945,12 +2015,12 @@ const isHN=l=>ACC(l.src)[2]==='hn';
 function fundSum(p,fn){return funds(p).filter(fn||(()=>true)).reduce((a,l)=>a+N(l.amt),0);}
 // Construction authority, separate from the appropriation. Scope summaries from the U.S. Code, checked on the date shown.
 const AUTH=[['2802','10 U.S.C. 2802 – Military construction project authorized by law (line item)','U.S. Code via govinfo, checked '+CHECKED],
- ['2803','10 U.S.C. 2803 – Emergency construction; no more than $50,000,000 per Secretary per fiscal year, from unobligated MILCON funds','U.S. Code via govinfo, checked '+CHECKED],
+ ['2803','10 U.S.C. 2803 – Emergency construction; no more than $'+(CorbelLaw.v('emerg')/1e6)+'M per Secretary per fiscal year, from unobligated MILCON funds',CorbelLaw.cite('emerg')+'; '+CorbelLaw.asof],
  ['2804','10 U.S.C. 2804 – Contingency construction (Secretary of Defense); notice to the committees and a wait before work starts','U.S. Code via govinfo, checked '+CHECKED],
- ['2805','10 U.S.C. 2805 – Unspecified minor construction; ceiling '+'$'+(LAW.umc.v/1e6)+'M ('+LAW.umc.cite+')',LAW.asof],
- ['2808','10 U.S.C. 2808 – Construction during a declaration of war or a national emergency requiring use of the armed forces','Scope summary not re-verified this session – assumption'],
- ['2811','10 U.S.C. 2811 – Repair with O&M funds; repairs over $7,500,000 need the Secretary’s prior approval; no new construction or additions','U.S. Code via govinfo, checked '+CHECKED],
- ['2854','10 U.S.C. 2854 – Restore or replace damaged or destroyed facilities; notice above the minor construction amount; O&M replacements capped at $300,000,000 per fiscal year (Pub. L. 119-60)','U.S. Code, as amended Dec 2025, checked '+CHECKED],
+ ['2805','10 U.S.C. 2805 – Unspecified minor construction; ceiling $'+(LAW.umc.v/1e6)+'M ('+LAW.umc.cite+'); O&M may fund up to $'+(CorbelLaw.v('umcOM')/1e6)+'M',LAW.asof],
+ ['2808','10 U.S.C. 2808 – Construction during a declaration of war or a national emergency requiring use of the armed forces; total $'+(CorbelLaw.v('natEmerg')/1e6)+'M per emergency ($100M if only inside the US)',CorbelLaw.cite('natEmerg')+'; '+CorbelLaw.asof],
+ ['2811','10 U.S.C. 2811 – Repair with O&M funds; repairs over $'+(CorbelLaw.v('repair')/1e6)+'M need the Secretary’s prior approval and a report; no new construction or additions',CorbelLaw.cite('repair')+'; '+CorbelLaw.asof],
+ ['2854','10 U.S.C. 2854 – Restore or replace damaged or destroyed facilities; notice above the minor construction amount; O&M replacements capped at $'+(CorbelLaw.v('restoreOM')/1e6)+'M per fiscal year',CorbelLaw.cite('restoreOM')+'; '+CorbelLaw.asof],
  ['HN','Host-nation arrangement – built under a bilateral agreement, not US construction authority',''],['OTHER','Other authority','']];
 const AUTHN=k=>(AUTH.find(a=>a[0]===k)||[k,k||'Not set'])[1];
 const PROG=[['requirement','Requirement'],['pom','In the POM'],['fydp','In the FYDP'],['pb','In the President’s Budget'],['authorized','Authorized'],['appropriated','Appropriated'],['obligated','Obligated'],['deferred','Deferred'],['cut','Cut']];
@@ -1966,9 +2036,11 @@ function dPct(p){const g=(p.gates||{}).design||{};if(g.pct!==undefined&&g.pct!==
 function gateOf(p,k){const g=(p.gates||{})[k]||{};if(k==='design'&&!['blocked','na'].includes(g.st)){const d=dPct(p);if(d){const st=d.v>=100?'done':d.v>0?'progress':'notstarted';return {...g,st,pct:d.v,date:g.date||d.date||'',src:d.src==='entered'?(g.src||''):d.src,auto:d.src!=='entered',derived:true};}}if(!g.st){if(k==='v1391'){const m=(p.milestones||[]).find(x=>x.name==='1391 validated'&&x.actual);if(m) return {st:'done',date:m.actual,src:'Project milestone',auto:true};}
   if(k==='pd'&&funds(p).some(l=>l.src==='PD'&&SI(l.stage)>=SI('appropriated'))) return {st:'done',src:'Funding line',auto:true};}return g;}
 const EXT=[['gpa','Guam Power Authority capacity'],['gwa','Guam Waterworks capacity'],['env','Environmental decision'],['hn','Host-nation approval'],['h2b','H-2B labor'],['longlead','Long-lead material'],['other','Other']];
+// The shared rulebook's checks on a PAULA project (funding lines normalized; e = the cost being tested).
+function lawOf(p,e){return CorbelLaw.check({authority:p.authority,funds:funds(p),scope:p.scope,cwe:e||est(p)||value(p),authorized:isAuth(p)?p.authorized:'',programmed:p.programmed});}
 function fundFlags(p){const F=[];const e=est(p)||value(p),auth=N(p.authorized),cf=curFY();const L=funds(p);const us=L.filter(l=>!isHN(l));
  if(auth&&e>auth){const g=e-auth,lim=Math.min(auth*LAW.costPct.v/100,2*LAW.umc.v);if(g>lim) F.push([2,'Cost growth of '+M(g)+' (+'+Math.round(g/auth*100)+'%) over the authorized '+M(auth)+' is more than '+LAW.costPct.cite+' allows without notice to Congress (limit '+M(lim)+').',LAW.costPct.cite]);
-  if(auth>LAW.report.v&&g/auth>=.25) F.push([2,'Over $40M with a 25%+ cost increase: an additional report is due.',LAW.report.cite]);}
+  if(auth>LAW.report.v&&g/auth>=.25) F.push([2,'Over $'+(LAW.report.v/1e6)+'M with a 25%+ cost increase: an additional report is due.',LAW.report.cite]);}
  const ap=us.filter(l=>l.src!=='PD'&&SI(l.stage)>=SI('appropriated')).reduce((a,l)=>a+N(l.amt),0);if(ap&&N(p.phase)>=5&&e-ap>Math.max(ap*.05,1e6)&&!L.some(isHN)) F.push([e-ap>ap*.1?2:1,'Funding shortfall of '+M(e-ap)+' (+'+Math.round((e-ap)/ap*100)+'%): '+M(ap)+' appropriated or obligated against a '+M(e)+' estimate. Gaps under 5% are left to contingency.','']);
  us.forEach(l=>{if(l.stage!=='appropriated') return;const a=ACC(l.src);const yrs=a[3];if(!yrs) return;const last=N(l.fy)+yrs-1;const left=dd(today(),last+'-09-30');
   if(left<0) F.push([2,M(N(l.amt))+' of FY'+l.fy+' '+a[1]+' funds expired for new obligations on 30 Sep '+last+'.',a[4]]);else if(left<=365) F.push([1,M(N(l.amt))+' of FY'+l.fy+' '+a[1]+' funds must be obligated by 30 Sep '+last+' ('+left+' days).',a[4]]);});
@@ -1976,6 +2048,7 @@ function fundFlags(p){const F=[];const e=est(p)||value(p),auth=N(p.authorized),c
  if(N(p.fy)&&N(p.fy)<cf&&!N(p.award)&&!L.some(isHN)&&!['deferred','cut'].includes(progOf(p))&&!us.some(l=>SI(l.stage)>=SI('authorized'))) F.push([1,'FY'+p.fy+' has passed with no authorization or appropriation recorded.','']);
  const ps=progOf(p);if(ps==='appropriated'&&!us.some(l=>SI(l.stage)>=SI('appropriated'))&&us.length) F.push([1,'Programming status says appropriated, but no funding line is appropriated.','']);
  if(['2802'].includes(p.authority)&&us.length&&us.every(l=>l.src==='OM')) F.push([1,'Line-item MILCON authority with only O&M funding lines – check the funding path.','']);
+ lawOf(p).filter(f=>f[2]!=='umc'||p.authority!=='2805').forEach(f=>F.push([f[0],f[1],CorbelLaw.cite(f[2])]));
  return F;}
 let FX=null;
 function fyWin(L){const cf=curFY();const ys=L.flatMap(p=>funds(p).map(l=>N(l.fy))).filter(Boolean);const a=Math.max(Math.min(cf-2,...ys),cf-4),b=cf+5;const o=[];for(let y=a;y<=b;y++) o.push(y);return o;}
@@ -2062,8 +2135,7 @@ function gateCheck(p){const W=[],B=[];const e=scenCost(p)||est(p)||value(p);cons
  if(ps==='cut') B.push(['Cut from the program','Programming status']);
  if(ps==='deferred') B.push(['Deferred out of this program','Programming status']);
  if(!us.length&&!N(p.programmed)&&!N(p.authorized)) B.push(['No funding path: no funding line and no programmed amount','Funding lines']);
- if(p.authority==='2805'&&e>LAW.umc.v) B.push(['Cost '+M(e)+' is above the '+M(LAW.umc.v)+' unspecified minor construction ceiling, so 10 U.S.C. 2805 cannot be the authority',LAW.umc.cite]);
- if(p.authority==='2811'&&us.some(l=>/^MCON/.test(l.src))) W.push(['10 U.S.C. 2811 is an O&M repair authority, but the funding lines are MILCON – check the path','Programming tab']);
+ lawOf(p,e).forEach(f=>{if(f[0]===2) B.push([f[1],CorbelLaw.cite(f[2])]);else if(f[0]===1) W.push([f[1],CorbelLaw.cite(f[2])]);});
  if(p.authority==='HN'&&us.length) W.push(['Host-nation authority with US funding lines – check the path','Programming tab']);
  if(!p.authority) W.push(['No construction authority recorded','Programming tab']);
  GATES.forEach(([k,n])=>{const g=gateOf(p,k);if(g.st==='blocked') B.push([n+' is blocked'+(g.owner?' ('+g.owner+')':''),'Readiness gate'+(g.src?': '+g.src:'')]);});
@@ -2787,8 +2859,8 @@ const PX=(function(){
   var j=await post('/api/assist',{engine:engine,system:sys||'',user:user||'',images:(images||[]).slice(0,8),tool:TOOL()});
   if(!j.result||typeof j.result!=='object') throw new Error('CARL returned no JSON');
   var res=noEm(j.result);useAdd('ai',j.usage,false);cPut(key,res);return res;}
- // Verbatim passages from CARL's library: [{src,section,page,text,rank}]
- async function library(query,k){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var j=await post('/api/library',{query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()});useAdd('library');return j.passages||[];}
+ // Verbatim passages from CARL's library: [{src,section,page,text,rank,tier,doc}]. o.collection 'programming' searches the programming store (statutes, FMR, budget books) instead of the inspection library.
+ async function library(query,k,o){if(!cuiOk()) throw new Error('Cancelled – nothing was sent.');var b={query:String(query||'').slice(0,2000),k:k||8,tool:TOOL()};if(o&&o.collection) b.collection=o.collection;var j=await post('/api/library',b);useAdd('library');return j.passages||[];}
  function usageText(){var U=useGet()[proj()]||{},L=[];Object.keys(U).forEach(function(t){var r=U[t];L.push(t+': '+r.calls+' AI calls ('+Math.round((r.in+r.out)/1000)+'K tokens), '+r.cached+' from cache, '+r.library+' library searches');});return L.length?L.join('\n'):'No CARL AI use in this project yet.';}
  function badge(){var bar=document.getElementById('msbar')||document.body,b=document.getElementById('carlai');
   if(!b){b=document.createElement('span');b.id='carlai';b.style.cssText='margin-left:auto;font-size:12px;padding:2px 8px;border-radius:10px;white-space:nowrap;cursor:default'+(bar===document.body?';position:fixed;right:14px;bottom:12px;z-index:50;box-shadow:0 1px 4px rgba(0,0,0,.2)':'');bar.appendChild(b);
