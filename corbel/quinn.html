@@ -838,7 +838,7 @@ function sumKey(scope=R.scope,key=R.key){return scope+'|'+key+'|'+R.from+'|'+R.t
 function sumGet(scope,key){return (Q.summaries||{})[sumKey(scope,key)]||null;}
 const SUM_SYS=`You summarize a consolidated construction inspection report (AF IMT 1477 records) for a Government COR or program manager. Write two or three short paragraphs in plain, factual language: coverage and gaps in inspection days, the open deficiencies that matter most and how long they have been open, what was corrected, and anything that needs the reader's attention. Use ONLY facts in the REPORT. Do not list or count buildings that have no inspection reports in the period. Do not add causes, recommendations of contract action, or anything the report does not say. No references to AI.
 Return ONLY JSON: {"summary":"the paragraphs, separated by a blank line"}`;
-async function writeSummary(quiet){if(!window.CARLAI||!CARLAI.state().ok){if(quiet) return;alert('Sign in to CARL (carl.carlcompliance.com) to write the summary with AI, then reload this page.');return;}
+async function writeSummary(quiet){if(!window.CARLAI||!CARLAI.state().ok){if(quiet) return;alert('Sign in again (Face ID) to write the summary with AI, then reload this page.');return;}
  const prev=(Q.summaries||{})[sumKey()];if(prev) delete Q.summaries[sumKey()];
  const tmp=document.createElement('div');tmp.innerHTML=reportFor(R.scope,R.key).replace(/<\/(p|h3|h4|tr)>/g,'\n').replace(/<\/t[dh]>/g,' | ');const txt=tmp.textContent.replace(/\n{3,}/g,'\n\n').slice(0,120000);
  const b=$('#bSum')||{};b.disabled=true;b.textContent='Writing…';const mm=$('#sumMsg');if(mm) mm.textContent='Writing the summary and checking every number against the report…';
@@ -1396,7 +1396,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -1418,13 +1418,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -1439,8 +1439,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});

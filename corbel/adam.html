@@ -478,7 +478,7 @@ At most 15, most specific first. Use only what the document states; leave need e
 const nz=s=>String(s||'').toLowerCase().replace(/[‘’]/g,"'").replace(/[“”]/g,'"').replace(/\s+/g,' ').trim();
 let RD=null;
 function readBox(){const b=$('#rdBox');const on=!!(window.CARLAI&&CARLAI.state().ok);
- b.innerHTML='<div class="sug" style="margin:0 0 12px"><b>Read a posture document</b><p class="small" style="margin:4px 0">A posture statement, budget overview or congressional report as PDF or text. ADAM lists the requirements it states; each must quote the document. Nothing is added until you pick it.</p>'+(on?'<button class="go sm" id="rdPick">Choose a file</button><input type="file" id="rdF" accept=".pdf,.txt" hidden> <span class="small" id="rdSt"></span>':'<span class="small">Sign in to CARL to use this.</span>')+'<div id="rdOut"></div></div>';
+ b.innerHTML='<div class="sug" style="margin:0 0 12px"><b>Read a posture document</b><p class="small" style="margin:4px 0">A posture statement, budget overview or congressional report as PDF or text. ADAM lists the requirements it states; each must quote the document. Nothing is added until you pick it.</p>'+(on?'<button class="go sm" id="rdPick">Choose a file</button><input type="file" id="rdF" accept=".pdf,.txt" hidden> <span class="small" id="rdSt"></span>':'<span class="small">Sign in again (Face ID) to use this.</span>')+'<div id="rdOut"></div></div>';
  if(!on) return;$('#rdPick').onclick=()=>$('#rdF').click();$('#rdF').onchange=async e=>{const f=e.target.files[0];e.target.value='';if(!f) return;const st=$('#rdSt');
   try{st.textContent='Reading '+f.name+'…';const t=await fileText(f);if((t.match(/\S+/g)||[]).length<30) throw new Error('Too little text found');st.textContent='Finding requirements…';
    const j=await CARLAI.ask('claude',READ_SYS,t.slice(0,150000),null,{fresh:true});const nt=nz(t);
@@ -1011,7 +1011,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -1033,13 +1033,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -1054,8 +1054,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});

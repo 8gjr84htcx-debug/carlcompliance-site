@@ -880,7 +880,7 @@ Return ONLY JSON:
 "s12":{"acq":"acquisition strategy","ds":"design start date YYYY-MM","pct":"percent design complete","asof":"as-of date of that percent YYYY-MM","d35":"35% design date YYYY-MM","dc":"date DESIGN complete (not construction) YYYY-MM","dcost":"total design cost $000","energy":"Yes|No|","std":"standard or definitive design used: Yes|No|","award":"contract award date YYYY-MM","start":"construction start YYYY-MM","complete":"CONSTRUCTION complete date YYYY-MM","fci":"facility condition index"}}
 Copy text and numbers exactly; leave anything not on the form empty. Contingency, SIOH and design go in "markup" lines and in cont, sioh, design.`;
 let XR=null;
-async function read1391(f){if(!aiOn()){alert('Sign in to CARL to read a 1391.');return;}const st=$('#rStat');const say=t=>{if(st) st.textContent=t;};
+async function read1391(f){if(!aiOn()){alert('Sign in again (Face ID) to read a 1391.');return;}const st=$('#rStat');const say=t=>{if(st) st.textContent=t;};
  try{say('Reading '+f.name+'…');const r=await readAny(f,say);const text=r.text;if((text.match(/\S+/g)||[]).length<30) throw new Error('Too little text found');
   say('Extracting the blocks…');const j=await CARLAI.ask('claude',X1391_SYS(),'1391:\n'+text.slice(0,120000),null,{fresh:true});
   const bad=[];const chk=(v,lbl)=>{const x=String(v??'').replace(/[,$]/g,'').trim();if(x&&/\d/.test(x)&&!String(text).replace(/[,$]/g,'').includes(x.replace(/\.0+$/,''))) bad.push(lbl+' '+v);};
@@ -921,7 +921,7 @@ function the1391(){const C=calc(),n=P.n,L=[];L.push('Blocks 1-8: '+[P.b.componen
  L.push('Block 9: primary facility '+(P.pf.guc_name||'')+' '+(C.qty||'')+' '+(P.pf.um||''));(C.prim||[]).forEach(x=>L.push('  primary item: '+x.item+' '+(x.qty||'')+' '+(x.um||'')));(C.sup||[]).forEach(x=>L.push('  supporting: '+x.item+' '+(x.qty||'')+' '+(x.um||'')+(x.cost?' $'+Math.round(x.cost).toLocaleString():'')));
  L.push('Block 10: '+(n.desc||''));L.push('Block 11 Project: '+(n.project||''));L.push('Requirement: '+(n.requirement||''));L.push('Current situation: '+(n.current||''));L.push('Impact if not provided: '+(n.impact||''));L.push('Additional: '+(n.additional||''));
  L.push('Block 12: '+Object.entries(P.s12).filter(([k,v])=>v).map(([k,v])=>k+' '+v).join('; '));return L.join('\n');}
-async function aiReview(q){if(!aiOn()){if(!q) alert('Sign in to CARL to run the AI review.');return;}const b=$('#bRev');if(b){b.disabled=true;b.textContent='Reviewing…';}
+async function aiReview(q){if(!aiOn()){if(!q) alert('Sign in again (Face ID) to run the AI review.');return;}const b=$('#bRev');if(b){b.disabled=true;b.textContent='Reviewing…';}
  try{const t=the1391();const j=await CARLAI.ask('claude',REV_SYS,'THE 1391:\n'+t+'\n\nRECORD:\n'+recordText().slice(0,40000),null,{fresh:true});
   P.ai_rev=(j.findings||[]).filter(x=>x&&x.title).map(x=>({s:x.severity==='bad'?'bad':'warn',t:'AI review: '+String(x.title),d:String(x.detail||'')+(x.quote&&inSrc(t,x.quote)?' (“'+x.quote+'”)':''),}));P.ai_rev_at=new Date().toISOString();P.ai_rev_sig=sig1391();
   log('AI red-team review',P.ai_rev.length+' findings');save();}
@@ -932,7 +932,7 @@ function sig1391(){const t=the1391();let h=0;for(let i=0;i<t.length;i++) h=(h*31
 // ---------- Reviewer questions ----------
 const ANS_SYS=`You draft the answer to a reviewer's question about a DoD military construction project (DD Form 1391). Answer directly in the first sentence, then support it with facts. Use ONLY facts in THE 1391 and RECORD; where a fact is missing write [NEEDED: what]. Plain, factual, under 150 words, no references to AI.
 Return ONLY JSON: {"answer":"..."}`;
-async function aiAnswer(it){if(!aiOn()){alert('Sign in to CARL to draft answers with AI.');return;}if(!String(it.q||'').trim()){alert('Type the question first.');return;}
+async function aiAnswer(it){if(!aiOn()){alert('Sign in again (Face ID) to draft answers with AI.');return;}if(!String(it.q||'').trim()){alert('Type the question first.');return;}
  if(String(it.a||'').trim()&&!confirm('Replace the current answer?')) return;
  try{const src='THE 1391:\n'+the1391()+'\n\nRECORD:\n'+recordText().slice(0,40000);const j=await CARLAI.ask('claude',ANS_SYS,src+'\n\nQUESTION: '+it.q,null,{fresh:true});const a=String(j.answer||'').trim();if(!a) throw new Error('Nothing returned');
   it.a=a;const bad=numsNotIn(a,src+'\n'+it.q);it.check=bad.length?'Check these numbers, not found in the 1391 or the record: '+bad.join(', '):'Every number traces to the 1391 or the record.';it.status=it.status==='open'?'answered':it.status;log('Answer drafted with AI',String(it.q).slice(0,60));save();}
@@ -952,7 +952,7 @@ function vBuild(){const v=$('#view');const n=nora(),e=earl();const r=e&&e.alts.f
  const have=[['NORA requirements',n?((n.requirements||[]).filter(x=>x.status!=='withdrawn').length+' requirements, '+(n.gaps||[]).length+' gaps'+(n.need_statement?', need statement':'')):'none'],['EARL recommendation',r?r.name+(r.price&&r.price.guc!==''?' (priced)':''):'none'],['Location',e&&e.price&&e.price.loc?e.price.loc.label:n&&n.project&&n.project.installation||'none']];
  v.innerHTML='<div class="panel"><h2>Build my 1391</h2><p class="lead">PIPER fills the DD Form 1391 from what NORA and EARL already hold: header, location and area cost factor, the priced primary facility, blocks 10 and 11. AI proposes the category code, the supporting facilities priced from UFS 3-701-01 Table 6, the acquisition strategy, and a block 12 schedule from the program year, each labelled for you to confirm. Then a red-team reviewer reads it the way OSD and congressional staff will.</p>'+
   '<table style="max-width:640px"><tbody>'+have.map(([a,b])=>'<tr><td>'+a+'</td><td>'+esc(b)+'</td></tr>').join('')+'</tbody></table>'+
-  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> Without it PIPER still copies everything NORA and EARL hold.')+'</div>'+
+  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in.':'<b>Sign in again (Face ID) to use AI.</b> Without it PIPER still copies everything NORA and EARL hold.')+'</div>'+
   (noCap?'<div class="find bad"><b>EARL’s recommended alternative has no construction cost.</b> '+esc(r.name)+' carries only '+((r.costs||[]).filter(c=>N(c.amount)>0).map(c=>c.cat).filter((x,i,a)=>a.indexOf(x)===i).join(', ')||'no costs')+'. Price its construction in EARL (step 4: facility type, size and the share renewed), then build. PIPER does not build block 9 from nothing.</div>':'')+'<div class="row"><button class="go" id="bB"'+(noCap?' disabled':'')+'>'+(P.built?'Build again (fills only what is empty)':'Build my 1391')+'</button><span class="small" id="bStat"></span></div></div>'+
   '<div class="panel"><h2>Review a 1391 someone else prepared</h2><p class="lead">Drop in the Service’s 1391 (PDF or Word). AI reads blocks 1 to 12 and the block 9 lines; PIPER checks every number against the form, rebuilds the estimate from UFS 3-730-01 and runs the red team against it.</p>'+
   '<label id="rdrop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer"><b>Drop the 1391 here or click to choose</b><br><span class="small">PDF or Word (.docx); scanned pages are read by AI</span><input type="file" id="rFile" accept=".pdf,.docx,.txt" hidden></label><div class="small" id="rStat"></div>'+
@@ -985,7 +985,7 @@ Return ONLY JSON: {"field":"","text":"the complete new field text","note":"one l
 let FIX=null;
 function fieldGet(f){return f==='notes'?P.pf.notes:f==='acq'?P.s12.acq:P.n[f];}
 function fieldSet(f,t){if(f==='notes') P.pf.notes=t;else if(f==='acq') P.s12.acq=t;else P.n[f]=t;}
-async function aiFix(i){if(!aiOn()){alert('Sign in to CARL to fix findings with AI.');return;}const x=findings()[i];if(!x) return;const b=document.querySelector('[data-fix="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
+async function aiFix(i){if(!aiOn()){alert('Sign in again (Face ID) to fix findings with AI.');return;}const x=findings()[i];if(!x) return;const b=document.querySelector('[data-fix="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
  try{const src='THE 1391:\n'+the1391()+'\nBasis notes: '+(P.pf.notes||'')+'\nJoint use: '+(P.n.joint||'')+'\n\nRECORD:\n'+recordText().slice(0,40000)+'\n\n'+srcText10();
   const j=await CARLAI.ask('claude',FIX_SYS,src+'\n\nFINDING: '+x.t+' – '+x.d,null,{fresh:true});
   const f=String(j.field||'');FIX={i,t:x.t,field:FIXF[f]?f:'',text:String(j.text||'').trim(),note:String(j.note||''),bad:FIXF[f]?numsNotIn(j.text,src):[]};}
@@ -1032,7 +1032,7 @@ function goFix(st){STEP=st;render();window.scrollTo(0,0);}
 const FIXALL_SYS=`You fix the wording findings a red-team review raised on a DD Form 1391. Given FINDINGS, THE 1391 and RECORD, rewrite only the fields that resolve them, keeping everything already right in each field. Fields: desc (block 10), project, requirement, current, impact, additional (block 11), joint (joint use certification). Use ONLY facts in THE 1391 and RECORD; where a fact the text needs is missing, write [NEEDED: what]. Keep each block 11 paragraph to what a reviewer reads in a minute; say what mission stops, by when and for whom, with the numbers the record gives. A certification only the installation can make (joint use) is written in standard wording ending with [NEEDED: confirm with the installation]. No references to AI.
 Return ONLY JSON: {"fields":{"<field>":"the complete new text"},"notes":["finding: what changed"]}`;
 let FIXALL=null;
-async function fixAll(){if(!aiOn()){alert('Sign in to CARL to fix findings with AI.');return;}const F=findings().filter(x=>!goStep(x));if(!F.length) return;const b=$('#bFixAll');if(b){b.disabled=true;b.textContent='Working on '+F.length+' findings…';}
+async function fixAll(){if(!aiOn()){alert('Sign in again (Face ID) to fix findings with AI.');return;}const F=findings().filter(x=>!goStep(x));if(!F.length) return;const b=$('#bFixAll');if(b){b.disabled=true;b.textContent='Working on '+F.length+' findings…';}
  try{const src='THE 1391:\n'+the1391()+'\nJoint use: '+(P.n.joint||'')+'\n\nRECORD:\n'+recordText().slice(0,40000)+'\n\n'+srcText10();
   const j=await CARLAI.ask('claude',FIXALL_SYS,src+'\n\nFINDINGS:\n'+F.map((x,i)=>(i+1)+'. '+x.t+(x.d?' – '+x.d:'')).join('\n'),null,{fresh:true});
   const fl={};Object.entries(j.fields||{}).forEach(([k,v])=>{if(['desc','project','requirement','current','impact','additional','joint'].includes(k)&&String(v||'').trim()&&String(v).trim()!==String(fieldGet(k)||'').trim()) fl[k]={text:String(v).trim(),bad:numsNotIn(v,src)};});
@@ -1202,7 +1202,7 @@ function srcText10(){const C=calc(),L=[];let cs=null;try{cs=JSON.parse(localStor
  if(P.n.desc) L.push('AUTHOR DRAFT: '+P.n.desc);return L.join('\n');}
 const DRAFT10_SYS=`You draft block 10 (Description of Proposed Construction) of a DD Form 1391. One paragraph: what is constructed, its size, the primary and supporting facilities, and the governing criteria it will meet. Name only criteria listed in SOURCES as SELECTED CRITERION, always including the DoD Building Code and antiterrorism baseline when listed. If SITE CONDITIONS are listed, state how the design addresses them. Use ONLY facts in SOURCES. No references to AI.
 Return ONLY JSON: {"desc":"the paragraph"}`;
-async function draft10(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+async function draft10(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in again (Face ID) to draft with AI, then reload this page.');return;}
  if(!q&&P.n.desc&&!confirm('Replace block 10 with an AI draft? Your text is sent along as a source.')) return;
  const src=srcText10();const b=$('#bAI10');if(b){b.disabled=true;b.textContent='Drafting…';}
  try{const j=await CARLAI.ask('claude',DRAFT10_SYS,'SOURCES:\n'+src);const t=String(j.desc||'').trim();if(!t) throw new Error('Nothing returned');
@@ -1211,7 +1211,7 @@ async function draft10(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('S
  catch(err){if(!q) alert('Draft failed: '+err.message);if(b){b.disabled=false;b.textContent='Draft block 10 with AI';}}}
 const DRAFT11_SYS=`You draft block 11 of a DD Form 1391 (Military Construction Project Data) for a U.S. DoD reviewer. Write in plain, factual budget-justification style: mission terms, the gap in numbers, and what happens if the project is not funded. Use ONLY facts in SOURCES. Where a fact the block needs is missing, write [NEEDED: what is missing] instead of inventing it. End each sentence that rests on a stated requirement with its ID in braces, e.g. {R-003}. No marketing language, no references to AI.
 Return ONLY JSON: {"project":"one sentence","requirement":"paragraph","current":"paragraph","impact":"paragraph","additional":"paragraph covering the economic analysis and criteria, only from SOURCES","req":"quantity required or empty","adqt":"adequate quantity or empty","substd":"substandard quantity or empty"}`;
-async function draft11(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in to CARL (carl.carlcompliance.com) to draft with AI, then reload this page.');return;}
+async function draft11(q){if(!window.CARLAI||!CARLAI.state().ok){if(!q) alert('Sign in again (Face ID) to draft with AI, then reload this page.');return;}
  const src=srcText11();if(!q&&!nora()){if(!confirm('There is no NORA requirements record for this project, so the draft will have many [NEEDED] gaps. Draft anyway?')) return;}
  const filled=['project','requirement','current','impact','additional'].filter(k=>P.n[k]);if(!q&&filled.length&&!confirm('Replace the text already in '+filled.join(', ')+' with a draft? Your text is sent along as a source.')) return;
  const b=$('#bAI11');if(b){b.disabled=true;b.textContent='Drafting…';}
@@ -1854,7 +1854,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -1876,13 +1876,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -1897,8 +1897,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});

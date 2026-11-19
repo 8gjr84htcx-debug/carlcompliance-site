@@ -1073,7 +1073,7 @@ function srcNums(all){if(srcNums.k===all) return srcNums.v;const N=new Set();con
  const W={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};String(all).toLowerCase().replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/g,(m,w)=>{N.add(W[w]);return m;});srcNums.k=all;srcNums.v=N;return N;}
 function emptyAns(j){if(!j||typeof j!=='object') return true;return !Object.keys(KEYF).some(k=>Array.isArray(j[k])&&j[k].length)&&!(Array.isArray(j.conflicts)&&j.conflicts.length);}
 function numsOk(item,all){const N=srcNums(all);['qty_have','qty_need'].forEach(f=>{const raw=String(item[f]??'').replace(/,/g,'').trim();if(!raw) return;const m=raw.match(/\d+(?:\.\d+)?/);if(m&&N.has(Number(m[0]))) return;item[f]='';item.numsCleared=true;});}
-async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) so NORA can use AI, then reload this page.');return;}
+async function buildReq(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in again (Face ID) so NORA can use AI, then reload this page.');return;}
  const all=allText();if(all.trim().length<40){alert('Add at least one document or some notes first.');return;}
  let CH=srcChunks();const skipped=Math.max(0,CH.length-MAXCH);CH=CH.slice(0,MAXCH);
  // On a rebuild only the new sources are sent, with a short list of what the record already holds, so the request stays small and the readers can say where the new source disagrees.
@@ -1226,7 +1226,7 @@ function vBuild(){const v=$('#view');const B=P.build;const signed=window.CARLAI&
   :c==='gaps'?'<b>'+esc(x.area)+'</b> – today '+esc(x.current||'?')+'; needed '+esc(x.required||'?')+((x.qty_have||x.qty_need)?' <span class="small">('+esc(x.qty_have||'?')+' of '+esc(x.qty_need||'?')+' '+esc(x.unit||'')+')</span>':'')+(x.impact?'<div class="small">Impact: '+esc(x.impact)+'</div>':'')+(x.numsCleared?'<div class="small">A number not found in your documents was removed.</div>':'')
   :c==='risks'?esc(x.text)+' <span class="small">(likelihood '+esc(x.l||3)+', impact '+esc(x.i||3)+')</span>':esc(x.text)+(x.target?' <span class="small">– target '+esc(x.target)+'</span>':'')+(x.basis?' <span class="small">– '+esc(x.basis)+'</span>':'')+(x.owner?' <span class="small">– confirm with '+esc(x.owner)+'</span>':'');
  v.innerHTML='<datalist id="shl">'+P.stakeholders.concat(B?B.items.stakeholders.filter(x=>x.keep):[]).map(s=>'<option value="'+esc(s.name+(s.title?', '+s.title:''))+'">').join('')+'</datalist>'+failNote(B)+conflictPanel()+'<div class="panel"><h2>Build my requirement</h2><p class="lead">Drop in what you have: returned interview kits, interview notes, emails, studies, a draft 1391 or the Service’s requirement document. Two independent AI readers read them on their own and pull out the project, stakeholders, requirements, gaps, constraints, assumptions, risks and success measures. Every item rests on the exact words it came from. You keep or drop each one, answer what the documents did not say, and NORA writes the need statement.</p>'+
-  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> You can still add documents now.')+'</div>'+
+  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in.':'<b>Sign in again (Face ID) to use AI.</b> You can still add documents now.')+'</div>'+
   '<label id="drop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:22px;text-align:center;cursor:pointer;margin:10px 0"><b>Drop files here or click to choose</b><br><span class="small">PDF, Word (.docx), email (.eml), text. Scanned PDF pages are read by AI.</span><input type="file" id="dFiles" multiple accept=".pdf,.docx,.eml,.txt,.md,.csv,.htm,.html" hidden></label>'+
   '<details><summary class="small" style="cursor:pointer">Or paste text</summary><input id="pTitle" placeholder="What it is (e.g. Interview with the squadron commander, 12 Nov)" style="margin:6px 0"><textarea id="pText" class="tall" placeholder="Paste notes, an email or a document"></textarea><div class="row"><button id="bPaste">Add</button></div></details>'+
   '<div id="dStat" class="small"></div>'+
@@ -1307,7 +1307,7 @@ function curClaims(t){const NEG=/\b(no|not|lack\w*|without|missing|none|cannot|c
   const ok=src.some(sn=>{const l=sn.toLowerCase();return NEG.test(l)&&what.filter(w=>l.includes(w.replace(/s$/,''))).length>=Math.min(2,what.length);});if(!ok) out.push((m[1]+' '+part).trim().slice(0,70));}}
  return [...new Set(out)];}
 function numCheck(text,src){const S=String(src).replace(/,/g,'');return [...new Set((String(text).replace(/\b\d+(?:st|nd|rd|th)\b/gi,'').match(/\d[\d,.]*/g)||[]).map(x=>x.replace(/,/g,'').replace(/\.$/,'')).filter(x=>x.length>1&&!S.includes(x)))];}
-async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to write with AI, then reload this page.');return;}
+async function aiNeed(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in again (Face ID) to write with AI, then reload this page.');return;}
  const b=$('#bAINeed');if(b){b.disabled=true;b.textContent='Writing…';}const rec=needRecord();
  try{const j=await CARLAI.ask('claude',NEED_SYS,'RECORD:\n'+rec,null,{fresh:true});const t=String(j.need||'').trim();if(!t) throw new Error('Nothing returned');
   P.need_statement=t;P.need_sig=needSig();P.need_sig_v=2;const bad=numCheck(t,rec+'\n'+P.sessions.map(s=>s.notes).join('\n'));const gaps=(t.match(/\[NEEDED:[^\]]*\]/g)||[]).length;
@@ -1385,7 +1385,7 @@ function bindConf(root,again){const G=confGroups();const rf=root.querySelector('
 const MEAS_SYS=`For each DoD facility requirement below, propose how a reviewer would verify it was met: one short, objective acceptance criterion (inspection of as-built drawings, test, measurement, commissioning report, survey). Use the numbers in the requirement; never invent new ones. If it cannot be made objective, say what document would show it.
 Return ONLY JSON: {"measures":[{"id":"R-001","measure":"..."}]}`;
 async function aiMeasures(quiet){const need=P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must'&&!String(r.measure||'').trim());if(!need.length) return 0;
- if(!(window.CARLAI&&CARLAI.state().ok)){if(!quiet) alert('Sign in to CARL to propose measures with AI.');return 0;}
+ if(!(window.CARLAI&&CARLAI.state().ok)){if(!quiet) alert('Sign in again (Face ID) to propose measures with AI.');return 0;}
  const b=$('#bMeas');if(b){b.disabled=true;b.textContent='Proposing…';}let n=0;
  try{const j=await CARLAI.ask('claude',MEAS_SYS,need.map(r=>r.id+': '+r.text).join('\n'),null,{fresh:true});
   (j.measures||[]).forEach(m=>{const r=need.find(x=>x.id===m.id);const t=String(m.measure||'').trim();if(r&&t){r.measure=t;r.origin=(r.origin||'')+'; measure proposed by AI';n++;}});
@@ -1401,7 +1401,7 @@ function imgB64(file){return new Promise((ok,no)=>{const im=new Image();im.onloa
 const RET_SYS=`You read a confirmation sheet a stakeholder returned for a DoD facility requirement. It may be typed, marked up or handwritten, and may be a photo or scan. For each requirement ID on the sheet, report what the person marked.
 Return ONLY JSON: {"signer":"name as written or empty","date":"YYYY-MM-DD or empty","items":[{"id":"R-001","verdict":"correct|change|unclear","change":"their new wording, exactly as written, if they changed it","note":"anything else they wrote beside it"}],"missing":"what they wrote under Anything missing, exactly as written, or empty"}
 Rules: "correct" only if the Correct box is clearly marked and nothing contradicts it. "change" if they marked Change or wrote new wording. "unclear" if you cannot tell. Never guess wording you cannot read; write [illegible] for it. Only report IDs from the LIST.`;
-async function readSheet(f){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL to read a returned sheet.');return;}
+async function readSheet(f){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in again (Face ID) to read a returned sheet.');return;}
  const st=$('#retStat');const say=t=>{if(st) st.textContent=t;};say('Reading '+f.name+'…');
  try{const n=f.name.toLowerCase();let images=null,text='';
   if(n.endsWith('.pdf')) images=await pdfImages(f,6);else if(/\.(jpe?g|png|gif|webp|heic)$/.test(n)||f.type.startsWith('image/')) images=[await imgB64(f)];else text=(await readAny(f)).text;
@@ -1496,7 +1496,7 @@ function kitHTML(roles){const p=P.project;const C=Object.fromEntries(covData().m
 const KIT_SYS=`You read a returned NORA interview kit for a DoD construction requirement. It may be typed, handwritten, marked up, scanned or photographed. Transcribe every answer exactly as written; write [illegible] where you cannot read it. Never fill in an answer that is not there.
 For a table, give each filled row as one line, cells in column order separated by " | ". A ticked box counts only if clearly marked.
 Return ONLY JSON: {"respondent":{"name":"","title":"","org":"","contact":"phone or email","part":"decide|approve|validate|advise|"},"role":"the role printed on the kit","date":"YYYY-MM-DD or empty","corrections":[{"item":"","correction":"exactly as written"}],"answers":[{"code":"the code in brackets beside the question","question":"","answer":"exactly as written"}],"other":"anything written under Anything else"}`;
-async function readKits(files){if(!aiOn2()){alert('Sign in to CARL to read returned kits.');return;}const st=$('#kStat');const say=t=>{if(st) st.textContent=t;};let n=0;
+async function readKits(files){if(!aiOn2()){alert('Sign in again (Face ID) to read returned kits.');return;}const st=$('#kStat');const say=t=>{if(st) st.textContent=t;};let n=0;
  for(const f of files){try{say('Reading '+f.name+'…');const nm=f.name.toLowerCase();let images=null,text='';
    if(nm.endsWith('.pdf')){const r=await readPdf(f,say);if((r.text.match(/\S+/g)||[]).length>40&&!r.note) text=r.text;else images=await pdfImagesN(f,6);}
    else if(/\.(jpe?g|png|gif|webp|heic)$/.test(nm)||f.type.startsWith('image/')) images=[await imgB64N(f)];else text=(await readAny(f)).text;
@@ -2121,7 +2121,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -2143,13 +2143,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -2164,8 +2164,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});

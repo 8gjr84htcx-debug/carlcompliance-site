@@ -870,7 +870,7 @@ async function buildSOW(){const sb=scopeBlock();if(sb){say(sb);if(window.MSsettl
 const SPLIT_SYS=`You split a construction statement of work into its sections exactly as written. Return ONLY JSON: {"title":"project title on the document","sections":[{"title":"heading as written","numbered":true,"text":"the section body copied exactly, keeping item numbers and line breaks"}]}. Copy text exactly; do not fix, summarize or reorder anything.`;
 const TRACE_SYS=`You trace a statement of work to the project's requirements. For each numbered item or paragraph in SECTION, list the requirement IDs it satisfies, or none. Return ONLY JSON: {"items":[{"start":"the first 8 words of the item exactly","reqs":["R-001"]}]}`;
 let XS=null;
-async function readSOW(f){if(!aiOnS()){alert('Sign in to CARL to review a statement of work.');return;}const st=$('#rStatS');const say=t=>{if(st) st.textContent=t;};
+async function readSOW(f){if(!aiOnS()){alert('Sign in again (Face ID) to review a statement of work.');return;}const st=$('#rStatS');const say=t=>{if(st) st.textContent=t;};
  try{say('Reading '+f.name+'…');const r=await readAny(f,say);const text=r.text;if((text.match(/\S+/g)||[]).length<40) throw new Error('Too little text found');
   say('Finding the sections…');const j=await CARLAI.ask('reviewer',SPLIT_SYS,'SOW:\n'+text.slice(0,120000),null,{fresh:true});
   const nt=nz3(text);const secs=(j.sections||[]).filter(x=>x&&x.title&&x.text).map(x=>({...x,ok:nt.includes(nz3(String(x.text).slice(0,120)))}));
@@ -885,7 +885,7 @@ async function applySOW(){const X=XS;S.template='custom';S.custom=X.secs.map(x=>
    const lines=s.text.split('\n');(j.items||[]).forEach(it=>{const ids=(it.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));if(!ids.length) return;const k=lines.findIndex(l=>nz3(l).startsWith(nz3(it.start).slice(0,30))&&nz3(it.start).length>5);if(k>=0&&!/\{[^}]+\}\s*$/.test(lines[k])) lines[k]=lines[k].replace(/\s*$/,' {'+ids.join(', ')+'}');});s.text=lines.join('\n');}catch(e){}}}
  log('SOW applied for review',S.review.file);save();if(aiOnS()) await aiReviewS(true);STEP='done';render();window.scrollTo(0,0);}
 const REVS_SYS=`You are a contracting officer's technical reviewer reading a construction statement of work against the project RECORD (requirements, criteria, 1391). Find what would cause a protest, a claim or a bad award: requirements not covered; scope with no requirement behind it; criteria the record selects that the SOW never invokes; quantities that contradict the 1391; vague or unmeasurable obligations; design-build text that prescribes means and methods. Return ONLY JSON: {"findings":[{"severity":"bad|warn","title":"short","detail":"what to fix","quote":"exact words from the SOW, or empty"}]} – at most 10, most important first.`;
-async function aiReviewS(q){if(!aiOnS()){if(!q) alert('Sign in to CARL to run the AI review.');return;}const b=$('#bRevS');if(b){b.disabled=true;b.textContent='Reviewing…';}
+async function aiReviewS(q){if(!aiOnS()){if(!q) alert('Sign in again (Face ID) to run the AI review.');return;}const b=$('#bRevS');if(b){b.disabled=true;b.textContent='Reviewing…';}
  // a new review replaces the old one: earlier AI findings (possibly about another SOW) are cleared now, and comment downloads wait until it finishes
  S.ai_rev=[];S.reviewing=true;save();
  try{const sow=S.sections.map(s=>s.title+'\n'+s.text).join('\n\n');const rec='REQUIREMENTS:\n'+S.reqs.map(r=>r.id+' ('+(r.priority||'')+'): '+r.text).join('\n')+'\nCRITERIA: '+S.criteria.slice(0,80).map(x=>(x.number?x.number+' ':'')+x.title).join('; ')+'\n'+(S.ctx||ctxText());
@@ -906,7 +906,7 @@ let FXS=null;
 function findingsAll(){const F=[];S.sections.forEach(s=>(s.notExact||[]).slice(0,3).forEach(t=>F.push({sev:'bad',msg:'Not as written in the reviewed document: check this passage against the original',hit:t.slice(0,140),sec:s})));allFindings().filter(f=>f.sev!=='info').forEach(f=>F.push({...f}));harmList().filter(h=>h[0]!=='info').forEach(([s,t,d])=>F.push({sev:s,msg:t+(d?' – '+d:''),hit:'',sec:null,harm:true}));(S.ai_rev||[]).forEach(x=>F.push({...x,sec:null,ai:true}));return F;}
 function secFor(f){if(f.sec) return f.sec;const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id){const s=S.sections.find(x=>x.reqs.includes(id))||S.sections.find(x=>x.num);if(s) return s;}
  if(f.hit){const s=S.sections.find(x=>nz3(x.text).includes(nz3(f.hit)));if(s) return s;}return S.sections.find(x=>x.num)||S.sections[0];}
-async function aiFixS(i){if(!aiOnS()){alert('Sign in to CARL to fix findings with AI.');return;}const f=findingsAll()[i];if(!f) return;const s=secFor(f);const b=document.querySelector('[data-fxs="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
+async function aiFixS(i){if(!aiOnS()){alert('Sign in again (Face ID) to fix findings with AI.');return;}const f=findingsAll()[i];if(!f) return;const s=secFor(f);const b=document.querySelector('[data-fxs="'+i+'"]');if(b){b.disabled=true;b.textContent='Working…';}
  try{const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id&&!s.reqs.includes(id)) s.reqs.push(id);
   const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT:\n'+S.ctx:'');const j=await CARLAI.ask('reviewer',FIXS_SYS(),src+'\n\nSECTION ('+s.title+'):\n'+s.text+'\n\nFINDING: '+f.msg+(f.hit?' (“'+f.hit+'”)':''),null,{fresh:true});
   FXS={i,msg:f.msg,sid:s.id,title:s.title,text:String(j.text||'').trim(),note:String(j.note||''),un:figuresUnverified(String(j.text||'').replace(/\{[^}]*\}/g,''),s)};}
@@ -919,7 +919,7 @@ function vBuildS(){const v=$('#view');if(!S.built&&!S.p.delivery_set){const d=dl
  v.innerHTML='<div class="panel"><h2>Build my SOW</h2><p class="lead">SOPHIE writes the statement of work from what the earlier tools hold. It imports the requirements and criteria, matches each requirement to the sections that must answer it, and writes every section through three steps: one reader drafts, a second reviews, and a reviewer rules on each change. Every item traces to a requirement, and the style rules are applied.</p>'+
   '<table style="max-width:640px"><tbody>'+have.map(([x,y])=>'<tr><td>'+x+'</td><td>'+esc(y)+'</td></tr>').join('')+'</tbody></table>'+
   '<div class="form" style="margin-top:10px"><div><label class="f">Format</label><select id="tplB">'+opts(Object.fromEntries(Object.entries(TEMPLATES).filter(([k])=>k!=='custom').map(([k,t])=>[k,t.name])),S.template)+'</select></div><div><label class="f">Delivery method</label><select id="dlvB">'+opts({db:'Design-build',dbb:'Design-bid-build',to:'Task order / FSRM',other:'Other'},S.p.delivery)+'</select>'+(!S.p.delivery_set&&dlvFromPiper()?'<div class="small">From PIPER block 12</div>':'')+'</div><div><label class="f">Buildings (optional)</label><input id="bldB" value="'+esc(S.p.buildings)+'" placeholder="found in your record if left blank"></div></div>'+
-  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in to CARL.':'<b>Sign in to CARL to use AI.</b> Without it SOPHIE assembles each section from the sources.')+'</div>'+
+  '<div class="mentor">Sanitized, unclassified information only. '+(signed?'AI: signed in.':'<b>Sign in again (Face ID) to use AI.</b> Without it SOPHIE assembles each section from the sources.')+'</div>'+
   '<div class="row"><button class="go" id="sB">'+(S.built?'Build again (fills only empty sections)':'Build my SOW')+'</button><span class="small" id="sStat"></span></div></div>'+
   '<div class="panel"><h2>Review a statement of work someone else wrote</h2><p class="lead">Drop in the SOW (PDF or Word). SOPHIE splits it into its sections as written, traces each item to your requirements, and checks coverage, criteria, the 1391 quantity and style.</p>'+
   '<label id="sdrop" style="display:block;border:2px dashed var(--line);border-radius:10px;padding:18px;text-align:center;cursor:pointer"><b>Drop the SOW here or click to choose</b><br><span class="small">PDF or Word (.docx)</span><input type="file" id="sFile" accept=".pdf,.docx,.txt" hidden></label><div class="small" id="rStatS"></div>'+
@@ -985,7 +985,7 @@ function bindConfirmS(v){const ao=v.querySelector('#asmOk');if(ao) ao.onclick=()
 function fixableS(f){return (!f.harm||/1391 quantity/.test(f.msg||''))&&!/^Not as written/.test(f.msg||'');}
 const FIXALLS_SYS=()=>styleBrief()+'\n\nYou fix every listed finding in one section of a statement of work. Change only what the findings need; keep every other sentence and every {ID} trace tag. Use only facts in SOURCES and PROJECT CONTEXT; where a fact is missing write [NEEDED: what]. Return ONLY JSON: {"text":"the complete corrected section","notes":["finding: what changed"]}';
 let FXA=null;
-async function fixAllS(){if(!aiOnS()){alert('Sign in to CARL to fix findings with AI.');return;}const F=findingsAll().filter(fixableS);if(!F.length) return;const G=new Map();F.forEach(f=>{const s=secFor(f);if(!s) return;if(!G.has(s.id)) G.set(s.id,{s,F:[]});G.get(s.id).F.push(f);});
+async function fixAllS(){if(!aiOnS()){alert('Sign in again (Face ID) to fix findings with AI.');return;}const F=findingsAll().filter(fixableS);if(!F.length) return;const G=new Map();F.forEach(f=>{const s=secFor(f);if(!s) return;if(!G.has(s.id)) G.set(s.id,{s,F:[]});G.get(s.id).F.push(f);});
  const b=$('#bFixAllS');const out=[];let k=0;
  for(const {s,F:fs} of G.values()){k++;if(b){b.disabled=true;b.textContent='Section '+k+' of '+G.size+'…';}
   try{fs.forEach(f=>{const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id&&!s.reqs.includes(id)) s.reqs.push(id);});
@@ -1140,7 +1140,7 @@ function figuresUnverified(text,s){text=String(text||'');if(window.CorbelID&&Cor
  const nums=(text.match(/\b\d[\d,.\/-]*\s*(%|percent|psi|psf|mph|inches|inch|in\.|feet|ft|sf|sy|lf|cy|mil|mils|years?|days?|hours?|gallons?|kw|kva|amps?|volts?|°f|degrees)?/gi)||[]).map(x=>x.trim()).filter(x=>!/^\d{1,2}\.$/.test(x)&&!/^\d{1,2}$/.test(x));
  return [...new Set(nums)].filter(n=>!src.includes(n.toLowerCase().replace(/\s+/g,' '))&&!src.includes(n.replace(/[^\d.]/g,'')));}
 async function aiDraft(s,d){const eng=d.querySelector('[data-eng]');const rd=SET.slots.filter(x=>x.enabled&&x.model&&x.role!=='arbiter');const ar=SET.slots.find(x=>x.enabled&&x.model&&x.role==='arbiter');
- if(!rd.length){alert('AI is off. Sign in to CARL, or use Assemble from sources.');return;}
+ if(!rd.length){alert('AI is off. Sign in again (Face ID), or use Assemble from sources.');return;}
  if(s.text.trim()&&!confirm('Replace the current text with an AI draft? The current text is kept in the record.')) return;
  const pill=(n,st)=>'<span class="eng"><span class="dot '+st+'"></span>'+esc(n)+'</span>';const status={};const draw=()=>eng.innerHTML=Object.entries(status).map(([n,st])=>pill(n,st)).join('');
  const src=sourcesFor(s);const prov={at:new Date().toISOString(),prev:s.text,steps:[]};
@@ -1233,7 +1233,7 @@ function citesIn(t){const out=new Map();const add=(k,q,n)=>{if(!out.has(k)) out.
  (t.match(/\b29\s*CFR\s*(?:Part\s*)?19(?:10|26)(?:\.\d+)?\b/gi)||[]).forEach(m=>{const n=m.match(/19(?:10|26)(?:\.\d+)?/)[0];add('29 CFR '+n,'29 CFR '+n,n.replace(/\D/g,''));});
  (t.match(/\b(?:NFPA\s*\d+[A-Z]?|(?:IBC|IFC|IPC|IMC|IEBC)\b)/g)||[]).forEach(m=>add(m,'',null));
  return [...out.values()];}
-async function checkCites(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in to CARL (carl.carlcompliance.com) to check citations against its library, then reload this page.');return;}
+async function checkCites(){if(!(window.CARLAI&&CARLAI.state().ok)){alert('Sign in again (Face ID) to check citations against its library, then reload this page.');return;}
  const list=citesIn(S.sections.map(s=>s.text).join('\n'));const b=$('#bCite');b.disabled=true;b.textContent='Checking '+list.length+'…';const rows=[];
  for(const c of list){if(!c.key){rows.push({cite:c.cite,status:'pointer',note:'NFPA and ICC codes are kept as pointers, never full text, by design'});continue;}
   try{const P=await CARLAI.library(c.q,5);const hit=P.find(p=>String(p.src+' '+(p.section||'')).replace(/\D/g,'').includes(c.key));rows.push(hit?{cite:c.cite,status:'in',match:hit.src}:{cite:c.cite,status:'gap',note:'Not in the library, or the search did not surface it. Confirm the number and edition.'});}
@@ -1713,7 +1713,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -1735,13 +1735,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -1756,8 +1756,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});

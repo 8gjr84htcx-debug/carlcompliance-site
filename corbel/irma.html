@@ -736,7 +736,7 @@ function newItem(kind){const n=I.items.filter(x=>x.kind===kind).reduce((m,x)=>Ma
 
 // ---------- references ----------
 function vRefs(){const v=$('#view');const sop=sophieText(),cs=coraSel();
- v.innerHTML='<div class="panel"><h2>Contract references</h2><p class="lead">The documents a finding may cite: the SOW, the specification sections, drawing notes, the criteria list. IRMA searches these, and every finding it asserts must quote one of them word for word. The submittal or RFI itself is always searched too, within its own four corners.'+(carlOn()?' Signed in to CARL, IRMA also searches CARL\u2019s library of governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR) and cites it word for word the same way.':' Sign in to CARL to add its library of governing criteria to every search.')+'</p>'+
+ v.innerHTML='<div class="panel"><h2>Contract references</h2><p class="lead">The documents a finding may cite: the SOW, the specification sections, drawing notes, the criteria list. IRMA searches these, and every finding it asserts must quote one of them word for word. The submittal or RFI itself is always searched too, within its own four corners.'+(carlOn()?' When signed in, IRMA also searches CARL\u2019s library of governing criteria (UFC, UFGS, EM 385-1-1, 29 CFR) and cites it word for word the same way.':' Sign in again (Face ID) to add its library of governing criteria to every search.')+'</p>'+
  '<div class="row" style="margin-top:0">'+(sop&&!I.refs.some(r=>/^SOW – /.test(r.name))?'<button class="sm go" id="bSop">Add the SOW from SOPHIE</button>':'')+(cs&&!I.refs.some(r=>/^CORA criteria/.test(r.name))?'<button class="sm go" id="bCora">Add the CORA criteria list</button>':'')+'</div>'+
  '<div class="drop" id="drop" style="margin-top:12px">Drop PDF or text files here, or <button class="sm" id="bPick">choose files</button><input type="file" id="fRef" accept=".pdf,.txt,.md" multiple hidden></div><p class="small" id="rstat">'+esc(MSG.ref)+'</p>'+
  '<div class="row"><input id="pn" placeholder="Name (e.g. UFGS 07 57 13 project specification)" style="flex:1"><select id="pk" style="width:auto">'+opts({sow:'SOW / PWS',spec:'Specification',dwg:'Drawing notes',ifs:'Installation standard',crit:'Criteria list',other:'Other'},'spec')+'</select><button id="bPaste">Add pasted text</button></div><textarea id="pt" placeholder="Or paste text here" style="margin-top:6px"></textarea>'+
@@ -806,7 +806,7 @@ function tDocs(){const x=CUR;const t=$('#tab');
  const dr=$('#drop');dr.ondragover=e=>{e.preventDefault();dr.classList.add('on');};dr.ondragleave=()=>dr.classList.remove('on');dr.ondrop=e=>{e.preventDefault();dr.classList.remove('on');ingestFiles([...e.dataTransfer.files],'doc');};
  $('#bPaste').onclick=()=>{const tx=$('#pt').value.trim();if(!tx) return;x.docs.push({id:uid(),name:'Pasted text',pages:[tx],images:[],added:today()});log(x,'Document added','pasted text');save();vItem();reviewIt(x);};
  t.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{x.docs=x.docs.filter(d=>d.id!==b.dataset.del);save();vItem();});
- t.querySelectorAll('[data-ocr]').forEach(b=>b.onclick=async()=>{const d=x.docs.find(z=>z.id===b.dataset.ocr);const r=readers()[0];if(!r){alert('Sign in to CARL to read images with AI.');return;}b.disabled=true;b.textContent='Reading…';
+ t.querySelectorAll('[data-ocr]').forEach(b=>b.onclick=async()=>{const d=x.docs.find(z=>z.id===b.dataset.ocr);const r=readers()[0];if(!r){alert('Sign in again (Face ID) to read images with AI.');return;}b.disabled=true;b.textContent='Reading…';
   try{for(const im of d.images){const j=await callAI(r,'Transcribe the page exactly. Return ONLY JSON {"text":"..."}. Keep line breaks. Do not summarize or correct.','Transcribe this page.',[im.data]);d.pages[im.page-1]=String(j.text||'');}
    log(x,'Scanned pages transcribed by AI',r.label+' '+r.model+' · '+d.images.length+' pages · transcription is not verified against an original text layer');d.images=[];save();vItem();}catch(e){alert('Failed: '+e.message);b.disabled=false;b.textContent='Read scanned pages with AI';}});}
 function tIntake(){const x=CUR;const t=$('#tab');const all=INTAKE.every(([k])=>x.intake[k]);
@@ -826,7 +826,7 @@ function intakeEmail(x){const r=x.lastReturn;return (I.settings.cor_name?I.setti
 // ---------- elements ----------
 function tElem(){const x=CUR;const t=$('#tab');const docText=x.docs.map(d=>d.pages.join('\n')).join('\n');
  t.innerHTML='<div class="panel"><h3 style="margin-top:0">Elements and grounding</h3><p class="lead">IRMA breaks the packet into the things that need an answer: each question, proposal, deviation and claim. Claims the packet makes about the contract are checked, not trusted. Each element is grounded against the contract references and the packet itself.</p><p class="small">Each element is labelled by the strength of its evidence: <b>Strong</b> (both readers agree, quotes verified), <b>Supported</b> (one verified quote, upheld by the arbiter or picked by you), <b>Needs review</b>, or <b>No basis found</b>. Only Strong and Supported go into the response as findings; the rest are listed for the COR’s judgment.</p>'+
- (!x.docs.length?'<div class="find warn"><b>No documents.</b> Add the packet on the Documents tab.</div>':'')+(!I.refs.length?(carlOn()?'<div class="find"><b>No contract references loaded.</b> IRMA will search CARL\u2019s library of governing criteria. Add the SOW and specifications for answers specific to this contract.</div>':'<div class="find warn"><b>No contract references loaded.</b> Findings can only cite the packet itself until you add the SOW and specifications, or sign in to CARL to search its library.</div>'):'')+
+ (!x.docs.length?'<div class="find warn"><b>No documents.</b> Add the packet on the Documents tab.</div>':'')+(!I.refs.length?(carlOn()?'<div class="find"><b>No contract references loaded.</b> IRMA will search CARL\u2019s library of governing criteria. Add the SOW and specifications for answers specific to this contract.</div>':'<div class="find warn"><b>No contract references loaded.</b> Findings can only cite the packet itself until you add the SOW and specifications, or sign in again (Face ID) to search its library.</div>'):'')+
  '<div class="row" style="margin-top:0"><button class="go" id="bDec">Find elements</button><button id="bAddE">Add element</button><button class="go" id="bGr">Ground all</button><span class="engines" id="eng"></span></div><div id="els"></div></div>';
  $('#bDec').onclick=()=>decompose(x,docText);$('#bAddE').onclick=()=>{x.elements.push({id:uid(),text:'',quote:'',kind:'question',disc:[],include:true});save();tElem();};$('#bGr').onclick=()=>groundAll(x);
  const box=$('#els');if(!x.elements.length){box.innerHTML='<div class="empty">No elements yet. Use Find elements, or add them by hand.</div>';return;}
@@ -1578,7 +1578,7 @@ const PX=(function(){
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
-  if(r.status===401) throw new Error('Sign in to CARL at carl.carlcompliance.com, then reload this page.');
+  if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
   if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
@@ -1600,13 +1600,13 @@ const PX=(function(){
    b.onclick=function(e){if(e.target.tagName==='A') return;alert('CARL AI use in this project, this browser:\n\n'+usageText());};}
   if(!badge.obs&&window.MutationObserver&&bar!==document.body){badge.obs=new MutationObserver(function(){if(!document.getElementById('carlai')) badge();});badge.obs.observe(bar,{childList:true});}
   b.style.background=ST.ok?'#e3f4e3':'#f1f1f1';b.style.color=ST.ok?'#0b6b0b':'#555';
-  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/signin" target="_blank" rel="noopener">sign in to CARL<\/a>';
+  b.innerHTML=ST.ok?'AI: CARL ✓'+(ST.user?' ('+String(ST.user).replace(/[<&]/g,'')+')':''):'AI: <a href="'+BASE+'/auth/corbel?r='+encodeURIComponent(location.pathname)+'" target="_blank" rel="noopener">sign in again (Face ID)<\/a>, then reload';
   b.title=ST.ok?'Click for AI use in this project':ST.msg;}
  window.CARLAI={ask:ask,library:library,base:BASE,state:function(){return ST;},ready:function(f){if(ST.ok!==null) f(ST);else READY.push(f);},usage:usageText};
 
  // ---- tools with AI settings (SCOTT, NORA, SOPHIE, IRMA): CARL as a provider
  if(typeof callAI==='function'&&typeof loadSettings==='function'){
-  var LABEL='CARL – shared AI on CARL’s keys (sign in to CARL)';
+  var LABEL='CARL – shared AI (included with your sign-in)';
   try{var ent=Object.entries(PROVIDERS);Object.keys(PROVIDERS).forEach(function(k){delete PROVIDERS[k];});PROVIDERS.carl=LABEL;ent.forEach(function(e){if(e[0]!=='carl') PROVIDERS[e[0]]=e[1];});}catch(e){}
   var DEF=function(){return [{provider:'carl',label:'Reader A',role:'reader',model:'reader-a',enabled:true},{provider:'carl',label:'Reader B',role:'reader',model:'reader-b',enabled:true},{provider:'carl',label:'Reviewer',role:'arbiter',model:'reviewer',enabled:true}];};
   var _load=loadSettings,_save=typeof saveSettings==='function'?saveSettings:null,_call=callAI,_base=typeof defaultBase==='function'?defaultBase:null;
@@ -1621,8 +1621,8 @@ const PX=(function(){
    var test=sys==='Reply with JSON only.'&&/"ok":true/.test(user||'');return ask(test?'fast':slot.model,sys,user,images,{fresh:test});};
  }
  fetch(BASE+'/api/assist',{credentials:'include'}).then(function(r){return r.json().catch(function(){return {};}).then(function(j){
-   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in to CARL'};
-   else ST={ok:false,msg:r.status===401?'Not signed in to CARL':(j.error||('CARL HTTP '+r.status))};});})
+   if(r.ok&&j.ok) ST={ok:true,user:j.user||'',msg:'Signed in'};
+   else ST={ok:false,msg:r.status===401?'Sign-in ended – sign in again (Face ID)':(j.error||('CARL HTTP '+r.status))};});})
   .catch(function(){ST={ok:false,msg:'CARL could not be reached'};})
   .then(function(){try{if(typeof loadSettings==='function'&&typeof SET!=='undefined') SET=loadSettings();}catch(e){}try{if(typeof renderEngines==='function') renderEngines();}catch(e){}
    READY.splice(0).forEach(function(f){try{f(ST);}catch(e){}});
