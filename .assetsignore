@@ -1,0 +1,6 @@
+worker.js
+corbel_gate.js
+wrangler.jsonc
+.assetsignore
+.git
+node_modules

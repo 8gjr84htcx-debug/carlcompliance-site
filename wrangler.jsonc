@@ -1,0 +1,17 @@
+{
+  // carlcompliance.com: static site, with Corbel behind CARL's sign-in.
+  "name": "carlcompliance-site",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-18",
+  "assets": {
+    "directory": ".",
+    "binding": "ASSETS",
+    // Only Corbel runs the worker first; every other page is served directly.
+    "run_worker_first": ["/corbel", "/corbel/*"]
+  },
+  // CARL's records: Corbel checks its passes and sessions there.
+  "d1_databases": [
+    { "binding": "DB", "database_name": "carl-records", "database_id": "bae438bd-1f65-4650-96f4-fdfc4b823ad1" }
+  ],
+  "vars": { "CARL_URL": "https://carl.carlcompliance.com" }
+}
