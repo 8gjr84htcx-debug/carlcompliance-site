@@ -388,8 +388,8 @@ function noraApply(n,x,c){const L=(w,d)=>{(n.log=n.log||[]).push({at:new Date().
   (n.gaps||[]).forEach(g=>{const t=String(g.required||'');if(!re().test(t)) return;const before=nums(t).reduce((a,b)=>a+b,0);g.required=t.replace(re(),String(to));if(Number(g.qty_need)===before&&nums(t).length>1) g.qty_need=String(nums(g.required).reduce((a,b)=>a+b,0));else if(Number(g.qty_need)===Number(from)) g.qty_need=String(to);L('Gap updated by ruling',g.area+': '+t+' → '+g.required);});
   subs.push([new RegExp('\\b'+from+'(?=\\s+(?:[a-z-]+\\s+){0,3}'+x.st+')','gi'),String(to)]);x.gapsDone=true;}
  const fix=(o,k,w)=>{if(!o||typeof o[k]!=='string') return;let t=o[k];subs.forEach(([re,to])=>{t=t.replace(re,to);});if(t!==o[k]){L('Updated by ruling',w+': '+o[k]+' → '+t);o[k]=t;}};
- if(subs.length){fix(n.project,'mission','Mission');(n.measures||[]).forEach(m=>{fix(m,'text','Success measure');fix(m,'target','Success measure target');});(n.assumptions||[]).forEach(a=>fix(a,'text','Assumption'));(n.constraints||[]).forEach(a=>fix(a,'text','Constraint'));}
- x.textDone=true;x.applied=true;}
+ if(subs.length){if(x.kind==='need'){(n.requirements||[]).forEach(r=>fix(r,'text',r.id||'Requirement'));(n.gaps||[]).forEach(g=>fix(g,'required','Gap '+(g.area||'')));}fix(n.project,'mission','Mission');(n.measures||[]).forEach(m=>{fix(m,'text','Success measure');fix(m,'target','Success measure target');});(n.assumptions||[]).forEach(a=>fix(a,'text','Assumption'));(n.constraints||[]).forEach(a=>fix(a,'text','Constraint'));}
+ x.textDone=x.kind==='need'?2:true;x.applied=true;}
 function noraRuleAny(id,c){if(TOOL==='nora'&&typeof window.noraRule==='function') return window.noraRule(id,c);const n=get(PKEY.nora);if(!n) return false;const x=(n.conflicts||[]).find(y=>y.id===id);if(!x||x.status!=='open') return false;
  x.status=c;x.ruled=new Date().toISOString();x.via='settlement prompt';x.applied=false;try{noraApply(n,x,c);}catch(e){x.applied=false;}raw(PKEY.nora,JSON.stringify(n));const s=loadStore();const p=s.projects[s.active];if(p){p.tools.nora=n;
   // a need-date ruling is the record's need date too

@@ -388,8 +388,8 @@ function noraApply(n,x,c){const L=(w,d)=>{(n.log=n.log||[]).push({at:new Date().
   (n.gaps||[]).forEach(g=>{const t=String(g.required||'');if(!re().test(t)) return;const before=nums(t).reduce((a,b)=>a+b,0);g.required=t.replace(re(),String(to));if(Number(g.qty_need)===before&&nums(t).length>1) g.qty_need=String(nums(g.required).reduce((a,b)=>a+b,0));else if(Number(g.qty_need)===Number(from)) g.qty_need=String(to);L('Gap updated by ruling',g.area+': '+t+' → '+g.required);});
   subs.push([new RegExp('\\b'+from+'(?=\\s+(?:[a-z-]+\\s+){0,3}'+x.st+')','gi'),String(to)]);x.gapsDone=true;}
  const fix=(o,k,w)=>{if(!o||typeof o[k]!=='string') return;let t=o[k];subs.forEach(([re,to])=>{t=t.replace(re,to);});if(t!==o[k]){L('Updated by ruling',w+': '+o[k]+' → '+t);o[k]=t;}};
- if(subs.length){fix(n.project,'mission','Mission');(n.measures||[]).forEach(m=>{fix(m,'text','Success measure');fix(m,'target','Success measure target');});(n.assumptions||[]).forEach(a=>fix(a,'text','Assumption'));(n.constraints||[]).forEach(a=>fix(a,'text','Constraint'));}
- x.textDone=true;x.applied=true;}
+ if(subs.length){if(x.kind==='need'){(n.requirements||[]).forEach(r=>fix(r,'text',r.id||'Requirement'));(n.gaps||[]).forEach(g=>fix(g,'required','Gap '+(g.area||'')));}fix(n.project,'mission','Mission');(n.measures||[]).forEach(m=>{fix(m,'text','Success measure');fix(m,'target','Success measure target');});(n.assumptions||[]).forEach(a=>fix(a,'text','Assumption'));(n.constraints||[]).forEach(a=>fix(a,'text','Constraint'));}
+ x.textDone=x.kind==='need'?2:true;x.applied=true;}
 function noraRuleAny(id,c){if(TOOL==='nora'&&typeof window.noraRule==='function') return window.noraRule(id,c);const n=get(PKEY.nora);if(!n) return false;const x=(n.conflicts||[]).find(y=>y.id===id);if(!x||x.status!=='open') return false;
  x.status=c;x.ruled=new Date().toISOString();x.via='settlement prompt';x.applied=false;try{noraApply(n,x,c);}catch(e){x.applied=false;}raw(PKEY.nora,JSON.stringify(n));const s=loadStore();const p=s.projects[s.active];if(p){p.tools.nora=n;
   // a need-date ruling is the record's need date too
@@ -1206,7 +1206,9 @@ function findings(){const F=[];const C=calc();const n=P.n;const add=(s,t,d)=>F.p
  {const pr=pumpReq();if(pr&&P.mode!=='review'){const l=pumpLine();if(!l) add('bad','Pumphouse not in the estimate',pr.id+' requires pumphouse space (“'+String(pr.text).slice(0,90)+'”), but no line prices it. Add a pumphouse line with its SF and unit cost.');else if(!N(l.qty)||!N(l.unit)) add('bad','Pumphouse not priced',pr.id+' requires pumphouse space; the pumphouse line has no '+(!N(l.qty)?'size':'unit cost')+' yet.');}}
  // EARL's recommended alternative and this 1391 should cost about the same: more than 25% apart means one of them is not the same project
  {let ea=null;try{const r=JSON.parse(localStorage.getItem('milcon_record')||'null');ea=r&&r.earl&&r.earl.recommended;}catch(e){}
-  const t=P.mode==='review'?N(P.review&&(P.review.ext_b9||P.review.ext_total))*1000:N(C.total);
+  // in review the record's settled figure is the one stated (the Appendix A total once it is chosen), else the form's own total
+  const rp=(()=>{try{const a=window.MS&&MS.active();return a&&a.core&&N(a.core.programmed);}catch(e){return 0;}})();
+  const t=P.mode==='review'?(rp||N(P.review&&(P.review.ext_b9||P.review.ext_total))*1000):N(C.total);
   if(ea&&N(ea.invest)&&t){const d=Math.abs(t-N(ea.invest))/Math.max(t,N(ea.invest));if(d>0.25) add('warn','EARL and this 1391 differ by '+Math.round(d*100)+'%','EARL’s recommended alternative ('+ea.name+') has a one-time investment of $'+(N(ea.invest)/1e6).toFixed(1)+'M (net present value $'+(N(ea.npv)/1e6).toFixed(1)+'M); this 1391 totals $'+(t/1e6).toFixed(1)+'M. Check that both describe the same scope before either goes forward.');}}
  // The category code must be in the same category group as the facility priced.
  {const cc=String(P.b.catcode||'').replace(/\D/g,'');const facs=[...new Set(P.prim.map(x=>String(x.fac||((String(x.item||'').match(/\bFAC\s?(\d{4})\b/)||[])[1])||'')).filter(Boolean))];
