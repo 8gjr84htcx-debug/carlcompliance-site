@@ -822,7 +822,7 @@ function vElicit(){const v=$('#view');
  if(!P.sessions.length){box.innerHTML='<div class="empty">No sessions yet. Add one, then type or paste the notes.</div>';return;}
  P.sessions.forEach(s=>{const c=document.createElement('div');c.className='card';
   c.innerHTML='<div class="hd"><span class="id">'+esc(SESSION_TYPES[s.type]||s.type)+'</span><input data-k="title" placeholder="Topic or document title" style="flex:1;min-width:200px"><input type="date" data-k="date" style="width:auto"><button class="sm" data-del>Remove</button></div>'+
-  '<div class="small" style="margin-bottom:4px">Participants</div><div class="pp">'+(P.stakeholders.length?P.stakeholders.map(x=>'<label class="pill" style="cursor:pointer"><input type="checkbox" style="width:auto;margin:0 4px 0 0" value="'+x.id+'" '+(s.participants.includes(x.id)?'checked':'')+'>'+esc(x.name||'(unnamed)')+'</label>').join(''):'<span class="small">Add stakeholders first to link participants.</span>')+'</div>'+
+  '<div class="small" style="margin-bottom:4px">Participants</div><div class="pp">'+(P.stakeholders.length?P.stakeholders.map(x=>'<label class="pill" style="cursor:pointer"><input type="checkbox" style="width:auto;margin:0 4px 0 0" value="'+x.id+'" '+((s.participants||[]).includes(x.id)?'checked':'')+'>'+esc(x.name||'(unnamed)')+'</label>').join(''):'<span class="small">Add stakeholders first to link participants.</span>')+'</div>'+
   '<div style="margin-top:8px"><textarea class="tall" data-k="notes" placeholder="Notes, transcript, or pasted requirement document text."></textarea></div>'+
   '<div class="row"><button class="go" data-find>Find requirements</button><span class="engines" data-eng></span></div><div data-cands></div>';
   bindAll(c,s);
@@ -1656,8 +1656,9 @@ function vReqs(){const v=$('#view');
 function vGap(){const v=$('#view');
  v.innerHTML='<div class="panel"><h2>Gap analysis</h2><p class="lead">For each capability, compare what exists today with what the mission needs. The gap and its impact become the heart of the need statement and the 1391 justification.</p>'+
  '<div class="mentor">Use numbers wherever you can: square feet, bays, beds, kilowatts, condition index, years of remaining life. Reviewers trust a measured gap; they question an adjective.</div>'+
- '<div id="gl"></div><div class="row"><button class="go" id="bAddG">Add capability</button></div></div>';
+ '<div id="gl"></div><div class="row"><button class="go" id="bAddG">Add capability</button></div></div>'+facCard();
  $('#bAddG').onclick=()=>{P.gaps.push({id:uid(),area:'',current:'',required:'',qty_have:'',qty_need:'',unit:'',impact:'',reqs:[]});save();vGap();renderSteps();};
+ bindFac();
  const box=$('#gl');if(!P.gaps.length){box.innerHTML='<div class="empty">No capabilities recorded yet.</div>';return;}
  const act=P.requirements.filter(r=>r.status!=='withdrawn');
  P.gaps.forEach(g=>{const d=document.createElement('div');d.className='card';
@@ -1665,12 +1666,26 @@ function vGap(){const v=$('#view');
   '<div class="cols2"><div><label class="f">What exists today</label><textarea data-k="current"></textarea></div><div><label class="f">What the mission requires</label><textarea data-k="required"></textarea></div></div>'+
   '<div class="grid4" style="margin-top:8px"><div><label class="f">Quantity today</label><input type="number" data-k="qty_have"></div><div><label class="f">Quantity required</label><input type="number" data-k="qty_need"></div><div><label class="f">Unit</label><input data-k="unit" placeholder="SF, bays, beds, kW"></div><div><label class="f">Gap</label><div data-gap style="padding:6px 0;font-weight:600"></div></div></div>'+
   '<div style="margin-top:8px"><label class="f">Impact on the mission if the gap is not closed</label><textarea data-k="impact"></textarea></div>'+
-  '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><div class="chips" data-rbox>'+act.map(r=>'<label class="chip" title="'+esc(r.text)+'"><input type="checkbox" value="'+r.id+'" '+(g.reqs.includes(r.id)?'checked':'')+'>'+esc(r.id+' '+r.text.slice(0,60)+(r.text.length>60?'…':''))+'</label>').join('')+'</div></div>';
+  '<div style="margin-top:8px"><label class="f">Requirements that close this gap</label><div class="chips" data-rbox>'+act.map(r=>'<label class="chip" title="'+esc(r.text)+'"><input type="checkbox" value="'+r.id+'" '+((g.reqs||[]).includes(r.id)?'checked':'')+'>'+esc(r.id+' '+r.text.slice(0,60)+(r.text.length>60?'…':''))+'</label>').join('')+'</div></div>';
   const gp=()=>{const h=Number(g.qty_have),n=Number(g.qty_need);d.querySelector('[data-gap]').textContent=(g.qty_need!==''&&!isNaN(n))?((n-(isNaN(h)?0:h)).toLocaleString()+' '+(g.unit||'')):'–';};
   bindAll(d,g,gp);gp();
   d.querySelectorAll('[data-rbox] input').forEach(c=>c.onchange=()=>{g.reqs=[...d.querySelectorAll('[data-rbox] input:checked')].map(o=>o.value);save();});
   d.querySelector('[data-del]').onclick=()=>{P.gaps=P.gaps.filter(x=>x!==g);log('Gap removed',g.area);save();vGap();renderSteps();};
   box.appendChild(d);});}
+
+// ---------- existing facility condition (feeds PAULA's condition and life-safety score) ----------
+const QRT=[['Q1','Q-1 Good (condition index 90–100)'],['Q2','Q-2 Fair (80–89)'],['Q3','Q-3 Poor (60–79)'],['Q4','Q-4 Failing (0–59)'],['none','No existing facility – new mission']];
+const qFromIdx=x=>{const n=Number(x);if(x===''||isNaN(n)) return '';return n>=90?'Q1':n>=80?'Q2':n>=60?'Q3':'Q4';};
+function FAC(){if(!P.facility) P.facility={building:'',rating:'',fci:'',source:'',life_safety:[]};if(!P.facility.life_safety) P.facility.life_safety=[];return P.facility;}
+function facCard(){const f=FAC();return '<div class="panel"><h2>Existing facility condition</h2><p class="lead">The building this project fixes or replaces. PAULA uses the rating and the life-safety deficiencies to score condition when it ranks projects. Take the rating from the real property record or a condition assessment and name it as the source.</p>'+
+ '<div class="grid4"><div><label class="f">Building</label><input data-fk="building" value="'+esc(f.building)+'" placeholder="e.g. Building 1234"></div><div><label class="f">Condition index (0–100)</label><input type="number" min="0" max="100" data-fk="fci" value="'+esc(f.fci)+'"></div><div><label class="f">Quality rating</label><select data-fk="rating"><option value="">Not set</option>'+QRT.map(([k,n])=>'<option value="'+k+'"'+(f.rating===k?' selected':'')+'>'+esc(n)+'</option>').join('')+'</select></div><div><label class="f">Source</label><input data-fk="source" value="'+esc(f.source)+'" placeholder="e.g. Real property record, FY26 assessment"></div></div>'+
+ (f.fci!==''&&f.rating&&f.rating!=='none'&&qFromIdx(f.fci)!==f.rating?'<p class="small" style="color:#8a6100">A condition index of '+esc(f.fci)+' is '+qFromIdx(f.fci).replace('Q','Q-')+', not '+f.rating.replace('Q','Q-')+'. Check which one the record shows.</p>':'')+
+ '<div style="margin-top:10px"><label class="f">Life-safety deficiencies</label>'+(f.life_safety.length?f.life_safety.map((x,i)=>'<div class="row" style="gap:6px;margin:4px 0"><input data-ls="'+i+'|text" value="'+esc(x.text)+'" placeholder="e.g. No fire sprinklers in an assembly space" style="flex:2"><input data-ls="'+i+'|code" value="'+esc(x.code||'')+'" placeholder="Code or standard, e.g. UFC 3-600-01" style="flex:1"><button class="sm" data-lsx="'+i+'">Remove</button></div>').join(''):'<p class="small" style="margin:4px 0">None recorded.</p>')+
+ '<button class="sm" id="bAddLS">Add deficiency</button></div></div>';}
+function bindFac(){const f=FAC();document.querySelectorAll('[data-fk]').forEach(el=>el.onchange=()=>{const k=el.dataset.fk;f[k]=el.value.trim();if(k==='fci'&&!f.rating&&qFromIdx(f.fci)) f.rating=qFromIdx(f.fci);log('Facility condition updated',k);save();if(k!=='source'&&k!=='building') vGap();});
+ document.querySelectorAll('[data-ls]').forEach(el=>el.onchange=()=>{const [i,k]=el.dataset.ls.split('|');f.life_safety[+i][k]=el.value.trim();save();});
+ document.querySelectorAll('[data-lsx]').forEach(b=>b.onclick=()=>{f.life_safety.splice(+b.dataset.lsx,1);save();vGap();});
+ const ad=document.getElementById('bAddLS');if(ad) ad.onclick=()=>{f.life_safety.push({text:'',code:''});save();vGap();};}
 
 // ---------- 6 constraints, assumptions, risks, measures ----------
 function vCars(){const v=$('#view');

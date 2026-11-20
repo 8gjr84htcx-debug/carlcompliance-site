@@ -388,6 +388,8 @@ function clusterDefault(loc){const t=String(loc||'').toLowerCase();if(!t.trim())
 const CLU=r=>r.cluster||clusterDefault(r.location);
 let FCLU='';document.addEventListener('change',e=>{if(e.target&&e.target.id==='fCluA'){FCLU=e.target.value;vAln();}});
 const COMPONENTS=['PACFLT','PACAF','USARPAC','MARFORPAC','SOCPAC','Other'];
+const CONSQ=[['severe','Severe – the mission cannot be performed'],['major','Major – the mission is degraded'],['moderate','Moderate – a workaround at a cost'],['minor','Minor – little effect']];
+const N0=v=>{const n=parseInt(v,10);return n>0?n:0;};
 const TIERS=[['critical','Critical',5],['high','High',4],['medium','Medium',3],['low','Low',2]];
 const TIER=k=>TIERS.find(t=>t[0]===k)||TIERS[2];
 const ST={ok:['On track','#e3f4e3','#006300'],risk:['At risk','#fdf1d6','#7a5200'],late:['Late','#fbeeee','#9b2c2c'],none:['No project linked','#eeedea','#52514e'],noneed:['No need date','#eeedea','#52514e'],unk:['Dates unknown','#eeedea','#52514e']};
@@ -450,13 +452,13 @@ function vReq(){const v=$('#view');const P=projects();
  $('#bAdd').onclick=()=>{const r={id:uid(),name:'',location:'',component:'',program:'',need:'',tier:'high',effect:'',source:'',links:[]};A.reqs.unshift(r);OPEN=r.id;log('Requirement added');save();vReq();setTimeout(()=>{const e=document.querySelector('[data-rf="'+r.id+'|name"]');if(e) e.focus();},50);};
  $('#bRead').onclick=readBox;if($('#fClu')) $('#fClu').onchange=e=>{FCLU=e.target.value;vReq();};bindReq(P);}
 function reqCard(r,P){const e=evalReq(r,P);const t=TIER(r.tier);const ed=OPEN===r.id;
- const head='<div class="row" style="margin:0;justify-content:space-between;align-items:flex-start;gap:10px"><div><h4>'+esc(r.name||'(unnamed requirement)')+'</h4><div class="meta">'+esc([r.location,CLU(r)?CLU(r)+' cluster':'',r.lead?'Lead: '+r.lead:'',r.component,r.program,t[1],r.need?'Needed '+fm(r.need):'No need date'].filter(Boolean).join('  ·  '))+'</div></div><div style="text-align:right">'+chip(e.st)+
+ const head='<div class="row" style="margin:0;justify-content:space-between;align-items:flex-start;gap:10px"><div><h4>'+esc(r.name||'(unnamed requirement)')+'</h4><div class="meta">'+esc([r.location,CLU(r)?CLU(r)+' cluster':'',r.lead?'Lead: '+r.lead:'',r.component,r.program,t[1],N0(r.rank)?'Command rank '+N0(r.rank)+(r.rank_src?'':' (no source)'):'',r.consequence?'If late: '+(CONSQ.find(x=>x[0]===r.consequence)||['',''])[1].split(' – ')[0]:'',r.need?'Needed '+fm(r.need):'No need date'].filter(Boolean).join('  ·  '))+'</div></div><div style="text-align:right">'+chip(e.st)+
   (e.cap?'<div class="small" style="margin-top:4px">Capability '+fm(e.cap)+(e.gap!=null?' · '+(e.gap>0?e.gap+' mo late':e.gap<0?(-e.gap)+' mo early':'on the date'):'')+'</div>':'')+'</div></div>';
  const form=ed?'<div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">'+
   '<div style="grid-column:1/-1"><label class="f">Requirement – the capability needed</label><input data-rf="'+r.id+'|name" value="'+esc(r.name)+'" placeholder="e.g. Dispersed fighter operations from Tinian"></div>'+
   '<div><label class="f">Location</label><input data-rf="'+r.id+'|location" value="'+esc(r.location)+'" placeholder="Installation or island"></div>'+
   '<div><label class="f">Needed by</label><input type="month" data-rf="'+r.id+'|need" value="'+esc(r.need)+'"></div>'+
-  '<div><label class="f">Priority</label><select data-rf="'+r.id+'|tier">'+TIERS.map(([k,n])=>'<option value="'+k+'"'+(r.tier===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Your priority tier</label><select data-rf="'+r.id+'|tier">'+TIERS.map(([k,n])=>'<option value="'+k+'"'+(r.tier===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+'<div><label class="f">Command rank (1 = highest)</label><input type="number" min="1" step="1" data-rf="'+r.id+'|rank" value="'+esc(r.rank||'')+'" placeholder="Not ranked"></div>'+'<div><label class="f">Rank source</label><input data-rf="'+r.id+'|rank_src" value="'+esc(r.rank_src||'')+'" placeholder="e.g. J4 posture list, Oct 2026 (unclassified)"></div>'+'<div><label class="f">If the capability is late</label><select data-rf="'+r.id+'|consequence"><option value="">Not set</option>'+CONSQ.map(([k,n])=>'<option value="'+k+'"'+(r.consequence===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
   '<div><label class="f">Component command</label><select data-rf="'+r.id+'|component"><option value="">Not set</option>'+COMPONENTS.map(x=>'<option'+(r.component===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
   '<div><label class="f">Cluster</label><select data-rf="'+r.id+'|cluster"><option value="">'+esc(clusterDefault(r.location)?'From location: '+clusterDefault(r.location):'Not set')+'</option>'+CLUSTERS.map(x=>'<option'+(r.cluster===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
   '<div><label class="f">Lead Service</label><select data-rf="'+r.id+'|lead"><option value="">Not set</option>'+LEAD_SVC.map(x=>'<option'+(r.lead===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
@@ -471,7 +473,7 @@ function reqCard(r,P){const e=evalReq(r,P);const t=TIER(r.tier);const ed=OPEN===
  const miss=e.miss&&e.miss.length?'<div class="small" style="color:#7a5200;margin-top:6px">No delivery date for '+e.miss.map(x=>esc(x.l.p.name)).join(', ')+': add a fiscal year or completion date in PAULA.</div>':'';
  return '<div class="req">'+head+form+links+sug+miss+'<div class="row" style="margin:8px 0 0"><button class="sm" data-re="'+r.id+'">'+(ed?'Done':'Edit')+'</button> <button class="sm" data-rd="'+r.id+'">Delete</button></div></div>';}
 function bindReq(P){const R=id=>A.reqs.find(r=>r.id===id);const sv=()=>{save();vReq();};
- document.querySelectorAll('[data-rf]').forEach(el=>el.onchange=()=>{const [id,k]=el.dataset.rf.split('|');R(id)[k]=el.value.trim();save();if(k!=='name'&&k!=='effect'&&k!=='source') vReq();});
+ document.querySelectorAll('[data-rf]').forEach(el=>el.onchange=()=>{const [id,k]=el.dataset.rf.split('|');R(id)[k]=el.value.trim();save();if(k!=='name'&&k!=='effect'&&k!=='source'&&k!=='rank_src') setTimeout(vReq,0);});
  document.querySelectorAll('[data-re]').forEach(b=>b.onclick=()=>{OPEN=OPEN===b.dataset.re?'':b.dataset.re;vReq();});
  document.querySelectorAll('[data-rd]').forEach(b=>b.onclick=()=>{const r=R(b.dataset.rd);if(!confirm('Delete “'+(r.name||'this requirement')+'”?')) return;A.reqs=A.reqs.filter(x=>x!==r);log('Requirement deleted',r.name);sv();});
  document.querySelectorAll('[data-la]').forEach(s=>s.onchange=()=>{if(!s.value) return;const r=R(s.dataset.la);r.links=(r.links||[]).concat([{pid:s.value,role:'required'}]);log('Project linked',r.name);sv();});
