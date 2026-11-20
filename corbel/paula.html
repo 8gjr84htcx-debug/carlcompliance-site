@@ -6,7 +6,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -566,7 +566,7 @@ button.go:disabled{opacity:.5;cursor:default}
 button.sm{font-size:12.5px;padding:3px 9px}
 button.link{border:none;background:none;color:var(--depth);padding:2px 4px;text-decoration:underline}
 header button{background:transparent;color:#fff;border-color:rgba(255,255,255,.35)}
-.wrap{max-width:1320px;margin:0 auto;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
+.wrap{max-width:none;margin:0;padding:22px 28px 60px;display:grid;grid-template-columns:230px minmax(0,1fr);gap:22px}
 @media(max-width:900px){.wrap{grid-template-columns:1fr}}
 nav.steps{position:sticky;top:16px;align-self:start;display:grid;gap:4px}
 nav.steps button{text-align:left;border:1px solid transparent;background:transparent;padding:9px 12px;display:flex;gap:10px;align-items:center;border-radius:8px}
@@ -950,7 +950,7 @@ function vPort(){const v=$('#view');const L=filtered();
  '<div class="card2"><h3>Health over time</h3><p class="cap">Projects in each health state at the end of each month, from status updates.</p>'+healthTrend(L)+healthLeg()+'</div></div>'+
  '<div class="grid g-11" style="margin-top:14px"><div class="card2"><h3>Next 90 days</h3><p class="cap">Upcoming milestones and gates. Filled marks are forecast on time; hollow marks are forecast late.</p>'+timeline(L)+'</div>'+
  '<div class="card2"><h3>Risk exposure</h3><p class="cap">Open risks by likelihood and impact across the filtered projects. Darker means more risks.</p>'+riskHeat(L)+'</div></div>';
- bindFilters();bindPortExtra(v);v.querySelectorAll('[data-clu]').forEach(e=>e.onclick=()=>{F.clu=e.dataset.clu;render();window.scrollTo(0,0);});if($('#cluAll')) $('#cluAll').onclick=()=>{F.clu='';render();};v.querySelectorAll('[data-open]').forEach(e=>e.onclick=()=>openP(P.projects.find(p=>p.id===e.dataset.open)));}
+ arrangePort(v);bindFilters();bindPortExtra(v);v.querySelectorAll('[data-clu]').forEach(e=>e.onclick=()=>{F.clu=e.dataset.clu;render();window.scrollTo(0,0);});if($('#cluAll')) $('#cluAll').onclick=()=>{F.clu='';render();};v.querySelectorAll('[data-open]').forEach(e=>e.onclick=()=>openP(P.projects.find(p=>p.id===e.dataset.open)));}
 // ---- Clusters: one row per cluster, click to filter the whole dashboard to it ----
 function msDate(p,n){const m=(p.milestones||[]).find(x=>x.name===n);return m?(m.actual||m.forecast||m.baseline||''):'';}
 function clusterCard(H){if(F.clu) return '<div class="card2" style="margin-top:14px"><div class="row" style="justify-content:space-between;align-items:center"><h3 style="margin:0">'+esc(F.clu)+' cluster</h3><button class="sm" id="cluAll">Show all clusters</button></div><p class="cap" style="margin-bottom:0">'+esc(CLUSTER_SRC)+'</p></div>';
@@ -1142,13 +1142,53 @@ function ppuDoc(){const T=TEAM();const W=P.work;const D=W.filter(w=>w.type!=='re
  const s3=cdH('3  Schedule and milestones')+(D.length||Rc.length?cdTable(['Workstream / milestone','Completion criterion','Baseline / current forecast','Status / dependency'],D.map(w=>{const s=wState(w);return [esc((w.ws||'')+' / '+w.title),esc(w.criterion||'')||ph('Observable result'),(w.base||w.due?fd(w.base||w.due):'–')+' / '+(s==='done'?'done '+fd(w.done):w.due&&w.due<today()?'overdue, no revised date':w.due?fd(w.due):'–'),(s==='done'?'Complete':s==='delayed'||s==='incomplete'?'Delayed':'On track')+(w.dep?' – '+esc(w.dep):'')];}).concat(Rc.map(w=>['Recurring: '+esc(w.title),esc(w.criterion||'')||ph('Meeting with documented output'),esc(w.freq||'')||ph('Frequency'),esc(w.owner||'')||ph('Owner / purpose')])),['30%','28%','22%','20%']):cdP(ph('Add milestones')))+
   cdP('<b>Quality check:</b> option-year nomenclature; TDL identifiers, command priorities, milestones, owners and funding dependencies aligned with approved records.','margin:12pt 0 0;font-size:9pt');
  return cdDoc('Project plan update',[rpBand('Project Plan Update',(T.program||'')+'  /  Option-year work plan input')+cdP('Working draft – complete with verified, authorized information before submission.','margin:8pt 0;font-size:9pt;font-style:italic;color:'+CD.taupe2)+head+s1+s2+s3+cdFoot(esc(T.program||'')+'  |  '+esc(T.marking||''))]);}
+// ---- Portfolio layout: panels can be moved, resized (full or half width) and hidden; one layout for every portfolio ----
+const LAYK='paula_layout';let LAYEDIT=false;
+const LAYFULL={'where-the-work-is':1,'clusters':1,'needs-attention':1,'delivery-against-need-dates':1,'actions-and-decisions':1,'milestones-due-met-and-missed':1};
+function layGet(){try{return JSON.parse(localStorage.getItem(LAYK)||'null')||{order:[],w:{},hidden:[]};}catch(e){return {order:[],w:{},hidden:[]};}}
+function laySet(o){try{localStorage.setItem(LAYK,JSON.stringify(o));}catch(e){}}
+function panelId(c){const h=c.querySelector(':scope>h3,:scope>.row>h3');if(!h) return '';const t=h.textContent.trim();if(/ cluster$/.test(t)||t==='Clusters') return 'clusters';return t.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');}
+function arrangePort(v){const kpi=v.querySelector('.g-kpi');if(!kpi) return;const cards=[...v.querySelectorAll('.card2')].filter(c=>panelId(c)&&!c.parentElement.closest('.card2'));if(!cards.length) return;
+ const def=cards.map(panelId);const names={};cards.forEach(c=>names[panelId(c)]=c.querySelector('h3').textContent.trim());
+ const Lo=layGet();const order=Lo.order.filter(id=>def.includes(id));def.forEach((id,i)=>{if(!order.includes(id)){const prev=def.slice(0,i).reverse().find(x=>order.includes(x));order.splice(prev?order.indexOf(prev)+1:0,0,id);}});
+ const hidden=new Set(Lo.hidden||[]);const byId={};cards.forEach(c=>byId[panelId(c)]=c);
+ const G=document.createElement('div');G.className='grid g-11';G.id='pgrid';G.style.marginTop='14px';
+ const bar=document.createElement('div');bar.className='row noprint';bar.style.cssText='justify-content:flex-end;gap:8px;margin-top:10px;align-items:center;flex-wrap:wrap';
+ const hid=order.filter(id=>hidden.has(id));
+ bar.innerHTML=LAYEDIT?'<span class="small" style="margin-right:auto">Drag a panel by its handle or use the arrows. Full or half sets its width.</span>'+(hid.length?'<span class="small">Hidden:</span>'+hid.map(id=>'<button class="sm" data-lshow="'+id+'">+ '+esc(names[id])+'</button>').join(''):'')+'<button class="sm" id="layReset">Reset</button><button class="sm go" id="layDone">Done</button>':'<button class="sm" id="layEdit">Edit layout</button>';
+ order.forEach((id,i)=>{const c=byId[id];if(!c) return;c.style.marginTop='0';const w=(Lo.w||{})[id]||(LAYFULL[id]?'full':'half');
+  if(hidden.has(id)&&!LAYEDIT) return;if(hidden.has(id)) return;
+  const box=document.createElement('div');box.className='pnl';box.dataset.pid=id;box.style.minWidth='0';box.style.gridColumn=w==='full'?'1 / -1':'auto';
+  if(LAYEDIT){box.draggable=true;box.style.outline='2px dashed #9ab';box.style.outlineOffset='3px';box.style.borderRadius='10px';
+   const tb=document.createElement('div');tb.className='row noprint';tb.style.cssText='gap:6px;align-items:center;margin-bottom:6px;flex-wrap:wrap';
+   tb.innerHTML='<span title="Drag to move" style="cursor:grab;font-size:16px;padding:0 6px;user-select:none">&#9776;</span><b class="small" style="margin-right:auto">'+esc(names[id])+'</b><button class="sm" data-lup="'+id+'" aria-label="Move up">&#8593;</button><button class="sm" data-ldn="'+id+'" aria-label="Move down">&#8595;</button><button class="sm" data-lw="'+id+'">'+(w==='full'?'Make half width':'Make full width')+'</button><button class="sm" data-lhide="'+id+'">Hide</button>';
+   box.appendChild(tb);c.style.pointerEvents='none';c.style.opacity='.85';}
+  box.appendChild(c);G.appendChild(box);});
+ // remove the old wrappers left behind, then place the bar and the grid right after the KPI tiles
+ [...v.querySelectorAll('.grid.g-11,.grid.g-2')].forEach(g=>{if(g!==G&&!g.querySelector('.card2')) g.remove();});
+ [...kpi.parentElement.children].forEach(el=>{if(el!==kpi&&el.tagName==='DIV'&&!el.className&&!el.textContent.trim()) el.remove();});
+ kpi.after(bar);bar.after(G);
+ const save2=o=>{laySet(o);render();};
+ const cur=()=>{const o=layGet();o.order=order.slice();o.w=o.w||{};o.hidden=[...hidden];return o;};
+ const mv=(id,d)=>{const vis=order.filter(x=>!hidden.has(x));const i=vis.indexOf(id),j=i+d;if(j<0||j>=vis.length) return;const a=order.indexOf(vis[i]),b=order.indexOf(vis[j]);[order[a],order[b]]=[order[b],order[a]];save2(cur());};
+ if($('#layEdit')) $('#layEdit').onclick=()=>{LAYEDIT=true;render();};
+ if($('#layDone')) $('#layDone').onclick=()=>{LAYEDIT=false;render();};
+ if($('#layReset')) $('#layReset').onclick=()=>{try{localStorage.removeItem(LAYK);}catch(e){}render();};
+ G.querySelectorAll('[data-lup]').forEach(b=>b.onclick=()=>mv(b.dataset.lup,-1));G.querySelectorAll('[data-ldn]').forEach(b=>b.onclick=()=>mv(b.dataset.ldn,1));
+ G.querySelectorAll('[data-lw]').forEach(b=>b.onclick=()=>{const o=cur();const id=b.dataset.lw;const w=o.w[id]||(LAYFULL[id]?'full':'half');o.w[id]=w==='full'?'half':'full';save2(o);});
+ G.querySelectorAll('[data-lhide]').forEach(b=>b.onclick=()=>{hidden.add(b.dataset.lhide);save2(cur());});
+ bar.querySelectorAll('[data-lshow]').forEach(b=>b.onclick=()=>{hidden.delete(b.dataset.lshow);save2(cur());});
+ if(LAYEDIT){let drag=null;G.querySelectorAll('.pnl').forEach(p=>{p.addEventListener('dragstart',e=>{drag=p.dataset.pid;e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',drag);}catch(_){}});
+  p.addEventListener('dragover',e=>{e.preventDefault();p.style.outlineColor='#1F5566';});p.addEventListener('dragleave',()=>{p.style.outlineColor='#9ab';});
+  p.addEventListener('drop',e=>{e.preventDefault();const to=p.dataset.pid;if(!drag||drag===to) return;order.splice(order.indexOf(drag),1);order.splice(order.indexOf(to),0,drag);save2(cur());});});}
+}
 function segBar(cnt){const tot=cnt.reduce((a,b)=>a+b,0)||1;
  return '<div style="display:flex;gap:2px;height:28px;margin-top:10px">'+cnt.map((n,l)=>n?'<div'+tipA(n+' '+LEVEL[l].n.toLowerCase()+'\n'+pct(n/tot)+' of projects')+' style="flex:'+n+';background:'+LEVEL[l].c+';border-radius:4px;display:flex;align-items:center;padding:0 8px;min-width:0;overflow:hidden;white-space:nowrap;font:600 13px system-ui,Segoe UI,sans-serif;color:'+(l===1?'#0b0b0b':'#fff')+'">'+(n/tot>.12?pct(n/tot):'')+'</div>':'').join('')+'</div>'+
  '<div class="leg" style="margin-top:8px">'+LEVEL.map((L,l)=>'<span><i style="background:'+L.c+'"></i>'+L.i+' '+L.n+' <b style="color:#0b0b0b">'+cnt[l]+'</b></span>').join('')+'</div>';}
 function mapSVG(H){const W=MAP.W,Hh=MAP.H;const X=lon=>(((lon<-30?lon+360:lon)-MAP.L0)/(MAP.L1-MAP.L0))*W,Y=lat=>((MAP.B1-lat)/(MAP.B1-MAP.B0))*Hh;
  const mx=Math.max(...H.map(x=>value(x.p)),1);const pts=H.map(x=>{let la=N(x.p.lat),lo=N(x.p.lon);if(!x.p.lat&&!x.p.lon){const g=locate(x.p.installation);if(!g) return null;la=g[0];lo=g[1];}return {x,cx:X(lo),cy:Y(la),dx:0,dy:0,r:5+Math.sqrt(value(x.p)/mx)*16};}).filter(Boolean);
  const miss=H.length-pts.length;const v=MZ.v||[0,0,W,Hh];const k=v[2]/W;setTimeout(()=>{if(mapEl()) mzSet(MZ.v||[0,0,W,Hh]);},0);
- return '<div class="mapw" style="position:relative"><svg id="pmap" viewBox="'+v.join(' ')+'" role="img" style="background:#eef4f6;border-radius:8px;overflow:hidden;touch-action:none;cursor:grab;display:block;width:100%"><path d="'+MAP.d+'" fill-rule="evenodd" fill="#dfe5e1" stroke="#c9d3cf" stroke-width=".8" vector-effect="non-scaling-stroke"/>'+
+ return '<div class="mapw" style="position:relative"><svg id="pmap" viewBox="'+v.join(' ')+'" role="img" style="background:#eef4f6;border-radius:8px;overflow:hidden;touch-action:none;cursor:grab;display:block;width:100%;height:min(72vh,calc(100vw * 0.62))"><path d="'+MAP.d+'" fill-rule="evenodd" fill="#dfe5e1" stroke="#c9d3cf" stroke-width=".8" vector-effect="non-scaling-stroke"/>'+
  pts.sort((a,b)=>b.r-a.r).map(p=>'<g class="mk" data-x="'+p.cx.toFixed(1)+'" data-y="'+p.cy.toFixed(1)+'" transform="translate('+p.cx.toFixed(1)+' '+p.cy.toFixed(1)+') scale('+k+')" style="cursor:pointer" data-open="'+p.x.p.id+'"'+tipA(M(value(p.x.p))+'\n'+p.x.p.name+'\n'+p.x.p.installation+' · '+LEVEL[p.x.h.overall].n+' · Phase '+p.x.p.phase)+'><g transform="translate('+p.dx.toFixed(1)+' '+p.dy.toFixed(1)+')">'+shape(p.x.h.overall,0,0,p.r/1.6)+'<circle r="'+Math.max(12,p.r)+'" fill="transparent"/></g></g>').join('')+'</svg>'+
  '<div class="mapz" style="position:absolute;top:8px;right:8px;display:flex;flex-direction:column;gap:4px"><button class="sm" data-mz="in" aria-label="Zoom in">+</button><button class="sm" data-mz="out" aria-label="Zoom out">−</button><button class="sm" data-mz="reset" aria-label="Show the whole Indo-Pacific">⤢</button></div></div>'+
  '<div class="row" style="margin-top:6px;gap:6px;flex-wrap:wrap">'+Object.keys(REGIONS).map(r=>'<button class="sm" data-mreg="'+esc(r)+'">'+esc(r)+'</button>').join('')+'</div>'+
@@ -1157,7 +1197,8 @@ function mapSVG(H){const W=MAP.W,Hh=MAP.H;const X=lon=>(((lon<-30?lon+360:lon)-M
 const REGIONS={'Indo-Pacific':null,'Japan and Korea':[123,147,24,45],'Guam':[144.55,145.05,13.18,13.72],'Saipan and Tinian':[145.45,145.95,14.85,15.35],'Guam and CNMI':[143.4,146.6,12.9,16.2],'Philippines':[115,128,4,21],'Okinawa':[126.5,129,25.6,27.2],'Hawaii':[-161,-154,18.5,22.6],'Alaska':[-170,-140,54,71.5],'Australia':[110,156,-44,-9],'India and Diego Garcia':[66,96,-10,32]};
 const MZ={v:null};
 function mapEl(){return document.getElementById('pmap');}
-function mzSet(v){const W=MAP.W,Hh=MAP.H;let [x,y,w,h]=v;const minW=W/400;if(w>W){w=W;h=Hh;}if(w<minW){h=h*minW/w;w=minW;}x=Math.max(0,Math.min(W-w,x));y=Math.max(0,Math.min(Hh-h,y));MZ.v=[x,y,w,h];const s=mapEl();if(!s) return;
+function mzAR(){const s=mapEl();const r=s&&s.getBoundingClientRect();return r&&r.width&&r.height?r.height/r.width:MAP.H/MAP.W;}
+function mzSet(v){const W=MAP.W,Hh=MAP.H;let [x,y,w,h]=v;const minW=W/400;const ea=mzAR();const cx0=x+w/2,cy0=y+h/2;if(w>W) w=W;if(w<minW) w=minW;h=w*ea;if(h>Hh){h=Hh;w=h/ea;}x=cx0-w/2;y=cy0-h/2;x=Math.max(0,Math.min(W-w,x));y=Math.max(0,Math.min(Hh-h,y));MZ.v=[x,y,w,h];const s=mapEl();if(!s) return;
  s.setAttribute('viewBox',MZ.v.map(n=>n.toFixed(2)).join(' '));const rw=s.getBoundingClientRect().width||W;const k=w/rw;const G=[...s.querySelectorAll('g.mk')];G.forEach(g=>g.setAttribute('transform','translate('+g.dataset.x+' '+g.dataset.y+') scale('+k.toFixed(4)+')'));
  // spread only marks that sit within 10 screen px of each other at this zoom; each ring centres on the true location
  const used=new Set();G.forEach((g,i)=>{if(used.has(i)) return;const x=+g.dataset.x,y=+g.dataset.y;const grp=[i];G.forEach((h,j)=>{if(j!==i&&!used.has(j)&&Math.hypot((+h.dataset.x-x)/k,(+h.dataset.y-y)/k)<10) grp.push(j);});grp.forEach(j=>used.add(j));
@@ -1165,7 +1206,7 @@ function mzSet(v){const W=MAP.W,Hh=MAP.H;let [x,y,w,h]=v;const minW=W/400;if(w>W
   grp.forEach((j,n)=>{const a=n/grp.length*Math.PI*2-Math.PI/2;const inner=G[j].firstElementChild;const tx=grp.length>1?((cx-+G[j].dataset.x)/k+Math.cos(a)*R):0,ty=grp.length>1?((cy-+G[j].dataset.y)/k+Math.sin(a)*R):0;inner.setAttribute('transform','translate('+tx.toFixed(1)+' '+ty.toFixed(1)+')');});});}
 function mzZoom(f,cx,cy){const W=MAP.W,Hh=MAP.H;const v=MZ.v||[0,0,W,Hh];if(cx==null){cx=v[0]+v[2]/2;cy=v[1]+v[3]/2;}const w=Math.max(W/400,Math.min(W,v[2]/f));f=v[2]/w;mzSet([cx-(cx-v[0])/f,cy-(cy-v[1])/f,w,v[3]/f]);}
 function mzRegion(name){const b=REGIONS[name];const W=MAP.W,Hh=MAP.H;if(!b){mzSet([0,0,W,Hh]);return;}
- const X=lon=>(((lon<-30?lon+360:lon)-MAP.L0)/(MAP.L1-MAP.L0))*W,Y=lat=>((MAP.B1-lat)/(MAP.B1-MAP.B0))*Hh;let x0=X(b[0]),x1=X(b[1]),y0=Y(b[3]),y1=Y(b[2]);let w=x1-x0,h=y1-y0;const ar=Hh/W;if(h/w>ar){const nw=h/ar;x0-=(nw-w)/2;w=nw;}else{const nh=w*ar;y0-=(nh-h)/2;h=nh;}mzSet([x0,y0,w,h]);}
+ const X=lon=>(((lon<-30?lon+360:lon)-MAP.L0)/(MAP.L1-MAP.L0))*W,Y=lat=>((MAP.B1-lat)/(MAP.B1-MAP.B0))*Hh;let x0=X(b[0]),x1=X(b[1]),y0=Y(b[3]),y1=Y(b[2]);let w=x1-x0,h=y1-y0;const ar=mzAR();if(h/w>ar){const nw=h/ar;x0-=(nw-w)/2;w=nw;}else{const nh=w*ar;y0-=(nh-h)/2;h=nh;}mzSet([x0,y0,w,h]);}
 function svgPt(s,e){const r=s.getBoundingClientRect(),v=MZ.v||[0,0,MAP.W,MAP.H];return [v[0]+(e.clientX-r.left)/r.width*v[2],v[1]+(e.clientY-r.top)/r.height*v[3]];}
 (function(){const ptrs=new Map();let drag=null,moved=false,pinch=null;
  document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('[data-mz],[data-mreg]');if(b){e.preventDefault();if(b.dataset.mreg) mzRegion(b.dataset.mreg);else if(b.dataset.mz==='reset') mzRegion('Indo-Pacific');else mzZoom(b.dataset.mz==='in'?2:.5);return;}
