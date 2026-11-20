@@ -12,14 +12,14 @@
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
  SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
  SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
- var NAMES={'':'My portfolio',test:'Test portfolio'};
+ var NAMES={'':'My portfolio',test:'Test portfolio',ipac:'Indo-Pacific rehearsal'};var SEEDED={test:'test_portfolio.json',ipac:'ipac_portfolio.json'};
  function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
  function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
- function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+ function seed(id){return fetch('/corbel/'+(SEEDED[id]||'test_portfolio.json'),{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Portfolio data not found');return x.json();}).then(function(j){
    wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
-   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+   if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
   TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -710,8 +710,8 @@
   <section class="pfsec" style="padding:0 24px 24px">
     <div class="pfbar" id="pfbar">
       <label for="pfsel">Portfolio</label>
-      <select id="pfsel"><option value="">My portfolio</option><option value="test">Test portfolio (sample data)</option></select>
-      <button id="pfreset" hidden>Reset test portfolio</button>
+      <select id="pfsel"><option value="">My portfolio</option><option value="test">Test portfolio (sample data)</option><option value="ipac">Indo-Pacific rehearsal (public budget data)</option></select>
+      <button id="pfreset" hidden>Reset this portfolio</button>
       <button id="pfbak" title="One file with every Corbel tool’s data in this portfolio">Back up all tools</button>
       <button id="pfres" title="Put a backup file back into this portfolio">Restore</button><input type="file" id="pfresf" accept=".json" hidden>
       <span class="pfnote" id="pfnote"></span>
@@ -720,10 +720,10 @@
   <script>
   (function(){var PF=window.CorbelPF;if(!PF){document.getElementById('pfbar').style.display='none';return;}
    var sel=document.getElementById('pfsel'),rs=document.getElementById('pfreset'),nt=document.getElementById('pfnote'),bar=document.getElementById('pfbar');
-   function show(){var t=PF.cur()==='test';sel.value=PF.cur();rs.hidden=!t;bar.classList.toggle('test',t);
-    nt.textContent=t?'Every tool now opens the sample Indo-Pacific portfolio and one fully worked project. Nothing here touches your real projects.':'Your real projects. Switch to Test to try any tool on sample data without touching them.';}
-   sel.onchange=function(){var v=sel.value;nt.textContent='Switching…';PF.use(v).then(function(){location.reload();}).catch(function(e){nt.textContent='Could not load the test portfolio: '+e.message;sel.value=PF.cur();});};
-   rs.onclick=function(){if(!confirm('Put the test portfolio back to the original sample data? Changes you made in it are lost. Your real projects are not touched.')) return;nt.textContent='Resetting…';PF.reset('test').then(function(){location.reload();});};
+   function show(){var c=PF.cur(),t=c==='test'||c==='ipac';sel.value=c;rs.hidden=!t;bar.classList.toggle('test',t);
+    nt.textContent=c==='ipac'?'35 real Indo-Pacific posture projects from the public FY2025–2027 budget books (C-1, PDI display and DD 1391s), with eight posture requirements. Need dates and priorities are not public; setting them is part of the practice. Nothing here touches your real projects.':t?'Every tool now opens the sample Indo-Pacific portfolio and one fully worked project. Nothing here touches your real projects.':'Your real projects. Switch to Test for sample data, or to the Indo-Pacific rehearsal to practice on the real public program.';}
+   sel.onchange=function(){var v=sel.value;nt.textContent='Switching…';PF.use(v).then(function(){location.reload();}).catch(function(e){nt.textContent='Could not load that portfolio: '+e.message;sel.value=PF.cur();});};
+   rs.onclick=function(){if(!confirm('Put '+PF.name()+' back to its original data? Changes you made in it are lost. Your real projects are not touched.')) return;nt.textContent='Resetting…';PF.reset(PF.cur()).then(function(){location.reload();});};
    document.getElementById('pfbak').onclick=function(){var n=PF.backup();nt.textContent=n?'Backed up '+n+' tool records from '+PF.name()+'. Keep the file somewhere safe; this browser is the only other copy.':'Nothing to back up yet in '+PF.name()+'.';};
    var rf=document.getElementById('pfresf');document.getElementById('pfres').onclick=function(){rf.click();};
    rf.onchange=function(){var f=rf.files[0];rf.value='';if(!f) return;if(!confirm('Put this backup into '+PF.name()+'? Each tool’s data in it replaces what this browser holds for that tool.')) return;PF.restore(f).then(function(r){nt.textContent='Restored '+r.n+' tool records'+(r.saved?' saved '+r.saved.slice(0,10):'')+'. Reloading…';setTimeout(function(){location.reload();},900);}).catch(function(e){nt.textContent=e.message;});};

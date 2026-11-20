@@ -12,14 +12,14 @@
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
  SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
  SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
- var NAMES={'':'My portfolio',test:'Test portfolio'};
+ var NAMES={'':'My portfolio',test:'Test portfolio',ipac:'Indo-Pacific rehearsal'};var SEEDED={test:'test_portfolio.json',ipac:'ipac_portfolio.json'};
  function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
  function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
- function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+ function seed(id){return fetch('/corbel/'+(SEEDED[id]||'test_portfolio.json'),{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Portfolio data not found');return x.json();}).then(function(j){
    wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
-   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+   if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
   TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -377,7 +377,16 @@ const today=()=>new Date().toLocaleDateString('en-CA');
 const N=v=>{const x=Number(String(v??'').replace(/[$,]/g,''));return isFinite(x)?x:0;};
 const M=n=>{const a=Math.abs(n);return (n<0?'-':'')+(a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(a>=1e8?0:1)+'M':a>=1e3?'$'+Math.round(a/1e3)+'K':'$'+Math.round(a));};
 function locate(inst){const t=String(inst||'').toLowerCase();const k=Object.keys(INST).sort((a,b)=>b.length-a.length).find(k=>t.includes(k));return k?{k,g:INST[k]}:null;}
-const POSTURE_PROGRAMS=['Marine Corps relocation to Guam','Guam Defense System','Tinian and CNMI','EDCA (Philippines)','Australia force posture','Other posture program'];
+const POSTURE_PROGRAMS=['Marine Corps relocation to Guam','Guam Defense System','Tinian and CNMI','EDCA (Philippines)','Australia force posture','Compact states (FSM, Palau, Marshall Islands)','Other posture program'];
+const CLUSTERS=['Guam','Micronesia','Japan','Philippines','Australia','Korea','Hawaii','Other'];
+const LEAD_SVC=['Army','Navy','Air Force','Marine Corps','Space Force','Defense agency'];
+function clusterDefault(loc){const t=String(loc||'').toLowerCase();if(!t.trim()) return '';
+ if(/okinawa|japan|kadena|yokota|yokosuka|sasebo|iwakuni|atsugi|zama|misawa|camp butler|camp foster/.test(t)) return 'Japan';if(/philippin|luzon|palawan|basa|subic|edca/.test(t)) return 'Philippines';
+ if(/australia|darwin|tindal|stirling/.test(t)) return 'Australia';if(/korea|humphreys|osan|kunsan|pohang|chinhae/.test(t)) return 'Korea';
+ if(/tinian|saipan|cnmi|northern mariana|micronesia|\bfsm\b|yap|pohnpei|chuuk|kosrae|palau|marshall|kwajalein|wake/.test(t)) return 'Micronesia';
+ if(/guam|andersen|apra|finegayan|blaz|polaris|marianas/.test(t)) return 'Guam';if(/hawaii|kauai|oahu|pearl|schofield|kaneohe/.test(t)) return 'Hawaii';return 'Other';}
+const CLU=r=>r.cluster||clusterDefault(r.location);
+let FCLU='';document.addEventListener('change',e=>{if(e.target&&e.target.id==='fCluA'){FCLU=e.target.value;vAln();}});
 const COMPONENTS=['PACFLT','PACAF','USARPAC','MARFORPAC','SOCPAC','Other'];
 const TIERS=[['critical','Critical',5],['high','High',4],['medium','Medium',3],['low','Low',2]];
 const TIER=k=>TIERS.find(t=>t[0]===k)||TIERS[2];
@@ -436,11 +445,12 @@ function vReq(){const v=$('#view');const P=projects();
  v.innerHTML='<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between"><h2 style="margin:0">Posture requirements</h2><div><button id="bRead">Read a posture document</button> <button class="go" id="bAdd">Add requirement</button></div></div>'+
   '<p class="lead">A requirement is a capability the force needs at a place by a date, from a publicly released source. Link the projects that deliver it; the latest required project sets the capability date. Record nothing classified or controlled here.</p>'+
   (P.length?'':'<p class="samp">No projects found in this browser. Add projects in PAULA first, or switch to the Test portfolio on the Corbel home page.</p>')+'<div id="rdBox"></div>'+
-  (A.reqs.length?A.reqs.map(r=>reqCard(r,P)).join(''):'<p class="small">No requirements yet. Add one, or read a posture document and pick from what it finds.</p>')+'</div>';
+  (A.reqs.length>1&&new Set(A.reqs.map(CLU).filter(Boolean)).size>1?'<div class="row"><label class="f" style="margin:0">Cluster</label><select id="fClu" style="width:auto"><option value="">All clusters</option>'+CLUSTERS.filter(c=>A.reqs.some(r=>CLU(r)===c)).map(c=>'<option'+(FCLU===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div>':'')+
+  (A.reqs.length?A.reqs.filter(r=>!FCLU||CLU(r)===FCLU).map(r=>reqCard(r,P)).join(''):'<p class="small">No requirements yet. Add one, or read a posture document and pick from what it finds.</p>')+'</div>';
  $('#bAdd').onclick=()=>{const r={id:uid(),name:'',location:'',component:'',program:'',need:'',tier:'high',effect:'',source:'',links:[]};A.reqs.unshift(r);OPEN=r.id;log('Requirement added');save();vReq();setTimeout(()=>{const e=document.querySelector('[data-rf="'+r.id+'|name"]');if(e) e.focus();},50);};
- $('#bRead').onclick=readBox;bindReq(P);}
+ $('#bRead').onclick=readBox;if($('#fClu')) $('#fClu').onchange=e=>{FCLU=e.target.value;vReq();};bindReq(P);}
 function reqCard(r,P){const e=evalReq(r,P);const t=TIER(r.tier);const ed=OPEN===r.id;
- const head='<div class="row" style="margin:0;justify-content:space-between;align-items:flex-start;gap:10px"><div><h4>'+esc(r.name||'(unnamed requirement)')+'</h4><div class="meta">'+esc([r.location,r.component,r.program,t[1],r.need?'Needed '+fm(r.need):'No need date'].filter(Boolean).join('  ·  '))+'</div></div><div style="text-align:right">'+chip(e.st)+
+ const head='<div class="row" style="margin:0;justify-content:space-between;align-items:flex-start;gap:10px"><div><h4>'+esc(r.name||'(unnamed requirement)')+'</h4><div class="meta">'+esc([r.location,CLU(r)?CLU(r)+' cluster':'',r.lead?'Lead: '+r.lead:'',r.component,r.program,t[1],r.need?'Needed '+fm(r.need):'No need date'].filter(Boolean).join('  ·  '))+'</div></div><div style="text-align:right">'+chip(e.st)+
   (e.cap?'<div class="small" style="margin-top:4px">Capability '+fm(e.cap)+(e.gap!=null?' · '+(e.gap>0?e.gap+' mo late':e.gap<0?(-e.gap)+' mo early':'on the date'):'')+'</div>':'')+'</div></div>';
  const form=ed?'<div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-top:10px">'+
   '<div style="grid-column:1/-1"><label class="f">Requirement – the capability needed</label><input data-rf="'+r.id+'|name" value="'+esc(r.name)+'" placeholder="e.g. Dispersed fighter operations from Tinian"></div>'+
@@ -448,6 +458,9 @@ function reqCard(r,P){const e=evalReq(r,P);const t=TIER(r.tier);const ed=OPEN===
   '<div><label class="f">Needed by</label><input type="month" data-rf="'+r.id+'|need" value="'+esc(r.need)+'"></div>'+
   '<div><label class="f">Priority</label><select data-rf="'+r.id+'|tier">'+TIERS.map(([k,n])=>'<option value="'+k+'"'+(r.tier===k?' selected':'')+'>'+n+'</option>').join('')+'</select></div>'+
   '<div><label class="f">Component command</label><select data-rf="'+r.id+'|component"><option value="">Not set</option>'+COMPONENTS.map(x=>'<option'+(r.component===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Cluster</label><select data-rf="'+r.id+'|cluster"><option value="">'+esc(clusterDefault(r.location)?'From location: '+clusterDefault(r.location):'Not set')+'</option>'+CLUSTERS.map(x=>'<option'+(r.cluster===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Lead Service</label><select data-rf="'+r.id+'|lead"><option value="">Not set</option>'+LEAD_SVC.map(x=>'<option'+(r.lead===x?' selected':'')+'>'+x+'</option>').join('')+'</select></div>'+
+  '<div><label class="f">Theater Posture Plan reference</label><input data-rf="'+r.id+'|tpp" value="'+esc(r.tpp||'')+'" placeholder="Unclassified label only"></div>'+
   '<div><label class="f">Posture program</label><select data-rf="'+r.id+'|program"><option value="">None</option>'+POSTURE_PROGRAMS.map(x=>'<option'+(r.program===x?' selected':'')+'>'+esc(x)+'</option>').join('')+'</select></div>'+
   '<div style="grid-column:1/-1"><label class="f">Effect – what the capability gives the commander</label><input data-rf="'+r.id+'|effect" value="'+esc(r.effect)+'"></div>'+
   '<div style="grid-column:1/-1"><label class="f">Source – a publicly released document, with its date</label><input data-rf="'+r.id+'|source" value="'+esc(r.source)+'" placeholder="e.g. INDOPACOM posture statement to Congress, Apr 2026"></div></div>':
@@ -490,10 +503,11 @@ function readBox(){const b=$('#rdBox');const on=!!(window.CARLAI&&CARLAI.state()
 function rdShow(){const o=$('#rdOut');if(!o||!RD) return;o.innerHTML=(RD.items.length?'<table class="ptable" style="margin-top:8px"><thead><tr><th></th><th>Requirement</th><th>Location</th><th>Needed</th><th>From the document</th></tr></thead><tbody>'+RD.items.map((x,i)=>'<tr><td><input type="checkbox" data-rk="'+i+'" style="width:auto" checked></td><td><b>'+esc(x.name)+'</b>'+(x.component?'<div class="small">'+esc(x.component)+'</div>':'')+'</td><td>'+esc(x.location)+'</td><td>'+(x.need?fm(x.need):'–')+'</td><td class="small">“'+esc(x.quote)+'”'+(x.page?' (p. '+x.page+')':'')+'</td></tr>').join('')+'</tbody></table><div class="row"><button class="go sm" id="rdAdd">Add the ticked requirements</button></div>':'<p class="small">No requirements found that the document states outright.</p>')+(RD.dropped?'<p class="small">'+RD.dropped+' suggestion'+(RD.dropped>1?'s were':' was')+' dropped because the quote is not in the document.</p>':'');
  if($('#rdAdd')) $('#rdAdd').onclick=()=>{const pick=RD.items.filter((x,i)=>document.querySelector('[data-rk="'+i+'"]').checked);pick.forEach(x=>A.reqs.push({id:uid(),name:x.name,location:x.location||'',component:x.component,program:x.program,need:x.need||'',need_basis:x.need_basis||'',tier:'high',effect:x.effect||'',source:RD.file+(x.page?', p. '+x.page:'')+' – “'+x.quote+'”'+(x.need_basis?' ('+x.need_basis+')':''),links:[]}));log('Requirements added from a document',pick.length+' from '+RD.file);RD=null;save();vReq();};}
 // ---------- alignment ----------
-function vAln(){const v=$('#view');const P=projects();const E=A.reqs.map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k).length;
+function vAln(){const v=$('#view');const P=projects();const E=A.reqs.filter(r=>!FCLU||CLU(r)===FCLU).map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k).length;
  const order={late:0,risk:1,unk:2,noneed:2,none:3,ok:4};E.sort((a,b)=>order[a.e.st]-order[b.e.st]||(b.e.gap||0)-(a.e.gap||0));
  v.innerHTML='<div class="panel"><h2>Alignment</h2><p class="lead">Each requirement’s need date against the date its projects deliver. The capability date is the latest required project’s completion; that project is binding. At risk means up to '+N(A.t.risk)+' months late.</p>'+
-  tiles([['Requirements',String(A.reqs.length)],['On track',String(c('ok'))],['At risk',String(c('risk'))],['Late',String(c('late'))],['No project or no date',String(c('none')+c('unk')+c('noneed'))]])+
+  (new Set(A.reqs.map(CLU).filter(Boolean)).size>1?'<div class="row"><label class="f" style="margin:0">Cluster</label><select id="fCluA" style="width:auto"><option value="">All clusters</option>'+CLUSTERS.filter(c=>A.reqs.some(r=>CLU(r)===c)).map(c=>'<option'+(FCLU===c?' selected':'')+'>'+c+'</option>').join('')+'</select></div>':'')+
+  tiles([['Requirements',String(E.length)],['On track',String(c('ok'))],['At risk',String(c('risk'))],['Late',String(c('late'))],['No project or no date',String(c('none')+c('unk')+c('noneed'))]])+
   (E.length?'<div class="card2">'+timeline(E)+'<div class="leg"><span><i style="background:#1F5566;transform:rotate(45deg);width:9px;height:9px"></i>Needed by</span><span><i style="background:#0ca30c;border-radius:50%"></i>Capability, on time</span><span><i style="background:#d03b3b;border-radius:50%"></i>Capability, late</span><span><i style="background:#fab219;border-radius:50%"></i>At risk</span><span><i class="ln" style="background:#d03b3b"></i>Gap</span></div></div>':'<p class="small">Add requirements first.</p>')+'</div>'+
   (E.length?'<div class="panel"><h3 style="margin-top:0">What sets each date</h3><table class="ptable"><thead><tr><th>Requirement</th><th>Needed</th><th>Capability</th><th>Gap</th><th>Binding project</th><th>Status</th></tr></thead><tbody>'+
   E.map(({r,e})=>'<tr><td><b>'+esc(r.name||'(unnamed)')+'</b><div class="small">'+esc([r.location,TIER(r.tier)[1]].filter(Boolean).join(' · '))+'</div></td><td>'+fm(r.need)+'</td><td>'+(e.cap?fm(e.cap)+(e.est?' <span class="small">(est.)</span>':''):'–')+'</td><td>'+(e.gap==null?'–':e.gap>0?'+'+e.gap+' mo':e.gap+' mo')+'</td><td>'+(e.bind?esc(e.bind.l.p.name)+'<div class="small">'+esc(e.bind.d.how)+'</div>':'–')+'</td><td>'+chip(e.st)+'</td></tr>').join('')+'</tbody></table></div>':'');}

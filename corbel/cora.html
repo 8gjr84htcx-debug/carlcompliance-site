@@ -12,14 +12,14 @@
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
  SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
  SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
- var NAMES={'':'My portfolio',test:'Test portfolio'};
+ var NAMES={'':'My portfolio',test:'Test portfolio',ipac:'Indo-Pacific rehearsal'};var SEEDED={test:'test_portfolio.json',ipac:'ipac_portfolio.json'};
  function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
  function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
- function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+ function seed(id){return fetch('/corbel/'+(SEEDED[id]||'test_portfolio.json'),{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Portfolio data not found');return x.json();}).then(function(j){
    wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
-   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+   if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
   TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();

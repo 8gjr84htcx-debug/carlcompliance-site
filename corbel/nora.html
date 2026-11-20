@@ -12,14 +12,14 @@
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
  SP.setItem=function(k,v){return s.call(this,this===ls?nk(k):k,v);};
  SP.removeItem=function(k){return r.call(this,this===ls?nk(k):k);};
- var NAMES={'':'My portfolio',test:'Test portfolio'};
+ var NAMES={'':'My portfolio',test:'Test portfolio',ipac:'Indo-Pacific rehearsal'};var SEEDED={test:'test_portfolio.json',ipac:'ipac_portfolio.json'};
  function keysOf(id){var out=[],p='pf:'+id+':';for(var i=0;i<ls.length;i++){var k=ls.key(i);if(k&&k.indexOf(p)===0) out.push(k);}return out;}
  function wipe(id){keysOf(id).forEach(function(k){r.call(ls,k);});}
- function seed(id){return fetch('/corbel/test_portfolio.json',{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Test data not found');return x.json();}).then(function(j){
+ function seed(id){return fetch('/corbel/'+(SEEDED[id]||'test_portfolio.json'),{cache:'no-cache'}).then(function(x){if(!x.ok) throw new Error('Portfolio data not found');return x.json();}).then(function(j){
    wipe(id);Object.keys(j.keys||{}).forEach(function(k){s.call(ls,'pf:'+id+':'+k,typeof j.keys[k]==='string'?j.keys[k]:JSON.stringify(j.keys[k]));});s.call(ls,'pf:'+id+':corbel_seeded',j.version||'1');});}
  window.CorbelPF={cur:cur,name:function(){return NAMES[cur()]||cur();},names:NAMES,
   use:function(id){id=id||'';var go=function(){if(id) s.call(ls,'corbel_portfolio',id);else r.call(ls,'corbel_portfolio');};
-   if(id==='test'&&!g.call(ls,'pf:test:corbel_seeded')) return seed('test').then(go);go();return Promise.resolve();},
+   if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
   TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+' – sample data, kept apart from your real projects. <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -298,7 +298,7 @@ function ownSet(core,k,v,src,direct,tool,ask){tool=tool||src;core.facts=core.fac
  if(ownEq(k,cur,v)) return false;if(core.kept[k]&&core.kept[k].some(x=>ownEq(k,x,v))) return false;
  // one waiting value per tool and fact: a tool's newer value replaces its older one
  const i=core.pending.findIndex(p=>p.k===k&&(p.tool||p.src)===tool);const it={k,v,src,tool,at:today()};if(i>=0){if(ownEq(k,core.pending[i].v,v)&&core.pending[i].src===src) return false;core.pending[i]=it;}else core.pending.push(it);return true;}
-const PAULA_F=['scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
+const PAULA_F=['delivery','scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
 const same=(a,b)=>(a&&typeof a==='object')||(b&&typeof b==='object')?JSON.stringify(a??null)===JSON.stringify(b??null):String(a??'')===String(b??'');
 // Cost and quantity belong to a scope. A cost priced for replacement cannot become the programmed cost of a renovation (or the reverse) without a person confirming the mismatch.
 const scClass=t=>/renovat|repair/i.test(String(t||''))?'reno':/new|replac/i.test(String(t||''))?'new':'';
@@ -338,7 +338,7 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   // NORA's risks reach PAULA's risk register (added once, never removed: close them in PAULA).
   ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase())) return;pp.risks.push({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA'});ch=true;});
   // PIPER's block 12: delivery method, design percent and the planned design and award dates.
-  {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
+  {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/troop/i.test(acq)?'Troop labor':/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
    if(dv&&!pp.delivery){pp.delivery=dv;pp.delivery_src='PIPER 1391 block 12';ch=true;}
    const pc=Number(String(s12.pct||'').replace(/[^\d.]/g,''));if(String(s12.pct||'').trim()!==''&&!isNaN(pc)){pp.gates=pp.gates||{};const g=pp.gates.design||{};if(g.pct===undefined||g.pct===''||(g.src||'').indexOf('PIPER')===0&&Number(g.pct)!==pc){pp.gates.design={...g,pct:Math.max(0,Math.min(100,pc)),date:/^\d{4}-\d{2}/.test(s12.asof||'')?String(s12.asof).slice(0,7)+'-01':(g.date||''),src:'PIPER 1391 block 12'+(s12.asof?' (as of '+s12.asof+')':'')};ch=true;}}
    [['35% design','d35'],['Design complete','dc'],['Contract award','award'],['Notice to proceed','start'],['Beneficial occupancy','complete']].forEach(([n,k])=>{const v=String(s12[k]||'');if(!/^\d{4}-\d{2}/.test(v)) return;const d=v.slice(0,7)+'-01';let m=(pp.milestones||[]).find(x=>x.name===n);if(!m){m={id:uid(),name:n,baseline:'',forecast:'',actual:''};pp.milestones=(pp.milestones||[]).concat([m]);ch=true;}if(!m.forecast&&!m.actual){m.forecast=d;m.fsrc='PIPER 1391 block 12';ch=true;}});}
@@ -398,7 +398,15 @@ const LAWR={
  mconYrs:{v:5,cite:'DoW FMR Vol 3 (period of availability)',what:'MILCON appropriations are available for obligation for 5 years',src:FMR3},
  purpose:{cite:'31 U.S.C. 1301(a)',what:'Funds may be used only for the purposes they were appropriated for',src:USC},
  time:{cite:'31 U.S.C. 1502(a)',what:'Funds with a fixed period pay only for needs of that period or contracts made in it',src:USC},
- ada:{cite:'31 U.S.C. 1341(a)',what:'No obligation or spending beyond the amount available (Antideficiency Act)',src:USC}};
+ ada:{cite:'31 U.S.C. 1341(a)',what:'No obligation or spending beyond the amount available (Antideficiency Act)',src:USC},
+ ipUmc:{v:3e7,cite:'Pub. L. 118-31 §2810 (10 U.S.C. 2805 note), as amended by Pub. L. 118-159 §2807, subsec. (a)',what:'INDOPACOM posture minor construction: the Commander of INDOPACOM may carry out projects with an approved cost under this amount',src:USC},
+ ipNotify:{v:2e6,cite:'Pub. L. 118-31 §2810 (10 U.S.C. 2805 note), as amended by Pub. L. 118-159 §2807, subsec. (f)',what:'INDOPACOM posture minor construction above this: written notice to the committees, then a 14-day wait before the project may start',src:USC},
+ ipOM:{v:8e6,cite:'Pub. L. 118-31 §2810 (10 U.S.C. 2805 note), as amended by Pub. L. 118-159 §2807, subsec. (e)(2)',what:'Most O&M may pay on an INDOPACOM posture minor construction project: 200 percent of the 2805(c) amount, before any location adjustment, never above the $30M limit',src:USC},
+ ipEnd:{v:'2029-03-31',cite:'Pub. L. 118-31 §2810 (10 U.S.C. 2805 note), as amended by Pub. L. 118-159 §2807, subsec. (i)',what:'The INDOPACOM posture minor construction authority expires on 31 March 2029',src:USC},
+ ipWhere:{cite:'Pub. L. 118-31 §2810 (10 U.S.C. 2805 note), as amended by Pub. L. 118-159 §2807, subsecs. (c), (d)',what:'Purpose must be rotational deployments, facility preparedness and resilience, prepositioning and storage, or land and operational control for these projects; the site must be in the INDOPACOM area at a main operating base, cooperative security location, forward operating site or contingency location',src:USC},
+ erc:{cite:'DoDD 4270.5 §5.4–5.5; 10 U.S.C. 2805; CJCSI 4600.02 series',what:'Exercise-related construction is unspecified minor construction outside the United States for the Joint Chiefs exercise program. It is funded from MILCON, Defense-Wide minor construction allocated to the Joint Staff; combatant commanders rank their requests, and the Chairman approves projects and notifies Congress. The 2805 limits apply.',src:'DoDD 4270.5 (library copy); CJCSI 4600.02 from its public summary, full text not opened; checked '+LAWCHK},
+ troopFunded:{cite:'DoW FMR Vol 3 §15.16.1',what:'The funded cost of construction covers materials, services, transport and labor, but not U.S. military labor',src:FMR3},
+ troopUnfunded:{cite:'DoW FMR Vol 3 §15.17.1',what:'Military pay on a project is an unfunded cost: it is added to the property’s value but not charged to the project. A component may not use its own materials or equipment on its own minor construction without reimbursing them',src:FMR3}};
 const lawM=n=>'$'+(n>=1e6?(+(n/1e6).toFixed(2))+'M':Math.round(n).toLocaleString());
 const lawN=v=>Number(String(v??'').replace(/[^\d.]/g,''))||0;
 // Findings for one shared-record project. Each: [level 0 info, 1 watch, 2 stop, text, rule id]. Facts in, rules out; no AI.
@@ -421,6 +429,18 @@ function lawCheck(c){const F=[];if(!c) return F;const a=String(c.authority||'');
  if(a==='2803'&&cost>LAWR.emerg.v) F.push([2,'Emergency construction is limited to '+lawM(LAWR.emerg.v)+' per Secretary per fiscal year; this project alone is '+lawM(cost)+'.','emerg']);
  if(!a&&omAmt&&work==='new'&&cost>LAWR.umcOM.v) F.push([1,'O&M funding on new work above '+lawM(LAWR.umcOM.v)+': O&M cannot pay for construction above that amount. Record the construction authority.','umcOM']);
  if(pd>LAWR.ae.v) F.push([0,'Design funding above '+lawM(LAWR.ae.v)+': the committees must be notified before the design work.','ae']);
+ if(a==='IPUMC'){const tdy=new Date().toISOString().slice(0,10);
+  if(cost&&cMin>=LAWR.ipUmc.v) F.push([2,'Cost '+lawM(cMin)+(pd?' (planning and design left out)':'')+' is not under the '+lawM(LAWR.ipUmc.v)+' limit for INDOPACOM posture minor construction.','ipUmc']);
+  else if(cost&&cMin>LAWR.ipNotify.v) F.push([1,'Above '+lawM(LAWR.ipNotify.v)+': the Commander sends written notice to the committees, and the project waits 14 days after they receive it.','ipNotify']);
+  if(omAmt>LAWR.ipOM.v) F.push([2,'O&M lines total '+lawM(omAmt)+'; O&M may pay no more than '+lawM(LAWR.ipOM.v)+' on these projects unless a location cost index raises it.','ipOM']);
+  if(tdy>LAWR.ipEnd.v) F.push([2,'The INDOPACOM posture minor construction authority expired on 31 March 2029.','ipEnd']);
+  else{const aw=String((c.events||{})['Contract award']||c.award_date||'');if(/^\d{4}-\d{2}/.test(aw)&&aw.slice(0,10)>LAWR.ipEnd.v) F.push([1,'Planned award '+aw.slice(0,7)+' is after the authority expires on 31 March 2029.','ipEnd']);}
+  F.push([0,'Confirm the purpose and the site type: rotational deployments, preparedness and resilience, prepositioning, or land and operational control, at a main operating base, cooperative security location, forward operating site or contingency location in the INDOPACOM area.','ipWhere']);}
+ if(L.some(l=>key(l)==='ERC')){if(cost&&cMin>LAWR.umc.v) F.push([2,'Exercise-related construction is minor construction: '+lawM(cMin)+' is above the '+lawM(LAWR.umc.v)+' ceiling.','erc']);
+  if(/^(guam|hawaii|alaska|cnmi|northern mariana|american samoa|wake)/i.test(String(c.country||'').trim())) F.push([1,'Exercise-related construction is for projects outside the United States; confirm '+String(c.country)+' qualifies before counting on these funds.','erc']);
+  else F.push([0,'Exercise-related construction: the combatant command ranks the request and the Chairman approves the project and notifies Congress.','erc']);}
+ if(/troop/i.test(String(c.delivery||''))){F.push([0,'Troop labor: test the cost limits on the funded cost, which leaves out U.S. military labor. Military pay is recorded as an unfunded cost.','troopFunded']);
+  F.push([0,'Materials or equipment from the unit’s own component must be reimbursed on minor construction; they cannot be used free.','troopUnfunded']);}
  const auth=lawN(c.authorized),e=lawN(c.cwe);
  if(auth&&e>auth){const g=e-auth,lim=Math.min(auth*LAWR.reprog.pct/100,LAWR.reprog.v);if(g>lim) F.push([1,'Increase of '+lawM(g)+' over the authorized '+lawM(auth)+' exceeds '+lawM(lim)+' (25% or $6M, whichever is less): a reprogramming needs prior congressional approval.','reprog']);}
  return F;}
