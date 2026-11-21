@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -909,6 +909,9 @@ function guessLoc_(){const want=String(E.project?.installation||'').toUpperCase(
  let best=null,score=0;for(const s of PD_.acf){const t=(s[0]+' '+s[4]+' '+s[1]).toUpperCase();const sc=words.filter(w=>t.includes(w)).length;if(sc>score){score=sc;best=s;}}
  return best&&score?best:null;}
 function locObj_(s){return s?{label:siteLabel_(s),acf:s[2],sacf:s[3]??s[2],us:!!s[5],country:s[1],remote:false}:null;}
+// When the 1391 (PIPER) prices this scope, new construction uses the 1391's own unit cost: contract cost over its quantity in the same unit.
+function u1391_(unit){try{const r=JSON.parse(localStorage.getItem('milcon_record')||'null');const pp=r&&r.piper;if(!pp||!(Number(pp.contract)>0)||!Array.isArray(pp.qtys)) return null;
+ const U=String(unit||'').trim().toUpperCase();const m=pp.qtys.find(x=>String(x.um||'').trim().toUpperCase()===U&&Number(x.qty)>0);if(!m) return null;return {rate:Number(pp.contract)/Number(m.qty),qty:Number(m.qty),um:m.um,contract:Number(pp.contract),no:pp.project_no||''};}catch(e){return null;}}
 function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:[],notes:[],ok:false};
  if(!L){out.notes.push('Pick the location first.');return out;}
  const [by,bm]=baseMid_();const lead=Number(E.lead)||0,occ=lead+1,N=period();
@@ -925,7 +928,14 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
    if(o) out.lines.push({cat:'relocation',src:'ask',label:'One-time move and fit-up from your answer',amount:Math.round(o),start:lead||1,end:''});
    out.sr=ch;out.first=o;out.ok=true;out.notes.push('Confirm the charge in the support agreement with the host installation.');}}
  const fac=p.fac!=null&&p.fac!==''?PD_.fac[Number(p.fac)]:null;
- if(mode==='build'&&(p.guc==null||p.guc==='')&&fac&&fac[3]&&Number(p.qty)){const q=Number(p.qty);
+ let u13=false;{const gq=p.guc!=null&&p.guc!==''?PD_.guc[Number(p.guc)]:null;const un=gq?(gq.per==='VF'?'':'SF'):fac?fac[2]:'';const u=mode==='build'&&!host&&a.type==='new'&&Number(p.qty)&&un?u1391_(un):null;
+  if(u){const q=Number(p.qty);const base=u.rate*q;const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*(p.med?0.13:0.09);
+   out.lines.push({cat:'design',label:'Planning and design, factor '+(p.med?'1.13':'1.09')+' (UFS 3-701-01 Eq 3-1)',amount:Math.round(des),start:1,end:''});
+   out.lines.push({cat:'construction',label:'1391 unit cost: contract cost '+$$(u.contract)+' ÷ '+u.qty.toLocaleString()+' '+u.um+' = '+$$(u.rate,2)+'/'+u.um+' × '+q.toLocaleString()+' '+u.um,amount:Math.round(base/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
+   out.lines.push({cat:'contingency',label:'Contingency 5% (UFS 3-730-01)',amount:Math.round(cont/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
+   out.lines.push({cat:'sioh',label:'SIOH '+siohPct+'% ('+(L.remote?'remote':L.us?'CONUS':'OCONUS')+', OASD(EI&E) 14 Apr 2022)',amount:Math.round(sioh/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
+   out.first=base+cont+sioh+des;out.ok=true;out.from1391=true;out.notes.push('Priced from the 1391’s own unit cost'+(u.no?' ('+u.no+')':'')+', not the pricing guide, so the economic analysis and the 1391 describe the same cost.');u13=true;}}
+ if(!u13&&mode==='build'&&(p.guc==null||p.guc==='')&&fac&&fac[3]&&Number(p.qty)){const q=Number(p.qty);
   // Infrastructure (fuel, piers, pavement, utility lines) has no UFS 3-730-01 Table 2 type: price it from the UFS 3-701-01 replacement unit cost for its FAC.
   p.prv=fac[3];p.fac_code=fac[0];p.fac_name=fac[1];p.fac_unit=fac[2];const ce=escF_(by,bm)/escF_(2026,4);const sup=Number(p.sup)||0;const base=q*fac[3]*L.acf*ce+sup;const cont=base*0.05,sioh=(base+cont)*siohPct/100,des=(base+cont)*(p.med?0.13:0.09);
   out.lines.push({cat:'design',label:'Planning and design, factor '+(p.med?'1.13':'1.09')+' (UFS 3-701-01 Eq 3-1)',amount:Math.round(des),start:1,end:''});
@@ -933,7 +943,7 @@ function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:
   out.lines.push({cat:'contingency',label:'Contingency 5% (UFS 3-730-01)',amount:Math.round(cont/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
   out.lines.push({cat:'sioh',label:'SIOH '+siohPct+'% ('+(L.remote?'remote':L.us?'CONUS':'OCONUS')+', OASD(EI&E) 14 Apr 2022)',amount:Math.round(sioh/nCon),start:conYrs[0],end:conYrs[1]>conYrs[0]?conYrs[1]:''});
   out.first=base+cont+sioh+des;out.ok=true;out.notes.push('Priced from the pricing guide’s replacement unit cost for FAC '+fac[0]+', a planning-level figure for infrastructure. Check it against the 1391 block 9 lines or an engineer’s estimate.');}
- else if(mode==='build'){const g=p.guc!=null&&p.guc!==''?PD_.guc[Number(p.guc)]:null;const q=Number(p.qty)||0;
+ else if(mode==='build'&&!u13){const g=p.guc!=null&&p.guc!==''?PD_.guc[Number(p.guc)]:null;const q=Number(p.qty)||0;
   if(!g||!q){out.notes.push('Pick the facility type (a building) or the FAC (infrastructure: fuel, piers, pavement, utility lines) and enter its size.');}
   else if(g.na||!g.usd){out.notes.push('The pricing guide has no unit cost for '+g.n+'. Price it from a similar facility or enter costs by hand.');}
   else{const ce=escF_(by,bm)/escF_(2025,10);let S=1,sn='';

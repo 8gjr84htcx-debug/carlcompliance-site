@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -1227,6 +1227,9 @@ function ruleTexts(x){const MN=['January','February','March','April','May','June
  else if(x.rid&&x.an&&x.bn&&x.an.length&&x.bn.length&&x.st){const from=x.an.find(n=>!x.bn.includes(n))??x.an[0],to=x.bn[0];subs.push([new RegExp('\\b'+from+'(?=\\s+(?:[a-z-]+\\s+){0,3}'+x.st+')','gi'),String(to)]);}
  if(!subs.length) return false;let ch=false;const fix=(o,k,where)=>{if(!o||typeof o[k]!=='string') return;let t=o[k];subs.forEach(([re,to])=>{t=t.replace(re,to);});if(t!==o[k]){log('Updated by ruling',where+': '+o[k]+' → '+t);o[k]=t;ch=true;}};
  if(x.kind==='need'){(P.requirements||[]).forEach(r=>fix(r,'text',r.id||'Requirement'));(P.gaps||[]).forEach(g=>fix(g,'required','Gap '+(g.area||'')));}
+ else (P.requirements||[]).forEach(r=>fix(r,'text',r.id||'Requirement'));
+ // every requirement's success measure, and each gap's description, carry the ruled value too
+ (P.requirements||[]).forEach(r=>{fix(r,'measure',(r.id||'Requirement')+' measure');fix(r,'rationale',(r.id||'Requirement')+' rationale');});(P.gaps||[]).forEach(g=>{fix(g,'impact','Gap '+(g.area||'')+' impact');if(x.kind!=='need') fix(g,'required','Gap '+(g.area||''));});
  fix(P.project,'mission','Mission');(P.measures||[]).forEach(m=>{fix(m,'text','Success measure');fix(m,'target','Success measure target');});(P.assumptions||[]).forEach(a=>fix(a,'text','Assumption'));(P.constraints||[]).forEach(a=>fix(a,'text','Constraint'));
  x.textDone=x.kind==='need'?2:true;return ch;}
 function ruleConflict(x,c,via){x.status=c;x.ruled=x.ruled||new Date().toISOString();if(via) x.via=via;log('Conflict ruled'+(via?' ('+via+')':''),x.what+': '+(c==='a'?x.a:c==='b'?x.b:'both stand'));

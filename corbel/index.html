@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -721,7 +721,7 @@
   (function(){var PF=window.CorbelPF;if(!PF){document.getElementById('pfbar').style.display='none';return;}
    var sel=document.getElementById('pfsel'),rs=document.getElementById('pfreset'),nt=document.getElementById('pfnote'),bar=document.getElementById('pfbar');
    function show(){var c=PF.cur(),t=c==='test'||c==='ipac';sel.value=c;rs.hidden=!t;bar.classList.toggle('test',t);
-    nt.textContent=c==='ipac'?'35 real Indo-Pacific posture projects from the public FY2025–2027 budget books (C-1, PDI display and DD 1391s), with eight posture requirements. Need dates and priorities are not public; setting them is part of the practice. Nothing here touches your real projects.':t?'Every tool now opens the sample Indo-Pacific portfolio and one fully worked project. Nothing here touches your real projects.':'Your real projects. Switch to Test for sample data, or to the Indo-Pacific rehearsal to practice on the real public program.';}
+    nt.textContent=c==='ipac'?'35 real Indo-Pacific posture projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding) (C-1, PDI display and DD 1391s), with eight posture requirements. Need dates and priorities are not public; setting them is part of the practice. Nothing here touches your real projects.':t?'Every tool now opens the sample Indo-Pacific portfolio and one fully worked project. Nothing here touches your real projects.':'Your real projects. Switch to Test for sample data, or to the Indo-Pacific rehearsal to practice on the real public program.';}
    sel.onchange=function(){var v=sel.value;nt.textContent='Switching…';PF.use(v).then(function(){location.reload();}).catch(function(e){nt.textContent='Could not load that portfolio: '+e.message;sel.value=PF.cur();});};
    rs.onclick=function(){if(!confirm('Put '+PF.name()+' back to its original data? Changes you made in it are lost. Your real projects are not touched.')) return;nt.textContent='Resetting…';PF.reset(PF.cur()).then(function(){location.reload();});};
    document.getElementById('pfbak').onclick=function(){var n=PF.backup();nt.textContent=n?'Backed up '+n+' tool records from '+PF.name()+'. Keep the file somewhere safe; this browser is the only other copy.':'Nothing to back up yet in '+PF.name()+'.';};
@@ -754,7 +754,8 @@
     var ad=J('adam_portfolio');var ar=ad&&ad.reqs?ad.reqs.filter(function(r){return (r.links||[]).some(function(l){return l.pid===id;});}):[];o.adam=ar.length?'Serves '+ar.length+' posture requirement'+(ar.length===1?'':'s'):'Not linked to a posture requirement';
     var hk=J('hank_portfolio');var hr=hk&&hk.items?hk.items[id]:null;o.hank=hr?(hr.dd&&hr.dd.finalDate?'Final DD Form 1354 done':hr.dates&&hr.dates.final?'Final acceptance '+hr.dates.final:hr.dates&&hr.dates.pis?'Placed in service '+hr.dates.pis:'Close-out started'):'Not in close-out yet';
     o.paula=c.priority&&!/^\s*1 of 1\b|not scored/i.test(c.priority)?'Priority: '+c.priority:c.priority?'Not scored':'Tracked in the portfolio';
-    var next=!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
+    var pq=((J('paula_project')||{}).projects||[]).filter(function(x){return x.id===id;})[0]||{};var ph=+(c.phase||pq.phase||0),ps=String(c.prog_status||pq.prog_status||((pq.funds||c.funds||[]).some(function(l){return /appropriated|obligated/.test(l.stage||'');})?'appropriated':'')),PSN={pb:'in the President’s Budget',authorized:'authorized',appropriated:'appropriated',obligated:'obligated'},fun=!!PSN[ps];
+    var next=ph>=8?['hank','Close it out in Hank']:(ph===7||+(c.award||pq.award)>0)?['irma','Review submittals and RFIs in Irma; update status in Paula']:(!n&&(fun||ph>=5))?['paula','Track it in Paula – '+(PSN[ps]?'already '+PSN[ps]:'phase '+ph)]:!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
     return {o:o,next:next,c:c};}
    function show(){var id=sel.value,s=status(id);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
     nt.textContent=[s.c.service,s.c.fy?'FY'+s.c.fy:'',s.c.programmed?M(s.c.programmed)+' programmed':'',s.c.to?'Task order '+s.c.to:''].filter(Boolean).join('  ·  ')||'Every tool opens this project.';
@@ -768,7 +769,7 @@
   <section class="lifecycle">
     <div class="lifecycle-inner">
       <h2>From posture to close-out, each phase closed by a gate</h2>
-      <p class="lead">The tools follow the work in the order it happens. Adam ties each project to the posture it serves; Paula watches every phase at once.</p>
+      <p class="lead">Two layers. Adam and Paula work at the theater level: posture, portfolio, priorities and decisions. The project tools follow each project through its phases and feed them.</p>
       <ol class="phases">
         <li><span class="n">0</span><span class="t">Set the posture</span><span class="w">Adam</span></li>
         <li><span class="n">1</span><span class="t">Identify the need</span><span class="w">Nora</span></li>
@@ -784,6 +785,7 @@
     </div>
   </section>
 
+  <section class="layer-head" style="padding:28px 0 4px"><div class="tool-inner" style="display:block"><h2 style="margin:0 0 6px">The theater layer</h2><p class="lead" style="margin:0;max-width:760px">Where the JPMO works: which posture capabilities are late and which project sets the date (Adam), the whole portfolio's health, funding, priorities and decisions (Paula), and a red-team review of each Service 1391 (Piper). Start here.</p></div></section>
   <section class="tool-section" id="adam">
     <div class="tool-inner">
       <div class="tool-meta">
@@ -799,6 +801,23 @@
       </div>
     </div>
   </section>
+
+  <section class="tool-section" id="paula">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Paula</div>
+        <div class="tool-descriptor">Portfolio Analytics, Updates, and Leadership Advisor</div>
+        <div class="tool-status ready">Ready to use</div>
+      </div>
+      <div class="tool-body">
+        <p class="tool-pitch">Sees the whole program at once. PAULA tracks cost, schedule, risk, and funds across every project, flags what needs leadership attention, and produces the status reports the chain of command asks for.</p>
+        <div class="tool-buttons">
+          <a href="/corbel/paula.html" class="btn btn-primary">Open Paula</a>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="layer-head" style="padding:28px 0 4px"><div class="tool-inner" style="display:block"><h2 style="margin:0 0 6px">The project layer</h2><p class="lead" style="margin:0;max-width:760px">The tools that build each project's record, from requirement to close-out. What they record feeds the theater layer: need dates, costs, schedules, risks and gates.</p></div></section>
 
   <div class="tool-divider"></div>
 
@@ -946,7 +965,7 @@
 
   <div class="tool-divider"></div>
 
-  <section class="tool-section" id="hank">
+  <section class="tool-section last" id="hank">
     <div class="tool-inner">
       <div class="tool-meta">
         <div class="tool-name">Hank</div>
@@ -964,21 +983,7 @@
 
   <div class="tool-divider"></div>
 
-  <section class="tool-section last" id="paula">
-    <div class="tool-inner">
-      <div class="tool-meta">
-        <div class="tool-name">Paula</div>
-        <div class="tool-descriptor">Portfolio Analytics, Updates, and Leadership Advisor</div>
-        <div class="tool-status ready">Ready to use</div>
-      </div>
-      <div class="tool-body">
-        <p class="tool-pitch">Sees the whole program at once. PAULA tracks cost, schedule, risk, and funds across every project, flags what needs leadership attention, and produces the status reports the chain of command asks for.</p>
-        <div class="tool-buttons">
-          <a href="/corbel/paula.html" class="btn btn-primary">Open Paula</a>
-        </div>
-      </div>
-    </div>
-  </section>
+  
 
   <!-- CLOSING BAND -->
   <section class="closing-band">

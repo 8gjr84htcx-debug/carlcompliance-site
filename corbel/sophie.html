@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -881,11 +881,11 @@ async function buildSOW(){const sb=scopeBlock();if(sb){say(sb);if(window.MSsettl
    (j.map||[]).forEach(m=>{const ids=(m.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));S.sections.filter(s=>s.key===m.section||s.key.split(':')[0]===m.section).forEach(s=>{ids.forEach(id=>{if(!s.reqs.includes(id)) s.reqs.push(id);});});});
    made.push('requirements matched to sections');}catch(e){made.push('matching failed: '+e.message);}}
  const todo=S.sections.filter(s=>!s.text.trim());let n=0,done=0;const unv=[];
- // Sections are drafted six at a time (busy-server replies are retried by the CARL link); a failed draft is tried once more, then built from the sources so no section is left empty.
+ // Sections are drafted up to ten at a time (busy-server replies are retried by the CARL link); a failed draft is tried once more, then built from the sources so no section is left empty.
  const one=async s=>{const k=s.key.split(':')[0];if(k==='docs'||k==='safe'||!aiOnS()){s.text=assemble(s)||assembleAny(s);if(s.text.trim()){s.status='draft';n++;}return;}
   for(let t=0;t<2&&!s.text.trim();t++){try{const u=await pipeS(s);if(u.length) unv.push(s.title+': '+u.join(', '));}catch(e){}}
   if(!s.text.trim()){s.text=assemble(s)||assembleAny(s);if(s.text.trim()) s.status='draft';}if(s.text.trim()) n++;save();say('Drafting the sections ('+(++done)+' of '+todo.length+' done)…');};
- say('Drafting '+todo.length+' sections…');const Q=todo.slice();await Promise.all([0,1,2,3,4,5].slice(0,Math.max(1,Math.min(6,Q.length))).map(async()=>{while(Q.length) await one(Q.shift());}));
+ say('Drafting '+todo.length+' sections…');const Q=todo.slice();await Promise.all(Array.from({length:Math.max(1,Math.min(10,Q.length))},async()=>{while(Q.length) await one(Q.shift());}));
  const empty=S.sections.filter(s=>!s.text.trim());made.push(n+' sections written'+(empty.length?'; '+empty.length+' still empty: '+empty.map(s=>s.title).join(', '):''));
  let fx=0;S.sections.forEach(s=>S.rules.filter(r=>ruleOn(r)&&r.fix).forEach(r=>{try{const re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');const c=(s.text.match(re)||[]).length;if(c){s.text=s.text.replace(re,r.fix);fx+=c;}}catch(e){}}));if(fx) made.push(fx+' automatic style fixes');
  if(aiOnS()){say('Running the AI review…');await aiReviewS(true);}
@@ -906,8 +906,8 @@ async function applySOW(){const X=XS;S.template='custom';S.custom=X.secs.map(x=>
  if(!S.p.title&&X.title) S.p.title=X.title;S.review={file:X.file,at:new Date().toISOString()};XS=null;
  if(nora()) impNora();if(coraSel()) impCora();
  const st=$('#rStatS');const say=t=>{if(st) st.textContent=t;};
- if(aiOnS()&&S.reqs.length){for(const s of S.sections){say('Tracing '+s.title+'…');try{const j=await CARLAI.ask('reviewer',TRACE_SYS,'REQUIREMENTS:\n'+S.reqs.map(r=>r.id+': '+r.text).join('\n')+'\n\nSECTION:\n'+s.text,null,{fresh:true});
-   const lines=s.text.split('\n');(j.items||[]).forEach(it=>{const ids=(it.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));if(!ids.length) return;const k=lines.findIndex(l=>nz3(l).startsWith(nz3(it.start).slice(0,30))&&nz3(it.start).length>5);if(k>=0&&!/\{[^}]+\}\s*$/.test(lines[k])) lines[k]=lines[k].replace(/\s*$/,' {'+ids.join(', ')+'}');});s.text=lines.join('\n');}catch(e){}}}
+ if(aiOnS()&&S.reqs.length){const TQ=S.sections.slice();let td=0;await Promise.all(Array.from({length:Math.min(4,TQ.length)},async()=>{while(TQ.length){const s=TQ.shift();say('Tracing the sections ('+(++td)+' of '+S.sections.length+')…');try{const j=await CARLAI.ask('reviewer',TRACE_SYS,'REQUIREMENTS:\n'+S.reqs.map(r=>r.id+': '+r.text).join('\n')+'\n\nSECTION:\n'+s.text,null,{fresh:true});
+   const lines=s.text.split('\n');(j.items||[]).forEach(it=>{const ids=(it.reqs||[]).filter(id=>S.reqs.some(r=>r.id===id));if(!ids.length) return;const k=lines.findIndex(l=>nz3(l).startsWith(nz3(it.start).slice(0,30))&&nz3(it.start).length>5);if(k>=0&&!/\{[^}]+\}\s*$/.test(lines[k])) lines[k]=lines[k].replace(/\s*$/,' {'+ids.join(', ')+'}');});s.text=lines.join('\n');}catch(e){}}}));}
  log('SOW applied for review',S.review.file);save();if(aiOnS()) await aiReviewS(true);STEP='done';render();window.scrollTo(0,0);}
 const REVS_SYS=`You are a contracting officer's technical reviewer reading a construction statement of work against the project RECORD (requirements, criteria, 1391). Find what would cause a protest, a claim or a bad award: requirements not covered; scope with no requirement behind it; criteria the record selects that the SOW never invokes; quantities that contradict the 1391; vague or unmeasurable obligations; design-build text that prescribes means and methods. Return ONLY JSON: {"findings":[{"severity":"bad|warn","title":"short","detail":"what to fix","quote":"exact words from the SOW, or empty"}]} – at most 10, most important first.`;
 async function aiReviewS(q){if(!aiOnS()){if(!q) alert('Sign in again (Face ID) to run the AI review.');return;}const b=$('#bRevS');if(b){b.disabled=true;b.textContent='Reviewing…';}
@@ -1012,11 +1012,11 @@ const FIXALLS_SYS=()=>styleBrief()+'\n\nYou fix every listed finding in one sect
 let FXA=null;
 async function fixAllS(){if(!aiOnS()){alert('Sign in again (Face ID) to fix findings with AI.');return;}const F=findingsAll().filter(fixableS);if(!F.length) return;const G=new Map();F.forEach(f=>{const s=secFor(f);if(!s) return;if(!G.has(s.id)) G.set(s.id,{s,F:[]});G.get(s.id).F.push(f);});
  const b=$('#bFixAllS');const out=[];let k=0;
- for(const {s,F:fs} of G.values()){k++;if(b){b.disabled=true;b.textContent='Section '+k+' of '+G.size+'…';}
+ const GQ=[...G.values()];await Promise.all(Array.from({length:Math.min(4,GQ.length)},async()=>{while(GQ.length){const {s,F:fs}=GQ.shift();k++;if(b){b.disabled=true;b.textContent='Section '+k+' of '+G.size+'…';}
   try{fs.forEach(f=>{const id=(f.msg.match(/^(R-\d+) is not covered/)||[])[1];if(id&&!s.reqs.includes(id)) s.reqs.push(id);});
    const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT:\n'+S.ctx:'');const j=await CARLAI.ask('reviewer',FIXALLS_SYS(),src+'\n\nSECTION ('+s.title+'):\n'+s.text+'\n\nFINDINGS:\n'+fs.map((f,i)=>(i+1)+'. '+f.msg+(f.hit?' (“'+f.hit+'”)':'')).join('\n'),null,{fresh:true});
    const t=String(j.text||'').trim();if(t&&t!==s.text.trim()) out.push({sid:s.id,title:s.title,n:fs.length,text:t,notes:(j.notes||[]).map(String),un:figuresUnverified(t.replace(/\{[^}]*\}/g,''),s)});}
-  catch(e){console.warn(e);}}
+  catch(e){console.warn(e);}}}));
  FXA={n:F.length,items:out};log('Fix all with AI proposed',out.length+' sections for '+F.length+' findings');vDoneS();const p=$('#fxaP');if(p) p.scrollIntoView({block:'start'});}
 function fixAllHTMLS(){if(!FXA) return '';if(!FXA.items.length) return '<div class="card" id="fxaP" style="margin:10px 0;padding:12px 14px"><b>No change proposed.</b><div class="row"><button id="fxaX">Close</button></div></div>';
  return '<div class="card" id="fxaP" style="margin:10px 0;padding:12px 14px;border-color:var(--shoal)"><b>Proposed changes for '+FXA.n+' findings in '+FXA.items.length+' section'+(FXA.items.length>1?'s':'')+'</b><p class="small">Edit anything below, then apply. Each section keeps its previous text in its record.</p>'+

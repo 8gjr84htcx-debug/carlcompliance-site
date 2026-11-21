@@ -31,7 +31,7 @@
    ks.forEach(function(k){s.call(ls,nk(k),j.keys[k]);});return {n:ks.length,saved:j.saved,from:j.portfolio};});}};
  function band(){if(!cur()||document.getElementById('pfband')) return;var d=document.createElement('div');d.id='pfband';
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
-  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books, for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
+  d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
  document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
@@ -774,7 +774,7 @@ function health(p,asOf){const T=P.t,parts=[];const now=asOf||today();const add=(
  if(authConflict(p)) add('Legal authority',1,'An authorized amount ('+M(N(p.authorized))+') is recorded but the programming status is '+PROGN(p.prog_status)+'; confirm which is right before anyone briefs it');
  // 1 Legal authority: the estimate against the amount Congress authorized (10 U.S.C. 2853).
  if(A&&hasE){const d=e-A,g=d/A,lim=Math.min(LAW.costPct.v/100*A,2*T.umc);
-  if(d>lim) add('Legal authority',2,'Up '+M(d)+' ('+pct(g,1)+') – beyond the '+LAW.costPct.cite+' limit of '+M(lim)+'; needs a waiver and congressional notice before obligating');
+  if(d>lim) add('Legal authority',2,'An increase of '+M(d)+' ('+pct(g,1)+') against a '+LAW.costPct.cite+' limit of '+M(lim)+'; needs a waiver and congressional notice before obligating');
   else if(d>0) add('Legal authority',A>LAW.report.v&&g>=.25?1:0,'Up '+M(d)+', inside the '+M(lim)+' variation limit; the Secretary concerned must determine it is needed for unusual cost variations ('+LAW.costPct.cite+')'+(A>LAW.report.v&&g>=.25?' – also needs the 2853(f) report':''));
   else add('Legal authority',0,'Within the authorized amount');}
  else if(!authConflict(p)) add('Legal authority',-1,A?'No current estimate yet':'Not yet authorized'+(baseOf(p)?' – the '+M(b)+' is '+baseLab(p):''));
@@ -872,7 +872,7 @@ const EXPLAIN_SYS=`You explain a DoD military construction project's status for 
 Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 ${EXEC_RULE}
 State a funding shortfall only as a SHORTFALL line gives it, with its figure; never work one out from other numbers.
-Return ONLY JSON: {"text":"the paragraphs, separated by a blank line"}`;
+Return ONLY JSON: {"text":"the paragraphs, separated by a blank line"} When a source gives a cost increase against a statutory limit, say it as “an increase of $X against a limit of $Y”; never subtract the two or say it “exceeds the limit by” an amount.`;
 async function aiExplain(p){if(!aiOk()) return;const h=health(p);const src=projFacts(p,h).concat(shortLines([p])).join('\n');const b=$('#bAIx');b.disabled=true;b.textContent='Writing…';
  try{const j=await CARLAI.ask('claude',EXPLAIN_SYS,'SOURCES:\n'+src);const t=String(j.text||'').trim();if(!t) throw new Error('Nothing returned');const bad=numBad(t,src),sb=statusBad(t,[p]).concat(execBad(t,[p])).concat(shortBad(t,[p]));
   p.ai_note={text:t,at:new Date().toISOString(),check:[bad.length?'Check these numbers, not found in the project data: '+bad.join(', '):'',sb.join('; ')].filter(Boolean).join('. ')};save();vOne();}
@@ -881,7 +881,7 @@ const BRIEF_SYS=`You write the opening summary of a military construction portfo
 Use each project’s PROGRAMMING STATUS exactly as given: say authorized, appropriated or in the President’s Budget only when the status says so; a programmed or FYDP project is requested, not authorized.
 ${EXEC_RULE}
 State a funding shortfall only as a SHORTFALL line gives it, with its figure; never work one out from other numbers.
-Return ONLY JSON: {"text":"the paragraph"}`;
+Return ONLY JSON: {"text":"the paragraph"} When a source gives a cost increase against a statutory limit, say it as “an increase of $X against a limit of $Y”; never subtract the two or say it “exceeds the limit by” an amount.`;
 function briefKey(){return [F.svc,F.clu,F.ctry,F.phase,F.pm].join('|')+'|'+today();}
 async function aiBrief(){if(!aiOk()) return;const L=filtered();if(!L.length){alert('No projects in the current filter.');return;}
  const H=L.map(p=>({p,h:health(p)}));const src=['PORTFOLIO: '+L.length+' projects, value '+M(L.reduce((s,p)=>s+value(p),0))+'; health '+[0,1,2].map(l=>LEVEL[l].n+' '+H.filter(x=>x.h.overall===l).length).join(', ')]
@@ -1422,7 +1422,7 @@ function dumbbell(p){const ms=p.milestones.filter(m=>m.baseline||m.forecast||m.a
 const FIELDS=[['name','Project title','wide'],['number','Project number'],['to','Task order / contract (links IRMA and QUINN)'],['service','Service','svc'],['installation','Installation'],['country','Country or state'],['lat','Latitude'],['lon','Longitude'],['phase','Lifecycle phase','phase'],['fy','Program fiscal year'],['pm','Project manager'],['contractor','Contractor'],['delivery','Delivery method','deliv'],
  ['programmed','Programmed amount (1391) $'],['authorized','Authorized / appropriated $'],['award','Contract award $'],['cwe','Current working estimate $'],['obligated','Obligated $'],['expended','Expended $'],['ntp','Notice to proceed','date'],['baseline_finish','Baseline completion (BOD)','date'],['forecast_finish','Forecast completion','date'],['pct','Physical percent complete'],
  ['funded','Funds available to the project $'],['scope_auth','Scope in the 1391 justification data (quantity)'],['scope_now','Scope now (same unit)'],['scope_unit','Scope unit (SF, LF, each…)'],
- ['incr','Incrementally funded','yni'],['incr_future','Planned future increments ($, from the 1391)'],['incr_src','Increment plan source'],['fac_bldg','Existing facility (building) – used when there is no NORA record'],['fac_fci','Existing facility condition index (0–100)'],['fac_ls','Life-safety deficiencies (count)'],['fac_new','No existing facility (new mission)','yn'],['fac_src','Condition source (record or assessment)'],['cap_have','Capacity today'],['cap_need','Capacity required'],['cap_unit','Capacity unit (seats, MW, berths…)']];
+ ['inst_code','Installation code (real property site code)'],['incr','Incrementally funded','yni'],['incr_future','Planned future increments ($, from the 1391)'],['incr_src','Increment plan source'],['fac_bldg','Existing facility (building) – used when there is no NORA record'],['fac_fci','Existing facility condition index (0–100)'],['fac_ls','Life-safety deficiencies (count)'],['fac_new','No existing facility (new mission)','yn'],['fac_src','Condition source (record or assessment)'],['cap_have','Capacity today'],['cap_need','Capacity required'],['cap_unit','Capacity unit (seats, MW, berths…)']];
 function pEdit(p){const t=$('#pt');
  t.innerHTML='<div class="panel"><div class="form">'+FIELDS.map(([k,l,ty])=>'<div class="'+(ty==='wide'?'wide':'')+'"><label class="f">'+l+'</label>'+(ty==='svc'?'<select data-k="'+k+'"><option value="">–</option>'+SERVICES.map(s=>'<option '+(p[k]===s?'selected':'')+'>'+s+'</option>').join('')+'</select>':ty==='deliv'?'<select data-k="'+k+'"><option value="">–</option>'+DELIVS.concat(p[k]&&!DELIVS.includes(p[k])?[p[k]]:[]).map(x=>'<option>'+esc(x)+'</option>').join('')+'</select>':ty==='yni'?'<select data-k="'+k+'"><option value="">From the title</option><option value="yes">Yes</option><option value="no">No</option></select>':ty==='yn'?'<select data-k="'+k+'"><option value="">No</option><option value="yes">Yes</option></select>':ty==='phase'?'<select data-k="'+k+'">'+[1,2,3,4,5,6,7,8].map(n=>'<option value="'+n+'" '+(N(p[k])===n?'selected':'')+'>'+n+'. '+PHASES[n]+'</option>').join('')+'</select>':'<input data-k="'+k+'" '+(ty==='date'?'type="date"':'')+'>')+'</div>').join('')+
  '<div class="wide"><label class="f">Decisions needed from leadership</label><textarea data-k="decisions"></textarea></div>'+
@@ -2287,9 +2287,13 @@ function depIssues(){const L=filtered();const out=[];const r=P.prio?prRank():[];
  return out.concat(extIssues());}
 function chainLen(p,seen){seen=seen||new Set();if(seen.has(p.id)) return 0;seen.add(p.id);const ds=deps(p);return ds.length?1+Math.max(...ds.map(d=>chainLen(pById(d.on),new Set(seen)))):0;}
 function siteKey(p){const t=String(p.installation||'').toLowerCase();const k=Object.keys(INST).sort((a,b)=>b.length-a.length).find(k=>t.includes(k));return k||t.trim();}
-function bundles(){const L=filtered().filter(p=>!N(p.award)&&N(p.phase)<=6);const g={};L.forEach(p=>{const k=siteKey(p);if(k)(g[k]=g[k]||[]).push(p);});const out=[];
+// Bundling partners: the same installation by code (or, without a code, the same installation name in full – never a shared place name like Yap), construction only.
+const NONCON_RX=/land acquisition|\bland purchase|planning (and|&) design|\bP&D\b|design funds|unspecified minor|minor construction program|host nation support|\bstudy\b/i;
+function isConstr(p){if(NONCON_RX.test(String(p.name||''))) return false;const L=(p.funds||[]);return !(L.length&&L.every(l=>l.src==='PD'));}
+function bundleKey(p){const c=String(p.inst_code||'').trim().toUpperCase();return c?'code:'+c:'name:'+String(p.installation||'').toLowerCase().replace(/\s+/g,' ').trim();}
+function bundles(){const L=filtered().filter(p=>!N(p.award)&&N(p.phase)<=6&&isConstr(p));const g={};L.forEach(p=>{const k=bundleKey(p);if(k)(g[k]=g[k]||[]).push(p);});const out=[];
  Object.entries(g).forEach(([k,ps])=>{if(ps.length<2) return;ps.sort((a,b)=>N(a.fy)-N(b.fy));for(let i=0;i<ps.length;i++){const grp=ps.filter(q=>Math.abs(N(q.fy)-N(ps[i].fy))<=1);if(grp.length>=2){const ids=grp.map(q=>q.id).sort().join(',');if(!out.some(o=>o.ids===ids)){const svc=[...new Set(grp.map(q=>q.service))];
-  out.push({ids,ps:grp,site:grp[0].installation,cost:grp.reduce((a,q)=>a+prCost(q),0),why:'Same installation'+(new Set(grp.map(q=>q.fy)).size===1?', same fiscal year':', fiscal years within one of each other')+(svc.length===1?', same Service':'; Services: '+svc.join(', '))+'. One solicitation and one mobilization can cut cost and schedule; check the delivery method and design agent match.'});}}}});
+  out.push({ids,ps:grp,site:grp[0].installation,cost:grp.reduce((a,q)=>a+prCost(q),0),why:(grp[0].inst_code?'Same installation code ('+grp[0].inst_code+')':'Same installation')+(new Set(grp.map(q=>q.fy)).size===1?', same fiscal year':', fiscal years within one of each other')+(svc.length===1?', same Service':'; Services: '+svc.join(', '))+'. One solicitation and one mobilization can cut cost and schedule; check the delivery method and design agent match.'});}}}});
  return out.filter(b=>!(P.seqDismiss||[]).includes(b.ids));}
 const DEP_SYS=`You help a military construction program office find dependencies between projects in its portfolio. Given the project list, suggest only dependencies that are clearly likely from the facts: for example utility, fuel or water projects that facilities at the same installation need first; site preparation; swing space; a pier or wharf before ships or facilities that rely on it. Same installation (or the same small island) is usually required. Do not invent facts. Fewer good suggestions are better than many weak ones.
 Types: utility, site, swing, finish, other.
