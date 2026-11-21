@@ -93,9 +93,37 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
+
+ // ---------- one capability date, read the same way by every tool ----------
+ // Order of evidence: an actual, then the sequenced projection, then the forecast, then the baseline, then an estimate from the fiscal year.
+ // live: the caller's own sequencing result for this project ({pf,slip}), when it has one; otherwise the stamp PAULA saved (p.seq).
+ function adamT(){var a=(window.CORBEL_ADAM&&window.CORBEL_ADAM())||load('adam_portfolio')||{};var t=a.t||{};return {build:+t.build>0?+t.build:30,risk:t.risk!=null&&t.risk!==''?+t.risk:6};}
+ function bod(p){return (p.milestones||[]).filter(function(m){return m.name==='Beneficial occupancy';})[0]||null;}
+ function ymAdd(ym,n){var a=+ym.slice(0,4),b=+ym.slice(5,7)-1+n;a+=Math.floor(b/12);b=((b%12)+12)%12;return a+'-'+String(b+1).padStart(2,'0');}
+ function projFinish(p,live,H){var f=finish(p,H);if(f&&f.kind==='actual') return {date:f.date,kind:'actual',src:f.src,est:false};
+  var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
+  if(sq) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
+  var m=bod(p);
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(m&&ISO.test(m.forecast||'')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
+  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
+  if(m&&ISO.test(m.baseline||'')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
+  var fy=+p.fy;if(fy>2000){var T=adamT(),now=today().slice(0,7),late=!(+p.award>0)&&(fy+'-09')<now,st=late?now:fy+'-09';
+   return {date:ymAdd(st,T.build)+'-01',kind:'estimate',src:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+T.build+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+T.build+' months to build (assumption)',est:true};}
+  return null;}
+ var KIND={actual:'actual',projected:'projection',forecast:'forecast',baseline:'baseline',estimate:'estimate'};
+ // Months late (positive) or early (negative) against a need date, and the one status rule: on time, at risk (late by up to the ADAM window), late.
+ function moN(s){return +String(s).slice(0,4)*12+(+String(s).slice(5,7))-1;}
+ function capSt(gap){if(gap==null) return 'noneed';var r=adamT().risk;return gap<=0?'ok':gap<=r?'risk':'late';}
+ // A capability: the latest completion among its required projects sets the date. byId(pid) returns the project; live(pid) the caller's sequencing for it.
+ function capability(r,byId,live,H){var L=(r.links||[]).filter(function(l){return l.role!=='supports';}).map(function(l){return byId(l.pid);}).filter(Boolean);
+  if(!L.length) return {st:'none',req:[]};var D=L.map(function(p){return {p:p,d:projFinish(p,live?live(p.id):null,H)};}),miss=D.filter(function(x){return !x.d;}),known=D.filter(function(x){return x.d;});
+  if(!known.length) return {st:'unk',req:L,miss:miss};known.sort(function(a,b){return a.d.date<b.d.date?1:a.d.date>b.d.date?-1:0;});var bind=known[0];
+  var gap=r.need?moN(bind.d.date)-moN(r.need):null,st=capSt(gap);if(miss.length&&st==='ok') st='unk';
+  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:known.some(function(x){return x.d.est;}),basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,

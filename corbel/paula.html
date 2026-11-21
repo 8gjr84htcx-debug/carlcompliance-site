@@ -93,9 +93,37 @@
   var it=HA&&HA.items&&HA.items[pid];if(it&&it.dates&&HK.indexOf(k)>=0&&it.dates[k]&&it.dates[k]!==date){it.dates[k]=date;ch.push('HANK');}
   try{if(!mem.paula&&PA&&p) localStorage.setItem('paula_project',JSON.stringify(PA));if(!mem.hank&&HA&&it) localStorage.setItem('hank_portfolio',JSON.stringify(HA));}catch(e){}
   return ch;}
+
+ // ---------- one capability date, read the same way by every tool ----------
+ // Order of evidence: an actual, then the sequenced projection, then the forecast, then the baseline, then an estimate from the fiscal year.
+ // live: the caller's own sequencing result for this project ({pf,slip}), when it has one; otherwise the stamp PAULA saved (p.seq).
+ function adamT(){var a=(window.CORBEL_ADAM&&window.CORBEL_ADAM())||load('adam_portfolio')||{};var t=a.t||{};return {build:+t.build>0?+t.build:30,risk:t.risk!=null&&t.risk!==''?+t.risk:6};}
+ function bod(p){return (p.milestones||[]).filter(function(m){return m.name==='Beneficial occupancy';})[0]||null;}
+ function ymAdd(ym,n){var a=+ym.slice(0,4),b=+ym.slice(5,7)-1+n;a+=Math.floor(b/12);b=((b%12)+12)%12;return a+'-'+String(b+1).padStart(2,'0');}
+ function projFinish(p,live,H){var f=finish(p,H);if(f&&f.kind==='actual') return {date:f.date,kind:'actual',src:f.src,est:false};
+  var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
+  if(sq) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
+  var m=bod(p);
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(m&&ISO.test(m.forecast||'')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
+  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
+  if(m&&ISO.test(m.baseline||'')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
+  var fy=+p.fy;if(fy>2000){var T=adamT(),now=today().slice(0,7),late=!(+p.award>0)&&(fy+'-09')<now,st=late?now:fy+'-09';
+   return {date:ymAdd(st,T.build)+'-01',kind:'estimate',src:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+T.build+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+T.build+' months to build (assumption)',est:true};}
+  return null;}
+ var KIND={actual:'actual',projected:'projection',forecast:'forecast',baseline:'baseline',estimate:'estimate'};
+ // Months late (positive) or early (negative) against a need date, and the one status rule: on time, at risk (late by up to the ADAM window), late.
+ function moN(s){return +String(s).slice(0,4)*12+(+String(s).slice(5,7))-1;}
+ function capSt(gap){if(gap==null) return 'noneed';var r=adamT().risk;return gap<=0?'ok':gap<=r?'risk':'late';}
+ // A capability: the latest completion among its required projects sets the date. byId(pid) returns the project; live(pid) the caller's sequencing for it.
+ function capability(r,byId,live,H){var L=(r.links||[]).filter(function(l){return l.role!=='supports';}).map(function(l){return byId(l.pid);}).filter(Boolean);
+  if(!L.length) return {st:'none',req:[]};var D=L.map(function(p){return {p:p,d:projFinish(p,live?live(p.id):null,H)};}),miss=D.filter(function(x){return !x.d;}),known=D.filter(function(x){return x.d;});
+  if(!known.length) return {st:'unk',req:L,miss:miss};known.sort(function(a,b){return a.d.date<b.d.date?1:a.d.date>b.d.date?-1:0;});var bind=known[0];
+  var gap=r.need?moN(bind.d.date)-moN(r.need):null,st=capSt(gap);if(miss.length&&st==='ok') st='unk';
+  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:known.some(function(x){return x.d.est;}),basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -979,11 +1007,14 @@ function needOf(p){let b=null;adamReqs().forEach(r=>{if(!r.need) return;(r.links
  if(!b&&p.need_date) b={d:d01(p.need_date),src:'Project need date'};return b;}
 function bodMs(p){return (p.milestones||[]).find(m=>m.name==='Beneficial occupancy');}
 function baseFin(p){const m=bodMs(p);return p.baseline_finish||(m&&m.baseline)||'';}
-function foreFin(p){const c=(typeof cpmC==='function'?cpmC():{})[p.id];return (c&&c.pf&&c.slip>0?c.pf:'')||ffOf(p)||(bodMs(p)&&(bodMs(p).actual||bodMs(p).forecast))||'';}
+// One completion date for every tool and every capability (CorbelDates.projFinish): actual, projection, forecast, baseline, then the fiscal-year estimate.
+function foreD(p){const c=(typeof cpmC==='function'?cpmC():{})[p.id];return window.CorbelDates?CorbelDates.projFinish(p,c):null;}
+function foreFin(p){const D=foreD(p);return D?D.date:'';}
+const stIx=gap=>({ok:0,risk:1,late:2})[CorbelDates.capSt(gap)];const riskMo=()=>CorbelDates.adamT().risk;
 const moN=s=>{const[a,b]=String(s).slice(0,7).split('-').map(Number);return a*12+b-1;};
 const moDiff=(a,b)=>moN(b)-moN(a);
 function slipRows(L){return L.map(p=>{const f=foreFin(p),b=baseFin(p),n=needOf(p);if(!f) return null;
- const spare=n?moDiff(f,n.d):null;const st=n?(spare<0?2:spare<3?1:0):-1;return {p,f,b,n,spare,st,slip:b?moDiff(b,f):null};}).filter(Boolean)
+ const spare=n?moDiff(f,n.d):null;const st=n?stIx(-spare):-1;return {p,f,b,n,spare,st,slip:b?moDiff(b,f):null};}).filter(Boolean)
  .sort((x,y)=>(x.st<0)-(y.st<0)||(x.spare??999)-(y.spare??999)||String(x.f).localeCompare(String(y.f)));}
 function slipCard(L){const R=slipRows(L);if(!R.length) return '';const nb=L.filter(p=>(foreFin(p)&&!baseFin(p))||(p.milestones||[]).some(m=>!m.baseline&&(m.forecast||m.actual))).length;
  const late=R.filter(r=>r.st===2).length,tight=R.filter(r=>r.st===1).length,non=R.filter(r=>r.st<0).length;
@@ -999,7 +1030,7 @@ function slipCard(L){const R=slipRows(L);if(!R.length) return '';const nb=L.filt
   '<div style="position:absolute;top:50%;left:'+X(r.f)+'%;width:11px;height:11px;border-radius:50%;background:'+c+';border:2px solid #fff;transform:translate(-50%,-50%)"></div></div>'+
   '<span style="font-size:11.5px;text-align:right;color:'+c+'">'+(r.n?(r.spare<0?(-r.spare)+' mo late':r.spare+' mo spare'):'no need date')+'</span></div>';};
  return '<div class="card2" style="margin-top:14px"><h3>Projects against need dates</h3><p class="cap">Forecast finish (dot) against the date the capability is needed (diamond), from ADAM or the project’s need date. The hollow dot is the locked baseline finish; the gray line is the slip. Sorted by months to spare. Click a row to open the project.</p>'+
- '<div class="leg" style="margin-bottom:8px"><span><i style="background:#d03b3b"></i>Late to need <b style="color:#0b0b0b">'+late+'</b></span><span><i style="background:#c98500"></i>Under 3 months to spare <b style="color:#0b0b0b">'+tight+'</b></span><span><i style="background:#0ca30c"></i>3 months or more <b style="color:#0b0b0b">'+(R.length-late-tight-non)+'</b></span><span><i style="background:#5f5e5a"></i>No need date <b style="color:#0b0b0b">'+non+'</b></span></div>'+
+ '<div class="leg" style="margin-bottom:8px"><span><i style="background:#d03b3b"></i>More than '+riskMo()+' months late <b style="color:#0b0b0b">'+late+'</b></span><span><i style="background:#c98500"></i>Up to '+riskMo()+' months late <b style="color:#0b0b0b">'+tight+'</b></span><span><i style="background:#0ca30c"></i>3 months or more <b style="color:#0b0b0b">'+(R.length-late-tight-non)+'</b></span><span><i style="background:#5f5e5a"></i>No need date <b style="color:#0b0b0b">'+non+'</b></span></div>'+
  '<div style="display:grid;grid-template-columns:minmax(0,210px) minmax(0,1fr) 92px;gap:8px;height:16px"><span></span><div style="position:relative">'+ax+'</div><span></span></div>'+SH.map(row).join('')+
  (R.length>14?'<button class="sm" id="slipAll" style="margin-top:6px">'+(SLIPALL?'Show the first 14':'Show all '+R.length)+'</button>':'')+
  (nb?'<p class="small" style="margin-top:8px">'+nb+' project'+(nb>1?'s have':' has')+' dates with no locked baseline, so their slip and misses can’t be shown. <button class="sm" id="lockAll">Lock baselines from today’s forecasts</button></p>':'')+'</div>';}
@@ -1032,7 +1063,7 @@ function onTimeCard(L){const ms=months(6);const unf=!F.svc&&!F.clu&&!F.ctry&&!F.
  const bars=v.map((x,i)=>{let y=H-b,o='';[[x[0],0],[x[2],1],[x[3],2],[x[4],3]].forEach(([n,c])=>{if(!n) return;const h=yh(n);y-=h;o+='<rect x="'+(cx(i)-bw/2)+'" y="'+y+'" width="'+bw+'" height="'+Math.max(0,h-1.5)+'" fill="'+C[c][0]+'"><title>'+mlab(ms[i])+': '+n+' '+C[c][1].toLowerCase()+'</title></rect>';});
   return o+'<text x="'+cx(i)+'" y="'+(H-6)+'" font-size="11" fill="#898781" text-anchor="middle">'+mlab(ms[i]).split(' ')[0]+'</text>'+(x[1]?'<text x="'+cx(i)+'" y="'+(y-5)+'" font-size="11" fill="#52514e" text-anchor="middle">'+(x[1]-x[4]?x[0]+' of '+(x[1]-x[4])+(x[4]?' · '+x[4]+' to confirm':''):x[4]+' to confirm')+'</text>':'<text x="'+cx(i)+'" y="'+(H-b-6)+'" font-size="10" fill="#b4b2a9" text-anchor="middle">none due</text>');}).join('');
  const D=ms.flatMap(m=>msDue(L,m));const SR={};slipRows(L).forEach(r=>SR[r.p.id]=r);
- const eff=x=>{const r=SR[x.p.id];if(!r||!r.n) return 'No need date';return r.spare<0?'Project now '+(-r.spare)+' mo late to need':r.spare<3?'Project '+r.spare+' mo from need':'Project still '+r.spare+' mo spare';};
+ const eff=x=>{const r=SR[x.p.id];if(!r||!r.n) return 'No need date';return r.spare<0?'Project now '+(-r.spare)+' mo late to need':'Project still '+r.spare+' mo spare';};
  const miss=D.filter(x=>x.st==='open'||x.st==='late').sort((a,b)=>(a.st==='open'?0:1)-(b.st==='open'?0:1)||b.days-a.days);const unc=D.filter(x=>x.st==='unconf').sort((a,b)=>b.days-a.days);const met=D.filter(x=>x.st==='met').sort((a,b)=>String(b.m.actual).localeCompare(String(a.m.actual)));
  const li=(x,c)=>'<div class="it clk" data-open="'+x.p.id+'" style="padding:6px 0;border-top:0.5px solid #e1e0d9"><b>'+esc(x.m.name||'Milestone')+'</b> – '+esc(x.p.name)+'<div class="small">'+(x.st==='met'?'Done '+fd(x.m.actual)+' against '+fd(x.m.baseline):x.st==='late'?'Finished '+fd(x.m.actual)+', '+x.days+' days after '+fd(x.m.baseline):x.st==='unconf'?'Due '+fd(x.m.baseline)+' – no actual or new forecast recorded':'Due '+fd(x.m.baseline)+', open '+x.days+' days'+(x.m.forecast?' · forecast '+fd(x.m.forecast):'')+' · '+esc(eff(x)))+'</div></div>';
  return '<div class="card2" style="margin-top:14px"><h3>Milestones due: met and missed</h3><p class="cap">Milestones due in each month against their locked baseline. A miss counts only when it finished late or has a later forecast; one with no update is “not confirmed” until someone checks it. Open misses come first and say whether the need date is at risk. Past months use the month-end snapshot when there is one.</p>'+
@@ -1205,17 +1236,17 @@ function hLabel(h){return h.unv?(h.needUpd?'Unverified – needs an update (date
 function capRows(L){const ids=new Set(L.map(p=>p.id));return adamReqs().map(r=>{const req=(r.links||[]).filter(l=>l.role!=='supports'&&ids.has(l.pid)).map(l=>pById(l.pid)).filter(Boolean);
  const sup=(r.links||[]).filter(l=>l.role==='supports'&&ids.has(l.pid)).map(l=>pById(l.pid)).filter(Boolean);if(!req.length&&!sup.length) return null;
  const fc=req.map(p=>({p,f:foreFin(p)})).filter(x=>x.f).sort((a,b)=>String(b.f).localeCompare(String(a.f)));const bind=fc[0]||null;const need=r.need?d01(r.need):'';
- const spare=need&&bind?moDiff(bind.f,need):null;const st=!need||!bind?-1:spare<0?2:spare<3?1:0;const unv=req.filter(p=>health(p).unv).length;
- return {r,req,sup,bind,need,spare,st,unv};}).filter(Boolean).sort((a,b)=>(a.st<0)-(b.st<0)||(a.spare??999)-(b.spare??999));}
+ const spare=need&&bind?moDiff(bind.f,need):null;let st=!need||!bind?-1:stIx(-spare);if(st===0&&fc.length<req.length) st=-1;const basis=bind?(foreD(bind.p)||{}):{};const unv=req.filter(p=>health(p).unv).length;
+ return {r,req,sup,bind,need,spare,st,unv,basis};}).filter(Boolean).sort((a,b)=>(a.st<0)-(b.st<0)||(a.spare??999)-(b.spare??999));}
 let CAPX=new Set();
 function capCard(L){const R=capRows(L);if(!R.length) return '';const col=['#0ca30c','#c98500','#d03b3b','#5f5e5a'];
  const tied=new Set(R.flatMap(x=>x.req.concat(x.sup).map(p=>p.id)));const un=L.filter(p=>!tied.has(p.id));
  const n=[0,1,2].map(s=>R.filter(x=>x.st===s).length),nn=R.filter(x=>x.st<0).length;
  const row=x=>{const c=col[x.st<0?3:x.st];const open=CAPX.has(x.r.id);
-  let h='<tr class="clk" data-capx="'+x.r.id+'"><td style="width:18px;color:#898781">'+(open?'&#9662;':'&#9656;')+'</td><td><b>'+esc(x.r.name)+'</b><div class="small">'+esc([x.r.location,x.r.program].filter(Boolean).join(' · '))+'</div></td><td>'+(x.need?fd(x.need):'<span class="small">not set in ADAM</span>')+'</td><td>'+(x.bind?fd(x.bind.f):'–')+'</td><td>'+(x.bind?esc(x.bind.p.name):'–')+(x.unv?'<div class="small" style="color:#5f5e5a">'+x.unv+' project'+(x.unv>1?'s':'')+' unverified</div>':'')+'</td><td style="color:'+c+';white-space:nowrap"><b>'+(x.st<0?(x.need?'no schedule':'no need date'):x.spare<0?(-x.spare)+' mo late':x.spare+' mo spare')+'</b></td></tr>';
+  let h='<tr class="clk" data-capx="'+x.r.id+'"><td style="width:18px;color:#898781">'+(open?'&#9662;':'&#9656;')+'</td><td><b>'+esc(x.r.name)+'</b><div class="small">'+esc([x.r.location,x.r.program].filter(Boolean).join(' · '))+'</div></td><td>'+(x.need?fd(x.need):'<span class="small">not set in ADAM</span>')+'</td><td>'+(x.bind?fd(x.bind.f)+'<div class="small">'+esc(CorbelDates.KIND[x.basis.kind]||'')+'</div>':'–')+'</td><td>'+(x.bind?esc(x.bind.p.name):'–')+(x.unv?'<div class="small" style="color:#5f5e5a">'+x.unv+' project'+(x.unv>1?'s':'')+' unverified</div>':'')+'</td><td style="color:'+c+';white-space:nowrap"><b>'+(x.st<0?(x.need?'no schedule':'no need date'):x.spare<0?(-x.spare)+' mo late':x.spare+' mo spare')+'</b></td></tr>';
   if(open) h+='<tr><td></td><td colspan="5"><table class="ptable" style="margin:2px 0 8px"><thead><tr><th>Project</th><th>Role</th><th>Forecast finish</th><th>Baseline finish</th><th>Health</th></tr></thead><tbody>'+x.req.concat(x.sup).map(p=>{const hh=health(p);return '<tr class="clk" data-open="'+p.id+'"><td>'+esc(p.name)+(x.bind&&x.bind.p===p?' <span class="small" style="color:'+c+'">sets the date</span>':'')+'</td><td>'+(x.req.includes(p)?'Required':'Supports')+'</td><td>'+(foreFin(p)?fd(foreFin(p)):'–')+'</td><td>'+(baseFin(p)?fd(baseFin(p)):'–')+'</td><td>'+esc(hLabel(hh))+'</td></tr>';}).join('')+'</tbody></table></td></tr>';return h;};
  return '<div class="card2" style="margin-top:14px"><h3>Capability readiness</h3><p class="cap">Each posture requirement from ADAM: when it is needed, when the last required project is forecast to finish, and which project sets that date. Click a row for its projects. Need dates come from ADAM; set them there.</p>'+
- '<div class="leg" style="margin-bottom:8px"><span><i style="background:#d03b3b"></i>Late to need <b style="color:#0b0b0b">'+n[2]+'</b></span><span><i style="background:#c98500"></i>Under 3 months to spare <b style="color:#0b0b0b">'+n[1]+'</b></span><span><i style="background:#0ca30c"></i>3 months or more <b style="color:#0b0b0b">'+n[0]+'</b></span><span><i style="background:#5f5e5a"></i>No need date or schedule <b style="color:#0b0b0b">'+nn+'</b></span></div>'+
+ '<div class="leg" style="margin-bottom:8px"><span><i style="background:#d03b3b"></i>More than '+riskMo()+' months late <b style="color:#0b0b0b">'+n[2]+'</b></span><span><i style="background:#c98500"></i>Up to '+riskMo()+' months late <b style="color:#0b0b0b">'+n[1]+'</b></span><span><i style="background:#0ca30c"></i>3 months or more <b style="color:#0b0b0b">'+n[0]+'</b></span><span><i style="background:#5f5e5a"></i>No need date or schedule <b style="color:#0b0b0b">'+nn+'</b></span></div>'+
  '<div style="overflow-x:auto"><table class="ptable"><thead><tr><th></th><th>Capability</th><th>Needed by</th><th>Forecast</th><th>Sets the date</th><th>Margin</th></tr></thead><tbody>'+R.map(row).join('')+'</tbody></table></div>'+
  (un.length?'<p class="small" style="margin-top:8px">'+un.length+' project'+(un.length>1?'s are':' is')+' not tied to a posture requirement. Link them in ADAM, or see them on the Projects against need dates panel (Edit layout).</p>':'')+'</div>';}
 // ---- Funding changes: what was enacted against what was requested, by project and year ----
@@ -1251,7 +1282,7 @@ function deckPosture(){const C=PX.C;const L=filtered();const H=L.map(p=>({p,h:he
  const ids=new Set(L.map(p=>p.id));const G=REG().items.filter(i=>(!i.pid||ids.has(i.pid))&&courtOf(i)==='gov'&&i.status!=='closed').sort((a,b)=>String(a.due||'9').localeCompare(String(b.due||'9')));
  const FC=fundChanges(L);const D=pxDeck('Posture','Posture Construction Status',scopeText()+'  ·  as of '+fd(today()));
  const risk=R.filter(x=>x.st===2||x.st===1);const mtxt=x=>x.st<0?(x.need?'No schedule':'No need date'):x.spare<0?(-x.spare)+' mo late':x.spare+' mo spare';const mcol=x=>x.st===2?C.red:x.st===1?C.amber:x.st===0?C.green:C.grey||'5F5E5A';
- const bl=[risk.length?risk.length+' of '+R.filter(x=>x.need).length+' capabilities with need dates are at risk: '+risk.slice(0,3).map(x=>x.r.name+' ('+mtxt(x)+', set by '+(x.bind?x.bind.p.name:'–')+')').join('; ')+'.':R.filter(x=>x.need).length?'No capability with a need date is forecast late.':'Need dates are not yet set for the posture requirements.',
+ const bl=[risk.length?risk.length+' of '+R.filter(x=>x.need).length+' capabilities with need dates are at risk: '+risk.slice(0,3).map(x=>x.r.name+' ('+mtxt(x)+', set by '+(x.bind?x.bind.p.name+(x.basis&&x.basis.kind?' – '+CorbelDates.KIND[x.basis.kind]:''):'–')+')').join('; ')+'.':R.filter(x=>x.need).length?'No capability with a need date is forecast late.':'Need dates are not yet set for the posture requirements.',
   G.length?G.length+' decision'+(G.length>1?'s':'')+' or request'+(G.length>1?'s are':' is')+' waiting on the Government.':'Nothing is waiting on the Government.',
   crNow()?crLine(L):'',
   cnt[3]?cnt[3]+' of '+L.length+' projects have no current status update, or dates passed with no actual recorded; their status is unverified.':'All projects have a current status update.',
@@ -2272,7 +2303,7 @@ function deckDecision(pp){const C=PX.C;const d=pp.doc;const D=pxDeck('Decision b
  return D;}
 
 // ================= SEQUENCE: dependencies, knock-on slips, bundling =================
-const DEPT=[['utility','Needs utilities or infrastructure from it'],['site','Needs its site cleared or prepared'],['swing','Needs swing space it provides'],['finish','Can’t start until it finishes'],['other','Other dependency']];
+const DEPT=[['utility','Needs utilities or infrastructure from it'],['site','Needs its site cleared or prepared'],['swing','Needs swing space it provides'],['finish','Can’t start until it finishes'],['other','Other dependency (starts after it starts)']];
 const pById=id=>P.projects.find(q=>q.id===id);
 function deps(p){return (p.deps||[]).filter(d=>pById(d.on));}
 function startOf(p){return p.ntp||(N(p.fy)?(N(p.fy))+'-06-01':'');}
@@ -2296,23 +2327,32 @@ function bundles(){const L=filtered().filter(p=>!N(p.award)&&N(p.phase)<=6&&isCo
   out.push({ids,ps:grp,site:grp[0].installation,cost:grp.reduce((a,q)=>a+prCost(q),0),why:(grp[0].inst_code?'Same installation code ('+grp[0].inst_code+')':'Same installation')+(new Set(grp.map(q=>q.fy)).size===1?', same fiscal year':', fiscal years within one of each other')+(svc.length===1?', same Service':'; Services: '+svc.join(', '))+'. One solicitation and one mobilization can cut cost and schedule; check the delivery method and design agent match.'});}}}});
  return out.filter(b=>!(P.seqDismiss||[]).includes(b.ids));}
 const DEP_SYS=`You help a military construction program office find dependencies between projects in its portfolio. Given the project list, suggest only dependencies that are clearly likely from the facts: for example utility, fuel or water projects that facilities at the same installation need first; site preparation; swing space; a pier or wharf before ships or facilities that rely on it. Same installation (or the same small island) is usually required. Do not invent facts. Fewer good suggestions are better than many weak ones.
-Types: utility, site, swing, finish, other.
+Types: utility (needs utilities or infrastructure it provides before it can be occupied), site (needs its site prepared before completion), swing (needs swing space before it can start), finish (cannot start until the other finishes), other (phases of one program: starts after the other starts). Use finish only when the facts say the work cannot start before the other is complete. Never suggest a dependency for a project already under construction (phase 7 or later).
+The quote must name both projects, or state this project's need for what the other provides.
 For each one, copy into "quote" the exact words from either project's DESCRIPTION that support it (at most 30 words). If no description supports it, leave "quote" empty.
 Return ONLY JSON: {"deps":[{"project":"<id of the project that depends>","on":"<id it depends on>","type":"utility","why":"one sentence from the facts","quote":"exact words from a DESCRIPTION, or empty"}]}`;
 const normQ=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();
+// The sentence must show the dependency, not just exist: it names both projects, or names the dependent's need for what the other provides.
+const DEPSW=new Set('phase inc increment project projects facility facilities construct construction replace replacement support supports system systems guam base marine navy army force forces joint island new and the for with'.split(' '));
+const nameW=p=>normQ(p&&p.name).split(' ').filter(w=>w.length>3&&!DEPSW.has(w)&&!/^\d+$/.test(w));
+function depShows(x){const q=' '+normQ(x.quote)+' ';const a=pById(x.project),b=pById(x.on);const has=p=>nameW(p).some(w=>q.includes(' '+w+' ')||(w.length>5&&q.includes(' '+w.slice(0,6))));
+ if(has(a)&&has(b)) return true;return has(b)&&/\b(need|needs|require|requires|required|depend|depends|after|following|prerequisite|once|relies|served|powered|supplied|cleared|prepared|before)\b/.test(q);}
 function depQuoteOK(x){const q=normQ(x.quote);if(q.split(' ').length<4) return false;return [x.project,x.on].some(id=>{const p=pById(id);return p&&normQ([p.desc,p.notes].join(' ')).includes(q);});}
 async function aiDeps(){const b=$('#sqAI');if(b){b.disabled=true;b.textContent='Looking for dependencies…';}const L=filtered();
  try{const j=await CARLAI.ask('claude',DEP_SYS,'PROJECTS:\n'+L.map(p=>[p.id,p.name,p.installation,p.service,'FY'+p.fy,'phase '+p.phase,'DESCRIPTION: '+String(p.desc||p.notes||'').slice(0,400)].join(' | ')).join('\n'));
-  P.seqSug=(j.deps||[]).filter(x=>pById(x.project)&&pById(x.on)&&x.project!==x.on&&!deps(pById(x.project)).some(d=>d.on===x.on)).map(x=>({...x,type:DEPT.some(t=>t[0]===x.type)?x.type:'other',why:String(x.why||'').slice(0,200),quote:String(x.quote||'').slice(0,300)})).map(x=>({...x,ok:depQuoteOK(x)}));save();vSeq();}
+  P.seqSug=(j.deps||[]).filter(x=>pById(x.project)&&pById(x.on)&&x.project!==x.on&&!deps(pById(x.project)).some(d=>d.on===x.on)).map(x=>({...x,type:DEPT.some(t=>t[0]===x.type)?x.type:'other',why:String(x.why||'').slice(0,200),quote:String(x.quote||'').slice(0,300)})).map(x=>{const found=depQuoteOK(x);return {...x,found,ok:found&&depShows(x)};});save();vSeq();}
  catch(e){if(b){b.disabled=false;b.textContent='Suggest dependencies with AI';}alert('Could not get suggestions: '+e.message);}}
-function vSeq(){const v=$('#view');const I=depIssues();const iss=I.filter(x=>x.lvl>0);const B=bundles();const L=filtered();const linked=L.filter(p=>deps(p).length||L.some(q=>deps(q).some(d=>d.on===p.id)));const sug=(P.seqSug||[]).filter(x=>pById(x.project)&&pById(x.on));
+// What accepting a suggestion would do to the dependent's projected finish, worked out before it is accepted.
+function sugEffect(x){try{const a=pById(x.project);if(!a||chainHas(pById(x.on),a.id)) return 'Would make a loop, so it can’t be added.';const C0=cpm()[a.id]||{};a.deps=(a.deps||[]).concat([{on:x.on,type:x.type,_t:1}]);const C1=cpm()[a.id]||{};a.deps=a.deps.filter(d=>!d._t);
+ const d=C0.pf&&C1.pf?dd(C0.pf,C1.pf):0;if(C1.built) return 'No date change: '+a.name+' is under construction, so only a dated outside event can move it.';return d>15?'Date effect: '+a.name+' would finish '+fd(C1.pf)+', about '+Math.round(d/30.4)+' months later than now.':'Date effect: none – '+a.name+' still finishes '+(C1.pf?fd(C1.pf):'as forecast')+'.';}catch(e){return '';}}
+function vSeq(){const v=$('#view');const I=depIssues();const iss=I.filter(x=>x.lvl>0);const B=bundles();const L=filtered();const linked=L.filter(p=>deps(p).length||L.some(q=>deps(q).some(d=>d.on===p.id)));const sug=(P.seqSug||[]).filter(x=>pById(x.project)&&pById(x.on));sug.forEach(x=>{x.found=depQuoteOK(x);x.ok=x.found&&depShows(x);});
  const opt=sel=>'<option value="">Choose a project</option>'+L.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(p=>'<option value="'+p.id+'"'+(sel===p.id?' selected':'')+'>'+esc(p.name+' – '+(p.installation||''))+'</option>').join('');
  v.innerHTML=filterRow()+'<div class="panel"><h2>Sequence</h2><p class="lead">Which projects depend on others, where a slip or a funding decision in one pushes another, and which projects could go to contract together.</p>'+
   '<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+t('Dependencies',String(L.reduce((a,p)=>a+deps(p).length,0)))+t('Knock-on problems',String(iss.length))+(()=>{const n=Math.max(0,...L.map(p=>chainLen(p)));return t('Longest chain',n+(n===1?' link':' links'));})()+t('Bundling candidates',String(B.length))+'</div></div>'+
   '<div class="panel"><h3 style="margin-top:0">Knock-on problems</h3>'+(iss.length?iss.map(x=>'<div class="find" style="display:flex;gap:10px;border-left:4px solid '+(x.lvl===2?'var(--crit)':'var(--watch)')+';padding:7px 10px;margin:6px 0"><span style="flex:1">'+esc(x.text)+'</span><button class="sm" data-sopen="'+x.q.id+'">Open '+esc(x.q.name.length>24?x.q.name.slice(0,23)+'…':x.q.name)+'</button></div>').join(''):'<p class="small">None. Dependencies, dates, fiscal years and the funding line line up.</p>')+'</div>'+
   (linked.length?'<div class="panel"><h3 style="margin-top:0">Linked projects over time</h3>'+gantt(linked)+'</div>':'')+seqExtra()+
   '<div class="panel"><h3 style="margin-top:0">Dependencies</h3>'+
-  (sug.length?'<div class="find" style="margin-bottom:10px"><b>Suggested by AI – tick the ones that are right and accept them together.</b> <span class="small">Each shows the sentence it rests on; a suggestion whose sentence was found in the project description is ticked for you.</span>'+sug.map((x,i)=>'<div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="checkbox" data-sck="'+i+'" style="flex:none;width:auto;margin-top:4px" '+(x.ok?'checked':'')+'><span style="flex:1">'+esc(pById(x.project).name)+' → '+esc((DEPT.find(t=>t[0]===x.type)||DEPT[4])[1].toLowerCase())+': <b>'+esc(pById(x.on).name)+'</b><br><span class="small">'+esc(x.why)+'</span><br><span class="small" style="color:'+(x.ok?'#0b6b2e':'#7a5200')+'">'+(x.ok?'Source: “'+esc(x.quote)+'” (found in the project description)':x.quote?'Quoted “'+esc(x.quote)+'”, but those words are not in either project description':'No source sentence – the AI’s reasoning only')+'</span></span><button class="sm go" data-sacc="'+i+'">Accept</button><button class="sm" data-srej="'+i+'">Dismiss</button></div>').join('')+'<div class="row" style="margin-top:8px"><button class="sm go" id="sAccAll">Accept the ticked suggestions</button></div></div>':'')+
+  (sug.length?'<div class="find" style="margin-bottom:10px"><b>Suggested by AI – tick the ones that are right and accept them together.</b> <span class="small">Each shows the sentence it rests on; a suggestion is ticked for you only when its sentence, found in the project description, names both projects or the need one has for the other. Each shows what it would do to the dates.</span>'+sug.map((x,i)=>'<div style="display:flex;gap:8px;align-items:flex-start;margin-top:6px"><input type="checkbox" data-sck="'+i+'" style="flex:none;width:auto;margin-top:4px" '+(x.ok?'checked':'')+'><span style="flex:1">'+esc(pById(x.project).name)+' → '+esc((DEPT.find(t=>t[0]===x.type)||DEPT[4])[1].toLowerCase())+': <b>'+esc(pById(x.on).name)+'</b><br><span class="small">'+esc(x.why)+'</span><br><span class="small" style="color:'+(x.ok?'#0b6b2e':'#7a5200')+'">'+(x.ok?'Source: “'+esc(x.quote)+'” (found in the project description)':x.found||(x.found==null&&depQuoteOK(x))?'Related, not shown to be a dependency: “'+esc(x.quote)+'”':x.quote?'Quoted “'+esc(x.quote)+'”, but those words are not in either project description':'No source sentence – the AI’s reasoning only')+'</span><br><span class="small">'+esc(sugEffect(x))+'</span></span><button class="sm go" data-sacc="'+i+'">Accept</button><button class="sm" data-srej="'+i+'">Dismiss</button></div>').join('')+'<div class="row" style="margin-top:8px"><button class="sm go" id="sAccAll">Accept the ticked suggestions</button></div></div>':'')+
   '<table class="ptable"><thead><tr><th>Project</th><th>Depends on</th><th>Why</th><th></th></tr></thead><tbody>'+L.flatMap(p=>deps(p).map((d,i)=>'<tr><td><b>'+esc(p.name)+'</b><div class="small">'+esc(p.installation||'')+' · FY'+esc(String(p.fy||''))+'</div></td><td>'+esc(pById(d.on).name)+'<div class="small">FY'+esc(String(pById(d.on).fy||''))+(finishOf(pById(d.on))?' · finishes '+fd(finishOf(pById(d.on))):'')+'</div></td><td>'+esc((DEPT.find(t=>t[0]===d.type)||DEPT[4])[1])+(d.src==='ai'?' <span class="small">(AI suggested, accepted)</span>':'')+'</td><td><button class="sm" data-sdel="'+p.id+'|'+i+'">Remove</button></td></tr>')).join('')+'</tbody></table>'+
   '<div class="row" style="gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center"><select id="sqA" style="max-width:280px">'+opt('')+'</select><select id="sqT" style="width:auto;max-width:300px">'+DEPT.map(([k,n])=>'<option value="'+k+'">'+esc(n.toLowerCase())+'</option>').join('')+'</select><select id="sqB" style="max-width:280px">'+opt('')+'</select><button class="sm go" id="sqAdd">Add dependency</button>'+
   (window.CARLAI&&CARLAI.state().ok?'<button class="sm" id="sqAI">Suggest dependencies with AI</button>':'')+'</div><p class="small">Read it as: first project → needs → second project.</p></div>'+
@@ -2332,15 +2372,24 @@ function vSeq(){const v=$('#view');const I=depIssues();const iss=I.filter(x=>x.l
 // that arrives after the date the project needs it pushes the project's finish by the difference.
 const SEQ_DUR=730;
 let _cpm=null,_cpmT=0;function cpmC(){if(!_cpm||Date.now()-_cpmT>400){_cpm=cpm();_cpmT=Date.now();}return _cpm;}
+// The lag on a start-to-start dependency: what the user entered, else 90 days.
+const DEP_LAG=d=>N(d.lag)>0?N(d.lag):90;
 function cpm(){const memo={},vis=new Set();
  const go=p=>{if(!p) return null;if(memo[p.id]) return memo[p.id];if(vis.has(p.id)) return null;vis.add(p.id);
   const S0=startOf(p),F0=finishOf(p);if(!S0&&!F0) return memo[p.id]={s:'',f:'',pf:'',slip:0,why:[],est:true};
   const dur=S0&&F0?Math.max(30,dd(S0,F0)):SEQ_DUR;const s0=S0||addD(F0,-dur),f0=F0||addD(S0,dur);const started=!!(p.ntp&&p.ntp<=today());
-  let s=s0;const why=[];
-  if(!started) deps(p).forEach(d=>{const q=go(pById(d.on));if(q&&q.pf&&q.pf>s){s=q.pf;why.unshift({k:'dep',id:d.on,days:dd(s0,q.pf)});}});
+  // Each dependency type has its own logic. Can't start until it finishes, and swing space: finish-to-start.
+  // Needs utilities or its site prepared: the provider must finish before this project's completion (finish-to-finish), not before its start.
+  // Other (often phases of one program): start-to-start with a lag. A project under construction (notice to proceed given, or phase 7 and later) moves only for a dated outside event.
+  let s=s0,ff='',ffId=null;const why=[];const built=started||N(p.phase)>=7;
+  if(!built) deps(p).forEach(d=>{const q=go(pById(d.on));if(!q) return;const ty=d.type||'other';
+   if(ty==='utility'||ty==='site'){if(q.pf&&q.pf>ff){ff=q.pf;ffId=d.on;}}
+   else if(ty==='other'){if(q.s){const v=addD(q.s,DEP_LAG(d));if(v>s){s=v;why.unshift({k:'dep',id:d.on,days:dd(s0,v),rel:'ss'});}}}
+   else if(q.pf&&q.pf>s){s=q.pf;why.unshift({k:'dep',id:d.on,days:dd(s0,q.pf),rel:'fs'});}});
   let ext=0,ex=null;(p.ext||[]).forEach(x=>{if((x.status||'open')==='met'||!x.expect||!x.need) return;const g=dd(x.need,x.expect);if(g>ext){ext=g;ex=x;}});
   if(ex) why.push({k:'ext',x:ex,days:ext});
-  const pf=addD(addD(s,dur),ext);return memo[p.id]={s,f:f0,pf,slip:Math.max(0,dd(f0,pf)),why:why.filter((w,i)=>w.k==='ext'||i===0),est:!F0,dur};};
+  let pf=addD(addD(s,dur),ext);if(ff&&ff>pf){why.unshift({k:'dep',id:ffId,days:dd(pf,ff),rel:'ff'});pf=ff;}
+  return memo[p.id]={s,f:f0,pf,slip:Math.max(0,dd(f0,pf)),why:why.filter((w,i)=>w.k==='ext'||i===0),est:!F0,dur,built};};
  P.projects.forEach(go);return memo;}
 // The chain that drives a project's projected finish, from the root cause to the project.
 function chainOf(id,C,seen){seen=seen||new Set();if(seen.has(id)) return [];seen.add(id);const c=C[id];const p=pById(id);if(!c||!p) return [];const w=(c.why||[]).slice().sort((a,b)=>b.days-a.days)[0];
