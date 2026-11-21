@@ -911,6 +911,8 @@ function guessLoc_(){const want=String(E.project?.installation||'').toUpperCase(
 function locObj_(s){return s?{label:siteLabel_(s),acf:s[2],sacf:s[3]??s[2],us:!!s[5],country:s[1],remote:false}:null;}
 // When the 1391 (PIPER) prices this scope, new construction uses the 1391's own unit cost: contract cost over its quantity in the same unit.
 function u1391_(unit){try{const r=JSON.parse(localStorage.getItem('milcon_record')||'null');const pp=r&&r.piper;if(!pp||!(Number(pp.contract)>0)||!Array.isArray(pp.qtys)) return null;
+ // only a 1391 that prices new construction: a renovation 1391's cost per square foot says nothing about building new
+ if(pp.qtys.some(x=>/renovat|repair|alter|replacement value|\bPRV\b|modernize/i.test(String(x.item||'')))) return null;
  const U=String(unit||'').trim().toUpperCase();const m=pp.qtys.find(x=>String(x.um||'').trim().toUpperCase()===U&&Number(x.qty)>0);if(!m) return null;return {rate:Number(pp.contract)/Number(m.qty),qty:Number(m.qty),um:m.um,contract:Number(pp.contract),no:pp.project_no||''};}catch(e){return null;}}
 function priceCalc(a){const p=a.price||{};const L=E.price?.loc;const out={lines:[],notes:[],ok:false};
  if(!L){out.notes.push('Pick the location first.');return out;}
