@@ -454,7 +454,11 @@ async function lawSource(id,box){const r=LAWR[id]||{};box.innerHTML='<div style=
   box.innerHTML=(show.length?show.map(p=>'<blockquote style="margin:6px 0;padding:6px 10px;background:#f4f7f6;border-left:3px solid #1F5566;font-size:12.5px;white-space:pre-wrap">'+esc(String(p.text).slice(0,900))+'<div style="font-size:11.5px;color:#4f6873;margin-top:4px">'+esc(p.src)+(p.page?', page '+p.page:'')+' – governing<\/div><\/blockquote>').join(''):'<div style="font-size:12px;color:#9b2c2c;margin-top:4px">CARL returned no governing passage for this rule. The rulebook figure stands on the citation above; check the source before relying on it.<\/div>')+
    ctx.map(p=>'<div style="font-size:11.5px;color:#4f6873;margin-top:2px">Background, not authority: '+esc(p.src)+(p.page?', page '+p.page:'')+'<\/div>').join('');}
  catch(e){box.innerHTML='<div style="font-size:12px;color:#9b2c2c;margin-top:4px">'+esc(/not set up/i.test(String(e.message))?'CARL’s programming collection is not set up yet.':'Could not reach CARL: '+e.message)+'<\/div>';}}
-window.CorbelLaw={rules:LAWR,checked:LAWCHK,v:k=>(LAWR[k]||{}).v,cite:k=>(LAWR[k]||{}).cite,check:lawCheck,html:lawFindingsHTML,
+// Continuing resolution in force. Dates change when Congress acts: update here, with the source and the date checked.
+const CRS={fy:2027,from:'2026-10-01',through:'2026-12-11',law:'P.L. 119-103, Division A (Continuing Appropriations Act, 2027), enacted 2 Sep 2026',
+ rule:'Funds continue at FY2026 rates. No new starts: §102 bars DoD from starting construction of a facility not funded in FY2026 or earlier, and §104 bars new starts generally.',
+ src:'CRS R49353, Overview of Continuing Appropriations for FY2027 (17 Sep 2026); checked 21 Nov 2026'};
+window.CorbelLaw={rules:LAWR,checked:LAWCHK,cr:CRS,v:k=>(LAWR[k]||{}).v,cite:k=>(LAWR[k]||{}).cite,check:lawCheck,html:lawFindingsHTML,
  asof:'Statutes as amended through Pub. L. 119-60 and DoW FMR Sep 2026, checked '+LAWCHK};
 function bar(){if(!PER.includes(TOOL)) return;const h=document.querySelector('header');if(!h) return;const d=document.createElement('div');d.id='msbar';
  d.style.cssText='display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:7px 28px;background:#1F5566;color:#fff;font:13px "Segoe UI",system-ui,sans-serif';h.after(d);refresh();}
