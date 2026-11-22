@@ -252,6 +252,23 @@
  window.prompt=function(msg,def){if(window.__corbelAutoYes) return def==null?'':String(def);var k='p:'+msg;if(pass&&pass.k===k){var v=pass.v;pass=null;return v;}if(document.getElementById('corbel-ask')) return null;var ev=last;
   box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
+<script id="corbel-nt">// ---------- No tool names in what leaves the suite ----------
+// Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'as reviewed'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+  [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
+ R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
+window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
+
+// Every text export (Word .doc as HTML, CSV, plain text) passes through the no-tool-names rule, whichever tool builds it.
+// JSON backups and binary files (images, .docx and .xlsx zips) are left alone.
+(function(){if(window.__corbelBlob) return;window.__corbelBlob=1;const OB=window.Blob;
+ function CB(parts,opt){try{const t=String((opt&&opt.type)||'');if(window.CorbelDeTool&&/msword|text\/html|text\/csv|text\/plain|vnd\.ms-excel/i.test(t)&&Array.isArray(parts)) parts=parts.map(x=>typeof x==='string'?window.CorbelDeTool(x):x);}catch(e){}return new OB(parts,opt);}
+ CB.prototype=OB.prototype;try{Object.setPrototypeOf(CB,OB);}catch(e){}window.Blob=CB;})();
+</script>
+
+
 
 
 
@@ -1069,7 +1086,7 @@ const XL=(function(){
   return zip(F);}
  // Column widths from the content: header and the longest cell, capped.
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
- function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)},sh.note?{note:window.CorbelDeTool(sh.note)}:{}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
 
 // ---------- Build my requirement: documents in, a full requirement record out ----------
@@ -1659,7 +1676,7 @@ function pkgCorbel(){const p=P.project;const act=P.requirements.filter(r=>r.stat
  const appB=cdBand('Appendix B','Traceability summary',pname,'')+cdLead('Where each requirement came from and, as the project moves on, where it is met. The full matrix is in the requirements workbook.')+
   cdTable(['ID','Requirement','Stated by','Confirmed','Where it is met'],T.slice(1).filter(r=>!/^Withdrawn/.test(r[ix('Status')])).map(r=>[e(r[0]),e(r[1]),e(r[ix('Source stakeholder(s)')]),e([r[ix('Confirmed by')],r[ix('Confirmed date')]].filter(Boolean).join(', ')||'Not yet'),e(later.map(c=>String(r[ix(c)]||'').trim()?c.replace(/ \(.*\)/,'')+': '+r[ix(c)]:'').filter(Boolean).join('; ')||'Later tools fill this in')]),['7%','33%','17%','17%','26%']);
  return cdDoc('Requirement package',[body,appA,appB]);}
-function noraBook(){const T=rtmFull();const sh=[{name:'Traceability matrix',rows:T,max:45,note:'Columns from “EARL alternative” on fill in as the project moves through EARL, PIPER, CORA, SOPHIE and QUINN.'},
+function noraBook(){const T=rtmFull();const sh=[{name:'Traceability matrix',rows:T,max:45,note:'Columns from “Economic analysis alternative” on fill in as the project moves through the economic analysis, the 1391, the criteria, the SOW and quality assurance.'},
  {name:'Stakeholder register',rows:regRows(),max:40},
  {name:'Gaps',rows:[['Capability','Today','Have','Required','Need','Unit','Gap','Impact if not closed']].concat(P.gaps.map(g=>{const n=Number(g.qty_need),h=Number(g.qty_have);return [g.area,g.current,g.qty_have===''?'':(isNaN(h)?g.qty_have:h),g.required,g.qty_need===''?'':(isNaN(n)?g.qty_need:n),g.unit,g.qty_need!==''&&!isNaN(n)?n-(isNaN(h)?0:h):'',g.impact];})),max:45},
  {name:'Risks',rows:[['Risk','Likelihood (1-5)','Impact (1-5)','Score','Response','Owner']].concat(P.risks.map(c=>[c.text,Number(c.l)||'',Number(c.i)||'',(Number(c.l)||3)*(Number(c.i)||3),c.response,c.owner])),max:50},
