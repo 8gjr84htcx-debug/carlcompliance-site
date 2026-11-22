@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta charset="utf-8">
 <script id="corbel-pf">/* Corbel portfolios: each portfolio keeps its own copy of every tool's data in this browser.
    "My portfolio" uses the plain keys; any other portfolio stores its keys as pf:<id>:<key>. */
 (function(){
@@ -100,30 +101,45 @@
  function adamT(){var a=(window.CORBEL_ADAM&&window.CORBEL_ADAM())||load('adam_portfolio')||{};var t=a.t||{};return {build:+t.build>0?+t.build:30,risk:t.risk!=null&&t.risk!==''?+t.risk:6};}
  function bod(p){return (p.milestones||[]).filter(function(m){return m.name==='Beneficial occupancy';})[0]||null;}
  function ymAdd(ym,n){var a=+ym.slice(0,4),b=+ym.slice(5,7)-1+n;a+=Math.floor(b/12);b=((b%12)+12)%12;return a+'-'+String(b+1).padStart(2,'0');}
+ // A completion cannot come before the project's award, the start of its fiscal year, or its design completing. A forecast or projection that does is set aside and flagged.
+ function msD(p,n){var m=(p.milestones||[]).filter(function(x){return x.name===n;})[0];return m?String(m.actual||m.forecast||m.baseline||'').slice(0,10):'';}
+ function floorOf(p){var c=[];var fy=+p.fy;if(fy>2000) c.push([(fy-1)+'-10-01','the start of FY'+fy]);var aw=msD(p,'Contract award');if(ISO.test(aw)) c.push([aw,'its award']);var dc=msD(p,'Design complete');if(ISO.test(dc)) c.push([dc,'design complete']);
+  c.sort(function(a,b){return a[0]<b[0]?1:-1;});return c[0]||null;}
  function projFinish(p,live,H){var f=finish(p,H);if(f&&f.kind==='actual') return {date:f.date,kind:'actual',src:f.src,est:false};
+  var fl=floorOf(p),aside=[];var ok=function(d,what){if(fl&&String(d).slice(0,10)<fl[0]){aside.push(what+' '+fd(String(d).slice(0,10))+' is before '+fl[1]+' – check');return false;}return true;};var r=projFinish0(p,live,ok);if(r&&aside.length){r.flag=aside.join('; ');r.src+=' ('+aside[0]+', so it was not used)';}return r;}
+ function projFinish0(p,live,ok){
   var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
-  if(sq) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
+  if(sq&&ok(sq.finish,'The projection')) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
   var m=bod(p);
-  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
-  if(m&&ISO.test(m.forecast||'')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
-  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
-  if(m&&ISO.test(m.baseline||'')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
+  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(m&&ISO.test(m.forecast||'')&&ok(m.forecast,'The forecast beneficial occupancy')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
+  if(ISO.test(p.baseline_finish||'')&&ok(p.baseline_finish,'The baseline completion')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
+  if(m&&ISO.test(m.baseline||'')&&ok(m.baseline,'The baseline beneficial occupancy')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
   var fy=+p.fy;if(fy>2000){var T=adamT(),now=today().slice(0,7),late=!(+p.award>0)&&(fy+'-09')<now,st=late?now:fy+'-09';
    return {date:ymAdd(st,T.build)+'-01',kind:'estimate',src:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+T.build+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+T.build+' months to build (assumption)',est:true};}
   return null;}
  var KIND={actual:'actual',projected:'projection',forecast:'forecast',baseline:'baseline',estimate:'estimate'};
+ // The rule in words, from the same order the code follows, for any method note.
+ var ORDER_WORDS='an actual completion, then the sequenced projection, then the forecast, then the baseline, then an estimate from the fiscal year; a forecast or projection earlier than the project’s award, fiscal-year start or design completion is set aside and flagged';
+ function ruleText(){var T=adamT();return 'Completion is taken in this order: '+ORDER_WORDS+' (award by the end of the fiscal year plus '+T.build+' months to build, an assumption you can adjust). Late is counted in days: up to '+T.risk+' months past the need date is at risk; more is late.';}
  // Months late (positive) or early (negative) against a need date, and the one status rule: on time, at risk (late by up to the ADAM window), late.
  function moN(s){return +String(s).slice(0,4)*12+(+String(s).slice(5,7))-1;}
  function capSt(gap){if(gap==null) return 'noneed';var r=adamT().risk;return gap<=0?'ok':gap<=r?'risk':'late';}
+ // Lateness is counted in days: late by more than the window (6 months by default) is late, so 6 months 26 days is late, not at risk.
+ // Months shown: whole months late, rounded up; whole months spare, rounded down.
+ function dD(s){s=String(s||'');return s.length===7?s+'-01':s.slice(0,10);}
+ function addMo(d,n){var y=+d.slice(0,4),m=+d.slice(5,7)-1+n,dd=+d.slice(8,10);y+=Math.floor(m/12);m=((m%12)+12)%12;var last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return y+'-'+String(m+1).padStart(2,'0')+'-'+String(Math.min(dd,last)).padStart(2,'0');}
+ function gapMo(fin,need){if(!fin||!need) return null;var a=Date.parse(dD(fin)),b=Date.parse(dD(need));var d=(a-b)/864e5;var r=d>0?Math.ceil(d/30.4375):-Math.floor(-d/30.4375);return r===0?0:r;}
+ function capStD(fin,need){if(!need) return 'noneed';if(!fin) return 'unk';var f=dD(fin),n=dD(need);if(f<=n) return 'ok';return f<=addMo(n,adamT().risk)?'risk':'late';}
  // A capability: the latest completion among its required projects sets the date. byId(pid) returns the project; live(pid) the caller's sequencing for it.
  function capability(r,byId,live,H){var L=(r.links||[]).filter(function(l){return l.role!=='supports';}).map(function(l){return byId(l.pid);}).filter(Boolean);
   if(!L.length) return {st:'none',req:[]};var D=L.map(function(p){return {p:p,d:projFinish(p,live?live(p.id):null,H)};}),miss=D.filter(function(x){return !x.d;}),known=D.filter(function(x){return x.d;});
   if(!known.length) return {st:'unk',req:L,miss:miss};known.sort(function(a,b){return a.d.date<b.d.date?1:a.d.date>b.d.date?-1:0;});var bind=known[0];
-  var gap=r.need?moN(bind.d.date)-moN(r.need):null,st=capSt(gap);if(miss.length&&st==='ok') st='unk';
-  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:known.some(function(x){return x.d.est;}),basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
+  var gap=r.need?gapMo(bind.d.date,r.need):null,st=capStD(bind.d.date,r.need);if(miss.length&&st==='ok') st='unk';
+  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:!!bind.d.est,flag:bind.d.flag||'',basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,KIND:KIND,adamT:adamT};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -237,7 +253,8 @@
   box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
 
-<meta charset="utf-8">
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>HANK – Handover, Acceptance, and Notification Keeper</title>
 <style>
@@ -655,11 +672,17 @@ function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0"
 // ---------- No tool names in what leaves the suite ----------
 // Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
 window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
- const R=[[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
-  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'read in the 1391 review'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+ const R=[[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'as reviewed'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
   [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
  R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
 window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
+
+// Every text export (Word .doc as HTML, CSV, plain text) passes through the no-tool-names rule, whichever tool builds it.
+// JSON backups and binary files (images, .docx and .xlsx zips) are left alone.
+(function(){if(window.__corbelBlob) return;window.__corbelBlob=1;const OB=window.Blob;
+ function CB(parts,opt){try{const t=String((opt&&opt.type)||'');if(window.CorbelDeTool&&/msword|text\/html|text\/csv|text\/plain|vnd\.ms-excel/i.test(t)&&Array.isArray(parts)) parts=parts.map(x=>typeof x==='string'?window.CorbelDeTool(x):x);}catch(e){}return new OB(parts,opt);}
+ CB.prototype=OB.prototype;try{Object.setPrototypeOf(CB,OB);}catch(e){}window.Blob=CB;})();
 
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
@@ -962,7 +985,7 @@ const DX=(function(){
     '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
    ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
   return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
- function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ function save(name,html){if(window.CorbelDeTool) html=window.CorbelDeTool(html);const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
  // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
  function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);

@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+<meta charset="utf-8">
 <script id="corbel-pf">/* Corbel portfolios: each portfolio keeps its own copy of every tool's data in this browser.
    "My portfolio" uses the plain keys; any other portfolio stores its keys as pf:<id>:<key>. */
 (function(){
@@ -100,30 +101,45 @@
  function adamT(){var a=(window.CORBEL_ADAM&&window.CORBEL_ADAM())||load('adam_portfolio')||{};var t=a.t||{};return {build:+t.build>0?+t.build:30,risk:t.risk!=null&&t.risk!==''?+t.risk:6};}
  function bod(p){return (p.milestones||[]).filter(function(m){return m.name==='Beneficial occupancy';})[0]||null;}
  function ymAdd(ym,n){var a=+ym.slice(0,4),b=+ym.slice(5,7)-1+n;a+=Math.floor(b/12);b=((b%12)+12)%12;return a+'-'+String(b+1).padStart(2,'0');}
+ // A completion cannot come before the project's award, the start of its fiscal year, or its design completing. A forecast or projection that does is set aside and flagged.
+ function msD(p,n){var m=(p.milestones||[]).filter(function(x){return x.name===n;})[0];return m?String(m.actual||m.forecast||m.baseline||'').slice(0,10):'';}
+ function floorOf(p){var c=[];var fy=+p.fy;if(fy>2000) c.push([(fy-1)+'-10-01','the start of FY'+fy]);var aw=msD(p,'Contract award');if(ISO.test(aw)) c.push([aw,'its award']);var dc=msD(p,'Design complete');if(ISO.test(dc)) c.push([dc,'design complete']);
+  c.sort(function(a,b){return a[0]<b[0]?1:-1;});return c[0]||null;}
  function projFinish(p,live,H){var f=finish(p,H);if(f&&f.kind==='actual') return {date:f.date,kind:'actual',src:f.src,est:false};
+  var fl=floorOf(p),aside=[];var ok=function(d,what){if(fl&&String(d).slice(0,10)<fl[0]){aside.push(what+' '+fd(String(d).slice(0,10))+' is before '+fl[1]+' – check');return false;}return true;};var r=projFinish0(p,live,ok);if(r&&aside.length){r.flag=aside.join('; ');r.src+=' ('+aside[0]+', so it was not used)';}return r;}
+ function projFinish0(p,live,ok){
   var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
-  if(sq) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
+  if(sq&&ok(sq.finish,'The projection')) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
   var m=bod(p);
-  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
-  if(m&&ISO.test(m.forecast||'')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
-  if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
-  if(m&&ISO.test(m.baseline||'')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
+  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(m&&ISO.test(m.forecast||'')&&ok(m.forecast,'The forecast beneficial occupancy')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
+  if(ISO.test(p.baseline_finish||'')&&ok(p.baseline_finish,'The baseline completion')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
+  if(m&&ISO.test(m.baseline||'')&&ok(m.baseline,'The baseline beneficial occupancy')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
   var fy=+p.fy;if(fy>2000){var T=adamT(),now=today().slice(0,7),late=!(+p.award>0)&&(fy+'-09')<now,st=late?now:fy+'-09';
    return {date:ymAdd(st,T.build)+'-01',kind:'estimate',src:late?'Estimate: FY'+fy+' has passed with no award recorded, so award is assumed now, plus '+T.build+' months to build (assumption)':'Estimate: awarded by the end of FY'+fy+' plus '+T.build+' months to build (assumption)',est:true};}
   return null;}
  var KIND={actual:'actual',projected:'projection',forecast:'forecast',baseline:'baseline',estimate:'estimate'};
+ // The rule in words, from the same order the code follows, for any method note.
+ var ORDER_WORDS='an actual completion, then the sequenced projection, then the forecast, then the baseline, then an estimate from the fiscal year; a forecast or projection earlier than the project’s award, fiscal-year start or design completion is set aside and flagged';
+ function ruleText(){var T=adamT();return 'Completion is taken in this order: '+ORDER_WORDS+' (award by the end of the fiscal year plus '+T.build+' months to build, an assumption you can adjust). Late is counted in days: up to '+T.risk+' months past the need date is at risk; more is late.';}
  // Months late (positive) or early (negative) against a need date, and the one status rule: on time, at risk (late by up to the ADAM window), late.
  function moN(s){return +String(s).slice(0,4)*12+(+String(s).slice(5,7))-1;}
  function capSt(gap){if(gap==null) return 'noneed';var r=adamT().risk;return gap<=0?'ok':gap<=r?'risk':'late';}
+ // Lateness is counted in days: late by more than the window (6 months by default) is late, so 6 months 26 days is late, not at risk.
+ // Months shown: whole months late, rounded up; whole months spare, rounded down.
+ function dD(s){s=String(s||'');return s.length===7?s+'-01':s.slice(0,10);}
+ function addMo(d,n){var y=+d.slice(0,4),m=+d.slice(5,7)-1+n,dd=+d.slice(8,10);y+=Math.floor(m/12);m=((m%12)+12)%12;var last=new Date(Date.UTC(y,m+1,0)).getUTCDate();return y+'-'+String(m+1).padStart(2,'0')+'-'+String(Math.min(dd,last)).padStart(2,'0');}
+ function gapMo(fin,need){if(!fin||!need) return null;var a=Date.parse(dD(fin)),b=Date.parse(dD(need));var d=(a-b)/864e5;var r=d>0?Math.ceil(d/30.4375):-Math.floor(-d/30.4375);return r===0?0:r;}
+ function capStD(fin,need){if(!need) return 'noneed';if(!fin) return 'unk';var f=dD(fin),n=dD(need);if(f<=n) return 'ok';return f<=addMo(n,adamT().risk)?'risk':'late';}
  // A capability: the latest completion among its required projects sets the date. byId(pid) returns the project; live(pid) the caller's sequencing for it.
  function capability(r,byId,live,H){var L=(r.links||[]).filter(function(l){return l.role!=='supports';}).map(function(l){return byId(l.pid);}).filter(Boolean);
   if(!L.length) return {st:'none',req:[]};var D=L.map(function(p){return {p:p,d:projFinish(p,live?live(p.id):null,H)};}),miss=D.filter(function(x){return !x.d;}),known=D.filter(function(x){return x.d;});
   if(!known.length) return {st:'unk',req:L,miss:miss};known.sort(function(a,b){return a.d.date<b.d.date?1:a.d.date>b.d.date?-1:0;});var bind=known[0];
-  var gap=r.need?moN(bind.d.date)-moN(r.need):null,st=capSt(gap);if(miss.length&&st==='ok') st='unk';
-  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:known.some(function(x){return x.d.est;}),basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
+  var gap=r.need?gapMo(bind.d.date,r.need):null,st=capStD(bind.d.date,r.need);if(miss.length&&st==='ok') st='unk';
+  return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:!!bind.d.est,flag:bind.d.flag||'',basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,KIND:KIND,adamT:adamT};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -237,7 +253,7 @@
   box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
 
-<meta charset="utf-8">
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SOPHIE – Scope Of work Preparation, Harmonization, Integration, and Editing</title>
 <script id="ms-core">window.MS_TOOL='sophie';
@@ -342,12 +358,14 @@ if(PER.includes(TOOL)){
 (function factScan(){const St=loadStore();let ch=false;Object.values(St.projects).forEach(P=>{const c=P.core;c.facts=c.facts||{};OWN.forEach(k=>{if(has(c[k])&&!c.facts[k]){c.facts[k]={src:'existing record',at:today()};ch=true;}});
   Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src'||k==='_ask')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
 if(TOOL==='paula') paulaIn();
+// The project this page opened with. A write from this page (a late save, the stamp on leaving) always goes to that project, never to one made or opened since in this or another tab.
+const LOADED=PER.includes(TOOL)?S.active:'';
 
 // ---- every save flows back into the record ----
 Storage.prototype.setItem=function(k,v){orig.call(this,k,v);if(this!==ls) return;try{onWrite(k,v);}catch(e){console.warn('Corbel record',e);}};
 function onWrite(k,v){const t=Object.keys(PKEY).find(x=>PKEY[x]===k);if(!t) return;const St=loadStore();
  if(t==='paula'){paulaOut(St,JSON.parse(v));return;}
- if(!PER.includes(TOOL)) return;const P=St.projects[St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val),t);P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
+ if(!PER.includes(TOOL)) return;const P=St.projects[LOADED||St.active];if(!P) return;const val=JSON.parse(v);P.tools[t]=val;mergeCore(P.core,MAP[t].get(val),t);P.updated=new Date().toISOString();saveStore(St);S=St;refresh();}
 
 // ---- PAULA: one PAULA project per record project, same id ----
 function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',created:new Date().toISOString(),projects:[],t:{},me:'',log:[]};let ch=false;
@@ -744,7 +762,7 @@ const TEMPLATES={
   ['env','Environmental','Hazardous materials, waste, storm water, historic and natural resource requirements.',true],
   ['gfp','Government-Furnished Property and Information','What the Government provides, and when.',true]]},
  custom:{name:'Custom headings',per_bldg:false,secs:[]}};
-const VERBS='provide|remove|install|repair|replace|furnish|test|inspect|submit|prepare|perform|clean|protect|demolish|construct|apply|verify|coordinate|maintain|restore|seal|patch|prime|paint|dispose|relocate|survey|document|commission|design|deliver|obtain|comply|ensure|repair|abate|excavate|backfill|compact|grade|pave|connect|disconnect|terminate|label|train|record|photograph|notify|schedule|schedule|measure|calibrate|flush|balance|start|adjust|secure|fasten|anchor|attach|embed|reinforce|cure|place|pour|form|strip|cut|core|drill|weld|bolt|tighten|caulk|flash|insulate|ventilate|drain|grout|sand|blast|strip|coat|seal|mark|stage|mobilize|demobilize|restore|return|turn|hand|transfer|identify|assess|evaluate|confirm|validate|design|develop|establish|implement|monitor|report|correct|reconnect|replace|renovate|rehabilitate|modernize|convert|alter|upgrade|reconfigure|retrofit|expand|extend|erect|build|meet|reroute|realign|resurface|reroof|recoat|refinish|warrant|stripe|plant|seed|landscape|waterproof|brace|support|fabricate|assemble|store|operate|program|integrate|disinfect|phase|investigate|locate|trench|bore|frame|sheath|hang|tape|finish|lay|set|shore|dewater|haul';
+const VERBS='manage|remediate|hold|conduct|achieve|accept|account|achieve|acquire|add|address|align|allow|analyze|apply|approve|arrange|assemble|assess|assign|assist|assure|attend|audit|authorize|avoid|brief|build|calculate|capture|certify|change|check|clear|close|collect|complete|confirm|consider|contain|control|convert|correct|create|define|demonstrate|deploy|detect|determine|develop|direct|dismantle|distribute|enable|enforce|establish|evaluate|examine|execute|exercise|extend|file|fill|finish|fit|fix|follow|give|handle|identify|implement|improve|include|incorporate|increase|inform|integrate|issue|keep|limit|load|locate|lock|log|lower|maintain|make|mark|meet|minimize|mitigate|modify|monitor|mount|move|observe|offer|open|operate|order|organize|pack|permit|plan|position|post|power|present|preserve|prevent|price|process|procure|produce|program|promote|propose|prove|publish|purge|raise|reach|receive|recommend|reconcile|reduce|refer|regulate|reinstall|reject|release|remediate|remedy|renew|report|request|require|reroute|resolve|respond|retain|return|review|revise|route|run|sample|scan|select|send|separate|serve|set|ship|show|size|specify|stabilize|stage|stockpile|stop|store|supply|support|suspend|take|tie|track|transfer|transport|treat|trench|turn|update|upgrade|use|validate|walk|warrant|wash|witness|work|wrap|write|provide|remove|install|repair|replace|furnish|test|inspect|submit|prepare|perform|clean|protect|demolish|construct|apply|verify|coordinate|maintain|restore|seal|patch|prime|paint|dispose|relocate|survey|document|commission|design|deliver|obtain|comply|ensure|repair|abate|excavate|backfill|compact|grade|pave|connect|disconnect|terminate|label|train|record|photograph|notify|schedule|schedule|measure|calibrate|flush|balance|start|adjust|secure|fasten|anchor|attach|embed|reinforce|cure|place|pour|form|strip|cut|core|drill|weld|bolt|tighten|caulk|flash|insulate|ventilate|drain|grout|sand|blast|strip|coat|seal|mark|stage|mobilize|demobilize|restore|return|turn|hand|transfer|identify|assess|evaluate|confirm|validate|design|develop|establish|implement|monitor|report|correct|reconnect|replace|renovate|rehabilitate|modernize|convert|alter|upgrade|reconfigure|retrofit|expand|extend|erect|build|meet|reroute|realign|resurface|reroof|recoat|refinish|warrant|stripe|plant|seed|landscape|waterproof|brace|support|fabricate|assemble|store|operate|program|integrate|disinfect|phase|investigate|locate|trench|bore|frame|sheath|hang|tape|finish|lay|set|shore|dewater|haul';
 const NOUN_START=/^(the|a|an|all|each|this|these|there|it|contractor|government|work|any|existing|new)\b/i;
 const ACRO_OK=new Set('UFC UFGS FC UFS ASTM ANSI ASCE ACI AISC AWS NFPA NEC OSHA EM FAR DFARS DOD DOW USA US DD AF USAF USACE NAVFAC AFCEC CO COR QC QA HVAC MEP PDF CAD BIM UL FM IBC IMC IPC ISO NIST CUI PPE AHA APP SSHO SDS GFP GFI LS SF SY LF CY EA HR VAC VDC AC DC LED IDS ESS SCIF SAPF ICD AT ATFP AT/FP UV TPO SPF EPDM BUR LPS RFI RFP SOW PWS IGE NTP BOD TBD ID NO OK CNMI JPMO RTM CSP ADA ABA EISA LEED IFS TSA AFB MCB NSA NAVBASE'.split(' '));
 const DEFAULT_RULES=[
@@ -886,6 +904,8 @@ function p1391Qty(p){if(!p) return null;if(p.pf&&Number(p.pf.qty)) return {q:Num
 function lt(iso){const d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
 function dlvFromPiper(){const p=piper();const a=String(p&&p.s12&&p.s12.acq||'');if(/bid[\s-]*build|\bdbb\b/i.test(a)) return 'dbb';if(/design[\s-]*build|\bdb\b/i.test(a)) return 'db';if(/task order|idiq|macc|satoc|joc|fsrm/i.test(a)) return 'to';return '';}
 function ctxText(){const n=nora(),p=piper(),e=earl(),L=[];if(n&&n.need_statement) L.push('NEED STATEMENT: '+n.need_statement);
+ // Figures the sources still dispute (open conflicts in NORA) are not settled: the drafter must not pick one.
+ {const U=((n&&n.conflicts)||[]).filter(x=>(x.status||'open')==='open');if(U.length) L.push('UNSETTLED (open conflicts awaiting a ruling – do not state either value as fact; write [to be confirmed: X or Y]): '+U.map(x=>String(x.what||'')+': '+String(x.a||'')+' | '+String(x.b||'')).join('; '));}
  if(n) (n.gaps||[]).forEach(g=>L.push('GAP: '+[g.area,g.current&&('today: '+g.current),g.required&&('needed: '+g.required),g.qty_need!==''&&g.qty_need!=null&&(g.qty_have+' of '+g.qty_need+' '+(g.unit||''))].filter(Boolean).join('; ')));
  if(n) (n.constraints||[]).forEach(c=>L.push('CONSTRAINT: '+c.text));
  if(p&&p.n&&p.n.desc) L.push('1391 BLOCK 10: '+p.n.desc);{const Q=p1391Qty(p);if(Q){L.push('1391 PRIMARY FACILITY'+(Q.reno?' (RENOVATION OF AN EXISTING BUILDING, NOT NEW CONSTRUCTION)':'')+': '+Q.item+', '+Q.q.toLocaleString()+' '+Q.um);(Q.lines||[]).filter(x=>x.item!==Q.item).forEach(x=>L.push('1391 OTHER PRIMARY LINE (its own size; never add it to the line above): '+x.item+', '+x.q.toLocaleString()+' '+x.um));}}
@@ -1199,7 +1219,7 @@ function styleBrief(){return ['Write U.S. Government construction statement-of-w
 function sourcesFor(s){const R=S.reqs.filter(r=>s.reqs.includes(r.id));const c=S.criteria.slice(0,80).map(x=>(x.number?x.number+' ':'')+x.title).join('; ');
  return 'PROJECT: '+S.p.title+' at '+S.p.installation+(bldgs().length?' (buildings: '+bldgs().join(', ')+')':'')+'\nSECTION: '+s.title+'\nSECTION PURPOSE: '+s.guide+(s.num?'\nFORMAT: numbered list':'\nFORMAT: paragraphs')+
  '\nREQUIREMENTS (trace each item to these IDs):\n'+(R.map(r=>r.id+': '+r.text+(r.measure?' (verify by: '+r.measure+')':'')).join('\n')||'none linked')+'\nAUTHOR NOTES:\n'+(s.notes||'none')+(c?'\nAPPLICABLE CRITERIA (from CORA): '+c:'')+(()=>{const sc=scottScope();return sc?'\nSCOPE FROM SCOTT (what the work involves): '+Object.entries(sc.f).map(([k,v])=>SCL[k]+': '+v.map(scLab).join(', ')).join('; '):'';})();}
-const DRAFT_SYS=()=>styleBrief()+'\n\nReturn ONLY JSON: {"text":"the section text. End each numbered item or paragraph with the requirement IDs it satisfies in braces, e.g. {R-003}. Use {NOTE} for text drawn only from author notes.","assumptions":["anything you had to assume"]}\nUse only facts, numbers and standards found in the sources. Do not invent quantities, dates, products or standards. Do not add work the sources do not name, such as demolition, removal, relocation or abatement of existing facilities.';
+const DRAFT_SYS=()=>styleBrief()+'\n\nReturn ONLY JSON: {"text":"the section text. End each numbered item or paragraph with the requirement IDs it satisfies in braces, e.g. {R-003}. Use {NOTE} for text drawn only from author notes.","assumptions":["anything you had to assume"]}\nUse only facts, numbers and standards found in the sources. Do not invent quantities, dates, products or standards. Where the context lists a figure as UNSETTLED, do not choose between the values: write [to be confirmed: X or Y]. Do not add work the sources do not name, such as demolition, removal, relocation or abatement of existing facilities.';
 const REVIEW_SYS=()=>styleBrief()+'\n\nYou review a draft section against its sources and the style rules. Return ONLY JSON: {"issues":[{"quote":"exact text from the draft","problem":"what is wrong","fix":"replacement text"}],"missing":["requirement IDs not covered"]}. List at most the 10 issues that matter most, most serious first; do not rewrite the section (the arbiter does that).';
 const ARB_SYS=()=>styleBrief()+'\n\nYou are the arbiter between a drafter and a reviewer. Produce the final section. Accept a reviewer fix only if it is supported by the sources and the style rules. Return ONLY JSON: {"text":"final section text with {ID} trace tags","rulings":["one line per reviewer issue: accepted or rejected and why"]}';
 function figuresUnverified(text,s){text=String(text||'');if(window.CorbelID&&CorbelID.stripRefs) text=CorbelID.stripRefs(text);text=text.replace(/\b(?:UFC|UFS|UFGS|DoDI|DoDD|EM|AFI|DAFI|FAR|DFARS|NFPA|ASTM|ASCE|ACI|IBC|ANSI|ASHRAE|UL)[\s-]?\d[\d.\-]*[A-Z]?\b/g,'');const src=[sourcesFor(s),S.ctx||'',S.reqs.map(r=>r.text+' '+(r.measure||'')).join(' '),S.p.title,S.p.installation,S.p.buildings,S.criteria.map(x=>x.number+' '+x.title).join(' ')].join(' ').toLowerCase();
@@ -1222,7 +1242,7 @@ async function aiDraft(s,d){const eng=d.querySelector('[data-eng]');const rd=SET
 // ---------- 3 style ----------
 function checkText(t,s){const F=[];if(!t) return F;const plain=t.replace(/\{[^}]*\}/g,'');
  S.rules.filter(r=>ruleOn(r)).forEach(r=>{let re;try{re=new RegExp(r.pat,r.flags.includes('g')?r.flags:r.flags+'g');}catch(e){return;}const m=[...plain.matchAll(re)];if(m.length) F.push({sev:r.sev,msg:r.msg+(m.length>1?' ('+m.length+')':''),hit:ctx(plain,m[0].index,m[0][0].length),rule:r});});
- if(s&&s.num) plain.split(/\n/).forEach(l=>{const m=l.match(/^\s*\d+[.)]\s+(.*)/);if(m&&(NOUN_START.test(m[1])||!new RegExp('^('+VERBS+')\\b','i').test(m[1]))) F.push({sev:'warn',msg:'Numbered item does not start with a verb.',hit:m[1].slice(0,80)});});
+ if(s&&s.num) plain.split(/\n/).forEach(l=>{const m=l.match(/^\s*\d+[.)]\s+(.*)/);if(m) m[1]=m[1].replace(/^[\s*_"“‘'(\[]+/,'');if(m&&(NOUN_START.test(m[1])||!new RegExp('^('+VERBS+')\\b','i').test(m[1]))) F.push({sev:'warn',msg:'Numbered item does not start with a verb.',hit:m[1].slice(0,80)});});
  {const re=/\b((?:[\w\/-]+\s+){0,4}[\w\/-]+)\s*,?\s+(?:and\s+|but\s+)?not\s+(?:a\s+|an\s+|plain\s+|regular\s+|standard\s+)*\1\b/gi;const m=[...plain.matchAll(re)].filter(x=>/[a-z0-9]{3}/i.test(x[1]));if(m.length) F.push({sev:'bad',msg:'Contradiction: requires something and forbids the same thing (“'+m[0][1]+'”).',hit:ctx(plain,m[0].index,m[0][0].length)});}
  if(S.p.delivery==='dbb'){const m=[...plain.matchAll(/\bdesign(?:\s+and\s+construction)?\s+services\b|\bdesign-build\b|\bthe contractor shall (?:design|prepare (?:the )?design)/gi)];if(m.length) F.push({sev:'bad',msg:'Design-bid-build: the Government furnishes the design, so the contractor cannot be asked for design or design-build services.',hit:ctx(plain,m[0].index,m[0][0].length)});}
  if(S.p.delivery==='db'){const m=[...plain.matchAll(/\bdesign-bid-build\b/gi)];if(m.length) F.push({sev:'warn',msg:'The project is design-build, but the text says design-bid-build.',hit:ctx(plain,m[0].index,m[0][0].length)});}
@@ -1658,7 +1678,7 @@ const DX=(function(){
     '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
    ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
   return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
- function save(name,html){const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
+ function save(name,html){if(window.CorbelDeTool) html=window.CorbelDeTool(html);const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
  // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
  function hook(){if(typeof window.dl!=='function'||window.dl.__dx) return;const old=window.dl;const nw=function(n,d,t){if(t==='application/msword'||/\.doc$/i.test(n)) return save(n,d);return old.apply(this,arguments);};nw.__dx=true;window.dl=nw;}
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',hook);else setTimeout(hook,0);window.addEventListener('load',hook);
