@@ -284,6 +284,8 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
 
 
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NORA – Needs, Options, and Requirements Analyst</title>
 <script id="ms-core">window.MS_TOOL='nora';
@@ -353,7 +355,7 @@ function piperReviewCost(s){if(s.mode!=='review') return {};const n=v=>Number(St
  const flag=b8&&b9&&Math.abs(b8-b9)/Math.max(b8,b9)>0.002;const form=(flag?b9:(b8||b9))*1000;const R=roundA(form);const k=v=>'$'+Math.round(v/1000).toLocaleString('en-US')+'K';
  const notes=[];if(R!==Math.round(form)) notes.push('The Service form shows '+k(form)+(flag?' (block 9 total)':'')+'; rounded per UFS 3-730-01 Appendix A that is $'+(R/1e6).toFixed(1)+'M.');
  if(flag) notes.push('Block 8 on the form is $'+(b8/1000).toFixed(1)+'M, which PIPER flags as must-fix.');
- return notes.length?{programmed:R,_ask:{programmed:'Offered: $'+(R/1e6).toFixed(1)+'M. '+notes.join(' ')}}:{programmed:R};}
+ const sk={programmed:'PIPER rebuild (Service 1391 '+(flag?'block 9 total':'block 8')+', rounded)'};return notes.length?{programmed:R,_srck:sk,_ask:{programmed:'Offered: $'+(R/1e6).toFixed(1)+'M. '+notes.join(' ')}}:{programmed:R,_srck:sk};}
 // ---- the facts one record owns: cost, scope basis, primary quantity with its unit, and need date ----
 // A tool fills an empty fact, or updates one it set itself; anything else waits in core.pending for a person to choose.
 const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date',to:'Task order or contract'};
@@ -373,9 +375,9 @@ const same=(a,b)=>(a&&typeof a==='object')||(b&&typeof b==='object')?JSON.string
 // Cost and quantity belong to a scope. A cost priced for replacement cannot become the programmed cost of a renovation (or the reverse) without a person confirming the mismatch.
 const scClass=t=>/renovat|repair/i.test(String(t||''))?'reno':/new|replac/i.test(String(t||''))?'new':'';
 function mergeCore(core,o,src,direct){if(!o) return false;let ch=false;const tool=src||'';src=o._src||src||'';const ask=o._ask||{};
- for(const [k,v] of Object.entries(o)){if(k==='_ev'||k==='_src'||k==='_ask') continue;if(OWN.includes(k)){if(!has(v)) continue;let a=ask[k]||'';
+ for(const [k,v] of Object.entries(o)){if(k==='_ev'||k==='_src'||k==='_ask'||k==='_srck') continue;if(OWN.includes(k)){if(!has(v)) continue;let a=ask[k]||'';
    if(!direct&&!a&&['programmed','qty'].includes(k)&&has(o.scope)&&has(core.scope)&&scClass(o.scope)&&scClass(core.scope)&&scClass(o.scope)!==scClass(core.scope)) a='This '+(k==='programmed'?'cost':'quantity')+' is for '+o.scope+'; the record’s scope is '+core.scope+'. Use it only if the scope is changing.';
-   if(ownSet(core,k,v,src,direct,tool==='record'?'piper':tool,a)) ch=true;continue;}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
+   if(ownSet(core,k,v,(o._srck&&o._srck[k])||src,direct,tool==='record'?'piper':tool,a)) ch=true;continue;}if(has(v)&&!(typeof v==='object'&&!Array.isArray(v)&&!Object.keys(v).length)&&!same(core[k],v)){core[k]=v;ch=true;}}
  core.events=core.events||{};for(const [k,v] of Object.entries(o._ev||{})){if(v==='@today'){if(!core.events[k]){core.events[k]=today();ch=true;}}else if(has(v)&&core.events[k]!==v){core.events[k]=v;ch=true;}}return ch;}
 
 // ---- startup: put the active project's state where the tool expects it ----
@@ -388,7 +390,7 @@ if(PER.includes(TOOL)){
 }
 // Saved work: facts already in the record keep their value (source "existing record"); every tool's current value is compared with them and any difference waits for a choice.
 (function factScan(){const St=loadStore();let ch=false;Object.values(St.projects).forEach(P=>{const c=P.core;c.facts=c.facts||{};OWN.forEach(k=>{if(has(c[k])&&!c.facts[k]){c.facts[k]={src:'existing record',at:today()};ch=true;}});
-  Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src'||k==='_ask')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
+  Object.entries(P.tools||{}).forEach(([t,v])=>{if(MAP[t]&&v){if(mergeCore(c,Object.fromEntries(Object.entries(MAP[t].get(v)).filter(([k])=>OWN.includes(k)||k==='_src'||k==='_ask'||k==='_srck')),t)) ch=true;}});});if(ch){saveStore(St);S=St;}})();
 if(TOOL==='paula') paulaIn();
 // The project this page opened with. A write from this page (a late save, the stamp on leaving) always goes to that project, never to one made or opened since in this or another tab.
 const LOADED=PER.includes(TOOL)?S.active:'';
@@ -407,9 +409,15 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   const T=p.tools||{},rc=T.record||{};const lv=[[1,'NORA',!!T.nora],[3,'EARL recommendation',!!(rc.earl&&rc.earl.recommended)],[3,'PIPER 1391',!!(rc.piper&&(rc.piper.rounded||rc.piper.contract))],[5,'SOPHIE SOW',!!(T.sophie&&(T.sophie.sections||[]).length)]].filter(x=>x[2]);
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
   if(rc.piper&&rc.piper.contract&&Number(pp.ecc)!==Number(rc.piper.contract)){pp.ecc=rc.piper.contract;ch=true;if(has(pp.cwe)&&!Number(pp.award)&&Number(pp.cwe)===Number(pp.ecc_was||rc.piper.contract)){pp.cwe='';}pp.ecc_was=rc.piper.contract;}
-  // NORA's risks reach PAULA's risk register (added once, never removed: close them in PAULA).
-  const rSame=window.CorbelRiskSame;
-  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase()||rSame(x.text,t))) return;const ai=/suggestion/i.test(String(r.origin||''));pp.risks.push(Object.assign({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA',origin:String(r.origin||'')},ai?{ai:true}:{}));ch=true;});
+  // NORA's risks reach PAULA's risk register, one row per NORA risk (never removed: close them in PAULA).
+  // When NORA rewords a risk, PAULA's row follows, field by field, unless it was edited in PAULA.
+  // Same-meaning risks are kept as rows and counted once in PAULA, with a note, so the two tools list the same risks.
+  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const lid='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];
+   const v={text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||'')};const ai=/suggestion/i.test(String(r.origin||''));
+   const ex=pp.risks.find(x=>(r.id&&x.nid===r.id)||x.id===lid||String(x.text||'').trim().toLowerCase()===t.toLowerCase());
+   if(ex){const snap=ex.nora||{};let d=false;Object.keys(v).forEach(f=>{if(!same(ex[f],v[f])&&ex.nora&&same(ex[f],snap[f])){ex[f]=v[f];d=true;}});
+    if(ex.nora&&ex.src==='NORA'&&ex.origin!==String(r.origin||'')){ex.origin=String(r.origin||'');if(!ai&&ex.ai) delete ex.ai;d=true;}if(d){ex.nora=v;if(r.id) ex.nid=r.id;ch=true;}return;}
+   pp.risks.push(Object.assign({id:r.id?'nora-'+r.id:lid,nid:r.id||'',nora:v},v,{status:'open',src:'NORA',origin:String(r.origin||'')},ai?{ai:true}:{}));ch=true;});
   // PIPER's block 12: delivery method, design percent and the planned design and award dates.
   {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/troop/i.test(acq)?'Troop labor':/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
    if(dv&&!pp.delivery){pp.delivery=dv;pp.delivery_src='PIPER 1391 block 12';ch=true;}
@@ -1397,6 +1405,8 @@ function knownInst(v){v=String(v||'');return UNIT_INST.some(([re,inst])=>re.test
 // Figures in the need statement that sources still dispute: until the conflict is ruled, the statement says so, and every tool reading it is told.
 function pendList(){return (P.conflicts||[]).filter(x=>(x.status||'open')==='open').map(x=>({what:String(x.what||'').trim(),a:String(x.a||'').trim(),b:String(x.b||'').trim()})).filter(x=>x.what||x.a||x.b);}
 function pendNeed(){const L=pendList();if(!L.length) return '';return '<div class="small" style="border:1px solid #c98500;background:#fff8e6;border-radius:6px;padding:6px 10px;margin:6px 0">Pending ruling – these figures in the statement are disputed by your sources, so the statement is not settled yet: '+L.map(x=>'<b>'+esc(x.what)+'</b> ('+esc(x.a)+' – or – '+esc(x.b)+')').join('; ')+'. Rule on them under Conflicts.</div>';}
+// Same-meaning risks stay listed here and are counted once in the portfolio, as PAULA does: the sourced one over a suggestion, then the later one.
+function riskKept(it){const same=window.CorbelRiskSame;if(!same||!it||!it.text) return null;const all=P.risks||[];const g=all.filter(r=>r.text&&same(r.text,it.text));if(g.length<2) return null;const src=r=>/suggestion/i.test(r.origin||'')?0:1;g.sort((a,b)=>(src(b)-src(a))||(all.indexOf(b)-all.indexOf(a)));return g[0]===it?null:g[0];}
 function instGuess(){const t=(P.sessions||[]).map(s=>s.notes||'').join('\n');for(const [re,inst] of UNIT_INST){const m=t.match(re);if(m) return {inst,clue:m[0]};}return null;}
 // The need statement, written from the record, with every number checked.
 const NEED_SYS=`You write the need statement for a DoD military construction requirement: one paragraph of 120 to 200 words a busy reviewer can read in a minute. Say who needs what capability, why now, and what happens to the mission without it. State the need, not a solution (say "covered maintenance space for two aircraft", not "a new hangar"). Use ONLY facts in RECORD; where a fact the paragraph needs is missing, write [NEEDED: what]. Plain words, active voice, no acronyms without spelling them out once, no references to AI or to this record.
@@ -1785,8 +1795,8 @@ function vCars(){const v=$('#view');
  ['constraints','assumptions','measures'].forEach(key=>{const tb=$('#tb_'+key);const cols=tb.dataset.cols.split(',');
   P[key].forEach(it=>{const tr=document.createElement('tr');tr.innerHTML=cols.map(c=>c==='confirmed'?'<td><select data-k="confirmed">'+opts({no:'No',yes:'Yes'},it.confirmed||'no')+'</select></td>':'<td><input data-k="'+c+'"></td>').join('')+'<td><button class="sm" data-del>Remove</button></td>';
    bindAll(tr,it);tr.querySelector('[data-del]').onclick=()=>{P[key]=P[key].filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});});
- const tb=$('#tb_risks');P.risks.forEach(it=>{const tr=document.createElement('tr');
-  tr.innerHTML='<td><input data-k="text"></td><td><select data-k="l">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.l||3))+'</select></td><td><select data-k="i">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.i||3))+'</select></td><td data-sc></td><td><input data-k="response"></td><td><input data-k="owner"></td><td><button class="sm" data-del>Remove</button></td>';
+ const tb=$('#tb_risks');P.risks.forEach(it=>{const tr=document.createElement('tr');const kp=riskKept(it);
+  tr.innerHTML='<td><input data-k="text">'+(kp?'<div class="small" style="color:#7a5200">Same as “'+esc(String(kp.text).slice(0,60))+'…” – counted once in the portfolio</div>':'')+'</td><td><select data-k="l">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.l||3))+'</select></td><td><select data-k="i">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.i||3))+'</select></td><td data-sc></td><td><input data-k="response"></td><td><input data-k="owner"></td><td><button class="sm" data-del>Remove</button></td>';
   const sc=()=>{const s=(Number(it.l)||3)*(Number(it.i)||3);tr.querySelector('[data-sc]').innerHTML='<span class="score '+(s>=15?'s-hi':s>=8?'s-md':'s-lo')+'">'+s+'</span>';};
   bindAll(tr,it,sc);sc();tr.querySelector('[data-del]').onclick=()=>{P.risks=P.risks.filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});
  v.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const k=b.dataset.add;P[k].push(k==='risks'?{id:uid(),text:'',l:'3',i:'3',response:'',owner:''}:{id:uid()});save();vCars();renderSteps();});}
