@@ -241,6 +241,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>PIPER – Programming, Investment, and Project Estimate Reviewer</title>
 <script id="ms-core">window.MS_TOOL='piper';
+// Two risks are the same when they say the same thing in different words: compare word stems, ignoring filler words.
+window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing'.split(' '));
+ const stem=w=>w.replace(/(ings|ing|ied|ies|ed|es|s)$/,'').replace(/(e)$/,'');const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)).map(stem).filter(w=>w.length>2);
+ return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=3&&n/Math.min(A.size,B.size)>=.5;};})();
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
@@ -354,8 +358,8 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
   if(rc.piper&&rc.piper.contract&&Number(pp.ecc)!==Number(rc.piper.contract)){pp.ecc=rc.piper.contract;ch=true;if(has(pp.cwe)&&!Number(pp.award)&&Number(pp.cwe)===Number(pp.ecc_was||rc.piper.contract)){pp.cwe='';}pp.ecc_was=rc.piper.contract;}
   // NORA's risks reach PAULA's risk register (added once, never removed: close them in PAULA).
-  const rTok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3);const rSame=(a,b)=>{const A=new Set(rTok(a)),B=new Set(rTok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n/Math.min(A.size,B.size)>=.6;};
-  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase()||rSame(x.text,t))) return;const ai=/suggestion/i.test(String(r.origin||''));pp.risks.push(Object.assign({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA'},ai?{ai:true}:{}));ch=true;});
+  const rSame=window.CorbelRiskSame;
+  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase()||rSame(x.text,t))) return;const ai=/suggestion/i.test(String(r.origin||''));pp.risks.push(Object.assign({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA',origin:String(r.origin||'')},ai?{ai:true}:{}));ch=true;});
   // PIPER's block 12: delivery method, design percent and the planned design and award dates.
   {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/troop/i.test(acq)?'Troop labor':/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
    if(dv&&!pp.delivery){pp.delivery=dv;pp.delivery_src='PIPER 1391 block 12';ch=true;}
@@ -969,11 +973,20 @@ function apply1391(){const j=XR.j;P.mode='review';P.auto={};P.ai_rev=[];['compon
 // ---------- AI red team ----------
 const REV_SYS=`You are a skeptical OSD and congressional staff reviewer of a DD Form 1391. Read THE 1391 against RECORD (the project's requirements, gaps and economic analysis) and find what a reviewer would challenge. Look for: block 11 numbers that contradict block 9 or RECORD; scope in block 10 or 9 with no requirement behind it; requirements with no scope; a solution stated as the requirement; a vague or missing impact; claims with no number; inconsistent dates or quantities; supporting costs that look high or low for the scope.
 Return ONLY JSON: {"findings":[{"severity":"bad|warn","title":"short","detail":"what to fix, one or two sentences","quote":"exact words from THE 1391 the finding is about, or empty"}]}
-Only real issues, most important first, at most 10. Never restate rule checks about missing blocks.`;
+Only real issues, most important first, at most 10. Never restate rule checks about missing blocks.
+Use the cost build-up line to reconcile block 9 to block 8: the primary and supporting facilities sum to the contract cost, and contingency and SIOH lie between that and the total. Read each block 12 date by its name: a design date is never a construction date.`;
 function the1391(){const C=calc(),n=P.n,L=[];L.push('Blocks 1-8: '+[P.b.component,P.b.installation,P.b.title,P.b.catcode&&'catcode '+P.b.catcode,'FY'+P.b.fy,'block 8 $'+k$(C.rounded)+'K'].filter(Boolean).join('; '));
  L.push('Block 9: primary facility '+(P.pf.guc_name||'')+' '+(C.qty||'')+' '+(P.pf.um||''));(C.prim||[]).forEach(x=>L.push('  primary item: '+x.item+' '+(x.qty||'')+' '+(x.um||'')+(x.uc?' @ $'+Math.round(x.uc).toLocaleString():'')+(x.cost?' = $'+Math.round(x.cost).toLocaleString():'')));(C.sup||[]).forEach(x=>L.push('  supporting: '+x.item+' '+(x.qty||'')+' '+(x.um||'')+(x.cost?' $'+Math.round(x.cost).toLocaleString():'')));
  L.push('Block 10: '+(n.desc||''));L.push('Block 11 Project: '+(n.project||''));L.push('Requirement: '+(n.requirement||''));L.push('Current situation: '+(n.current||''));L.push('Impact if not provided: '+(n.impact||''));L.push('Additional: '+(n.additional||''));
- L.push('Block 12: '+Object.entries(P.s12).filter(([k,v])=>v).map(([k,v])=>k+' '+v).join('; '));return L.join('\n');}
+ // Block 9 cost build-up, so the reviewer can reconcile block 9 to block 8 without guessing what lies between them.
+ const $k=v=>'$'+Math.round(N(v)).toLocaleString();const R=P.review||{};
+ L.push('Block 9 cost build-up: primary facility '+$k(C.primary)+'; supporting facilities '+$k(C.supporting)+'; contract cost (subtotal) '+$k(C.contract)+'; contingency '+$k(C.cont)+(C.contract?' ('+(100*N(C.cont)/N(C.contract)).toFixed(1)+'%)':'')+'; SIOH '+$k(C.sioh)+(C.siohPct?' ('+C.siohPct+'%)':'')+(N(C.db)?'; design-build design '+$k(C.db):'')+'; total request '+$k(C.total)+'; rounded total (block 8) '+$k(C.rounded)+'. Block 8 equals the block 9 total including contingency and SIOH.');
+ if(R.ext) L.push('Service 1391 as submitted: total '+$k(R.ext_total)+'; primary '+$k(R.ext_prim)+'; supporting '+$k(R.ext_sup)+'; contingency '+$k(R.ext_cont)+'; SIOH '+$k(R.ext_sioh)+'.');
+ // Block 12 schedule, each date named: design dates are design, not construction.
+ const S12=[['acq','Acquisition method'],['ds','Design start date'],['pct','Design percent complete'],['asof','Design status as of'],['d35','Design 35% complete date'],['dc','Design complete date (design only, not construction)'],['dcost','Design cost'],['energy','Energy study'],['std','Standard or definitive design'],['award','Construction contract award date'],['start','Construction start date'],['complete','Construction complete date'],['fci','Facility condition index']];
+ L.push('Block 12 (supplemental data):');S12.forEach(([k,n])=>{if(P.s12[k]) L.push('  '+n+': '+P.s12[k]);});
+ if(!P.s12.complete) L.push('  Construction complete date: not stated on this 1391. Do not treat a design date as construction completion.');
+ return L.join('\n');}
 // An export made while the AI review is still running waits for it, so the must-fix count stamped on the output is the one on the screen.
 async function waitRev(b,go){if(REVP){const t=b.textContent;b.disabled=true;b.textContent='Waiting for the AI review…';try{await REVP;}catch(e){}b.disabled=false;b.textContent=t;}go();}
 let REVP=null;

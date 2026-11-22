@@ -432,6 +432,8 @@ window.CORBEL_ADAM=()=>(typeof A!=='undefined'&&A)?A:null;
 function load(){try{const j=JSON.parse(localStorage.getItem('adam_portfolio')||'null');if(j){j.t={...DEF.t,...j.t};j.reqs=j.reqs||[];j.log=j.log||[];}return j;}catch(e){return null;}}
 let saveT=null;
 function save(){clearTimeout(saveT);saveT=setTimeout(()=>{try{localStorage.setItem('adam_portfolio',JSON.stringify(A));$('#saved').textContent='Saved in this browser '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});}catch(e){$('#saved').textContent='Not saved – use Save file';}},250);}
+// Exports read only: what was downloaded is kept in its own key, never in the project record.
+function elog(w,d){try{const k='adam_export_log';const L=JSON.parse(localStorage.getItem(k)||'[]');L.push({at:new Date().toISOString(),what:w,detail:d||''});localStorage.setItem(k,JSON.stringify(L.slice(-200)));}catch(e){}}
 function log(w,d){A.log.push({at:new Date().toISOString(),what:w,detail:d||''});A.log=A.log.slice(-300);}
 // ---------- projects: PAULA's list, plus record projects PAULA has not seen ----------
 function projects(){let pa=null,st=null;try{pa=JSON.parse(localStorage.getItem('paula_project')||'null');}catch(e){}try{st=JSON.parse(localStorage.getItem('milcon_store')||'null');}catch(e){}
@@ -602,8 +604,8 @@ function book(){const P=projects();return [{name:'Requirements',rows:[['Requirem
 function vRep(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Reports</h2><div class="outs">'+
  '<div class="card"><h4>Posture alignment paper</h4><p>Word, in the Corbel look: which requirements are late, the binding project behind each, and what would recover them.</p><button class="sm go" id="oDoc">Download Word</button></div>'+
  '<div class="card"><h4>Alignment workbook</h4><p>Excel: requirements, every link with its delivery date and basis, and the mission score each project passes to PAULA.</p><button class="sm go" id="oXl">Download Excel</button></div></div></div>';
- $('#oDoc').onclick=()=>{dl('ADAM_Posture_Alignment_'+today()+'.doc',paper(),'application/msword');log('Alignment paper downloaded');save();};
- $('#oXl').onclick=()=>{XL.save('ADAM_Alignment_'+today()+'.xlsx',book());log('Alignment workbook downloaded');save();};}
+ $('#oDoc').onclick=()=>{dl('ADAM_Posture_Alignment_'+today()+'.doc',paper(),'application/msword');elog('Alignment paper downloaded');};
+ $('#oXl').onclick=()=>{XL.save('ADAM_Alignment_'+today()+'.xlsx',book());elog('Alignment workbook downloaded');};}
 // ---------- data and settings ----------
 function vData(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Data and settings</h2><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'+
  '<div><label class="f">Months to build, when a project has no completion date (assumption)</label><input type="number" min="6" max="96" id="tB" value="'+N(A.t.build)+'"></div>'+

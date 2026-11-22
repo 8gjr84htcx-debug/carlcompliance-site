@@ -241,6 +241,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SOPHIE – Scope Of work Preparation, Harmonization, Integration, and Editing</title>
 <script id="ms-core">window.MS_TOOL='sophie';
+// Two risks are the same when they say the same thing in different words: compare word stems, ignoring filler words.
+window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing'.split(' '));
+ const stem=w=>w.replace(/(ings|ing|ied|ies|ed|es|s)$/,'').replace(/(e)$/,'');const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)).map(stem).filter(w=>w.length>2);
+ return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=3&&n/Math.min(A.size,B.size)>=.5;};})();
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
@@ -354,8 +358,8 @@ function paulaIn(){let pa=get('paula_project');if(!pa) pa={schema:'paula-1',crea
   lv.forEach(([n,src])=>{if(Number(pp.phase||1)<n&&!pp.phase_manual){pp.phase=n;pp.phase_src=src;ch=true;}});
   if(rc.piper&&rc.piper.contract&&Number(pp.ecc)!==Number(rc.piper.contract)){pp.ecc=rc.piper.contract;ch=true;if(has(pp.cwe)&&!Number(pp.award)&&Number(pp.cwe)===Number(pp.ecc_was||rc.piper.contract)){pp.cwe='';}pp.ecc_was=rc.piper.contract;}
   // NORA's risks reach PAULA's risk register (added once, never removed: close them in PAULA).
-  const rTok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3);const rSame=(a,b)=>{const A=new Set(rTok(a)),B=new Set(rTok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n/Math.min(A.size,B.size)>=.6;};
-  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase()||rSame(x.text,t))) return;const ai=/suggestion/i.test(String(r.origin||''));pp.risks.push(Object.assign({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA'},ai?{ai:true}:{}));ch=true;});
+  const rSame=window.CorbelRiskSame;
+  ((T.nora&&T.nora.risks)||[]).forEach((r,i)=>{const t=String(r.text||r||'').trim();if(!t) return;const id='nora-'+t.toLowerCase().replace(/[^a-z0-9]+/g,'-').slice(0,40);pp.risks=pp.risks||[];if(pp.risks.some(x=>x.id===id||String(x.text||'').trim().toLowerCase()===t.toLowerCase()||rSame(x.text,t))) return;const ai=/suggestion/i.test(String(r.origin||''));pp.risks.push(Object.assign({id,text:t,l:Number(r.l)||3,i:Number(r.i)||3,response:String(r.response||r.mitigation||''),owner:String(r.owner||''),status:'open',src:'NORA',origin:String(r.origin||'')},ai?{ai:true}:{}));ch=true;});
   // PIPER's block 12: delivery method, design percent and the planned design and award dates.
   {const s12=(T.piper&&T.piper.s12)||{};const acq=String(s12.acq||'');const dv=/troop/i.test(acq)?'Troop labor':/design[\s-]*bid[\s-]*build|\bdbb\b/i.test(acq)?'Design-bid-build':/design[\s-]*build|\bdb\b/i.test(acq)?'Design-build':'';
    if(dv&&!pp.delivery){pp.delivery=dv;pp.delivery_src='PIPER 1391 block 12';ch=true;}
