@@ -258,9 +258,11 @@
 <title>EARL – Economic Analysis and Recommendation Ledger</title>
 <script id="ms-core">window.MS_TOOL='earl';
 // Two risks are the same when they say the same thing in different words: compare word stems, ignoring filler words.
-window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing'.split(' '));
- const stem=w=>w.replace(/(ings|ing|ied|ies|ed|es|s)$/,'').replace(/(e)$/,'');const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)).map(stem).filter(w=>w.length>2);
- return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=3&&n/Math.min(A.size,B.size)>=.5;};})();
+window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing during along encountered discovered building facility site area work works may can the and for any all old new'.split(' '));
+ const SUF=['ations','ation','ated','ating','ates','ate','ions','ion','ings','ing','ied','ies','ed','es','s','ly'];const stem=w=>{for(const x of SUF){if(w.length-x.length>=4&&w.endsWith(x)) return w.slice(0,-x.length);}return w;};
+ const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)&&!/^\d+$/.test(w)).map(stem);
+ // Same when at least two content words (stems, so "contamination" and "contaminated" match) are shared and they make up 40% of the shorter risk.
+ return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=2&&n/Math.min(A.size,B.size)>=0.4;};})();
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
@@ -798,7 +800,7 @@ function results(opt={}){const rows=E.alts.map(a=>{const n=npv(a,opt);const part
 
 // ---------- uncertainty ranges ----------
 // EARL's planning ranges for inputs it estimated; costs you enter by hand are taken as given.
-const RANGE={inv:[0.85,1.30,'Construction and design priced from the DoD tables'],sus:[0.90,1.20,'Sustainment priced from the DoD tables'],ask:[0.80,1.20,'Lease, joint-use or host-nation figures from your answers'],est:[0.50,1.50,'Status quo costs EARL estimated']};
+const RANGE={inv:[0.85,1.30,'Construction and design priced from the DoD tables'],sus:[0.90,1.20,'Sustainment priced from the DoD tables'],ask:[0.80,1.20,'Lease, joint-use or host-nation figures from your answers'],est:[0.50,1.50,'Status quo costs estimated in this analysis']};
 function rClass(c){if(c.sqAuto) return (c.est??/estimate confirmed/.test(c.label||''))?'est':null;if(!c.auto) return null;if(c.src==='ask') return 'ask';return CATS[c.cat]?.[1]?'sus':'inv';}
 function cfOf(side){return c=>{const k=rClass(c);return k?RANGE[k][side]:1;};}
 function npvRange(a){return {lo:npv(a,{cf:cfOf(0)}).pv,hi:npv(a,{cf:cfOf(1)}).pv};}
@@ -1277,7 +1279,7 @@ function aoaHTML(){const R=results();const RI=rangeInfo();const S=sensitivity();
  '<h2>3. Alternatives identified</h2>'+tb(['Alternative','Type','Origin','Disposition'],E.alts.map(a=>[a.name,ATYPES[a.type],orig(a),feasible(a)?'Carried forward':'Screened out: '+failReasons(a).join('; ')]))+
  '<h2>4. Description of each alternative</h2>'+E.alts.map(a=>'<h3>'+esc(a.name)+'</h3><p>'+esc(a.desc||'–')+'</p>'+(a.origin_quote?'<p class="q">From the requirement record: “'+esc(a.origin_quote)+'”</p>':'')).join('')+
  '<h2>5. Life-cycle cost</h2>'+tb(['Rank','Alternative','NPV of cost','Likely range','Undiscounted','Residual credit'],R.rows.slice().sort((x,y)=>(y.ok-x.ok)||(x.npv-y.npv)).map(r=>[r.rank||'–',r.a.name,r.ok?$$(r.npv):r.unpriced?unpLbl(r):'Screened out',r.ok?$r(RI.rg[r.a.id]):'–',$$(r.und),$$(r.rv)]))+
- '<p>'+esc(rangeText(RI))+' Ranges apply EARL’s planning bands to the inputs it estimated: '+Object.values(RANGE).map(x=>x[2].toLowerCase()+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs entered by the analyst are taken as given.</p>'+
+ '<p>'+esc(rangeText(RI))+' Ranges apply the analysis’s planning bands to the inputs it estimated: '+Object.values(RANGE).map(x=>x[2].charAt(0).toLowerCase()+x[2].slice(1).replace(/\bdod\b/gi,'DoD')+' '+Math.round((x[0]-1)*100)+'% to +'+Math.round((x[1]-1)*100)+'%').join('; ')+'. Costs entered by the analyst are taken as given.</p>'+
  '<p class="m">Unit costs, area cost factors and sustainment costs from UFS 3-701-01 (July 2026 tables) and UFS 3-730-01; SIOH per OASD(EI&amp;E), 14 Apr 2022; discounting per OMB Circular A-94 Appendix C ('+esc(APPC.edition)+'). Each cost basis is listed in Appendix A.</p>'+
  '<h2>6. Non-cost factors</h2>'+tb(['Factor','Weight'].concat(E.alts.map(x=>x.name)),E.criteria.map(c=>[c.name,c.weight].concat(E.alts.map(x=>x.scores[c.id]??'Not scored'))).concat([['Weighted score',''].concat(E.alts.map(x=>E.criteria.some(c=>x.scores[c.id]!=null&&x.scores[c.id]!=='')?wscore(x).toFixed(2):'Not scored'))]))+
  E.alts.filter(x=>x.why).map(x=>'<p><b>'+esc(x.name)+':</b> '+esc(x.why)+'</p>').join('')+

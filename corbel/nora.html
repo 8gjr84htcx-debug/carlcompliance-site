@@ -265,13 +265,17 @@
 
 
 
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NORA – Needs, Options, and Requirements Analyst</title>
 <script id="ms-core">window.MS_TOOL='nora';
 // Two risks are the same when they say the same thing in different words: compare word stems, ignoring filler words.
-window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing'.split(' '));
- const stem=w=>w.replace(/(ings|ing|ied|ies|ed|es|s)$/,'').replace(/(e)$/,'');const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)).map(stem).filter(w=>w.length>2);
- return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=3&&n/Math.min(A.size,B.size)>=.5;};})();
+window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('that this with from could would will might major minor continued continue cause causes caused risk risks result results resulting into about there their have been being which when where while than then also more most some such very project system existing during along encountered discovered building facility site area work works may can the and for any all old new'.split(' '));
+ const SUF=['ations','ation','ated','ating','ates','ate','ions','ion','ings','ing','ied','ies','ed','es','s','ly'];const stem=w=>{for(const x of SUF){if(w.length-x.length>=4&&w.endsWith(x)) return w.slice(0,-x.length);}return w;};
+ const tok=t=>String(t||'').toLowerCase().replace(/[^a-z0-9 ]+/g,' ').split(/\s+/).filter(w=>w.length>3&&!STOP.has(w)&&!/^\d+$/.test(w)).map(stem);
+ // Same when at least two content words (stems, so "contamination" and "contaminated" match) are shared and they make up 40% of the shorter risk.
+ return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=2&&n/Math.min(A.size,B.size)>=0.4;};})();
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
@@ -1065,7 +1069,7 @@ const XL=(function(){
   return zip(F);}
  // Column widths from the content: header and the longest cell, capped.
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
- function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
 
 // ---------- Build my requirement: documents in, a full requirement record out ----------
