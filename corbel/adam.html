@@ -584,7 +584,7 @@ function vPrj(){const v=$('#view');const P=projects();const rows=P.map(p=>({p,m:
   '<table class="ptable"><thead><tr><th>Project</th><th>Serves</th><th style="text-align:right">Mission score</th></tr></thead><tbody>'+rows.map(x=>'<tr><td><b>'+esc(x.p.name)+'</b><div class="small">'+esc([x.p.installation,x.p.fy?'FY'+x.p.fy:'',x.p._src].filter(Boolean).join(' · '))+'</div></td><td class="small">'+(x.R.length?x.R.map(r=>esc(r.name)).join('<br>'):'–')+'</td><td style="text-align:right">'+(x.m?'<b>'+x.m.v+'</b>':'–')+'</td></tr>').join('')+'</tbody></table></div>';}
 // ---------- reports ----------
 function kTiles(T){const w=Math.floor(100/T.length);return '<table width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:10pt 0 4pt"><tr>'+T.map(([l,v,c],i)=>'<td width="'+w+'%" bgcolor="'+CD.tint+'" style="background:'+CD.tint+';border:0.75pt solid '+CD.rule+';padding:7pt 9pt">'+cdP(esc(l).toUpperCase(),'margin:0;font-size:7pt;letter-spacing:1.5pt;color:'+CD.mute)+cdP(v,'margin:2pt 0 0;font-size:17pt;color:'+(c||CD.navy))+'</td>'+(i<T.length-1?'<td width="6" style="width:5pt">&nbsp;</td>':'')).join('')+'</tr></table>';}
-function dl(name,data,type){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+function dl(name,data,type){if(window.CorbelDeTool&&/\.(doc|csv|txt|html?)$/i.test(name)) data=CorbelDeTool(data);const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([data],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
 function paper(){const P=projects();const E=A.reqs.map(r=>({r,e:evalReq(r,P)}));const c=k=>E.filter(x=>x.e.st===k);const late=c('late').sort((a,b)=>b.e.gap-a.e.gap),risk=c('risk');
  let b=cdBand('Decision paper','Posture Alignment',fdt()+(A.me?'  ·  '+A.me:''));
  b+=kTiles([['Requirements',String(E.length)],['On track',String(c('ok').length)],['At risk',String(risk.length)],['Late',String(late.length),late.length?'#9B2C2C':null],['No project or date',String(c('none').length+c('unk').length+c('noneed').length)]]);
@@ -604,8 +604,8 @@ function book(){const P=projects();return [{name:'Requirements',rows:[['Requirem
 function vRep(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Reports</h2><div class="outs">'+
  '<div class="card"><h4>Posture alignment paper</h4><p>Word, in the Corbel look: which requirements are late, the binding project behind each, and what would recover them.</p><button class="sm go" id="oDoc">Download Word</button></div>'+
  '<div class="card"><h4>Alignment workbook</h4><p>Excel: requirements, every link with its delivery date and basis, and the mission score each project passes to PAULA.</p><button class="sm go" id="oXl">Download Excel</button></div></div></div>';
- $('#oDoc').onclick=()=>{dl('ADAM_Posture_Alignment_'+today()+'.doc',paper(),'application/msword');elog('Alignment paper downloaded');};
- $('#oXl').onclick=()=>{XL.save('ADAM_Alignment_'+today()+'.xlsx',book());elog('Alignment workbook downloaded');};}
+ $('#oDoc').onclick=()=>{dl('Posture_Alignment_'+today()+'.doc',paper(),'application/msword');elog('Alignment paper downloaded');};
+ $('#oXl').onclick=()=>{XL.save('Alignment_'+today()+'.xlsx',book());elog('Alignment workbook downloaded');};}
 // ---------- data and settings ----------
 function vData(){const v=$('#view');v.innerHTML='<div class="panel"><h2>Data and settings</h2><div class="form" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">'+
  '<div><label class="f">Months to build, when a project has no completion date (assumption)</label><input type="number" min="6" max="96" id="tB" value="'+N(A.t.build)+'"></div>'+
@@ -657,6 +657,15 @@ function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" c
  '<tr>'+head.map((h,i)=>'<td bgcolor="'+CD.navy+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+CD.navy+';padding:5pt 7pt">'+cdP(esc(h).toUpperCase(),'margin:0;font-size:7.5pt;letter-spacing:1.5pt;color:'+CD.gold)+'</td>').join('')+'</tr>'+
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
 function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
+
+// ---------- No tool names in what leaves the suite ----------
+// Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'read in the 1391 review'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+  [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
+ R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
+window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
 
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
@@ -723,7 +732,7 @@ const XL=(function(){
   return zip(F);}
  // Column widths from the content: header and the longest cell, capped.
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
- function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
 
 // ---------- Corbel Word documents: a real .docx, built in the page ----------
@@ -1047,7 +1056,7 @@ const PX=(function(){
   f.push(['ppt/theme/theme1.xml',THEME]);
   S.forEach((s,i)=>{f.push(['ppt/slides/slide'+(i+1)+'.xml',slideXml(s,i+1,N,deck)]);f.push(['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml')])]);});
   return zip(f);}
- function save(name,deck){const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+ function save(name,deck){if(window.CorbelDeToolDeep) deck=window.CorbelDeToolDeep(deck);const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
  // Split long tables over several slides.
  function chunk(rows,n){const h=rows[0],b=rows.slice(1),out=[];for(let i=0;i<b.length;i+=n) out.push([h].concat(b.slice(i,i+n)));return out.length?out:[[h]];}
  return {save,build,chunk,C};})();

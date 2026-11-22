@@ -2163,7 +2163,7 @@ const PX=(function(){
   f.push(['ppt/theme/theme1.xml',THEME]);
   S.forEach((s,i)=>{f.push(['ppt/slides/slide'+(i+1)+'.xml',slideXml(s,i+1,N,deck)]);f.push(['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml')])]);});
   return zip(f);}
- function save(name,deck){const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+ function save(name,deck){if(window.CorbelDeToolDeep) deck=window.CorbelDeToolDeep(deck);const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
  // Split long tables over several slides.
  function chunk(rows,n){const h=rows[0],b=rows.slice(1),out=[];for(let i=0;i<b.length;i+=n) out.push([h].concat(b.slice(i,i+n)));return out.length?out:[[h]];}
  return {save,build,chunk,C};})();

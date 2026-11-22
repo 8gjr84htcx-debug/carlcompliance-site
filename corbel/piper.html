@@ -995,7 +995,7 @@ async function aiReview0(q){if(!aiOn()){if(!q) alert('Sign in again (Face ID) to
  try{const t=the1391();const j=await CARLAI.ask('claude',REV_SYS,'THE 1391:\n'+t+'\n\nRECORD:\n'+recordText().slice(0,40000),null,{fresh:true});
   P.ai_rev=(j.findings||[]).filter(x=>x&&x.title).map(x=>({s:x.severity==='bad'?'bad':'warn',t:'AI review: '+String(x.title),d:String(x.detail||'')+(x.quote&&inSrc(t,x.quote)?' (“'+x.quote+'”)':''),}));P.ai_rev_at=new Date().toISOString();P.ai_rev_sig=sig1391();
   log('AI red-team review',P.ai_rev.length+' findings');save();}
- catch(e){if(!q) alert('AI review failed: '+e.message);}
+ catch(e){if(/Cancelled/i.test(e.message)){if(b){b.disabled=false;b.textContent=P.ai_rev_at?'Run the AI review again':'Run the AI review';}return;}if(!q) alert('AI review failed: '+e.message);}
  if(b){b.disabled=false;b.textContent='Run the AI review again';}if(!q) render();}
 function sig1391(){const t=the1391();let h=0;for(let i=0;i<t.length;i++) h=(h*31+t.charCodeAt(i))|0;return String(h);}
 
@@ -1044,7 +1044,7 @@ function vDone(){const v=$('#view');const C=calc();const F=findings();const bad=
   fixHTML()+(F.length?F.map((x,i)=>{const g=goStep(x);return '<div class="find '+x.s+'" style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1"><b>'+esc(x.t)+'</b> <span>'+esc(x.d)+'</span></div>'+(g?'<button class="sm" data-go2="'+g+'">Fix it</button>':aiOn()?'<button class="sm" data-fix="'+i+'">Fix with AI</button>':'')+'</div>';}).join(''):'<div class="small">No findings.</div>')+
   '<div class="row"><button id="bRev">'+(P.ai_rev_at?'Run the AI review again':'Run the AI review')+'</button><span class="small">Rule checks run as you type; the AI reviewer reads the narrative against block 9, NORA and EARL.</span></div></div>';
  v.querySelectorAll('[data-o]').forEach(b=>b.onclick=()=>waitRev(b,()=>({doc:()=>preDl1391(),print:()=>{const w=window.open('','_blank');w.document.write(formHTML());w.document.close();setTimeout(()=>w.print(),400);},backup:()=>{XL.save(fname('Estimate-Backup','xlsx'),pBook());log('Estimate backup downloaded');save();},jb:()=>dl(fname('Justification','doc'),cdDoc('Justification text',[(draftMark()?cdP('<b>'+esc(draftMark())+'</b>','color:#8A2B1E;font-size:13pt'):'')+cdBand('Justification text',P.b.title||'DD Form 1391',[P.b.installation,P.b.fy&&('FY'+P.b.fy)].filter(Boolean).join('  \u00b7  '),'')+(qtyMismatch().length?cdP('<b>Quantity check against the record:</b><br>'+qtyMismatch().map(esc).join('<br>'),'color:#8A2B1E;font-size:10pt'):'')+jb().split(/\n{2,}/).map(t=>cdP(esc(t).replace(/\n/g,'<br>'),'font-size:11pt;line-height:140%')).join('')]),'application/msword')})[b.dataset.o]()));
- $('#bRev').onclick=()=>aiReview(false);v.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>aiFix(Number(b.dataset.fix)));bindFix();bindConfirm();
+ $('#bRev').onclick=e=>{const b=e.currentTarget;if(REVP) return;b.disabled=true;b.textContent='Reviewing…';aiReview(false);};v.querySelectorAll('[data-fix]').forEach(b=>b.onclick=()=>aiFix(Number(b.dataset.fix)));bindFix();bindConfirm();
  v.querySelectorAll('[data-go2]').forEach(b=>b.onclick=()=>goFix(b.dataset.go2));const fa=$('#bFixAll');if(fa) fa.onclick=fixAll;bindFixAll();}
 
 // ---------- Fix a finding with AI ----------
@@ -1312,7 +1312,7 @@ function qNoun(w){w=w.toLowerCase();if(w==='sf'||w==='sq') return 'sf';return w.
 function qPairs(t){const o=[];String(t||'').replace(/(\$?)(\d[\d,]*(?:\.\d+)?)(%?)[\s-]+(?:(?:secure|new|additional|existing|more|total)\s+)?([A-Za-z]+)/g,(m,d,num,pc,w,i)=>{if(d||pc) return m;const v=Number(num.replace(/,/g,''));if(!isFinite(v)) return m;if(/^\d{4}$/.test(num)&&v>=1900&&v<=2100) return m;const pre=String(t).slice(Math.max(0,i-5),i);if(/(UFC|FY|DoDI|\d-)\s*$/i.test(pre)) return m;const k=qNoun(w);if(QSTOP.has(k)||k.length<2) return m;o.push({v,k,w});return m;});return o;}
 function qtyMismatch(){const r=nora();if(!r) return [];const rec={};const put=(v,k,src)=>{(rec[k]=rec[k]||[]).push({v,src});};
  (r.requirements||[]).filter(q=>q.status!=='rejected').forEach(q=>qPairs((q.text||'')+'. '+(q.measure||'')).forEach(x=>put(x.v,x.k,q.id)));
- (r.gaps||[]).forEach(g=>{if(g.qty_need!==''&&g.qty_need!=null&&g.unit) put(Number(g.qty_need),qNoun(String(g.unit).split(/\s+/).pop()),g.id||g.area||'gap');});
+ (r.gaps||[]).forEach(g=>{if(g.qty_need!==''&&g.qty_need!=null&&g.unit) put(Number(g.qty_need),qNoun(String(g.unit).split(/\s+/).pop()),(g.reqs||[]).length?g.reqs.join(', '):'the '+(g.area||'capability')+' gap');});
  const n=P.n,txt=[n.project,n.requirement,n.current,n.impact,n.additional].join('. ');const out=[],seen=new Set();
  qPairs(txt).forEach(x=>{const R=rec[x.k];if(!R||R.some(y=>y.v===x.v)) return;const key=x.k+x.v;if(seen.has(key)) return;seen.add(key);const vs=[...new Set(R.map(y=>y.v))];
   out.push('Block 11 says '+x.v.toLocaleString()+' '+x.w+'; the record says '+vs.map(v=>v.toLocaleString()).join(' or ')+' ('+[...new Set(R.map(y=>y.src))].join(', ')+').');});
@@ -1514,6 +1514,15 @@ function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" c
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
 function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 
+// ---------- No tool names in what leaves the suite ----------
+// Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'read in the 1391 review'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+  [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
+ R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
+window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
+
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
 const XL=(function(){
@@ -1579,7 +1588,7 @@ const XL=(function(){
   return zip(F);}
  // Column widths from the content: header and the longest cell, capped.
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
- function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
 
 // ---------- Corbel Word documents: a real .docx, built in the page ----------
@@ -1903,7 +1912,7 @@ const PX=(function(){
   f.push(['ppt/theme/theme1.xml',THEME]);
   S.forEach((s,i)=>{f.push(['ppt/slides/slide'+(i+1)+'.xml',slideXml(s,i+1,N,deck)]);f.push(['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml')])]);});
   return zip(f);}
- function save(name,deck){const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+ function save(name,deck){if(window.CorbelDeToolDeep) deck=window.CorbelDeToolDeep(deck);const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
  // Split long tables over several slides.
  function chunk(rows,n){const h=rows[0],b=rows.slice(1),out=[];for(let i=0;i<b.length;i+=n) out.push([h].concat(b.slice(i,i+n)));return out.length?out:[[h]];}
  return {save,build,chunk,C};})();

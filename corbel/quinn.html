@@ -841,7 +841,7 @@ function vRecs(){const v=$('#view');const months=[...new Set(Q.records.map(r=>(r
  $('#bAddB').onclick=()=>{const b=bldgFrom($('#nb').value)||$('#nb').value.trim().toUpperCase();if(b&&Q.removed) Q.removed=Q.removed.filter(x=>x!==b);if(b&&!Q.registry.some(x=>x.building===b)){Q.registry.push({building:b,to:'',project:''});save();vRecs();}};
  $('#bImpR').onclick=()=>$('#fR').click();$('#fR').onchange=e=>{const f=e.target.files[0];e.target.value='';if(!f) return;f.text().then(t=>{let k=0;t.split(/\r?\n/).forEach(l=>{const c=l.split(',').map(x=>x.trim().replace(/^"|"$/g,''));const b=bldgFrom(c[0])||(c[0]||'').toUpperCase();if(!b||/building/i.test(c[0])) return;let r=Q.registry.find(x=>x.building===b);if(!r){r={building:b,to:'',project:''};Q.registry.push(r);}if(c[1]) r.to=c[1];if(c[2]) r.project=c[2];k++;});log('Building list imported',k+' rows');save();vRecs();});};
  const q=$('#rq');q.value=RQ.q;q.oninput=()=>{RQ.q=q.value;rows();};$('#rm').onchange=e=>{RQ.m=e.target.value;rows();};$('#rb2').onchange=e=>{RQ.b=e.target.value;rows();};
- $('#bCsv').onclick=()=>XL.save('QUINN_1477_extract_'+today()+'.xlsx',[{name:'1477 extract',rows:[['Date','Building','Task order','File','Inspector','Signed','SHA-256'].concat(Object.keys(SEC_NAME).map(k=>k+'. '+SEC_NAME[k]))].concat(Q.records.map(r=>[r.date,r.building,to(r.building),r.file,r.inspector,r.signed?'Yes':'No',r.hash].concat(Object.keys(SEC_NAME).map(k=>(r.secs[k]||[]).join(' | ')))))}]);
+ $('#bCsv').onclick=()=>XL.save('1477_extract_'+today()+'.xlsx',[{name:'1477 extract',rows:[['Date','Building','Task order','File','Inspector','Signed','SHA-256'].concat(Object.keys(SEC_NAME).map(k=>k+'. '+SEC_NAME[k]))].concat(Q.records.map(r=>[r.date,r.building,to(r.building),r.file,r.inspector,r.signed?'Yes':'No',r.hash].concat(Object.keys(SEC_NAME).map(k=>(r.secs[k]||[]).join(' | ')))))}]);
  rows();
  function rows(){const t=RQ.q.toLowerCase();const L=Q.records.filter(r=>(!RQ.m||(r.date||'').startsWith(RQ.m))&&(!RQ.b||r.building===RQ.b)&&(!t||(r.file+' '+r.building+' '+r.inspector+' '+r.raw).toLowerCase().includes(t))).sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const tb=$('#rt');tb.innerHTML='';L.slice(0,500).forEach(r=>{const tr=document.createElement('tr');
@@ -860,7 +860,7 @@ function vIss(){const v=$('#view');const bl=[...new Set(Q.issues.map(i=>i.buildi
  $('#is').onchange=e=>{IQ.show=e.target.value;vIss();};$('#ib').onchange=e=>{IQ.b=e.target.value;vIss();};
  $('#bAddI').onclick=()=>{Q.issues.unshift({id:uid(),key:'',building:IQ.b||'',kind:'Quality',text:'',first:today(),last:today(),status:'open',closed:'',action:'',ref:'',history:[],manual:true});save();vIss();renderSteps();};
  $('#bRe').onclick=()=>{if(!confirm('Rebuild the log from the records? Items you added by hand and corrective actions you typed are kept.')) return;const keep=Q.issues.filter(i=>i.manual);const acts=Object.fromEntries(Q.issues.map(i=>[i.building+'|'+i.key,i.action]));Q.issues=keep;Q.records.slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')).forEach(harvestIssues);Q.issues.forEach(i=>{if(acts[i.building+'|'+i.key]) i.action=acts[i.building+'|'+i.key];});log('Deficiency log rebuilt');save();vIss();renderSteps();};
- $('#bIcsv').onclick=()=>XL.save('QUINN_Deficiencies_'+today()+'.xlsx',[{name:'Deficiencies',rows:[['Building','Task order','Type','Deficiency','First seen','Last seen','Days open','Status','Closed','Corrective action','Reference','Reports']].concat(Q.issues.map(i=>[i.building,to(i.building),i.kind,i.text,i.first,i.last,daysOpen(i),i.status,i.closed,i.action,i.ref,i.history.map(h=>h.date+' '+h.tag).join('; ')]))}]);
+ $('#bIcsv').onclick=()=>XL.save('Deficiencies_'+today()+'.xlsx',[{name:'Deficiencies',rows:[['Building','Task order','Type','Deficiency','First seen','Last seen','Days open','Status','Closed','Corrective action','Reference','Reports']].concat(Q.issues.map(i=>[i.building,to(i.building),i.kind,i.text,i.first,i.last,daysOpen(i),i.status,i.closed,i.action,i.ref,i.history.map(h=>h.date+' '+h.tag).join('; ')]))}]);
  const tb=$('#ib2');const L=Q.issues.filter(i=>(!IQ.b||i.building===IQ.b)&&(IQ.show==='all'||(IQ.show==='closed'?i.status==='closed':IQ.show==='aged'?i.status!=='closed'&&daysOpen(i)>30:i.status!=='closed')));
  L.forEach(i=>{const tr=document.createElement('tr');tr.innerHTML='<td><input data-k="building" style="width:90px"></td><td><select data-k="kind" style="width:auto">'+opts({Quality:'Quality',Safety:'Safety',Environmental:'Environmental'},i.kind)+'</select></td><td><textarea data-k="text" style="min-height:40px"></textarea><div class="small">'+i.history.map(h=>esc(h.date+' '+h.tag)).join(' · ')+'</div></td><td><input type="date" data-k="first" style="width:140px"></td><td>'+esc(i.last)+'</td><td class="num">'+(i.status==='closed'?'–':daysOpen(i))+'</td><td><textarea data-k="action" style="min-height:40px"></textarea></td><td><select data-k="status" style="width:auto">'+opts({open:'Open',closed:'Closed'},i.status)+'</select></td>';
   tr.querySelectorAll('[data-k]').forEach(el=>{el.value=i[el.dataset.k]??'';el.oninput=el.onchange=()=>{i[el.dataset.k]=el.value;if(el.dataset.k==='status'){i.closed=i.status==='closed'?today():'';i.history.push({date:today(),tag:i.status==='closed'?'CLOSED (manual)':'REOPENED (manual)',file:''});}save();renderSteps();};});tb.appendChild(tr);});
@@ -887,7 +887,7 @@ function vRep(){periodDefault();const v=$('#view');const bl=[...new Set(Q.regist
  $('#rmo').onchange=e=>{const m=e.target.value;if(!m) return;R.from=m+'-01';R.to=m+'-'+String(new Date(+m.slice(0,4),+m.slice(5,7),0).getDate()).padStart(2,'0');$('#rf').value=R.from;$('#rt2').value=R.to;pv();};
  $('#rbp').checked=R.boiler;$('#rsrc').checked=R.src;$('#rbp').onchange=e=>{R.boiler=e.target.checked;pv();};$('#rsrc').onchange=e=>{R.src=e.target.checked;pv();};
  $('#bDoc').onclick=()=>preDl(()=>{dl(fn('doc'),reportDoc(R.scope,R.key),'application/msword');log('Report downloaded',sumKey());save();});
- if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('QUINN_'+b+'_'+R.from+'_to_'+R.to+'.doc',reportDoc('building',b),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
+ if($('#bAll')) $('#bAll').onclick=async()=>{const bs=buildingsIn();for(const b of bs){dl('Inspection_Report_'+b+'_'+R.from+'_to_'+R.to+'.doc',reportDoc('building',b),'application/msword');await new Promise(r=>setTimeout(r,350));}log('Per-building reports downloaded',bs.length+' buildings');save();};
  $('#bSum').onclick=writeSummary;
  pv();function pv(){$('#pv').innerHTML='<iframe id="pvf" title="Report preview" style="width:100%;border:0;min-height:600px;background:#fff"></iframe>';const f=$('#pvf');f.onload=()=>{try{f.style.height=(f.contentDocument.documentElement.scrollHeight+20)+'px';}catch(e){}};f.srcdoc=reportDoc(R.scope,R.key);}}
 // ---------- AI summary of the consolidated report ----------
@@ -1031,6 +1031,15 @@ function cdTable(head,rows,widths){return '<table width="100%" cellpadding="6" c
  rows.map((r,j)=>{const bg=j%2?CD.tint2:'#FFFFFF';return '<tr>'+r.map((c,i)=>'<td bgcolor="'+bg+'"'+(widths&&widths[i]?' width="'+widths[i]+'"':'')+' style="background:'+bg+';padding:6pt 7pt;border-bottom:0.5pt solid '+CD.rule+'">'+cdP(c,'margin:0;font-size:9.5pt')+'</td>').join('')+'</tr>';}).join('')+'</table>';}
 function cdFoot(t){return '<table data-keepprev="1" width="100%" cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin-top:16pt"><tr><td style="border-top:0.75pt solid '+CD.gold+';padding:6pt 0 0">'+cdP(t,'margin:0;font-size:8pt;color:'+CD.mute)+'</td></tr></table>';}
 
+// ---------- No tool names in what leaves the suite ----------
+// Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'read in the 1391 review'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+  [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
+ R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
+window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
+
 // ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
 // Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
 const XL=(function(){
@@ -1096,7 +1105,7 @@ const XL=(function(){
   return zip(F);}
  // Column widths from the content: header and the longest cell, capped.
  function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
- function save(name,sheets){sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
  return {save,book,fit};})();
 
 // ---------- Corbel Word documents: a real .docx, built in the page ----------
@@ -1420,7 +1429,7 @@ const PX=(function(){
   f.push(['ppt/theme/theme1.xml',THEME]);
   S.forEach((s,i)=>{f.push(['ppt/slides/slide'+(i+1)+'.xml',slideXml(s,i+1,N,deck)]);f.push(['ppt/slides/_rels/slide'+(i+1)+'.xml.rels',RELS([REL('rId1','slideLayout','../slideLayouts/slideLayout1.xml')])]);});
   return zip(f);}
- function save(name,deck){const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
+ function save(name,deck){if(window.CorbelDeToolDeep) deck=window.CorbelDeToolDeep(deck);const b=build(deck);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>a.remove(),300);}
  // Split long tables over several slides.
  function chunk(rows,n){const h=rows[0],b=rows.slice(1),out=[];for(let i=0;i<b.length;i+=n) out.push([h].concat(b.slice(i,i+n)));return out.length?out:[[h]];}
  return {save,build,chunk,C};})();
