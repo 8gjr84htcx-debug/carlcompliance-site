@@ -899,14 +899,14 @@ async function pipeS1(s){const src=sourcesFor(s)+(S.ctx?'\nPROJECT CONTEXT (fact
   // Nothing to rule on: the reviewer found no issue, nothing missing and offered no rewrite, so the arbiter call is skipped.
   if(!(rj.issues||[]).length&&!(rj.missing||[]).length) prov.steps.push({role:'arbiter',rulings:[],skipped:true});
   else try{const aj=await CARLAI.ask('reviewer',ARB_SYS(),src+'\n\nDRAFT:\n'+text+'\n\nREVIEW:\n'+JSON.stringify({issues:(rj.issues||[]).slice(0,10),missing:rj.missing}));text=String(aj.text||text);prov.steps.push({role:'arbiter',rulings:aj.rulings||[]});}
-  catch(e){(rj.issues||[]).slice(0,10).forEach(x=>{if(x&&x.quote&&x.fix&&text.includes(x.quote)) text=text.replace(x.quote,x.fix);});}}catch(e){}
+  catch(e){prov.arbFail=String(e.message||e).slice(0,160);(rj.issues||[]).slice(0,10).forEach(x=>{if(x&&x.quote&&x.fix&&text.includes(x.quote)) text=text.replace(x.quote,x.fix);});}}catch(e){prov.revFail=String(e.message||e).slice(0,160);}
  const un=figuresUnverified(text.replace(/\{[^}]*\}/g,''),s);prov.unverified=un;prov.unscoped=workUnscoped(text,s);s.ai=prov;s.text=text;s.status='reviewed';return un;}
 // A section with many requirements is drafted in parts, at the same time, so one large section no longer holds the SOW up.
 const SPLIT_N=6;
 async function pipeS(s){const R=s.reqs||[];if(R.length<=SPLIT_N) return pipeS1(s);const k=Math.ceil(R.length/SPLIT_N);
  const subs=Array.from({length:k},(_,i)=>({...s,reqs:R.slice(i*SPLIT_N,(i+1)*SPLIT_N),text:'',ai:null,notes:(s.notes||'')+'\nThis is part '+(i+1)+' of '+k+' of this section; cover only the requirements listed here. '+(i?'Do not repeat an introduction; continue the section.':'Open the section.')}));
  const uns=await Promise.all(subs.map(pipeS1));let text=subs.map(x=>x.text.trim()).filter(Boolean).join('\n');if(s.num){let n=0;text=text.replace(/^(\s*)\d+\.(\s)/gm,(m,a,b)=>a+(++n)+'.'+b);}
- const un=[...new Set([].concat(...uns))];s.ai={at:new Date().toISOString(),prev:s.text,parts:k,steps:[].concat(...subs.map(x=>(x.ai||{}).steps||[])),unverified:un,unscoped:[...new Set([].concat(...subs.map(x=>(x.ai||{}).unscoped||[])))]};s.text=text;s.status='reviewed';return un;}
+ const un=[...new Set([].concat(...uns))];s.ai={at:new Date().toISOString(),prev:s.text,parts:k,steps:[].concat(...subs.map(x=>(x.ai||{}).steps||[])),unverified:un,unscoped:[...new Set([].concat(...subs.map(x=>(x.ai||{}).unscoped||[])))],arbFail:subs.map(x=>(x.ai||{}).arbFail).filter(Boolean)[0]||'',revFail:subs.map(x=>(x.ai||{}).revFail).filter(Boolean)[0]||''};s.text=text;s.status='reviewed';return un;}
 // Work the sources never ask for (demolition, removal, relocation, abatement) is flagged, so an invented item cannot slip into the SOW.
 function workUnscoped(text,s){const W=[['demoli','demolition'],['remove existing','removal of existing work'],['removal of','removal'],['relocat','relocation'],['abate','abatement'],['dispose of','disposal']];const t=String(text||'').toLowerCase();
  const src=[sourcesFor(s),S.ctx||'',S.reqs.map(r=>r.text+' '+(r.measure||'')).join(' ')].join(' ').toLowerCase();return W.filter(([k])=>t.includes(k)&&!src.includes(k.slice(0,6))).map(([,n])=>n);}
@@ -1032,10 +1032,10 @@ function commentsHTML(){const F=findingsAll();const P2=S.proposals||{};const bad
 // ---------- Confirm in place ----------
 function asmAll(){const A=new Set();S.sections.forEach(s=>{if(s.ai&&!s.ai.confirmed&&!s.ai.asm_ok&&s.ai.steps&&s.ai.steps[0]) (s.ai.steps[0].assumptions||[]).forEach(a=>{const t=String(a||'').trim();if(t) A.add(t);});});return [...A];}
 function confirmHTMLS(){const rows=[];const AA=asmAll();if(AA.length) rows.push('<div class="card" style="margin:8px 0;padding:10px 14px"><b>The drafters assumed</b><ul class="small" style="margin:4px 0">'+AA.map(a=>'<li>'+esc(a)+'</li>').join('')+'</ul><div class="row"><button class="sm go" id="asmOk">These are right</button><span class="small">If not, correct the project details or the sections under Adjust details \u2192 Write sections, then rebuild.</span></div></div>');
- S.sections.forEach(s=>{const k=s.key.split(':')[0];const noReq=!s.reqs.length&&!['docs','safe'].includes(k)&&S.reqs.length&&!s.review&&!(s.ai&&s.ai.linkedOk);const un=(s.ai&&!s.ai.confirmed&&s.ai.unverified)||[];const uw=(s.ai&&!s.ai.confirmed&&s.ai.unscoped)||[];const asm=[];
-  if(!noReq&&!un.length&&!uw.length&&!asm.length) return;
+ S.sections.forEach(s=>{const k=s.key.split(':')[0];const noReq=!s.reqs.length&&!['docs','safe'].includes(k)&&S.reqs.length&&!s.review&&!(s.ai&&s.ai.linkedOk);const un=(s.ai&&!s.ai.confirmed&&s.ai.unverified)||[];const uw=(s.ai&&!s.ai.confirmed&&s.ai.unscoped)||[];const asm=[];const rf=s.ai&&!s.ai.confirmed&&(s.ai.arbFail||s.ai.revFail);
+  if(!noReq&&!un.length&&!uw.length&&!asm.length&&!rf) return;
   rows.push('<div class="card" style="margin:8px 0;padding:10px 14px"><b>'+esc(s.title)+'</b>'+
-   (un.length?'<div class="small">Figures not in your sources: '+esc(un.join(', '))+'</div>':'')+(uw.length?'<div class="small" style="color:#9b2c2c">Work not in your sources: '+esc(uw.join(', '))+' – remove it or add the requirement behind it</div>':'')+(asm.length?'<div class="small">The drafter assumed: '+esc(asm.join('; '))+'</div>':'')+
+   (un.length?'<div class="small">Figures not in your sources: '+esc(un.join(', '))+'</div>':'')+(rf?'<div class="small" style="color:#9b2c2c">'+(s.ai.revFail?'The review step':'The final rewrite')+' did not complete, so this section has the draft with only the reviewer’s direct fixes. Redraft it to give it the full review.</div>':'')+(uw.length?'<div class="small" style="color:#9b2c2c">Work not in your sources: '+esc(uw.join(', '))+' – remove it or add the requirement behind it</div>':'')+(asm.length?'<div class="small">The drafter assumed: '+esc(asm.join('; '))+'</div>':'')+
    (noReq?'<div class="small" style="margin-top:4px"><b>No requirement is behind this section</b>, so it was written from context alone. Link the ones it answers and rewrite it:</div><div class="reqpick" style="max-height:140px;overflow:auto">'+S.reqs.map(r=>'<label><input type="checkbox" data-lk="'+s.id+'" value="'+esc(r.id)+'"><b>'+esc(r.id)+'</b> '+esc(r.text)+'</label>').join('')+'</div><div class="row"><button class="sm go" data-relink="'+s.id+'">Link and rewrite</button><button class="sm" data-nolink="'+s.id+'">It needs none</button></div>':'')+
    ((un.length||asm.length)?'<textarea class="sow" data-ct="'+s.id+'" style="min-height:120px;margin-top:6px">'+esc(s.text)+'</textarea><div class="row"><button class="sm go" data-cok="'+s.id+'">Save and confirm</button></div>':'')+'</div>');});
  return rows.length?'<div class="panel"><h2>Confirm before you send it</h2><p class="lead">Fix it here; the full editor is under Adjust details \u2192 Write sections.</p>'+rows.join('')+'</div>':'';}
@@ -1775,12 +1775,15 @@ const PX=(function(){
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
   var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
- // A dropped connection, a timeout or a busy server is tried twice more (after 1.5 and 4 seconds) before the tool is told it failed.
+ // A dropped connection, a timeout or a busy server is tried twice more (an answer cut off at its length limit is not: it would fail the same way) (after 1.5 and 4 seconds) before the tool is told it failed.
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
-  if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
+  // A long answer is streamed with a 200 up front, so CARL puts the real status in the body as _status.
+  var st=r.ok&&j&&+j._status>=400?+j._status:r.status;
+  if(st===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
+  if(!r.ok||st>=400){var he=new Error(j.error||('CARL HTTP '+st));he.retry=(st===429||st>=500)&&!/max_tokens|cut off/i.test(he.message);throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.

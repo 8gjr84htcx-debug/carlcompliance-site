@@ -1458,12 +1458,15 @@ const PX=(function(){
  function cuiOk(){try{if(sessionStorage.getItem('carl_ai_cui')) return true;}catch(e){}
   var ok=confirm('This sends the text to commercial AI services through CARL.\n\nDo not send CUI, classified or other controlled information.\n\nContinue?');
   if(ok){try{sessionStorage.setItem('carl_ai_cui','1');}catch(e){}}return ok;}
- // A dropped connection, a timeout or a busy server is tried twice more (after 1.5 and 4 seconds) before the tool is told it failed.
+ // A dropped connection, a timeout or a busy server is tried twice more (an answer cut off at its length limit is not: it would fail the same way) (after 1.5 and 4 seconds) before the tool is told it failed.
  async function post(path,body){var waits=[1500,4000],last;for(var i=0;i<=waits.length;i++){try{return await post1(path,body);}catch(e){last=e;if(!e.retry||i===waits.length) throw e;await new Promise(function(r){setTimeout(r,waits[i]);});}}throw last;}
  async function post1(path,body){var r;try{r=await fetch(BASE+path,{method:'POST',credentials:'include',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}catch(e){var ne=new Error('No connection to CARL ('+(e.message||'network error')+')');ne.retry=true;throw ne;}
   var t=await r.text(),j={};try{j=JSON.parse(t);}catch(e){}
   if(r.status===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
-  if(!r.ok){var he=new Error(j.error||('CARL HTTP '+r.status));he.retry=r.status===429||r.status>=500;throw he;}return j;}
+  // A long answer is streamed with a 200 up front, so CARL puts the real status in the body as _status.
+  var st=r.ok&&j&&+j._status>=400?+j._status:r.status;
+  if(st===401) throw new Error('Your sign-in has ended. Sign in again (Face ID), then reload this page.');
+  if(!r.ok||st>=400){var he=new Error(j.error||('CARL HTTP '+st));he.retry=(st===429||st>=500)&&!/max_tokens|cut off/i.test(he.message);throw he;}return j;}
  // House style for every AI answer: no em dashes (an en dash takes their place), the same rule the templates follow.
  function noEm(v){if(typeof v==='string') return v.replace(/\s*\u2014\s*/g,' \u2013 ');if(Array.isArray(v)) return v.map(noEm);if(v&&typeof v==='object'){var o={};Object.keys(v).forEach(function(k){o[k]=noEm(v[k]);});return o;}return v;}
  // engine: 'claude' | 'gemini' | 'fast'. Returns the model's JSON object.
