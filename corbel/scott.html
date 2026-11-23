@@ -266,6 +266,17 @@
 
 
 
+
+
+
+
+
+
+
+
+
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>SCOTT – Scope Content Organizer and Trigger Tracer</title>
 <style>
@@ -332,7 +343,7 @@ details summary{cursor:pointer;color:var(--mute);font-size:13.5px;margin:8px 0}
 <body>
 <header>
  <a class="home" href="/corbel/">Corbel</a>
- <h1>SCOTT <span style="font-weight:400;font-size:15px;opacity:.75">Scope Content Organizer and Trigger Tracer</span></h1>
+ <h1>Scope triggers – SCOTT <span style="font-weight:400;font-size:15px;opacity:.75">Scope Content Organizer and Trigger Tracer</span></h1>
  <div class="sp"></div>
  <span id="msbar" style="display:flex;align-items:center;margin-right:10px"></span>
  <button id="bSettings">AI settings</button>
@@ -1063,7 +1074,7 @@ function defaultBase(p){return p==='anthropic'?'api.anthropic.com':p==='gemini'?
 
 async function parse(){
  const scope=$('#scope').value.trim();if(!scope){$('#scope').focus();return;}
- $('#bParse').disabled=true;const status={};const results={};
+ $('#bParse').disabled=true;{const bp=$('#bParse');bp.dataset.lab=bp.dataset.lab||bp.textContent;bp.textContent='Parsing… about 30 s. Keep this page open';}const status={};const results={};
  const engines=engineList();
  status.offline={state:'ok',msg:'Done'};results.offline={triggers:offline(scope)};
  renderEngines(status);
@@ -1074,7 +1085,7 @@ async function parse(){
   renderEngines(status);}));
  STATE={scope,results,...merge(scope,results),names:Object.fromEntries(engines.map(e=>[e.id,e.name]))};
  STATE.elements=collectElements();
- $('#bParse').disabled=false;renderOut();
+ $('#bParse').disabled=false;$('#bParse').textContent=$('#bParse').dataset.lab||'Parse scope';renderOut();
  if(arbiter()&&STATE.items.some(i=>i.status==='single'&&!['value','duration_days'].includes(i.field))){STATE.arbStatus=status;await reconcile();}
 }
 function collectElements(){const els=[];for(const [src,r] of Object.entries(STATE.results)){if(src==='offline'||!r||r.error) continue;(r.work_elements||[]).forEach(w=>els.push({...w,src,ok:verified(STATE.scope,w.evidence)}));}
