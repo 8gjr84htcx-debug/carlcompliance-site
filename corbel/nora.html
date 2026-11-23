@@ -290,6 +290,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
 
 
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NORA – Needs, Options, and Requirements Analyst</title>
 <script id="ms-core">window.MS_TOOL='nora';
@@ -1653,7 +1654,7 @@ async function pdfImagesN(file,max){const lib=await pdfLib();const doc=await lib
 function imgB64N(file){return new Promise((ok,no)=>{const im=new Image();im.onload=()=>{const k=Math.min(1,1800/Math.max(im.width,im.height));const c=document.createElement('canvas');c.width=im.width*k;c.height=im.height*k;c.getContext('2d').drawImage(im,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1]);};im.onerror=()=>no(new Error('Could not open the image'));im.src=URL.createObjectURL(file);});}
 // One checklist: what the package and Gate 1 need. The build page and the Gate 1 panel show the same list.
 const FIX={title:['project','name','name'],mission:['project','mission'],driver:['project','driver_detail','driver_detail'],date:['project','need_date','need_date'],decide:['stake',null,'decider'],user:['stake',null,'user'],pw:['stake',null,'pw'],
- reqs:['reqs'],gap:['gap'],impact:['gap'],site:['cars'],measure:['cars'],risk:['cars'],source:['reqs'],verify:['out','bMeas'],confirm:['out','confP'],need:['out','need']};
+ reqs:['reqs'],conflict:['out'],gap:['gap'],impact:['gap'],site:['cars'],measure:['cars'],risk:['cars'],source:['reqs'],verify:['out','bMeas'],confirm:['out','confP'],need:['out','need']};
 function checklist(){const C=covData();const act=P.requirements.filter(r=>r.status!=='withdrawn');const s=b=>b?'rec':'';
  return C.map(([k,l,r,st])=>[k,l,st,r]).concat([
   ['conflict','No unresolved conflict between sources (quantities, dates, scope)',s(!(P.conflicts||[]).some(x=>x.status==='open')),'pm'],
@@ -1663,7 +1664,7 @@ function checklist(){const C=covData();const act=P.requirements.filter(r=>r.stat
   ['need','Need statement written, with no gaps left in it',s(String(P.need_statement||'').trim().length>80&&!/\[NEEDED/.test(P.need_statement||'')),'pm']]);}
 function checkHTML(){const L=checklist();const pend=P.build&&!P.build.applied;
  return '<table><tbody>'+L.map(([k,l,s,r])=>'<tr><td style="width:28px;color:'+(s==='rec'?'var(--ok)':s==='new'?'var(--warn)':'var(--mute)')+'">'+(s==='rec'?'✓':s==='new'?'◐':'○')+'</td><td>'+esc(l)+'</td><td class="small" style="white-space:nowrap">'+
-  (s==='rec'?'Done':s==='new'?'Found, waiting for your review':(['source','verify','confirm','need'].includes(k)?'':'Ask: '+esc(KRL[r])+' &nbsp; ')+(pend&&!FIX[k][2]&&FIX[k][0]!=='out'?'':'<a href="#" data-fix="'+k+'">Fix it</a>'))+'</td></tr>').join('')+'</tbody></table>';}
+  (s==='rec'?'Done':s==='new'?'Found, waiting for your review':(['source','verify','confirm','need'].includes(k)?'':'Ask: '+esc(KRL[r])+' &nbsp; ')+(pend&&!(FIX[k]||['out'])[2]&&(FIX[k]||['out'])[0]!=='out'?'':'<a href="#" data-fix="'+k+'">Fix it</a>'))+'</td></tr>').join('')+'</tbody></table>';}
 function fixGo(k){const f=FIX[k]||['out'];const pend=P.build&&!P.build.applied;let sel=null;
  if(pend&&f[2]&&document.querySelector('[data-a="'+f[2]+'"]')){STEP='build';sel='[data-a="'+f[2]+'"]';}
  else{STEP=f[0];if(f[1]) sel='#'+f[1]+',[data-k="'+f[1]+'"]';}
