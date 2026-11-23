@@ -280,6 +280,17 @@ window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('tha
  // Consequence words (delay, cost, schedule, limit…) are ignored: two risks are the same by their cause and subject, not by sharing an outcome.
  // Same when at least two content words (stems, so "contamination" and "contaminated" match) are shared and they make up 40% of the shorter risk.
  return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=2&&n/Math.min(A.size,B.size)>=0.4;};})();
+// Which risks count, decided once for every tool. A risk counts when it is open, is not an AI suggestion nobody has
+// accepted, and does not say the same as another counted risk. When two say the same thing, the one kept is the one from
+// your documents, then one typed by hand, then a suggestion; within the same kind, the later one, then the higher score.
+window.CorbelRiskRank=window.CorbelRiskRank||function(r){const o=String((r&&r.origin)||'');if((r&&r.ai)||/suggest/i.test(o)) return 0;if(/documents/i.test(o)) return 2;return 1;};
+window.CorbelOpenRisks=window.CorbelOpenRisks||function(p){const all=(p&&p.risks)||[];const rk=window.CorbelRiskRank;const sc=r=>(Number(r.l)||3)*(Number(r.i)||3);
+ const R=all.filter(r=>r&&r.text&&r.status!=='closed'&&!(r.ai&&!r.accepted)).slice().sort((a,b)=>(rk(b)-rk(a))||(all.indexOf(b)-all.indexOf(a))||(sc(b)-sc(a)));
+ const out=[];const same=window.CorbelRiskSame||((a,b)=>a===b);R.forEach(r=>{const k=out.find(x=>same(x.text,r.text));if(k){(k._dup=k._dup||[]).push(r.text);(k._dupIds=k._dupIds||[]).push(r.id);}else out.push(Object.assign({},r));});return out;};
+// How PAULA counts one of NORA's risks, read from PAULA's record for the project: {counted, sameAs, why} or null when PAULA has no row yet.
+window.CorbelRiskState=window.CorbelRiskState||function(pid,r){try{const pa=JSON.parse(localStorage.getItem('paula_project')||'null');const pp=pa&&(pa.projects||[]).find(x=>x.id===pid);if(!pp||!r) return null;
+ const t=String(r.text||'').trim().toLowerCase();const row=(pp.risks||[]).find(x=>(r.id&&x.nid===r.id)||String(x.text||'').trim().toLowerCase()===t);if(!row) return null;
+ if(row.status==='closed') return {counted:false,why:'closed'};const O=window.CorbelOpenRisks(pp);const sm=window.CorbelRiskSame||((a,b)=>a===b);if(row.ai&&!row.accepted){const k=O.find(x=>sm(x.text,row.text));return {counted:false,why:'suggestion',sameAs:k?k.text:''};}if(O.some(x=>x.id===row.id)) return {counted:true};const k=O.find(x=>(x._dupIds||[]).includes(row.id));return {counted:false,why:'same',sameAs:k?k.text:''};}catch(e){return null;}};
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';

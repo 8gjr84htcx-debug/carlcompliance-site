@@ -287,6 +287,9 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
 
 
+
+
+
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>NORA – Needs, Options, and Requirements Analyst</title>
 <script id="ms-core">window.MS_TOOL='nora';
@@ -297,6 +300,17 @@ window.CorbelRiskSame=window.CorbelRiskSame||(function(){const STOP=new Set('tha
  // Consequence words (delay, cost, schedule, limit…) are ignored: two risks are the same by their cause and subject, not by sharing an outcome.
  // Same when at least two content words (stems, so "contamination" and "contaminated" match) are shared and they make up 40% of the shorter risk.
  return (a,b)=>{const A=new Set(tok(a)),B=new Set(tok(b));if(!A.size||!B.size) return false;let n=0;A.forEach(w=>{if(B.has(w)) n++;});return n>=2&&n/Math.min(A.size,B.size)>=0.4;};})();
+// Which risks count, decided once for every tool. A risk counts when it is open, is not an AI suggestion nobody has
+// accepted, and does not say the same as another counted risk. When two say the same thing, the one kept is the one from
+// your documents, then one typed by hand, then a suggestion; within the same kind, the later one, then the higher score.
+window.CorbelRiskRank=window.CorbelRiskRank||function(r){const o=String((r&&r.origin)||'');if((r&&r.ai)||/suggest/i.test(o)) return 0;if(/documents/i.test(o)) return 2;return 1;};
+window.CorbelOpenRisks=window.CorbelOpenRisks||function(p){const all=(p&&p.risks)||[];const rk=window.CorbelRiskRank;const sc=r=>(Number(r.l)||3)*(Number(r.i)||3);
+ const R=all.filter(r=>r&&r.text&&r.status!=='closed'&&!(r.ai&&!r.accepted)).slice().sort((a,b)=>(rk(b)-rk(a))||(all.indexOf(b)-all.indexOf(a))||(sc(b)-sc(a)));
+ const out=[];const same=window.CorbelRiskSame||((a,b)=>a===b);R.forEach(r=>{const k=out.find(x=>same(x.text,r.text));if(k){(k._dup=k._dup||[]).push(r.text);(k._dupIds=k._dupIds||[]).push(r.id);}else out.push(Object.assign({},r));});return out;};
+// How PAULA counts one of NORA's risks, read from PAULA's record for the project: {counted, sameAs, why} or null when PAULA has no row yet.
+window.CorbelRiskState=window.CorbelRiskState||function(pid,r){try{const pa=JSON.parse(localStorage.getItem('paula_project')||'null');const pp=pa&&(pa.projects||[]).find(x=>x.id===pid);if(!pp||!r) return null;
+ const t=String(r.text||'').trim().toLowerCase();const row=(pp.risks||[]).find(x=>(r.id&&x.nid===r.id)||String(x.text||'').trim().toLowerCase()===t);if(!row) return null;
+ if(row.status==='closed') return {counted:false,why:'closed'};const O=window.CorbelOpenRisks(pp);const sm=window.CorbelRiskSame||((a,b)=>a===b);if(row.ai&&!row.accepted){const k=O.find(x=>sm(x.text,row.text));return {counted:false,why:'suggestion',sameAs:k?k.text:''};}if(O.some(x=>x.id===row.id)) return {counted:true};const k=O.find(x=>(x._dupIds||[]).includes(row.id));return {counted:false,why:'same',sameAs:k?k.text:''};}catch(e){return null;}};
 /* Corbel shared project record. Inlined into each tool; runs before the tool's own script. */
 (function(){
 'use strict';
@@ -1378,9 +1392,9 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
  kept('constraints').forEach(x=>{if(dupOf(P.constraints,x.text)){skipped++;return;}P.constraints.push({id:uid(),text:x.text,basis:x.basis||(x.ok?'“'+x.quote+'”':'')});n.constraints=(n.constraints||0)+1;});
  kept('assumptions').forEach(x=>{if(dupOf(P.assumptions,x.text)){skipped++;return;}P.assumptions.push({id:uid(),text:x.text,owner:x.owner||'',confirmed:'no'});n.assumptions=(n.assumptions||0)+1;});
  // A risk that says the same as one already listed is merged, not added: a later statement from your documents replaces the older wording; a suggestion never replaces a sourced risk.
-  kept('risks').forEach(x=>{const c=v=>String(Math.max(1,Math.min(5,Math.round(Number(v)||3))));const same=window.CorbelRiskSame||((a,b)=>a===b);
+  let rsm=0;kept('risks').forEach(x=>{const c=v=>String(Math.max(1,Math.min(5,Math.round(Number(v)||3))));const same=window.CorbelRiskSame||((a,b)=>a===b);
    const ex=P.risks.find(r=>sameT(r.text||'',x.text)||same(r.text,x.text));
-   if(ex){if(x.ok){Object.assign(ex,{text:x.text,l:c(x.l),i:c(x.i),response:x.response||ex.response||'',owner:x.owner||ex.owner||'',origin:'From your documents',merged:(ex.merged||0)+1});n.merged=(n.merged||0)+1;}else skipped++;return;}
+   if(ex){if(x.ok){Object.assign(ex,{text:x.text,l:c(x.l),i:c(x.i),response:x.response||ex.response||'',owner:x.owner||ex.owner||'',origin:'From your documents',merged:(ex.merged||0)+1});n.merged=(n.merged||0)+1;}else{skipped++;rsm++;}return;}
    P.risks.push({id:uid(),text:x.text,l:c(x.l),i:c(x.i),response:x.response||'',owner:x.owner||'',origin:x.ok?'From your documents':'Suggestion'});n.risks=(n.risks||0)+1;});
  kept('measures').forEach(x=>{if(dupOf(P.measures,x.text)){skipped++;return;}P.measures.push({id:uid(),text:x.text,target:x.target||'',how:x.how||''});n.measures=(n.measures||0)+1;});
  if(!String(P.project.prepared_by||'').trim()&&window.CARLAI&&CARLAI.state().user){P.project.prepared_by=CARLAI.state().user;}
@@ -1391,7 +1405,7 @@ function applyReq(){const B=P.build,I=B.items,kept=c=>I[c].filter(x=>x.keep);con
   // an Air Force base (AFB, AB) named from the notes also gives the Service, labelled for the user to confirm
   if(!String(P.project.service||'').trim()&&/\b(AFB|AB)\b/.test(String(P.project.installation||''))&&ins){P.project.service='af';P.project.service_src='From the installation ('+P.project.installation+') – check it';log('Service suggested','Air Force, from '+P.project.installation);}}
  (B.conflicts||[]).forEach(x=>{P.conflicts=P.conflicts||[];if(!P.conflicts.some(y=>y.what===x.what&&y.a===x.a&&y.b===x.b)){P.conflicts.push({...x});n.conflicts=(n.conflicts||0)+1;}});
- B.applied=true;B.summary='Added '+(Object.entries(n).map(([k,v])=>v+' '+(k==='project'?'project fields':k)).join(', ')||'nothing new')+(skipped?'; '+skipped+' duplicate'+(skipped>1?'s':'')+' skipped':'')+'.';
+ B.applied=true;B.summary='Added '+(Object.entries(n).map(([k,v])=>v+' '+(k==='project'?'project fields':k)).join(', ')||'nothing new')+(skipped?'; '+skipped+' duplicate'+(skipped>1?'s':'')+' skipped':'')+(rsm?'; '+rsm+' suggestion'+(rsm>1?'s':'')+' merged with a same-meaning risk':'')+'.';
  log('Build my requirement: applied',B.summary);save();STEP='out';render();window.scrollTo(0,0);
  if(window.CARLAI&&CARLAI.state().ok){(async()=>{if(!(P.need_statement||'').trim()) await aiNeed();await aiMeasures(true);})();}}
 
@@ -1407,8 +1421,11 @@ function knownInst(v){v=String(v||'');return UNIT_INST.some(([re,inst])=>re.test
 // Figures in the need statement that sources still dispute: until the conflict is ruled, the statement says so, and every tool reading it is told.
 function pendList(){return (P.conflicts||[]).filter(x=>(x.status||'open')==='open').map(x=>({what:String(x.what||'').trim(),a:String(x.a||'').trim(),b:String(x.b||'').trim()})).filter(x=>x.what||x.a||x.b);}
 function pendNeed(){const L=pendList();if(!L.length) return '';return '<div class="small" style="border:1px solid #c98500;background:#fff8e6;border-radius:6px;padding:6px 10px;margin:6px 0">Pending ruling – these figures in the statement are disputed by your sources, so the statement is not settled yet: '+L.map(x=>'<b>'+esc(x.what)+'</b> ('+esc(x.a)+' – or – '+esc(x.b)+')').join('; ')+'. Rule on them under Conflicts.</div>';}
-// Same-meaning risks stay listed here and are counted once in the portfolio, as PAULA does: the sourced one over a suggestion, then the later one.
-function riskKept(it){const same=window.CorbelRiskSame;if(!same||!it||!it.text) return null;const all=P.risks||[];const g=all.filter(r=>r.text&&same(r.text,it.text));if(g.length<2) return null;const src=r=>/suggestion/i.test(r.origin||'')?0:1;g.sort((a,b)=>(src(b)-src(a))||(all.indexOf(b)-all.indexOf(a)));return g[0]===it?null:g[0];}
+// Whether a risk counts is read from PAULA's record for this project (CorbelRiskState), so an accept, close or removal
+// in PAULA shows here. Before PAULA has a row for it, the same shared rule (CorbelOpenRisks) is applied to NORA's list.
+function riskSt(it){const a_=window.MS&&MS.active&&MS.active();const pid=a_&&typeof a_==='object'?a_.id:a_;const st=pid&&window.CorbelRiskState?CorbelRiskState(pid,it):null;if(st) return st;
+ const L=(P.risks||[]).filter(r=>r.text).map(r=>Object.assign({},r,{ai:/suggest/i.test(r.origin||'')}));const me=L.find(r=>r.id===it.id);if(!me) return {counted:false};const O=window.CorbelOpenRisks?CorbelOpenRisks({risks:L}):L;const sm=window.CorbelRiskSame||((a,b)=>a===b);if(me.ai){const k=O.find(x=>sm(x.text,me.text));return {counted:false,why:'suggestion',sameAs:k?k.text:''};}if(O.some(x=>x.id===it.id)) return {counted:true};const k=O.find(x=>(x._dupIds||[]).includes(it.id));return {counted:false,why:'same',sameAs:k?k.text:''};}
+function riskKept(it){const st=riskSt(it);return st&&st.sameAs?{text:st.sameAs,id:((P.risks||[]).find(r=>r.text===st.sameAs)||{}).id}:null;}
 function instGuess(){const t=(P.sessions||[]).map(s=>s.notes||'').join('\n');for(const [re,inst] of UNIT_INST){const m=t.match(re);if(m) return {inst,clue:m[0]};}return null;}
 // The need statement, written from the record, with every number checked.
 const NEED_SYS=`You write the need statement for a DoD military construction requirement: one paragraph of 120 to 200 words a busy reviewer can read in a minute. Say who needs what capability, why now, and what happens to the mission without it. State the need, not a solution (say "covered maintenance space for two aircraft", not "a new hangar"). Use ONLY facts in RECORD; where a fact the paragraph needs is missing, write [NEEDED: what]. Plain words, active voice, no acronyms without spelling them out once, no references to AI or to this record.
@@ -1798,7 +1815,7 @@ function vCars(){const v=$('#view');
   P[key].forEach(it=>{const tr=document.createElement('tr');tr.innerHTML=cols.map(c=>c==='confirmed'?'<td><select data-k="confirmed">'+opts({no:'No',yes:'Yes'},it.confirmed||'no')+'</select></td>':'<td><input data-k="'+c+'"></td>').join('')+'<td><button class="sm" data-del>Remove</button></td>';
    bindAll(tr,it);tr.querySelector('[data-del]').onclick=()=>{P[key]=P[key].filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});});
  const tb=$('#tb_risks');P.risks.forEach(it=>{const tr=document.createElement('tr');const kp=riskKept(it);
-  tr.innerHTML='<td><input data-k="text">'+(kp?'<div class="small" style="color:#7a5200">Same as “'+esc(String(kp.text).slice(0,60))+'…” – counted once in the portfolio</div>':'')+(/suggestion/i.test(it.origin||'')?'<div class="small" style="color:#5f5e5a">Suggestion – not counted in the portfolio until accepted in PAULA</div>':'')+'</td><td><select data-k="l">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.l||3))+'</select></td><td><select data-k="i">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.i||3))+'</select></td><td data-sc></td><td><input data-k="response"></td><td><input data-k="owner"></td><td><button class="sm" data-del>Remove</button></td>';
+  tr.innerHTML='<td><input data-k="text">'+(kp?'<div class="small" style="color:#7a5200">Same as “'+esc(String(kp.text).slice(0,60))+'…” – counted once in the portfolio</div>':'')+(()=>{const st=riskSt(it);return st.why==='suggestion'?'<div class="small" style="color:#5f5e5a">Suggestion – not counted in the portfolio until accepted in PAULA</div>':st.why==='closed'?'<div class="small" style="color:#5f5e5a">Closed in PAULA – not counted</div>':'';})()+'</td><td><select data-k="l">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.l||3))+'</select></td><td><select data-k="i">'+opts({1:'1',2:'2',3:'3',4:'4',5:'5'},String(it.i||3))+'</select></td><td data-sc></td><td><input data-k="response"></td><td><input data-k="owner"></td><td><button class="sm" data-del>Remove</button></td>';
   const sc=()=>{const s=(Number(it.l)||3)*(Number(it.i)||3);tr.querySelector('[data-sc]').innerHTML='<span class="score '+(s>=15?'s-hi':s>=8?'s-md':'s-lo')+'">'+s+'</span>';};
   bindAll(tr,it,sc);sc();tr.querySelector('[data-del]').onclick=()=>{P.risks=P.risks.filter(x=>x!==it);save();vCars();renderSteps();};tb.appendChild(tr);});
  v.querySelectorAll('[data-add]').forEach(b=>b.onclick=()=>{const k=b.dataset.add;P[k].push(k==='risks'?{id:uid(),text:'',l:'3',i:'3',response:'',owner:''}:{id:uid()});save();vCars();renderSteps();});}
@@ -1830,7 +1847,7 @@ function draftNeed(){const p=P.project;const loc=LOCS[p.location]||'';const act=
  if(p.need_date) t+='The capability is required by '+new Date(p.need_date+'T00:00').toLocaleDateString('en-US',{month:'long',year:'numeric'})+'.';
  return t.replace(/\s+/g,' ').trim();}
 function vOut(){const v=$('#view');const gi=gateItems();
- v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks counted',(()=>{const L=P.risks.filter(r=>r.text),c=L.filter(r=>!/suggestion/i.test(r.origin||'')&&!riskKept(r)).length;return c+(L.length>c?'<span class="small" style="font-weight:400"> of '+L.length+' listed</span>':'');})()],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
+ v.innerHTML='<div class="panel"><h2>'+esc(P.project.name||'Your requirement')+'</h2><p class="lead">'+esc([P.project.installation,SERVICES[P.project.service]].filter(Boolean).join(' · '))+'</p><div style="display:flex;flex-wrap:wrap;gap:10px;margin:10px 0">'+[['Requirements',P.requirements.filter(r=>r.status!=='withdrawn').length],['Must-haves',P.requirements.filter(r=>r.status!=='withdrawn'&&r.priority==='must').length],['Gaps',P.gaps.length],['Stakeholders',P.stakeholders.length],['Risks counted',(()=>{const L=P.risks.filter(r=>r.text),c=L.filter(r=>riskSt(r).counted).length;return c+(L.length>c?'<span class="small" style="font-weight:400"> of '+L.length+' listed</span>':'');})()],['Sources',P.sessions.length]].map(([l,n])=>'<div style="flex:1;min-width:110px;border:1px solid var(--line);border-radius:8px;padding:8px 12px"><div class="small">'+l+'</div><div style="font-size:24px;font-weight:600">'+n+'</div></div>').join('')+'</div>'+
  '<p class="small">Change anything under Adjust details. Requirements stay Draft until the person who stated them confirms them: use Confirm with your sources below.</p></div>'+
  '<div class="panel"><h2>Need statement</h2><p class="lead">One paragraph a busy reviewer can read in a minute: who needs what, why now, what happens without it. It becomes the opening of the 1391 justification.</p>'+pendNeed()+
  '<textarea id="need" class="tall" style="min-height:160px"></textarea><div class="row"><button class="go" id="bAINeed">'+(P.need_statement?'Rewrite with AI':'Write with AI')+'</button><button id="bDraft">'+(P.need_statement?'Redraft from the record (no AI)':'Draft from the record (no AI)')+'</button><span class="small" id="nwc"></span></div>'+(needStale()?'<div class="find warn"><b>Out of date: the record has changed since this was written.</b> '+esc(needDateOff()||ruledOff()||'Requirements, gaps, the project details or the shared record (need date, quantity, scope or cost) changed.')+' <button class="sm go" id="bReNeed">Rewrite</button></div>':'')+(P.need_check?'<div class="mentor">'+esc(P.need_check)+'</div>':'')+'</div>'+measPanel()+confPanel()+retPanel()+
