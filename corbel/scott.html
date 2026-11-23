@@ -7,7 +7,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -34,7 +34,7 @@
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
   d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
- document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
+ document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()&&!a.hasAttribute('data-no-pf')&&!window.__corbelNoPf){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
@@ -252,6 +252,113 @@
  window.prompt=function(msg,def){if(window.__corbelAutoYes) return def==null?'':String(def);var k='p:'+msg;if(pass&&pass.k===k){var v=pass.v;pass=null;return v;}if(document.getElementById('corbel-ask')) return null;var ev=last;
   box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
+<script id="corbel-is">/* Corbel issue log: one click from any page records what was seen, where, and (on the Test and IPAC portfolios only)
+   enough page state to reproduce it. Kept in this browser under its own key, corbel_issues, outside every portfolio,
+   so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
+(function(){
+ if(window.CorbelIssues) return;
+ var BUILD='corbel112',KEY='corbel_issues',CAP=200,ERRS=[];
+ window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
+ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
+ var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
+ function load(){try{var j=JSON.parse(G.call(LS,KEY)||'[]');return Array.isArray(j)?j:[];}catch(e){return [];}}
+ function store(L){S.call(LS,KEY,JSON.stringify(L));}
+ function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+ function pad(n){return (n<10?'0':'')+n;}
+ function local(d){d=d||new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());}
+ function pf(){var c='';try{c=G.call(LS,'corbel_portfolio')||'';}catch(e){}return c==='test'?'Test':c==='ipac'?'IPAC':c?c:'Real';}
+ function job(){var h=document.querySelector('h1');if(!h) return 'Home';var t='';for(var i=0;i<h.childNodes.length;i++){var n=h.childNodes[i];if(n.nodeType===3) t+=n.textContent;else break;}t=t.trim();return t||'Home';}
+ function jobOnly(t){return String(t||'').replace(/\s+–\s+[A-Z]{3,}$/,'');}
+ function page(){var b=document.querySelector('#steps button.on, #steps .on, nav .on, .tabs .on');var t=b?(b.innerText||b.textContent||''):'';t=t.replace(/^\s*\d+\s*/,'').replace(/\s+\d+!?\s*$/,'').replace(/✓/g,'').replace(/\s+/g,' ').trim();
+  if(!t){var h=document.querySelector('#view h2, main h2');t=h?h.textContent.trim():'';}return t.slice(0,60);}
+ function proj(){try{var a=window.MS&&MS.active&&MS.active();if(a&&typeof a==='object') return {id:a.id,name:(a.core&&(a.core.name||a.core.title))||a.name||'',rec:a};}catch(e){}return null;}
+ function cut(o,n){var s;try{s=typeof o==='string'?o:JSON.stringify(o);}catch(e){s='';}return s&&s.length>n?s.slice(0,n)+'…[cut at '+n+' characters]':s||'';}
+ function snapshot(){var p=proj(),t=window.MS_TOOL||'',own=null,log=[];
+  try{var raw=LS.getItem(t+'_project');if(raw){var j=JSON.parse(raw);if(j&&Array.isArray(j.projects)&&p){own=j.projects.filter(function(x){return x.id===p.id;})[0]||null;}else own=j;}}catch(e){}
+  if(!own&&p&&p.rec&&p.rec.tools) own=p.rec.tools[t]||null;
+  var src=own&&Array.isArray(own.log)?own.log:(p&&p.rec&&p.rec.tools&&p.rec.tools[t]&&Array.isArray(p.rec.tools[t].log)?p.rec.tools[t].log:[]);log=src.slice(-20);
+  var main=document.getElementById('view')||document.querySelector('main')||document.body;var txt=(main.innerText||'');
+  return {project:cut(p?{id:p.id,core:p.rec.core}:null,60000),tool_record:cut(own,60000),log:log,page_text:txt.slice(0,20000),errors:ERRS.slice(-5)};}
+ function openCount(L){return (L||load()).filter(function(x){return x.status==='Open';}).length;}
+ function flash(t){var d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;right:16px;bottom:52px;z-index:10001;background:#1f3a2a;color:#fff;padding:8px 14px;border-radius:8px;font:14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';document.body.appendChild(d);setTimeout(function(){d.remove();},3000);}
+ var CSS='#ciPanel,#ciLog{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;overflow:auto;font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:#222}'+
+  '#ciPanel .box,#ciLog .box{background:#fff;border-radius:10px;margin:40px 12px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.25)}#ciPanel .box{width:min(560px,100%)}#ciLog .box{width:min(1200px,100%)}'+
+  '#ciPanel label{display:block;font-weight:600;margin:10px 0 4px}#ciPanel textarea{width:100%;box-sizing:border-box;min-height:70px;font:inherit;padding:6px}#ciPanel select{font:inherit;padding:4px}'+
+  '.ci-ctx{background:#f5f5f2;border-radius:6px;padding:8px 10px;font-size:13px;margin-top:10px}.ci-note{font-size:12px;color:#555;margin-top:3px}.ci-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}'+
+  '.ci-btn{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #999;background:#fff;cursor:pointer}.ci-btn.go{background:#1f3a2a;color:#fff;border-color:#1f3a2a}'+
+  '#ciLog table{border-collapse:collapse;width:100%;font-size:13px}#ciLog th,#ciLog td{border-bottom:1px solid #ddd;padding:5px 6px;text-align:left;vertical-align:top}#ciLog th{background:#f5f5f2}'+
+  '#ciBtn{font:12px system-ui,sans-serif;padding:2px 9px;border-radius:10px;border:1px solid #bbb;background:#fff;cursor:pointer;margin-left:8px;white-space:nowrap}';
+ function css(){if(document.getElementById('ciCss')) return;var s=document.createElement('style');s.id='ciCss';s.textContent=CSS;document.head.appendChild(s);}
+ function close(id){var x=document.getElementById(id);if(x) x.remove();}
+ function openPanel(){css();close('ciPanel');var real=pf()==='Real',p=proj(),tl=job(),pg=page(),now=new Date();
+  var d=document.createElement('div');d.id='ciPanel';d.setAttribute('role','dialog');d.setAttribute('aria-label','Log an issue');
+  d.innerHTML='<div class="box"><h2 style="margin:0 0 4px">Log an issue</h2><div class="ci-note">Kept in this browser only, until you export it.</div>'+
+   '<label for="ciSaw">What I saw</label><textarea id="ciSaw" placeholder="The exact text or number, and where"></textarea>'+
+   '<label for="ciExp">What I expected <span style="font-weight:400;color:#666">(optional)</span></label><textarea id="ciExp" style="min-height:44px"></textarea>'+
+   '<div class="ci-row"><div><label for="ciSev" style="margin-top:0">Severity</label><select id="ciSev"><option>Must-fix</option><option selected>Should-fix</option><option>Minor</option></select></div>'+
+   '<div><label for="ciType" style="margin-top:0">Type</label><select id="ciType"><option selected>Wrong result</option><option>Confusing</option><option>Slow</option><option>Broken</option><option>Idea</option></select></div></div>'+
+   '<div class="ci-note">Must-fix = a wrong number, date or status in front of leadership, or lost or crossed data.</div>'+
+   '<div class="ci-ctx">'+esc(local(now))+' · '+esc(tl)+(pg?' / '+esc(pg):'')+' · '+esc(pf())+(real?'':' · '+esc(p&&p.name?p.name:'No project open'))+' · '+BUILD+
+   (real?'<div style="margin-top:4px;color:#7a5200">Real portfolio: only your note is saved, no project data.</div>':'<div style="margin-top:4px;color:#555">A snapshot of this page and project is attached, so the issue can be reproduced.</div>')+'</div>'+
+   '<div class="ci-row"><button class="ci-btn go" id="ciSave">Save</button><button class="ci-btn" id="ciKeep">Save and keep working</button><button class="ci-btn" id="ciX">Cancel</button><span id="ciMsg" class="ci-note"></span></div></div>';
+  document.body.appendChild(d);var saw=d.querySelector('#ciSaw');saw.focus();
+  d.addEventListener('keydown',function(e){if(e.key==='Escape'){e.stopPropagation();close('ciPanel');}});d.addEventListener('click',function(e){if(e.target===d) close('ciPanel');});
+  d.querySelector('#ciX').onclick=function(){close('ciPanel');};
+  var save=function(keep){var t=saw.value.trim();if(!t){d.querySelector('#ciMsg').textContent='Say what you saw first.';saw.focus();return;}
+   var L=load();if(L.length>=CAP){d.querySelector('#ciMsg').textContent='The log holds '+CAP+' entries. Export it and clear fixed entries before adding more.';return;}
+   var e={id:'i'+Date.now().toString(36),at:now.toISOString(),local:local(now),tool:jobOnly(tl),tool_id:window.MS_TOOL||'home',page:pg,portfolio:pf(),build:BUILD,saw:t,expected:d.querySelector('#ciExp').value.trim(),severity:d.querySelector('#ciSev').value,type:d.querySelector('#ciType').value,status:'Open',fixed_in:''};
+   if(!real){e.project=p&&p.name?p.name:'';try{e.snapshot=snapshot();}catch(x){e.snapshot={error:String(x)};}}
+   L.push(e);try{store(L);}catch(x){if(e.snapshot){delete e.snapshot;e.snapshot_dropped='Browser storage full – snapshot not kept';try{store(L);}catch(y){d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}else{d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}
+   if(L.length>=CAP-10) setTimeout(function(){alert('The issue log holds '+L.length+' of '+CAP+' entries. Export it and clear fixed entries soon.');},50);
+   if(keep){saw.value='';d.querySelector('#ciExp').value='';d.querySelector('#ciMsg').textContent='Logged – '+openCount(L)+' open';saw.focus();setTimeout(function(){var m=document.getElementById('ciMsg');if(m) m.textContent='';},3000);}
+   else{close('ciPanel');flash('Logged – '+openCount(L)+' open');}refreshLinks();};
+  d.querySelector('#ciSave').onclick=function(){save(false);};d.querySelector('#ciKeep').onclick=function(){save(true);};}
+ // ---- the log page ----
+ var F={status:'Open',severity:'',tool:''};
+ function openLog(){css();close('ciLog');var d=document.createElement('div');d.id='ciLog';document.body.appendChild(d);d.addEventListener('click',function(e){if(e.target===d) close('ciLog');});d.addEventListener('keydown',function(e){if(e.key==='Escape') close('ciLog');});drawLog();}
+ function drawLog(){var d=document.getElementById('ciLog');if(!d) return;var L=load(),tools=[];L.forEach(function(x){if(tools.indexOf(x.tool)<0) tools.push(x.tool);});
+  var R=L.filter(function(x){return (!F.status||x.status===F.status)&&(!F.severity||x.severity===F.severity)&&(!F.tool||x.tool===F.tool);}).slice().reverse();
+  var opt=function(v,list,lab){return '<option value="">'+lab+'</option>'+list.map(function(o){return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>';}).join('');};
+  d.innerHTML='<div class="box"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Issue log</h2><span class="ci-note">'+openCount(L)+' open of '+L.length+' · kept in this browser only</span><span style="flex:1"></span><button class="ci-btn" id="ciLx">Close</button></div>'+
+   '<div class="ci-row"><select id="cfS">'+opt(F.status,['Open','Fixed',"Won't fix"],'Any status')+'</select><select id="cfV">'+opt(F.severity,['Must-fix','Should-fix','Minor'],'Any severity')+'</select><select id="cfT">'+opt(F.tool,tools,'Any tool')+'</select>'+
+   '<span style="flex:1"></span><button class="ci-btn" id="ciXl">Export to Excel</button><button class="ci-btn" id="ciJs">Export for the programmer (.json)</button><button class="ci-btn" id="ciClr">Clear fixed</button></div>'+
+   (R.length?'<table style="margin-top:10px"><thead><tr><th>Date</th><th>Tool</th><th>Page</th><th>Portfolio</th><th>Severity</th><th>Type</th><th>What I saw</th><th>Status</th><th></th></tr></thead><tbody>'+R.map(function(x){
+    return '<tr data-id="'+x.id+'"><td style="white-space:nowrap">'+esc(x.local)+'</td><td>'+esc(x.tool)+'</td><td>'+esc(x.page)+'</td><td>'+esc(x.portfolio)+(x.project?'<div class="ci-note">'+esc(x.project)+'</div>':'')+'</td><td>'+esc(x.severity)+'</td><td>'+esc(x.type)+'</td>'+
+     '<td>'+esc(x.saw)+(x.expected?'<div class="ci-note">Expected: '+esc(x.expected)+'</div>':'')+(x.snapshot?'<div class="ci-note">Snapshot attached</div>':'')+'</td>'+
+     '<td><select data-st>'+['Open','Fixed',"Won't fix"].map(function(o){return '<option'+(o===x.status?' selected':'')+'>'+o+'</option>';}).join('')+'</select>'+(x.status==='Fixed'?'<div><input data-fx placeholder="in build" value="'+esc(x.fixed_in||'')+'" style="width:96px;margin-top:3px"></div>':'')+'</td>'+
+     '<td><button class="ci-btn" data-del style="padding:2px 8px">Delete</button></td></tr>';}).join('')+'</tbody></table>':'<p>No entries'+(F.status||F.severity||F.tool?' match these filters':'')+'.</p>')+'</div>';
+  var upd=function(id,f){var L2=load(),x=L2.filter(function(y){return y.id===id;})[0];if(!x) return;f(x,L2);store(L2);};
+  d.querySelector('#ciLx').onclick=function(){close('ciLog');refreshLinks();};
+  d.querySelector('#cfS').onchange=function(e){F.status=e.target.value;drawLog();};d.querySelector('#cfV').onchange=function(e){F.severity=e.target.value;drawLog();};d.querySelector('#cfT').onchange=function(e){F.tool=e.target.value;drawLog();};
+  d.querySelectorAll('tr[data-id]').forEach(function(tr){var id=tr.dataset.id;var st=tr.querySelector('[data-st]');st.onchange=function(){upd(id,function(x){x.status=st.value;if(x.status==='Fixed'&&!x.fixed_in) x.fixed_in=BUILD;if(x.status!=='Fixed') x.fixed_in='';});drawLog();refreshLinks();};
+   var fx=tr.querySelector('[data-fx]');if(fx) fx.onchange=function(){upd(id,function(x){x.fixed_in=fx.value.trim();});};
+   tr.querySelector('[data-del]').onclick=function(){if(!confirm('Delete this entry? It cannot be brought back.')) return;var L2=load().filter(function(y){return y.id!==id;});store(L2);drawLog();refreshLinks();};});
+  d.querySelector('#ciClr').onclick=function(){var n=load().filter(function(x){return x.status==='Fixed';}).length;if(!n){alert('No entries are marked Fixed.');return;}if(!confirm('Remove '+n+' entr'+(n>1?'ies':'y')+' marked Fixed?')) return;store(load().filter(function(x){return x.status!=='Fixed';}));drawLog();refreshLinks();};
+  d.querySelector('#ciJs').onclick=exportJson;d.querySelector('#ciXl').onclick=exportXl;}
+ function day(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+ function dl(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.setAttribute('data-no-pf','');document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);}
+ function exportJson(){dl(new Blob([JSON.stringify({schema:'corbel-issues-1',exported:new Date().toISOString(),build:BUILD,issues:load()},null,1)],{type:'application/json'}),'Issue_Log_'+day()+'.json');}
+ function exportXl(){var X_=window.XL||(typeof XL!=='undefined'?XL:null);if(!X_||!X_.save){alert('The spreadsheet writer did not load. Use the .json export.');return;}var L=load(),c=function(t,n){t=String(t==null?'':t);return t.length>(n||32000)?t.slice(0,n||32000)+'…':t;};
+  var I=[['ID','Date (local)','Tool','Page','Portfolio','Project','Build','Severity','Type','What I saw','What I expected','Status','Fixed in','Snapshot']].concat(L.map(function(x){return [x.id,x.local,x.tool,x.page,x.portfolio,x.project||'',x.build,x.severity,x.type,x.saw,x.expected||'',x.status,x.fixed_in||'',x.snapshot?'Yes':(x.snapshot_dropped||'No')];}));
+  var Sn=[['ID','Date (local)','Portfolio','Project','Recent errors','Tool log (last 20)','Page text','Project record','Tool record']].concat(L.filter(function(x){return x.snapshot;}).map(function(x){var s=x.snapshot;return [x.id,x.local,x.portfolio,x.project||'',c((s.errors||[]).map(function(e){return e.at+' '+e.msg+(e.where?' ('+e.where+')':'');}).join('\n')),c(JSON.stringify(s.log||[])),c(s.page_text),c(s.project),c(s.tool_record)];}));
+  window.__corbelNoPf=true;try{  X_.save('Issue_Log_'+day()+'.xlsx',[{name:'Issues',rows:I},{name:'Snapshots',rows:Sn}]);}finally{window.__corbelNoPf=false;}}
+ // ---- the button, the shortcut and the home-page link ----
+ function refreshLinks(){var n=openCount();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.textContent='Issue log ('+n+' open)';});}
+ function button(){if(document.getElementById('ciBtn')) return;var b=document.createElement('button');b.id='ciBtn';b.type='button';b.textContent='Log an issue';b.title='Log an issue (Alt+L, or Option+L on a Mac)';b.onclick=openPanel;
+  var ai=document.getElementById('carlai'),bar=document.getElementById('msbar');
+  if(ai&&ai.parentNode&&ai.parentNode!==document.body) ai.parentNode.insertBefore(b,ai);else if(bar) bar.appendChild(b);
+  else{b.style.cssText='position:fixed;right:14px;bottom:44px;z-index:51;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(b);}}
+ document.addEventListener('keydown',function(e){if(e.altKey&&!e.ctrlKey&&!e.metaKey&&(e.code==='KeyL'||String(e.key).toLowerCase()==='l')){e.preventDefault();openPanel();}});
+ function boot(){button();refreshLinks();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.onclick=function(e){e.preventDefault();openLog();};});setInterval(function(){var o=document.getElementById('ciBtn'),ai=document.getElementById('carlai');if(o&&ai&&ai.parentNode!==document.body&&o.parentNode!==ai.parentNode){o.remove();o=null;}if(!o) button();},1500);}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);else boot();
+ window.CorbelIssues={open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
+})();
+</script>
+
+
+
+
+
 
 
 

@@ -7,7 +7,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -34,7 +34,7 @@
   d.style.cssText='background:#C9A227;color:#10303F;font:600 13px/1.3 "Segoe UI",system-ui,sans-serif;padding:6px 14px;text-align:center;position:relative;z-index:50';
   d.innerHTML=(NAMES[cur()]||cur())+(cur()==='ipac'?' – projects from the public FY2026 and FY2027 budget books (FY2025–2027 funding), for practice; kept apart from your real projects.':' – sample data, kept apart from your real projects.')+' <a href="/corbel/" style="color:#10303F;text-decoration:underline">Switch on the Corbel home page</a>';
   document.body.insertBefore(d,document.body.firstChild);}
- document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
+ document.addEventListener('click',function(e){var a=e.target&&e.target.closest&&e.target.closest('a[download]');if(a&&cur()&&!a.hasAttribute('data-no-pf')&&!window.__corbelNoPf){var n=a.getAttribute('download')||'';if(n&&n.indexOf('TEST_')!==0) a.setAttribute('download','TEST_'+n);}},true);
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',band);else band();
 })();
 </script>
@@ -252,6 +252,128 @@
  window.prompt=function(msg,def){if(window.__corbelAutoYes) return def==null?'':String(def);var k='p:'+msg;if(pass&&pass.k===k){var v=pass.v;pass=null;return v;}if(document.getElementById('corbel-ask')) return null;var ev=last;
   box(msg,true,def,function(v){if(v!=null){pass={k:k,v:v};if(!replay(ev)) pass={k:k,v:v};}});return null;};})();
 </script>
+<script id="corbel-nt">// ---------- No tool names in what leaves the suite ----------
+// Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+  [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'as reviewed'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
+  [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
+ R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
+window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.CorbelDeTool;if(typeof x==='string') return f(x);if(Array.isArray(x)) return x.map(window.CorbelDeToolDeep);if(x&&typeof x==='object'){const o={};for(const k in x) o[k]=window.CorbelDeToolDeep(x[k]);return o;}return x;};
+
+// Every text export (Word .doc as HTML, CSV, plain text) passes through the no-tool-names rule, whichever tool builds it.
+// JSON backups and binary files (images, .docx and .xlsx zips) are left alone.
+(function(){if(window.__corbelBlob) return;window.__corbelBlob=1;const OB=window.Blob;
+ function CB(parts,opt){try{const t=String((opt&&opt.type)||'');if(window.CorbelDeTool&&/msword|text\/html|text\/csv|text\/plain|vnd\.ms-excel/i.test(t)&&Array.isArray(parts)) parts=parts.map(x=>typeof x==='string'?window.CorbelDeTool(x):x);}catch(e){}return new OB(parts,opt);}
+ CB.prototype=OB.prototype;try{Object.setPrototypeOf(CB,OB);}catch(e){}window.Blob=CB;})();
+</script>
+<script id="corbel-is">/* Corbel issue log: one click from any page records what was seen, where, and (on the Test and IPAC portfolios only)
+   enough page state to reproduce it. Kept in this browser under its own key, corbel_issues, outside every portfolio,
+   so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
+(function(){
+ if(window.CorbelIssues) return;
+ var BUILD='corbel112',KEY='corbel_issues',CAP=200,ERRS=[];
+ window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
+ window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
+ var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
+ function load(){try{var j=JSON.parse(G.call(LS,KEY)||'[]');return Array.isArray(j)?j:[];}catch(e){return [];}}
+ function store(L){S.call(LS,KEY,JSON.stringify(L));}
+ function esc(t){return String(t==null?'':t).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
+ function pad(n){return (n<10?'0':'')+n;}
+ function local(d){d=d||new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+' '+pad(d.getHours())+':'+pad(d.getMinutes());}
+ function pf(){var c='';try{c=G.call(LS,'corbel_portfolio')||'';}catch(e){}return c==='test'?'Test':c==='ipac'?'IPAC':c?c:'Real';}
+ function job(){var h=document.querySelector('h1');if(!h) return 'Home';var t='';for(var i=0;i<h.childNodes.length;i++){var n=h.childNodes[i];if(n.nodeType===3) t+=n.textContent;else break;}t=t.trim();return t||'Home';}
+ function jobOnly(t){return String(t||'').replace(/\s+–\s+[A-Z]{3,}$/,'');}
+ function page(){var b=document.querySelector('#steps button.on, #steps .on, nav .on, .tabs .on');var t=b?(b.innerText||b.textContent||''):'';t=t.replace(/^\s*\d+\s*/,'').replace(/\s+\d+!?\s*$/,'').replace(/✓/g,'').replace(/\s+/g,' ').trim();
+  if(!t){var h=document.querySelector('#view h2, main h2');t=h?h.textContent.trim():'';}return t.slice(0,60);}
+ function proj(){try{var a=window.MS&&MS.active&&MS.active();if(a&&typeof a==='object') return {id:a.id,name:(a.core&&(a.core.name||a.core.title))||a.name||'',rec:a};}catch(e){}return null;}
+ function cut(o,n){var s;try{s=typeof o==='string'?o:JSON.stringify(o);}catch(e){s='';}return s&&s.length>n?s.slice(0,n)+'…[cut at '+n+' characters]':s||'';}
+ function snapshot(){var p=proj(),t=window.MS_TOOL||'',own=null,log=[];
+  try{var raw=LS.getItem(t+'_project');if(raw){var j=JSON.parse(raw);if(j&&Array.isArray(j.projects)&&p){own=j.projects.filter(function(x){return x.id===p.id;})[0]||null;}else own=j;}}catch(e){}
+  if(!own&&p&&p.rec&&p.rec.tools) own=p.rec.tools[t]||null;
+  var src=own&&Array.isArray(own.log)?own.log:(p&&p.rec&&p.rec.tools&&p.rec.tools[t]&&Array.isArray(p.rec.tools[t].log)?p.rec.tools[t].log:[]);log=src.slice(-20);
+  var main=document.getElementById('view')||document.querySelector('main')||document.body;var txt=(main.innerText||'');
+  return {project:cut(p?{id:p.id,core:p.rec.core}:null,60000),tool_record:cut(own,60000),log:log,page_text:txt.slice(0,20000),errors:ERRS.slice(-5)};}
+ function openCount(L){return (L||load()).filter(function(x){return x.status==='Open';}).length;}
+ function flash(t){var d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;right:16px;bottom:52px;z-index:10001;background:#1f3a2a;color:#fff;padding:8px 14px;border-radius:8px;font:14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';document.body.appendChild(d);setTimeout(function(){d.remove();},3000);}
+ var CSS='#ciPanel,#ciLog{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;overflow:auto;font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:#222}'+
+  '#ciPanel .box,#ciLog .box{background:#fff;border-radius:10px;margin:40px 12px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.25)}#ciPanel .box{width:min(560px,100%)}#ciLog .box{width:min(1200px,100%)}'+
+  '#ciPanel label{display:block;font-weight:600;margin:10px 0 4px}#ciPanel textarea{width:100%;box-sizing:border-box;min-height:70px;font:inherit;padding:6px}#ciPanel select{font:inherit;padding:4px}'+
+  '.ci-ctx{background:#f5f5f2;border-radius:6px;padding:8px 10px;font-size:13px;margin-top:10px}.ci-note{font-size:12px;color:#555;margin-top:3px}.ci-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;align-items:center}'+
+  '.ci-btn{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid #999;background:#fff;cursor:pointer}.ci-btn.go{background:#1f3a2a;color:#fff;border-color:#1f3a2a}'+
+  '#ciLog table{border-collapse:collapse;width:100%;font-size:13px}#ciLog th,#ciLog td{border-bottom:1px solid #ddd;padding:5px 6px;text-align:left;vertical-align:top}#ciLog th{background:#f5f5f2}'+
+  '#ciBtn{font:12px system-ui,sans-serif;padding:2px 9px;border-radius:10px;border:1px solid #bbb;background:#fff;cursor:pointer;margin-left:8px;white-space:nowrap}';
+ function css(){if(document.getElementById('ciCss')) return;var s=document.createElement('style');s.id='ciCss';s.textContent=CSS;document.head.appendChild(s);}
+ function close(id){var x=document.getElementById(id);if(x) x.remove();}
+ function openPanel(){css();close('ciPanel');var real=pf()==='Real',p=proj(),tl=job(),pg=page(),now=new Date();
+  var d=document.createElement('div');d.id='ciPanel';d.setAttribute('role','dialog');d.setAttribute('aria-label','Log an issue');
+  d.innerHTML='<div class="box"><h2 style="margin:0 0 4px">Log an issue</h2><div class="ci-note">Kept in this browser only, until you export it.</div>'+
+   '<label for="ciSaw">What I saw</label><textarea id="ciSaw" placeholder="The exact text or number, and where"></textarea>'+
+   '<label for="ciExp">What I expected <span style="font-weight:400;color:#666">(optional)</span></label><textarea id="ciExp" style="min-height:44px"></textarea>'+
+   '<div class="ci-row"><div><label for="ciSev" style="margin-top:0">Severity</label><select id="ciSev"><option>Must-fix</option><option selected>Should-fix</option><option>Minor</option></select></div>'+
+   '<div><label for="ciType" style="margin-top:0">Type</label><select id="ciType"><option selected>Wrong result</option><option>Confusing</option><option>Slow</option><option>Broken</option><option>Idea</option></select></div></div>'+
+   '<div class="ci-note">Must-fix = a wrong number, date or status in front of leadership, or lost or crossed data.</div>'+
+   '<div class="ci-ctx">'+esc(local(now))+' · '+esc(tl)+(pg?' / '+esc(pg):'')+' · '+esc(pf())+(real?'':' · '+esc(p&&p.name?p.name:'No project open'))+' · '+BUILD+
+   (real?'<div style="margin-top:4px;color:#7a5200">Real portfolio: only your note is saved, no project data.</div>':'<div style="margin-top:4px;color:#555">A snapshot of this page and project is attached, so the issue can be reproduced.</div>')+'</div>'+
+   '<div class="ci-row"><button class="ci-btn go" id="ciSave">Save</button><button class="ci-btn" id="ciKeep">Save and keep working</button><button class="ci-btn" id="ciX">Cancel</button><span id="ciMsg" class="ci-note"></span></div></div>';
+  document.body.appendChild(d);var saw=d.querySelector('#ciSaw');saw.focus();
+  d.addEventListener('keydown',function(e){if(e.key==='Escape'){e.stopPropagation();close('ciPanel');}});d.addEventListener('click',function(e){if(e.target===d) close('ciPanel');});
+  d.querySelector('#ciX').onclick=function(){close('ciPanel');};
+  var save=function(keep){var t=saw.value.trim();if(!t){d.querySelector('#ciMsg').textContent='Say what you saw first.';saw.focus();return;}
+   var L=load();if(L.length>=CAP){d.querySelector('#ciMsg').textContent='The log holds '+CAP+' entries. Export it and clear fixed entries before adding more.';return;}
+   var e={id:'i'+Date.now().toString(36),at:now.toISOString(),local:local(now),tool:jobOnly(tl),tool_id:window.MS_TOOL||'home',page:pg,portfolio:pf(),build:BUILD,saw:t,expected:d.querySelector('#ciExp').value.trim(),severity:d.querySelector('#ciSev').value,type:d.querySelector('#ciType').value,status:'Open',fixed_in:''};
+   if(!real){e.project=p&&p.name?p.name:'';try{e.snapshot=snapshot();}catch(x){e.snapshot={error:String(x)};}}
+   L.push(e);try{store(L);}catch(x){if(e.snapshot){delete e.snapshot;e.snapshot_dropped='Browser storage full – snapshot not kept';try{store(L);}catch(y){d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}else{d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}
+   if(L.length>=CAP-10) setTimeout(function(){alert('The issue log holds '+L.length+' of '+CAP+' entries. Export it and clear fixed entries soon.');},50);
+   if(keep){saw.value='';d.querySelector('#ciExp').value='';d.querySelector('#ciMsg').textContent='Logged – '+openCount(L)+' open';saw.focus();setTimeout(function(){var m=document.getElementById('ciMsg');if(m) m.textContent='';},3000);}
+   else{close('ciPanel');flash('Logged – '+openCount(L)+' open');}refreshLinks();};
+  d.querySelector('#ciSave').onclick=function(){save(false);};d.querySelector('#ciKeep').onclick=function(){save(true);};}
+ // ---- the log page ----
+ var F={status:'Open',severity:'',tool:''};
+ function openLog(){css();close('ciLog');var d=document.createElement('div');d.id='ciLog';document.body.appendChild(d);d.addEventListener('click',function(e){if(e.target===d) close('ciLog');});d.addEventListener('keydown',function(e){if(e.key==='Escape') close('ciLog');});drawLog();}
+ function drawLog(){var d=document.getElementById('ciLog');if(!d) return;var L=load(),tools=[];L.forEach(function(x){if(tools.indexOf(x.tool)<0) tools.push(x.tool);});
+  var R=L.filter(function(x){return (!F.status||x.status===F.status)&&(!F.severity||x.severity===F.severity)&&(!F.tool||x.tool===F.tool);}).slice().reverse();
+  var opt=function(v,list,lab){return '<option value="">'+lab+'</option>'+list.map(function(o){return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>';}).join('');};
+  d.innerHTML='<div class="box"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Issue log</h2><span class="ci-note">'+openCount(L)+' open of '+L.length+' · kept in this browser only</span><span style="flex:1"></span><button class="ci-btn" id="ciLx">Close</button></div>'+
+   '<div class="ci-row"><select id="cfS">'+opt(F.status,['Open','Fixed',"Won't fix"],'Any status')+'</select><select id="cfV">'+opt(F.severity,['Must-fix','Should-fix','Minor'],'Any severity')+'</select><select id="cfT">'+opt(F.tool,tools,'Any tool')+'</select>'+
+   '<span style="flex:1"></span><button class="ci-btn" id="ciXl">Export to Excel</button><button class="ci-btn" id="ciJs">Export for the programmer (.json)</button><button class="ci-btn" id="ciClr">Clear fixed</button></div>'+
+   (R.length?'<table style="margin-top:10px"><thead><tr><th>Date</th><th>Tool</th><th>Page</th><th>Portfolio</th><th>Severity</th><th>Type</th><th>What I saw</th><th>Status</th><th></th></tr></thead><tbody>'+R.map(function(x){
+    return '<tr data-id="'+x.id+'"><td style="white-space:nowrap">'+esc(x.local)+'</td><td>'+esc(x.tool)+'</td><td>'+esc(x.page)+'</td><td>'+esc(x.portfolio)+(x.project?'<div class="ci-note">'+esc(x.project)+'</div>':'')+'</td><td>'+esc(x.severity)+'</td><td>'+esc(x.type)+'</td>'+
+     '<td>'+esc(x.saw)+(x.expected?'<div class="ci-note">Expected: '+esc(x.expected)+'</div>':'')+(x.snapshot?'<div class="ci-note">Snapshot attached</div>':'')+'</td>'+
+     '<td><select data-st>'+['Open','Fixed',"Won't fix"].map(function(o){return '<option'+(o===x.status?' selected':'')+'>'+o+'</option>';}).join('')+'</select>'+(x.status==='Fixed'?'<div><input data-fx placeholder="in build" value="'+esc(x.fixed_in||'')+'" style="width:96px;margin-top:3px"></div>':'')+'</td>'+
+     '<td><button class="ci-btn" data-del style="padding:2px 8px">Delete</button></td></tr>';}).join('')+'</tbody></table>':'<p>No entries'+(F.status||F.severity||F.tool?' match these filters':'')+'.</p>')+'</div>';
+  var upd=function(id,f){var L2=load(),x=L2.filter(function(y){return y.id===id;})[0];if(!x) return;f(x,L2);store(L2);};
+  d.querySelector('#ciLx').onclick=function(){close('ciLog');refreshLinks();};
+  d.querySelector('#cfS').onchange=function(e){F.status=e.target.value;drawLog();};d.querySelector('#cfV').onchange=function(e){F.severity=e.target.value;drawLog();};d.querySelector('#cfT').onchange=function(e){F.tool=e.target.value;drawLog();};
+  d.querySelectorAll('tr[data-id]').forEach(function(tr){var id=tr.dataset.id;var st=tr.querySelector('[data-st]');st.onchange=function(){upd(id,function(x){x.status=st.value;if(x.status==='Fixed'&&!x.fixed_in) x.fixed_in=BUILD;if(x.status!=='Fixed') x.fixed_in='';});drawLog();refreshLinks();};
+   var fx=tr.querySelector('[data-fx]');if(fx) fx.onchange=function(){upd(id,function(x){x.fixed_in=fx.value.trim();});};
+   tr.querySelector('[data-del]').onclick=function(){if(!confirm('Delete this entry? It cannot be brought back.')) return;var L2=load().filter(function(y){return y.id!==id;});store(L2);drawLog();refreshLinks();};});
+  d.querySelector('#ciClr').onclick=function(){var n=load().filter(function(x){return x.status==='Fixed';}).length;if(!n){alert('No entries are marked Fixed.');return;}if(!confirm('Remove '+n+' entr'+(n>1?'ies':'y')+' marked Fixed?')) return;store(load().filter(function(x){return x.status!=='Fixed';}));drawLog();refreshLinks();};
+  d.querySelector('#ciJs').onclick=exportJson;d.querySelector('#ciXl').onclick=exportXl;}
+ function day(){var d=new Date();return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate());}
+ function dl(blob,name){var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.setAttribute('data-no-pf','');document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove();},1500);}
+ function exportJson(){dl(new Blob([JSON.stringify({schema:'corbel-issues-1',exported:new Date().toISOString(),build:BUILD,issues:load()},null,1)],{type:'application/json'}),'Issue_Log_'+day()+'.json');}
+ function exportXl(){var X_=window.XL||(typeof XL!=='undefined'?XL:null);if(!X_||!X_.save){alert('The spreadsheet writer did not load. Use the .json export.');return;}var L=load(),c=function(t,n){t=String(t==null?'':t);return t.length>(n||32000)?t.slice(0,n||32000)+'…':t;};
+  var I=[['ID','Date (local)','Tool','Page','Portfolio','Project','Build','Severity','Type','What I saw','What I expected','Status','Fixed in','Snapshot']].concat(L.map(function(x){return [x.id,x.local,x.tool,x.page,x.portfolio,x.project||'',x.build,x.severity,x.type,x.saw,x.expected||'',x.status,x.fixed_in||'',x.snapshot?'Yes':(x.snapshot_dropped||'No')];}));
+  var Sn=[['ID','Date (local)','Portfolio','Project','Recent errors','Tool log (last 20)','Page text','Project record','Tool record']].concat(L.filter(function(x){return x.snapshot;}).map(function(x){var s=x.snapshot;return [x.id,x.local,x.portfolio,x.project||'',c((s.errors||[]).map(function(e){return e.at+' '+e.msg+(e.where?' ('+e.where+')':'');}).join('\n')),c(JSON.stringify(s.log||[])),c(s.page_text),c(s.project),c(s.tool_record)];}));
+  window.__corbelNoPf=true;try{  X_.save('Issue_Log_'+day()+'.xlsx',[{name:'Issues',rows:I},{name:'Snapshots',rows:Sn}]);}finally{window.__corbelNoPf=false;}}
+ // ---- the button, the shortcut and the home-page link ----
+ function refreshLinks(){var n=openCount();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.textContent='Issue log ('+n+' open)';});}
+ function button(){if(document.getElementById('ciBtn')) return;var b=document.createElement('button');b.id='ciBtn';b.type='button';b.textContent='Log an issue';b.title='Log an issue (Alt+L, or Option+L on a Mac)';b.onclick=openPanel;
+  var ai=document.getElementById('carlai'),bar=document.getElementById('msbar');
+  if(ai&&ai.parentNode&&ai.parentNode!==document.body) ai.parentNode.insertBefore(b,ai);else if(bar) bar.appendChild(b);
+  else{b.style.cssText='position:fixed;right:14px;bottom:44px;z-index:51;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(b);}}
+ document.addEventListener('keydown',function(e){if(e.altKey&&!e.ctrlKey&&!e.metaKey&&(e.code==='KeyL'||String(e.key).toLowerCase()==='l')){e.preventDefault();openPanel();}});
+ function boot(){button();refreshLinks();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.onclick=function(e){e.preventDefault();openLog();};});setInterval(function(){var o=document.getElementById('ciBtn'),ai=document.getElementById('carlai');if(o&&ai&&ai.parentNode!==document.body&&o.parentNode!==ai.parentNode){o.remove();o=null;}if(!o) button();},1500);}
+ if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);else boot();
+ window.CorbelIssues={open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
+})();
+</script>
+
+
+
+
+
 
 
 
@@ -773,6 +895,7 @@
       <button id="pfbak" title="One file with every Corbel tool’s data in this portfolio">Back up all tools</button>
       <button id="pfres" title="Put a backup file back into this portfolio">Restore</button><input type="file" id="pfresf" accept=".json" hidden>
       <span class="pfnote" id="pfnote"></span>
+      <a href="#" data-issue-log style="margin-left:auto">Issue log (0 open)</a>
     </div>
   </section>
   <script>
@@ -1055,6 +1178,75 @@
     <div class="footer-text">&copy; Two Thousand Twenty-Six &middot; All rights reserved</div>
   </footer>
 
+<script id="corbel-lib">
+// ---------- Corbel Excel workbooks: a real .xlsx, built in the page ----------
+// Each sheet: navy header row, frozen header, filters, sized columns, wrapped text, light stripes.
+const XL=(function(){
+ const enc=new TextEncoder();let CRC=null;
+ function crc32(b){if(!CRC){CRC=new Uint32Array(256);for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++) c=c&1?0xEDB88320^(c>>>1):c>>>1;CRC[n]=c>>>0;}}let c=0xFFFFFFFF;for(let i=0;i<b.length;i++) c=CRC[(c^b[i])&255]^(c>>>8);return (c^0xFFFFFFFF)>>>0;}
+ // Small deflate (fixed Huffman codes, LZ77 over a 32 KB window): Office files come out a fraction of the size, built synchronously in the page.
+ function deflateRaw(src){const n=src.length;let out=new Uint8Array(Math.max(1024,(n>>1)+1024)),op=0,bb=0,bc=0;
+  function grow(){const o=new Uint8Array(out.length*2);o.set(out);out=o;}
+  function put(v,len){bb|=v<<bc;bc+=len;while(bc>=8){if(op>=out.length) grow();out[op++]=bb&255;bb>>>=8;bc-=8;}}
+  function rev(c,l){let r=0;for(let i=0;i<l;i++){r=(r<<1)|(c&1);c>>=1;}return r;}
+  const LC=new Uint16Array(288),LL=new Uint8Array(288);for(let i=0;i<288;i++){let c,l;if(i<144){c=0x30+i;l=8;}else if(i<256){c=0x190+i-144;l=9;}else if(i<280){c=i-256;l=7;}else{c=0xC0+i-280;l=8;}LC[i]=rev(c,l);LL[i]=l;}
+  const LB=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258],LX=[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  const DB=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577],DXB=[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  const lsym=new Uint8Array(259);for(let s=0,l=3;l<=258;l++){while(s<28&&LB[s+1]<=l) s++;lsym[l]=s;}
+  function dsym(d){let lo=0,hi=29;while(lo<hi){const m=(lo+hi+1)>>1;if(DB[m]<=d) lo=m;else hi=m-1;}return lo;}
+  put(1,1);put(1,2);
+  const HS=1<<15,head=new Int32Array(HS).fill(-1),prev=new Int32Array(32768),W=32768;
+  const hsh=i=>((src[i]<<10)^(src[i+1]<<5)^src[i+2])&(HS-1);
+  let i=0;while(i<n){let bl=0,bd=0;if(i+2<n){const h=hsh(i);let j=head[h],ch=48;const lim=Math.min(258,n-i);
+    while(j>=0&&i-j<=W&&ch--){if(src[j+bl]===src[i+bl]&&src[j]===src[i]){let l=0;while(l<lim&&src[j+l]===src[i+l]) l++;if(l>bl){bl=l;bd=i-j;if(l===lim) break;}}j=prev[j&(W-1)];}
+    prev[i&(W-1)]=head[h];head[h]=i;}
+   if(bl>=3){const s=lsym[bl];put(LC[257+s],LL[257+s]);if(LX[s]) put(bl-LB[s],LX[s]);const d=dsym(bd);put(rev(d,5),5);if(DXB[d]) put(bd-DB[d],DXB[d]);
+    for(let k=1;k<bl;k++){const p=i+k;if(p+2<n){const h=hsh(p);prev[p&(W-1)]=head[h];head[h]=p;}}i+=bl;}
+   else{put(LC[src[i]],LL[src[i]]);i++;}}
+  put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
+ function zip(files){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+   h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
+   parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
+   cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
+  const cs=cen.reduce((a,b)=>a+b.length,0);const e=new DataView(new ArrayBuffer(22));e.setUint32(0,0x06054b50,true);e.setUint16(8,files.length,true);e.setUint16(10,files.length,true);e.setUint32(12,cs,true);e.setUint32(16,off,true);
+  return new Blob(parts.concat(cen,[new Uint8Array(e.buffer)]),{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});}
+ const x=s=>String(s??'').replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+ const col=n=>{let s='';n++;while(n){const m=(n-1)%26;s=String.fromCharCode(65+m)+s;n=Math.floor((n-1)/26);}return s;};
+ const STY='<?xml version="1.0" encoding="UTF-8" standalone="yes"?><styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">'+
+  '<fonts count="3"><font><sz val="10"/><color rgb="FF1A1410"/><name val="Georgia"/></font><font><b/><sz val="9"/><color rgb="FFE8D5A8"/><name val="Georgia"/></font><font><sz val="9"/><i/><color rgb="FF7A7065"/><name val="Georgia"/></font></fonts>'+
+  '<fills count="4"><fill><patternFill patternType="none"/></fill><fill><patternFill patternType="gray125"/></fill><fill><patternFill patternType="solid"><fgColor rgb="FF1B2F4E"/><bgColor indexed="64"/></patternFill></fill><fill><patternFill patternType="solid"><fgColor rgb="FFFBF8F2"/><bgColor indexed="64"/></patternFill></fill></fills>'+
+  '<borders count="2"><border><left/><right/><top/><bottom/><diagonal/></border><border><left/><right/><top/><bottom style="thin"><color rgb="FFC9B998"/></bottom><diagonal/></border></borders>'+
+  '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>'+
+  '<cellXfs count="7"><xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>'+
+  '<xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="0" borderId="1" xfId="0" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="0" fillId="3" borderId="1" xfId="0" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top" wrapText="1"/></xf>'+
+  '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>'+
+  '<xf numFmtId="3" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf>'+
+  '<xf numFmtId="3" fontId="0" fillId="3" borderId="1" xfId="0" applyNumberFormat="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="top"/></xf></cellXfs>'+
+  '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles></styleSheet>';
+ function sheetXML(sh){const R=sh.rows,nc=Math.max(...R.map(r=>r.length));const W=sh.widths||[];
+  const cell=(v,ci,ri,s)=>{const ref=col(ci)+(ri+1);if(typeof v==='number'&&isFinite(v)){const ss=(Number.isInteger(v)&&Math.abs(v)>=1000&&(s===2||s===3))?(s===2?5:6):s;return '<c r="'+ref+'" s="'+ss+'"><v>'+v+'</v></c>';}return '<c r="'+ref+'" s="'+s+'" t="inlineStr"><is><t xml:space="preserve">'+x(v)+'</t></is></c>';};
+  const rows=R.map((r,ri)=>'<row r="'+(ri+1)+'"'+(ri===0?' ht="30" customHeight="1"':'')+'>'+Array.from({length:nc},(_,ci)=>cell(r[ci]??'',ci,ri,ri===0?1:(ri%2?2:3))).join('')+'</row>').join('');
+  const note=sh.note?'<row r="'+(R.length+2)+'"><c r="A'+(R.length+2)+'" s="4" t="inlineStr"><is><t>'+x(sh.note)+'</t></is></c></row>':'';
+  return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">'+
+   '<sheetViews><sheetView workbookViewId="0"'+(sh.zoom?' zoomScale="'+sh.zoom+'"':'')+'><pane ySplit="1" topLeftCell="A2" activePane="bottomLeft" state="frozen"/></sheetView></sheetViews><sheetFormatPr defaultRowHeight="15"/>'+
+   '<cols>'+Array.from({length:nc},(_,i)=>'<col min="'+(i+1)+'" max="'+(i+1)+'" width="'+(W[i]||16)+'" customWidth="1"/>').join('')+'</cols>'+
+   '<sheetData>'+rows+note+'</sheetData>'+(R.length>1?'<autoFilter ref="A1:'+col(nc-1)+R.length+'"/>':'')+'<pageMargins left="0.4" right="0.4" top="0.5" bottom="0.5" header="0.3" footer="0.3"/><pageSetup orientation="landscape" fitToWidth="1" fitToHeight="0"/></worksheet>';}
+ function book(sheets){const names=sheets.map((s,i)=>String(s.name||('Sheet'+(i+1))).replace(/[\\\/\?\*\[\]:]/g,' ').slice(0,31));
+  const F=[['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>'+sheets.map((s,i)=>'<Override PartName="/xl/worksheets/sheet'+(i+1)+'.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>').join('')+'</Types>'],
+   ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>'],
+   ['xl/workbook.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets>'+names.map((n,i)=>'<sheet name="'+x(n)+'" sheetId="'+(i+1)+'" r:id="rId'+(i+1)+'"/>').join('')+'</sheets>'+
+    '<definedNames>'+sheets.map((s,i)=>s.rows.length>1?'<definedName name="_xlnm._FilterDatabase" localSheetId="'+i+'" hidden="1">\''+x(names[i])+'\'!$A$1:$'+col(Math.max(...s.rows.map(r=>r.length))-1)+'$'+s.rows.length+'</definedName>':'').join('')+'</definedNames></workbook>'],
+   ['xl/_rels/workbook.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'+sheets.map((s,i)=>'<Relationship Id="rId'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet'+(i+1)+'.xml"/>').join('')+'<Relationship Id="rId'+(sheets.length+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/></Relationships>'],
+   ['xl/styles.xml',STY]].concat(sheets.map((s,i)=>['xl/worksheets/sheet'+(i+1)+'.xml',sheetXML(s)]));
+  return zip(F);}
+ // Column widths from the content: header and the longest cell, capped.
+ function fit(rows,max){const nc=Math.max(...rows.map(r=>r.length));return Array.from({length:nc},(_,i)=>{const L=rows.map(r=>String(r[i]??'').length);const h=String(rows[0][i]||'').length;return Math.max(10,Math.min(max||50,Math.max(h+2,Math.round(Math.max(...L.slice(1),0)*0.9)+2)));});}
+ function save(name,sheets){if(window.CorbelDeToolDeep) sheets=sheets.map(sh=>Object.assign({},sh,{name:window.CorbelDeTool(sh.name),rows:window.CorbelDeToolDeep(sh.rows)},sh.note?{note:window.CorbelDeTool(sh.note)}:{}));sheets.forEach(s=>{if(!s.widths) s.widths=fit(s.rows,s.max);});const b=book(sheets);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},500);}
+ return {save,book,fit};})();
+</script>
 <script id="carl-ai">/* CARL shared AI: AI and CARL's library for every tool on carlcompliance.com,
    through CARL's server, on CARL's keys, for anyone signed in to
    carl.carlcompliance.com. No key is ever in this page. Signed out, the CARL
