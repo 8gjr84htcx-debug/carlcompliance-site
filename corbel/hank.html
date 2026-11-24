@@ -272,7 +272,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel112',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel113',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -288,14 +288,28 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
   if(!t){var h=document.querySelector('#view h2, main h2');t=h?h.textContent.trim():'';}return t.slice(0,60);}
  function proj(){try{var a=window.MS&&MS.active&&MS.active();if(a&&typeof a==='object') return {id:a.id,name:(a.core&&(a.core.name||a.core.title))||a.name||'',rec:a};}catch(e){}return null;}
  function cut(o,n){var s;try{s=typeof o==='string'?o:JSON.stringify(o);}catch(e){s='';}return s&&s.length>n?s.slice(0,n)+'…[cut at '+n+' characters]':s||'';}
- function snapshot(){var p=proj(),t=window.MS_TOOL||'',own=null,log=[];
-  try{var raw=LS.getItem(t+'_project');if(raw){var j=JSON.parse(raw);if(j&&Array.isArray(j.projects)&&p){own=j.projects.filter(function(x){return x.id===p.id;})[0]||null;}else own=j;}}catch(e){}
+ var SNAP=19000,RESERVE=500000;
+ // Each snapshot is held to 20 KB: the page text is cut first, then the tool's log, then the records themselves.
+ // The typed fields, the context line and the page errors are never cut.
+ function snapshot(){var p=proj(),t=window.MS_TOOL||'',own=null;
+  try{var raw=LS.getItem(t+'_project');if(raw){var j=JSON.parse(raw);if(j&&Array.isArray(j.projects)){own=p?(j.projects.filter(function(x){return x.id===p.id;})[0]||null):null;}else own=j;}}catch(e){}
   if(!own&&p&&p.rec&&p.rec.tools) own=p.rec.tools[t]||null;
-  var src=own&&Array.isArray(own.log)?own.log:(p&&p.rec&&p.rec.tools&&p.rec.tools[t]&&Array.isArray(p.rec.tools[t].log)?p.rec.tools[t].log:[]);log=src.slice(-20);
+  var src=own&&Array.isArray(own.log)?own.log:(p&&p.rec&&p.rec.tools&&p.rec.tools[t]&&Array.isArray(p.rec.tools[t].log)?p.rec.tools[t].log:[]);
   var main=document.getElementById('view')||document.querySelector('main')||document.body;var txt=(main.innerText||'');
-  return {project:cut(p?{id:p.id,core:p.rec.core}:null,60000),tool_record:cut(own,60000),log:log,page_text:txt.slice(0,20000),errors:ERRS.slice(-5)};}
+  var o={project:cut(p?{id:p.id,core:p.rec.core}:null,60000),tool_record:cut(own,60000),log:src.slice(-20),page_text:txt.slice(0,20000),errors:ERRS.slice(-5)};
+  var sz=function(){return JSON.stringify(o).length;};
+  if(sz()>SNAP) o.page_text=txt.slice(0,5000);
+  if(sz()>SNAP) o.log=src.slice(-10);
+  if(sz()>SNAP){var room=Math.max(0,SNAP-JSON.stringify({log:o.log,page_text:o.page_text,errors:o.errors}).length-300);var a=o.project.length;
+   var pa=Math.min(a,Math.floor(room/3)),pb=Math.max(0,room-pa);o.project=cut(o.project,pa);o.tool_record=cut(o.tool_record,pb);}
+  if(sz()>SNAP) o.page_text=o.page_text.slice(0,Math.max(0,o.page_text.length-(sz()-SNAP)-50));
+  if(sz()>SNAP) o.log=[];
+  return o;}
+ // Room check by a trial write: the browser's real limit differs by browser, so ask the browser itself.
+ function room(n){try{S.call(LS,'corbel_space_probe',new Array(n+1).join('x'));LS.removeItem('corbel_space_probe');return true;}catch(e){try{LS.removeItem('corbel_space_probe');}catch(x){}return false;}}
+ function used(){var n=0;try{for(var i=0;i<LS.length;i++){var k=LS.key(i);n+=k.length+(G.call(LS,k)||'').length;}}catch(e){}return n;}
  function openCount(L){return (L||load()).filter(function(x){return x.status==='Open';}).length;}
- function flash(t){var d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;right:16px;bottom:52px;z-index:10001;background:#1f3a2a;color:#fff;padding:8px 14px;border-radius:8px;font:14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';document.body.appendChild(d);setTimeout(function(){d.remove();},3000);}
+ function flash(t,ms){var d=document.createElement('div');d.textContent=t;d.style.cssText='position:fixed;right:16px;bottom:52px;z-index:10001;background:#1f3a2a;color:#fff;padding:8px 14px;border-radius:8px;font:14px system-ui,sans-serif;box-shadow:0 2px 8px rgba(0,0,0,.25)';document.body.appendChild(d);setTimeout(function(){d.remove();},ms||3000);}
  var CSS='#ciPanel,#ciLog{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;overflow:auto;font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:#222}'+
   '#ciPanel .box,#ciLog .box{background:#fff;border-radius:10px;margin:40px 12px;padding:16px 18px;box-shadow:0 6px 24px rgba(0,0,0,.25)}#ciPanel .box{width:min(560px,100%)}#ciLog .box{width:min(1200px,100%)}'+
   '#ciPanel label{display:block;font-weight:600;margin:10px 0 4px}#ciPanel textarea{width:100%;box-sizing:border-box;min-height:70px;font:inherit;padding:6px}#ciPanel select{font:inherit;padding:4px}'+
@@ -322,11 +336,13 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
   var save=function(keep){var t=saw.value.trim();if(!t){d.querySelector('#ciMsg').textContent='Say what you saw first.';saw.focus();return;}
    var L=load();if(L.length>=CAP){d.querySelector('#ciMsg').textContent='The log holds '+CAP+' entries. Export it and clear fixed entries before adding more.';return;}
    var e={id:'i'+Date.now().toString(36),at:now.toISOString(),local:local(now),tool:jobOnly(tl),tool_id:window.MS_TOOL||'home',page:pg,portfolio:pf(),build:BUILD,saw:t,expected:d.querySelector('#ciExp').value.trim(),severity:d.querySelector('#ciSev').value,type:d.querySelector('#ciType').value,status:'Open',fixed_in:''};
-   if(!real){e.project=p&&p.name?p.name:'';try{e.snapshot=snapshot();}catch(x){e.snapshot={error:String(x)};}}
+   var lowMsg='';if(!real){e.project=p&&p.name?p.name:'';try{e.snapshot=snapshot();}catch(x){e.snapshot={error:String(x)};}
+    if(!room(JSON.stringify(e).length+RESERVE)){delete e.snapshot;e.snapshot_dropped='Storage nearly full';lowMsg='Snapshot left out – storage is nearly full. Export the log and clear fixed entries.';}}
    L.push(e);try{store(L);}catch(x){if(e.snapshot){delete e.snapshot;e.snapshot_dropped='Browser storage full – snapshot not kept';try{store(L);}catch(y){d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}else{d.querySelector('#ciMsg').textContent='Browser storage is full. Export the log and clear fixed entries.';return;}}
    if(L.length>=CAP-10) setTimeout(function(){alert('The issue log holds '+L.length+' of '+CAP+' entries. Export it and clear fixed entries soon.');},50);
-   if(keep){saw.value='';d.querySelector('#ciExp').value='';d.querySelector('#ciMsg').textContent='Logged – '+openCount(L)+' open';saw.focus();setTimeout(function(){var m=document.getElementById('ciMsg');if(m) m.textContent='';},3000);}
-   else{close('ciPanel');flash('Logged – '+openCount(L)+' open');}refreshLinks();};
+   var msg='Logged – '+openCount(L)+' open'+(lowMsg?'. '+lowMsg:'');
+   if(keep){saw.value='';d.querySelector('#ciExp').value='';d.querySelector('#ciMsg').textContent=msg;saw.focus();setTimeout(function(){var m=document.getElementById('ciMsg');if(m) m.textContent='';},lowMsg?8000:3000);}
+   else{close('ciPanel');flash(msg,lowMsg?8000:3000);}refreshLinks();};
   d.querySelector('#ciSave').onclick=function(){save(false);};d.querySelector('#ciKeep').onclick=function(){save(true);};}
  // ---- the log page ----
  var F={status:'Open',severity:'',tool:''};
@@ -334,7 +350,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  function drawLog(){var d=document.getElementById('ciLog');if(!d) return;var L=load(),tools=[];L.forEach(function(x){if(tools.indexOf(x.tool)<0) tools.push(x.tool);});
   var R=L.filter(function(x){return (!F.status||x.status===F.status)&&(!F.severity||x.severity===F.severity)&&(!F.tool||x.tool===F.tool);}).slice().reverse();
   var opt=function(v,list,lab){return '<option value="">'+lab+'</option>'+list.map(function(o){return '<option'+(o===v?' selected':'')+'>'+esc(o)+'</option>';}).join('');};
-  d.innerHTML='<div class="box"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Issue log</h2><span class="ci-note">'+openCount(L)+' open of '+L.length+' · kept in this browser only</span><span style="flex:1"></span><button class="ci-btn" id="ciLx">Close</button></div>'+
+  d.innerHTML='<div class="box"><div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><h2 style="margin:0">Issue log</h2><span class="ci-note">Issue log: '+L.length+' entr'+(L.length===1?'y':'ies')+', '+Math.round((G.call(LS,KEY)||'').length/1024)+' KB · '+openCount(L)+' open · kept in this browser only</span><span style="flex:1"></span><button class="ci-btn" id="ciLx">Close</button></div>'+
    '<div class="ci-row"><select id="cfS">'+opt(F.status,['Open','Fixed',"Won't fix"],'Any status')+'</select><select id="cfV">'+opt(F.severity,['Must-fix','Should-fix','Minor'],'Any severity')+'</select><select id="cfT">'+opt(F.tool,tools,'Any tool')+'</select>'+
    '<span style="flex:1"></span><button class="ci-btn" id="ciXl">Export to Excel</button><button class="ci-btn" id="ciJs">Export for the programmer (.json)</button><button class="ci-btn" id="ciClr">Clear fixed</button></div>'+
    (R.length?'<table style="margin-top:10px"><thead><tr><th>Date</th><th>Tool</th><th>Page</th><th>Portfolio</th><th>Severity</th><th>Type</th><th>What I saw</th><th>Status</th><th></th></tr></thead><tbody>'+R.map(function(x){
@@ -361,14 +377,19 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  function refreshLinks(){var n=openCount();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.textContent='Issue log ('+n+' open)';});}
  function button(){if(document.getElementById('ciBtn')) return;var b=document.createElement('button');b.id='ciBtn';b.type='button';b.textContent='Log an issue';b.title='Log an issue (Alt+L, or Option+L on a Mac)';b.onclick=openPanel;
   var ai=document.getElementById('carlai'),bar=document.getElementById('msbar');
-  if(ai&&ai.parentNode&&ai.parentNode!==document.body) ai.parentNode.insertBefore(b,ai);else if(bar) bar.appendChild(b);
+  var hd=document.querySelector('body > header');
+  if(ai&&ai.parentNode&&ai.parentNode!==document.body) ai.parentNode.insertBefore(b,ai);else if(bar) bar.appendChild(b);else if(hd) hd.appendChild(b);
   else{b.style.cssText='position:fixed;right:14px;bottom:44px;z-index:51;box-shadow:0 1px 4px rgba(0,0,0,.2)';document.body.appendChild(b);}}
  document.addEventListener('keydown',function(e){if(e.altKey&&!e.ctrlKey&&!e.metaKey&&(e.code==='KeyL'||String(e.key).toLowerCase()==='l')){e.preventDefault();openPanel();}});
  function boot(){button();refreshLinks();document.querySelectorAll('[data-issue-log]').forEach(function(a){a.onclick=function(e){e.preventDefault();openLog();};});setInterval(function(){var o=document.getElementById('ciBtn'),ai=document.getElementById('carlai');if(o&&ai&&ai.parentNode!==document.body&&o.parentNode!==ai.parentNode){o.remove();o=null;}if(!o) button();},1500);}
  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',boot);else boot();
- window.CorbelIssues={open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
+ // Any save in Corbel that fails for lack of room says so on screen instead of failing silently.
+ (function(){var P=Storage.prototype,inner=P.setItem;P.setItem=function(k,v){try{return inner.call(this,k,v);}catch(e){if(e&&(e.name==='QuotaExceededError'||e.code===22||/quota/i.test(String(e.message)))){var show=function(){if(document.getElementById('ciFull')) return;var d=document.createElement('div');d.id='ciFull';d.setAttribute('role','alert');d.style.cssText='position:fixed;left:12px;right:12px;top:12px;z-index:10002;background:#9B2C2C;color:#fff;padding:10px 14px;border-radius:8px;font:14px system-ui,sans-serif';d.innerHTML='<b>Not saved – this browser’s storage for Corbel is full.</b> Export the issue log and clear fixed entries, or back up and clear a portfolio you no longer need. <button style="margin-left:8px" onclick="this.parentNode.remove()">Close</button>';(document.body||document.documentElement).appendChild(d);};if(document.body) show();else document.addEventListener('DOMContentLoaded',show);}throw e;}};})();
+ window.CorbelIssues={used:used,open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
 })();
 </script>
+
+
 
 
 
