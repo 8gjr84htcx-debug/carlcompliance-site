@@ -7,7 +7,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_role:1,corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -671,8 +671,24 @@ function refresh(){const d=document.getElementById('msbar');if(!d) return;const 
  (()=>{const F=P?lawCheck(P.core):[];const n=F.filter(f=>f[0]>0).length;return '<button id="mslaw" title="Statutory and FMR checks on this project" style="font-size:12.5px;padding:3px 10px;'+(n?'background:#fff;color:#10303F;border:none;font-weight:600':'background:transparent;color:#fff;border-color:rgba(255,255,255,.4)')+'">'+(n?n+' rule flag'+(n>1?'s':''):'Rules')+'<\/button>';})()+
  '<button id="msmore" style="font-size:12.5px;padding:3px 10px;background:transparent;color:#fff;border-color:rgba(255,255,255,.4)">Projects…<\/button>';
  d.querySelector('#mssel').onchange=e=>sw(e.target.value);
- d.querySelector('#msnew').onclick=()=>{const n=prompt('Name of the new project');if(!n) return;const s2=loadStore();flush(s2);const id=uid();s2.projects[id]={id,core:{name:n.trim()},tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
+ d.querySelector('#msnew').onclick=newProjDlg;
  d.querySelector('#msmore').onclick=manage;const lb=d.querySelector('#mslaw');if(lb) lb.onclick=lawDlg;const pb=d.querySelector('#mspend');if(pb) pb.onclick=settle;}
+// New project, in the page (embedded browsers drop native prompts). It starts empty: nothing is copied from the open
+// project – no money, dates, scope or task order. Installation and Service are copied only if the user ticks the box.
+function newProjDlg(){const old=document.getElementById('msnewdlg');if(old) old.remove();const cur=(()=>{const s=loadStore();return s.projects[s.active]||null;})();const cc=(cur&&cur.core)||{};
+ const dl=document.createElement('div');dl.id='msnewdlg';dl.setAttribute('role','dialog');dl.setAttribute('aria-label','New project');
+ dl.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:#222';
+ const same=(cc.installation||cc.service)?'<label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:400"><input type="checkbox" id="msnSame" style="width:auto;margin-top:3px"><span>Same installation and Service as '+esc(cc.name||'the open project')+' ('+esc([cc.installation,cc.service].filter(Boolean).join(', '))+')<\/span><\/label>':'';
+ dl.innerHTML='<div style="background:#fff;border-radius:10px;margin:60px 12px;padding:16px 18px;width:min(480px,100%);box-shadow:0 6px 24px rgba(0,0,0,.25)"><h2 style="margin:0 0 4px;font-size:18px">New project<\/h2><div style="font-size:12.5px;color:#555">It starts empty. Nothing is copied from the open project: no money, dates, scope or task order.<\/div>'+
+  '<label for="msnName" style="display:block;font-weight:600;margin:12px 0 4px">Project name<\/label><input id="msnName" style="width:100%;box-sizing:border-box;font:inherit;padding:6px" placeholder="For example: Tinian Harbor dredging">'+same+
+  '<div style="display:flex;gap:8px;margin-top:14px;align-items:center"><button id="msnGo" style="font:inherit;padding:6px 12px;border-radius:6px;background:#1f3a2a;color:#fff;border:1px solid #1f3a2a;cursor:pointer">Start empty<\/button><button id="msnX" style="font:inherit;padding:6px 12px;border-radius:6px;background:#fff;border:1px solid #999;cursor:pointer">Cancel<\/button><span id="msnMsg" style="font-size:12.5px;color:#9B2C2C"><\/span><\/div><\/div>';
+ document.body.appendChild(dl);const nm=dl.querySelector('#msnName');nm.focus();
+ const close=()=>dl.remove();dl.querySelector('#msnX').onclick=close;dl.addEventListener('click',e=>{if(e.target===dl) close();});dl.addEventListener('keydown',e=>{if(e.key==='Escape') close();if(e.key==='Enter'&&e.target===nm) go();});
+ const go=()=>{const n=nm.value.trim();if(!n){dl.querySelector('#msnMsg').textContent='Give it a name first.';nm.focus();return;}
+  const s2=loadStore();flush(s2);const id=uid();const core={name:n};const sm=dl.querySelector('#msnSame');if(sm&&sm.checked){if(cc.installation) core.installation=cc.installation;if(cc.service) core.service=cc.service;}
+  s2.projects[id]={id,core,tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
+ dl.querySelector('#msnGo').onclick=go;}
+window.MSnewProject=newProjDlg;
 // One place to settle what two tools disagree on: the record's value, the other tool's value, choose one.
 window.MSsettle=()=>settle();
 // NORA's open "sources disagree" items belong in the same settlement prompt, with both speakers and their authority.

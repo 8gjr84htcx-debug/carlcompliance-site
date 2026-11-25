@@ -7,7 +7,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_role:1,corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};

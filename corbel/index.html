@@ -7,7 +7,7 @@
 (function(){
  var ls;try{ls=window.localStorage;}catch(e){return;}if(!ls||window.CorbelPF) return;
  var SP=Storage.prototype,g=SP.getItem,s=SP.setItem,r=SP.removeItem;
- var SHARED={corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
+ var SHARED={corbel_role:1,corbel_issues:1,corbel_portfolio:1,carl_ai_base:1,carl_ai_admin:1,paula_layout:1};// carl_ai_cache stays with its portfolio, so test answers never reach real work
  function cur(){try{return g.call(ls,'corbel_portfolio')||'';}catch(e){return '';}}
  function nk(k){var c=cur();k=String(k);return c&&!SHARED[k]&&k.indexOf('pf:')!==0?'pf:'+c+':'+k:k;}
  SP.getItem=function(k){return g.call(this,this===ls?nk(k):k);};
@@ -388,6 +388,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  window.CorbelIssues={used:used,open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
 })();
 </script>
+
 
 
 
@@ -864,6 +865,11 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
     .phases .w { font-family: 'Lora', Georgia, serif; font-size: 13px; color: var(--taupe-warm); display: block; margin-top: 2px; }
     .notice { max-width: 760px; margin: 28px auto 0; font-family: 'Lora', Georgia, serif; font-size: 13.5px; line-height: 1.7; color: var(--ink-soft); border-left: 2px solid var(--oxblood); padding: 6px 0 6px 16px; }
     .tool-status.ready { color: var(--green-status); }
+    .projfold > summary{list-style:none;padding:20px 0 12px}
+    .projfold > summary::-webkit-details-marker{display:none}
+    .projfold > summary h2::before{content:'▸ ';color:var(--oxblood)}
+    .projfold[open] > summary h2::before{content:'▾ '}
+
     @media (max-width: 900px) { .lifecycle { padding: 40px 24px 32px; } .phases { grid-template-columns: repeat(2, 1fr); } }
 
     .pfbar { max-width: 760px; box-sizing: border-box; margin: 0 auto 8px; padding: 14px 18px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; font-family: 'Lora', Georgia, serif; font-size: 14px; color: var(--ink-soft); border: 0.5px solid var(--cream-divider); }
@@ -942,7 +948,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    function J(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
    function M(n){n=+n||0;var a=Math.abs(n);return a>=1e9?'$'+(a/1e9).toFixed(2)+'B':a>=1e6?'$'+(a/1e6).toFixed(1)+'M':a>=1e3?'$'+Math.round(a/1e3)+'K':'$'+Math.round(a);}
    var st=J('milcon_store')||{projects:{}},ids=Object.keys(st.projects||{});
-   if(!ids.length){sel.innerHTML='<option>No projects yet</option>';sel.disabled=true;nt.textContent='Start a project in Nora; every tool then shares it.';nx.style.display='';nx.textContent='Start in Nora';nx.href='/corbel/nora.html';return;}
+   if(!ids.length){var th=(function(){try{return (localStorage.getItem('corbel_role')||'theater')==='theater';}catch(e){return true;}})();sel.innerHTML='<option>No projects yet</option>';sel.disabled=true;nt.textContent=th?'Add a project in Paula; every tool then shares it.':'Start a project in Nora; every tool then shares it.';nx.style.display='';nx.textContent=th?'Start in Paula':'Start in Nora';nx.href=th?'/corbel/paula.html':'/corbel/nora.html';return;}
    sel.innerHTML=ids.map(function(id){var c=st.projects[id].core||{};return '<option value="'+id+'"'+(id===st.active?' selected':'')+'>'+(c.name||'(untitled)').replace(/</g,'&lt;')+(c.installation?' – '+c.installation.replace(/</g,'&lt;'):'')+'</option>';}).join('');
    function status(id){var p=st.projects[id],c=p.core||{},T=p.tools||{},rc=T.record||{},ev=c.events||{},o={};
     var n=T.nora;o.nora=ev['Requirement validated']?'✓ Requirement validated':n?((n.requirements||[]).length+' requirements, not yet validated'):'Not started';
@@ -959,7 +965,11 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
     var pq=((J('paula_project')||{}).projects||[]).filter(function(x){return x.id===id;})[0]||{};var ph=+(c.phase||pq.phase||0),SO=['programmed','requested','authorized','appropriated','obligated'],top=(pq.funds||c.funds||[]).reduce(function(m,l){return Math.max(m,SO.indexOf(l.stage||''));},-1),ps=String(c.prog_status||pq.prog_status||(top>=0?SO[top]:(+(c.programmed||pq.programmed)>0?'programmed':''))),PSN={pb:'in the President’s Budget',requested:'in the President’s Budget',authorized:'authorized',appropriated:'appropriated',obligated:'obligated'},fun=!!PSN[ps];
     var next=ph>=8?['hank','Close it out in Hank']:(ph===7||+(c.award||pq.award)>0)?['irma','Review submittals and RFIs in Irma; update status in Paula']:(!n&&(fun||ph>=5))?['paula','Track it in Paula – '+(PSN[ps]?'already '+PSN[ps]:'phase '+ph)]:(!n&&ps==='programmed')?['piper','Review its 1391 in Piper – already programmed']:!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
     return {o:o,next:next,c:c};}
-   function show(){var id=sel.value,s=status(id);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
+   var TH={adam:1,paula:1,earl:1,piper:1,vera:1};
+   function role(){try{return localStorage.getItem('corbel_role')||'theater';}catch(e){return 'theater';}}
+   // A theater advisor is pointed only at theater tools: project-tool steps become the theater step that follows them.
+   function theaterNext(n){if(role()!=='theater'||TH[n[0]]) return n;var M={nora:['earl','Weigh the alternatives in Earl'],sophie:['paula','Track it in Paula'],scott:['paula','Track it in Paula'],cora:['paula','Track it in Paula'],irma:['paula','Update status in Paula'],quinn:['paula','Update status in Paula'],hank:['paula','Update status in Paula']};return M[n[0]]||['paula','Track it in Paula'];}
+   function show(){var id=sel.value,s=status(id);s.next=theaterNext(s.next);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
     nt.textContent=[s.c.service,s.c.fy?'FY'+s.c.fy:'',s.c.programmed?M(s.c.programmed)+' programmed':'',s.c.to?'Task order '+s.c.to:''].filter(Boolean).join('  ·  ')||'Every tool opens this project.';
     ['adam','nora','earl','piper','sophie','irma','quinn','hank','paula'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
      d.textContent=s.o[t];d.style.fontWeight=s.next[0]===t?'700':'400';});}
@@ -971,23 +981,24 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
   <section class="lifecycle">
     <div class="lifecycle-inner">
       <h2>From posture to close-out, each phase closed by a gate</h2>
-      <p class="lead">Two layers. Adam and Paula work at the theater level: posture, portfolio, priorities and decisions. The project tools follow each project through its phases and feed them.</p>
+      <p class="lead">Two layers. The theater tools – Adam, Paula, Earl, Piper and Vera – work across the portfolio: posture, priorities, decisions and assessment. The project tools follow each project through its phases and feed them.</p>
       <ol class="phases">
         <li><span class="n">0</span><span class="t">Set the posture</span><span class="w">Adam</span></li>
         <li><span class="n">1</span><span class="t">Identify the need</span><span class="w">Nora</span></li>
         <li><span class="n">2</span><span class="t">Weigh alternatives</span><span class="w">Earl</span></li>
         <li><span class="n">3</span><span class="t">Plan and program</span><span class="w">Piper</span></li>
         <li><span class="n">4</span><span class="t">Budget and authorize</span><span class="w">Piper</span></li>
-        <li><span class="n">5</span><span class="t">Charter and design</span><span class="w">Cora</span></li>
-        <li><span class="n">6</span><span class="t">Acquisition</span><span class="w">Sophie, Scott, Cora</span></li>
-        <li><span class="n">7</span><span class="t">Construct</span><span class="w">Irma, Quinn, Piper</span></li>
+        <li><span class="n">5</span><span class="t">Charter and design</span><span class="w">Cora; Vera (assess)</span></li>
+        <li><span class="n">6</span><span class="t">Acquisition</span><span class="w">Sophie, Scott, Cora; Vera (assess)</span></li>
+        <li><span class="n">7</span><span class="t">Construct</span><span class="w">Irma, Quinn, Piper; Vera (assess)</span></li>
         <li><span class="n">8</span><span class="t">Close out</span><span class="w">Hank</span></li>
       </ol>
       <p class="notice">These tools run in your browser. Use them with unclassified, publicly releasable information only. Controlled unclassified information belongs on government systems and AI services approved for it. The tools recommend; contracting officers and design agents decide.</p>
     </div>
   </section>
 
-  <section class="layer-head" style="padding:28px 0 4px"><div class="tool-inner" style="display:block"><h2 style="margin:0 0 6px">The theater layer</h2><p class="lead" style="margin:0;max-width:760px">Where the JPMO works: which posture capabilities are late and which project sets the date (Adam), the whole portfolio's health, funding, priorities and decisions (Paula), and a red-team review of each Service 1391 (Piper). Start here.</p></div></section>
+  <section class="layer-head" style="padding:28px 0 4px"><div class="tool-inner" style="display:block"><h2 style="margin:0 0 6px">Theater tools</h2><p class="lead" style="margin:0 0 10px;max-width:760px">In the order they are used: the posture the force needs, the portfolio that delivers it, whether each approach is right, whether each 1391 is sound, and whether execution is delivering.</p>
+   <div class="pfbar" id="rolebar" style="padding:0"><label for="rolesel">I work as</label><select id="rolesel"><option value="theater">Theater advisor</option><option value="pm">Project manager</option><option value="both">Both</option></select><span class="pfnote" id="rolenote"></span></div></div></section>
   <section class="tool-section" id="adam">
     <div class="tool-inner">
       <div class="tool-meta">
@@ -1004,6 +1015,8 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
     </div>
   </section>
 
+  <div class="tool-divider"></div>
+
   <section class="tool-section" id="paula">
     <div class="tool-inner">
       <div class="tool-meta">
@@ -1015,25 +1028,6 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
         <p class="tool-pitch">Sees the whole program at once. PAULA tracks cost, schedule, risk, and funds across every project, flags what needs leadership attention, and produces the status reports the chain of command asks for.</p>
         <div class="tool-buttons">
           <a href="/corbel/paula.html" class="btn btn-primary">Portfolio – PAULA</a>
-        </div>
-      </div>
-    </div>
-  </section>
-  <section class="layer-head" style="padding:28px 0 4px"><div class="tool-inner" style="display:block"><h2 style="margin:0 0 6px">The project layer</h2><p class="lead" style="margin:0;max-width:760px">The tools that build each project's record, from requirement to close-out. What they record feeds the theater layer: need dates, costs, schedules, risks and gates.</p></div></section>
-
-  <div class="tool-divider"></div>
-
-  <section class="tool-section" id="nora">
-    <div class="tool-inner">
-      <div class="tool-meta">
-        <div class="tool-name">Nora</div>
-        <div class="tool-descriptor">Needs, Options, and Requirements Analyst</div>
-        <div class="tool-status ready">Ready to use</div>
-      </div>
-      <div class="tool-body">
-        <p class="tool-pitch">Turns &ldquo;we have a problem&rdquo; into requirements that survive review. NORA identifies the stakeholders, runs the interviews and workshops, captures each requirement with the person who stated it, and measures the gap between what exists and what the mission needs. It seeds the traceability matrix every other tool builds on.</p>
-        <div class="tool-buttons">
-          <a href="/corbel/nora.html" class="btn btn-primary">Requirement – NORA</a>
         </div>
       </div>
     </div>
@@ -1069,7 +1063,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
       <div class="tool-body">
         <p class="tool-pitch">Creates, reviews, updates, and defends the DD Form 1391. PIPER builds the parametric estimate from the DoD Facilities Pricing Guide, red-teams the justification before headquarters does, keeps every version across budget cycles, and drafts answers to the questions reviewers ask.</p>
         <div class="tool-buttons">
-          <a href="/corbel/piper.html" class="btn btn-primary">1391 build and review – PIPER</a>
+          <a href="/corbel/piper.html" class="btn btn-primary">1391 review – PIPER</a>
         </div>
       </div>
     </div>
@@ -1077,17 +1071,53 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
   <div class="tool-divider"></div>
 
-  <section class="tool-section" id="sophie">
+  <section class="tool-section" id="vera">
     <div class="tool-inner">
       <div class="tool-meta">
-        <div class="tool-name">Sophie</div>
-        <div class="tool-descriptor">Scope Of work Preparation, Harmonization, Integration, and Editing</div>
+        <div class="tool-name">Vera</div>
+        <div class="tool-descriptor">Verification, Evaluation, and Risk Assessment</div>
+        <div class="tool-status">Coming in the next release</div>
+      </div>
+      <div class="tool-body">
+        <p class="tool-pitch">Assesses execution across a multi-site program: what is right and what is wrong, site by site, each finding traced to its evidence, rated and given a recommendation. It reads the portfolio, posture, 1391 and alternatives records, adds site visits and a schedule health check, and writes the assessment report and briefing.</p>
+        <div class="tool-buttons">
+          <span class="btn btn-primary" aria-disabled="true" style="opacity:.55;cursor:default">Program assessment – VERA</span>
+        </div>
+      </div>
+    </div>
+  </section>
+  <section class="layer-head" style="padding:4px 0 8px"><div class="tool-inner" style="display:block"><p class="lead" style="margin:0">VERA’s findings feed back into PAULA and ADAM.</p></div></section>
+  <details id="projfold" class="projfold">
+  <summary class="layer-head"><div class="tool-inner" style="display:block"><h2 style="margin:0;font-size:19px;cursor:pointer">Project delivery tools (7) – requirements, criteria, scope, SOW, RFIs, inspections, close-out</h2></div></summary>
+  <section class="tool-section" id="nora">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Nora</div>
+        <div class="tool-descriptor">Needs, Options, and Requirements Analyst</div>
         <div class="tool-status ready">Ready to use</div>
       </div>
       <div class="tool-body">
-        <p class="tool-pitch">Writes the scope of work in your format. One model drafts, a second reviews, a third settles their disagreements, and every &ldquo;shall&rdquo; traces back to a requirement. The finished scope runs back through SCOTT and CORA, so gaps surface before the solicitation does.</p>
+        <p class="tool-pitch">Turns &ldquo;we have a problem&rdquo; into requirements that survive review. NORA identifies the stakeholders, runs the interviews and workshops, captures each requirement with the person who stated it, and measures the gap between what exists and what the mission needs. It seeds the traceability matrix every other tool builds on.</p>
         <div class="tool-buttons">
-          <a href="/corbel/sophie.html" class="btn btn-primary">Statement of work – SOPHIE</a>
+          <a href="/corbel/nora.html" class="btn btn-primary">Requirement – NORA</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="tool-divider"></div>
+
+  <section class="tool-section" id="cora">
+    <div class="tool-inner">
+      <div class="tool-meta">
+        <div class="tool-name">Cora</div>
+        <div class="tool-descriptor">Criteria Organizer and Regulatory Advisor</div>
+        <div class="tool-status ready">Ready to use</div>
+      </div>
+      <div class="tool-body">
+        <p class="tool-pitch">Determines which UFC, UFGS sections, FAR and DFARS clauses, and EM 385-1-1 and OSHA requirements apply to a project, with the reason and source for each, and a record of everything it left out. Exports a criteria list ready for the scope of work.</p>
+        <div class="tool-buttons">
+          <a href="/corbel/cora.html" class="btn btn-primary">Criteria – CORA</a>
         </div>
       </div>
     </div>
@@ -1113,17 +1143,17 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
   <div class="tool-divider"></div>
 
-  <section class="tool-section" id="cora">
+  <section class="tool-section" id="sophie">
     <div class="tool-inner">
       <div class="tool-meta">
-        <div class="tool-name">Cora</div>
-        <div class="tool-descriptor">Criteria Organizer and Regulatory Advisor</div>
+        <div class="tool-name">Sophie</div>
+        <div class="tool-descriptor">Scope Of work Preparation, Harmonization, Integration, and Editing</div>
         <div class="tool-status ready">Ready to use</div>
       </div>
       <div class="tool-body">
-        <p class="tool-pitch">Determines which UFC, UFGS sections, FAR and DFARS clauses, and EM 385-1-1 and OSHA requirements apply to a project, with the reason and source for each, and a record of everything it left out. Exports a criteria list ready for the scope of work.</p>
+        <p class="tool-pitch">Writes the scope of work in your format. One model drafts, a second reviews, a third settles their disagreements, and every &ldquo;shall&rdquo; traces back to a requirement. The finished scope runs back through SCOTT and CORA, so gaps surface before the solicitation does.</p>
         <div class="tool-buttons">
-          <a href="/corbel/cora.html" class="btn btn-primary">Criteria – CORA</a>
+          <a href="/corbel/sophie.html" class="btn btn-primary">Statement of work – SOPHIE</a>
         </div>
       </div>
     </div>
@@ -1167,7 +1197,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
   <div class="tool-divider"></div>
 
-  <section class="tool-section last" id="hank">
+  <section class="tool-section" id="hank">
     <div class="tool-inner">
       <div class="tool-meta">
         <div class="tool-name">Hank</div>
@@ -1185,8 +1215,15 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
 
   <div class="tool-divider"></div>
 
-  
+  </details>
 
+  <script>
+  (function(){var sel=document.getElementById('rolesel'),fd=document.getElementById('projfold'),nt=document.getElementById('rolenote');if(!sel||!fd) return;
+   function get(){try{return localStorage.getItem('corbel_role')||'theater';}catch(e){return 'theater';}}
+   function apply(){var r=get();sel.value=r;fd.open=r!=='theater';nt.textContent=r==='theater'?'Project delivery tools are folded below; they stay one click away.':r==='pm'?'Project delivery tools are open.':'Everything is open.';}
+   sel.onchange=function(){try{localStorage.setItem('corbel_role',sel.value);}catch(e){}apply();var p=document.getElementById('pjsel');if(p&&p.onchange) p.onchange();};
+   apply();})();
+  </script>
   <!-- CLOSING BAND -->
   <section class="closing-band">
     <p class="closing-text">Built by a program manager who has carried these documents through review, for the people who will carry them next.</p>
