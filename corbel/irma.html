@@ -137,9 +137,27 @@
   if(!known.length) return {st:'unk',req:L,miss:miss};known.sort(function(a,b){return a.d.date<b.d.date?1:a.d.date>b.d.date?-1:0;});var bind=known[0];
   var gap=r.need?gapMo(bind.d.date,r.need):null,st=capStD(bind.d.date,r.need);if(miss.length&&st==='ok') st='unk';
   return {st:st,req:L,cap:bind.d.date,gap:gap,bind:bind,miss:miss,est:!!bind.d.est,flag:bind.d.flag||'',basis:bind.d.src+' ('+KIND[bind.d.kind]+')'};}
+ // ---------- capacity as well as date: one rule, read the same way by ADAM, PAULA and the briefs ----------
+ // r.caps: [{id,measure,ac,unit,need,src,deliv:[{pid,n}]}]. Each project's date comes from projFinish. Numbers are only what was entered.
+ var CAPM=[['parking','Aircraft parking spots','spots'],['rwlen','Runway length','ft'],['pcn','Runway strength','PCN'],['fuel','Fuel storage','bbl'],['thru','Fuel throughput','gal/day'],['hyd','Hydrant outlets','outlets'],['berthl','Berth length','ft'],['berthd','Berth depth','ft'],['pier','Pier or wharf count','piers'],['other','Other','']];
+ function fmy(d){var m=/^(\d{4})-(\d{2})/.exec(d||'');return m?MON[+m[2]-1]+' '+m[1]:'';}
+ function capMeta(c){var m=CAPM.filter(function(x){return x[0]===c.measure;})[0]||CAPM[CAPM.length-1];return {key:m[0],name:c.measure==='other'?(c.label||'Other'):m[1]+(c.measure==='parking'&&c.ac?' ('+c.ac+')':''),unit:c.unit||m[2]};}
+ function capacity(r,byId,live,H){var out=[];(r.caps||[]).forEach(function(c){var need=+c.need||0,M=capMeta(c);if(!need) return;
+   var rows=(c.deliv||[]).map(function(d){var p=byId(d.pid);if(!p||!(+d.n>0)) return null;var f=projFinish(p,live?live(p.id):null,H);return {p:p,n:+d.n,date:f?f.date:'',est:!!(f&&f.est)};}).filter(Boolean);
+   rows.sort(function(a,b){return !a.date?1:!b.date?-1:a.date<b.date?-1:a.date>b.date?1:0;});
+   var cum=0,steps=[],full='',byNeed=0,nd=r.need?dD(r.need):'',undated=0;rows.forEach(function(x){if(!x.date){undated+=x.n;return;}cum+=x.n;steps.push({date:x.date,cum:cum,p:x.p.name});if(!full&&cum>=need) full=x.date;if(nd&&x.date<=nd) byNeed+=x.n;});
+   var total=cum+undated,u=M.unit?' '+M.unit:'',L={cap:c,name:M.name,unit:M.unit,need:need,steps:steps,full:full,byNeed:byNeed,total:total,undated:undated,src:c.src||''};
+   if(!rows.length){L.st='none';L.text=M.name+': '+need+u+' needed; no project delivers it yet';}
+   else if(!full){L.st='partial';L.share=Math.min(1,(nd?byNeed:cum)/need);L.text=(nd?byNeed:cum)+' of '+need+u+(nd?' by the need date':'')+'; full capacity not yet planned ('+total+u+' in all'+(undated?', '+undated+' with no date':'')+')';}
+   else if(!nd){L.st='ok';L.text='Full capacity by '+fmy(full)+' (no need date)';}
+   else if(full<=nd){var sp=-gapMo(full,nd);L.st='ok';L.text='Full capacity by '+fmy(full)+(sp>0?' ('+sp+' mo spare)':' (on the date)');}
+   else if(byNeed>0){L.st='partial';L.share=byNeed/need;L.text=byNeed+' of '+need+u+' by the need date; full capacity '+fmy(full);}
+   else{var g=gapMo(full,nd);L.st=capStD(full,nd);L.text='Full capacity by '+fmy(full)+' (+'+g+' mo late)';}
+   L.line=M.name+': '+L.text;out.push(L);});
+  var part=out.filter(function(x){return x.st==='partial';});return {lines:out,partial:part.length>0,share:part.length?Math.min.apply(null,part.map(function(x){return x.share||0;})):1,any:out.length>0};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capacity:capacity,CAPM:CAPM,capMeta:capMeta,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -272,7 +290,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel113',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel116',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
