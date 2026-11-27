@@ -292,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel118',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel119',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -1965,9 +1965,12 @@ const digI=s=>String(s||'').replace(/[^\d.]/g,'').replace(/\.0+$/,'');
 function normF(k,v){return k==='number'?numI(v):['cost','fy','dpct'].includes(k)?digI(v):['d35','dc'].includes(k)?ymOf(v)||String(v||''):nzI(k==='component'?SVCN(v):v);}
 const onPage=(v,t)=>{const d=String(v||'').replace(/[,$\s]/g,'');if(!d) return false;return String(t).replace(/[,$\s]/g,'').toLowerCase().includes(d.toLowerCase());};
 function costTok(c){const t=String(c).replace(/\$/g,'').trim().split(/\s+/).filter(x=>/\d/.test(x));if(!t.length) return '';const ok=x=>/^\d{1,3}(,\d{3})+(\.\d+)?$|^\d+(\.\d+)?$/.test(x);if(t[1]&&!/,/.test(t[0])&&/^\d{1,3}$/.test(t[0])&&/^\d{1,2},\d{3}/.test(t[1])&&ok(t[0]+t[1])) return digI(t[0]+t[1]);return digI((t[0].match(/\d[\d,]*(\.\d+)?/)||[''])[0]);}
+// Block 8 may print both amounts ("AUTH: 0 APPR: 20,000"): the cost is the appropriation, in $000, digits only; the authorization is kept apart.
+function costAppr(s){s=String(s??'');const m=s.match(/APPR(?:OP(?:RIATION)?)?\.?\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)/i);if(m) return digI(m[1]);if(/AUTH/i.test(s)){const r=s.replace(/AUTH(?:ORI[SZ]ATION)?\.?\s*:?\s*\$?\s*[\d,]+(?:\.\d+)?/ig,' ');return /\d/.test(r)?costTok(r):'';}return costTok(s);}
+function costAuth(s){const m=String(s??'').match(/AUTH(?:ORI[SZ]ATION)?\.?\s*:?\s*\$?\s*([\d,]+(?:\.\d+)?)/i);return m?digI(m[1]):'';}
 function readerA(grp){const first=grp.pages[0];let h=hdrPos(first);if(Object.keys(h).length<4) h={...hdrText(first.t),...h};
  const all=grp.pages.map(p=>p.t).join('\n');const o={},pg={};const set=(k,v,n)=>{if(v){o[k]=String(v).trim();pg[k]=n;}};
- ['title','number','installation','pe','catcode'].forEach(k=>set(k,h[k],first.n));set('component',h.component&&SVCN(h.component),first.n);set('cost',h.cost&&costTok(h.cost),first.n);
+ ['title','number','installation','pe','catcode'].forEach(k=>set(k,h[k],first.n));set('component',h.component&&SVCN(h.component),first.n);set('cost',h.cost&&costAppr(h.cost),first.n);if(h.cost&&costAuth(h.cost)!=='') o.auth=costAuth(h.cost);
  const fy=(first.t.match(/FY\s*(20\d\d)\s+MILITARY\s+CONSTRUCTION/i)||first.t.match(/\bFY\s*(20\d\d)\b/i)||[])[1];set('fy',fy,first.n);
  const b=blk12(all);Object.entries(b).forEach(([k,v])=>{const p=grp.pages.find(x=>k==='dpct'?/Percent\s+Complet/i.test(x.t):k==='d35'?/35\s*%\s*Design/i.test(x.t):/Design\s+Complet/i.test(x.t));set(k,v,p?p.n:first.n);});
  return {o,pg};}
@@ -1979,42 +1982,56 @@ function groups(pages,file){const out=[];let cur=null;
   cur={file,no,ti,pages:[pg],loose:0};out.push(cur);});
  return out;}
 const R1391_SYS=`You read DD Form 1391 pages from a U.S. military construction budget justification book. Return ONLY JSON:
-{"title":"","number":"","installation":"","component":"","fy":"","pe":"","catcode":"","cost":"","dpct":"","d35":"","dc":"","pages":{"title":0,"number":0,"installation":0,"component":0,"fy":0,"pe":0,"catcode":0,"cost":0,"dpct":0,"d35":0,"dc":0}}
-title is block 4, number block 7, installation block 3, component block 1, pe block 5, catcode block 6, cost block 8 in thousands of dollars (digits only, as printed). fy is the fiscal year in the form heading. From block 12: dpct is the design percent complete (digits only), d35 the date 35% design is complete and dc the date design is complete, both YYYY-MM. Copy text exactly as printed. Leave a field empty if it is not on the pages; never estimate. pages gives the page number each value is printed on.`;
+{"title":"","number":"","installation":"","component":"","fy":"","pe":"","catcode":"","cost":"","auth":"","dpct":"","d35":"","dc":"","pages":{"title":0,"number":0,"installation":0,"component":0,"fy":0,"pe":0,"catcode":0,"cost":0,"dpct":0,"d35":0,"dc":0}}
+title is block 4, number block 7, installation block 3, component block 1, pe block 5, catcode block 6, cost is the appropriation request in block 8 (APPR, or the only amount if one is printed) in thousands of dollars, digits only; auth is the authorization amount (AUTH) in block 8 if printed, digits only. fy is the fiscal year in the form heading. From block 12: dpct is the design percent complete (digits only), d35 the date 35% design is complete and dc the date design is complete, both YYYY-MM. Copy text exactly as printed. Leave a field empty if it is not on the pages; never estimate. pages gives the page number each value is printed on.`;
 const ARB_SYS=`Two readers took one field from the same DD Form 1391 pages and disagree. Read the pages and decide which value is printed there, or give the correct printed value if neither is right. Return ONLY JSON {"value":"","quote":"the exact words on the page that show it","page":0}. If the field is not on the pages, return an empty value.`;
 const RTAB_SYS=`You read a U.S. defense budget exhibit table (for example the Pacific Deterrence Initiative display or a military construction project list) and list every construction project row. Return ONLY JSON {"unit":"thousands|millions","rows":[{"title":"","installation":"","component":"","fy":"","amount":"","account":"","page":0}]}
 amount is the request for that row exactly as printed (digits and commas, no symbols); unit is the unit the table states. fy is the fiscal year of the amount. Copy text exactly; skip subtotal and total rows; never estimate.`;
 const REVB_SYS=`You review DD Form 1391 pages the way an OSD or congressional staff reviewer would before the budget hearing. Find what a reviewer would challenge: a requirement with no number behind it, scope with no requirement, a solution stated as the requirement, a vague impact if not provided, block 11 that contradicts block 9 or 12, dates that do not hang together. Return ONLY JSON {"findings":[{"severity":"bad|warn","title":"short","detail":"one or two sentences on what to fix","quote":"exact words from the pages, or empty"}]} with at most 3 findings, most important first. Only real issues.`;
-async function aiRead(grp){const src=grp.pages.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n').slice(0,60000);const j=await CARLAI.ask('claude',R1391_SYS,src,null,{fresh:true});const o={},pg={};
- IMF.forEach(([k])=>{let v=String(j[k]??'').trim();if(!v) return;if(k==='component') v=SVCN(v);if(k==='cost'||k==='dpct') v=digI(v);if(k==='d35'||k==='dc') v=ymOf(v)||v;o[k]=v;const n=N((j.pages||{})[k]);pg[k]=grp.pages.some(p=>p.n===n)?n:grp.pages[0].n;});return {o,pg};}
+const IMP_T=()=>window.__impT||150000;
+// A reading call that does not answer in time is dropped: the first reader's values stand, marked amber.
+function askT(engine,sys,src){return Promise.race([CARLAI.ask(engine,sys,src,null,{fresh:true}),new Promise((_,rej)=>setTimeout(()=>{const e=new Error('no answer in '+Math.round(IMP_T()/1000)+' s');e.timeout=true;rej(e);},IMP_T()))]);}
+async function aiRead(grp){const src=grp.pages.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n').slice(0,60000);const j=await askT('claude',R1391_SYS,src);const o={},pg={};
+ IMF.forEach(([k])=>{let v=String(j[k]??'').trim();if(!v) return;if(k==='component') v=SVCN(v);if(k==='cost') v=costAppr(v);if(k==='dpct') v=digI(v);if(k==='d35'||k==='dc') v=ymOf(v)||v;o[k]=v;const n=N((j.pages||{})[k]);pg[k]=grp.pages.some(p=>p.n===n)?n:grp.pages[0].n;});const au=String(j.auth??'').trim();if(au) o.auth=costAuth('AUTH '+au)||digI(au);return {o,pg};}
 async function arbitrate(grp,k,a,b){const src=grp.pages.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n').slice(0,60000);
- const j=await CARLAI.ask('gemini',ARB_SYS,'FIELD: '+(IMF.find(f=>f[0]===k)||[k,k])[1]+'\nREADER A: '+a+'\nREADER B: '+b+'\n\nPAGES:\n'+src,null,{fresh:true});
+ const j=await askT('gemini',ARB_SYS,'FIELD: '+(IMF.find(f=>f[0]===k)||[k,k])[1]+'\nREADER A: '+a+'\nREADER B: '+b+'\n\nPAGES:\n'+src);
  const q=String(j.quote||'').trim(),v=String(j.value||'').trim();if(!v||!q) return null;const all=grp.pages.map(p=>p.t).join('\n');
  if(!nzI(all).includes(nzI(q))) return null;if(['cost','fy','dpct'].includes(k)?!onPage(v,q):!nzI(q).includes(nzI(k==='component'?v:v).split(' ')[0])) return null;
- const n=N(j.page);return {v:k==='component'?SVCN(v):v,page:grp.pages.some(p=>p.n===n)?n:grp.pages[0].n,quote:q};}
+ const n=N(j.page);return {v:k==='component'?SVCN(v):k==='cost'?costAppr(v):v,page:grp.pages.some(p=>p.n===n)?n:grp.pages[0].n,quote:q};}
 // Merge the two readings field by field.
 async function settle(grp,A,B,say){const F={};const all=grp.pages.map(p=>p.t).join('\n');
  for(const [k] of IMF){const a=A.o[k]||'',b=B?(B.o[k]||''):'';let bOk=!!b&&(!['cost','fy','dpct'].includes(k)||onPage(b,all));const f={a,b:b||'',bDropped:!!b&&!bOk};
   if(a&&bOk&&normF(k,a)===normF(k,b)){f.v=a;f.how='agree';f.page=A.pg[k];}
-  else if(a&&!bOk){f.v=a;f.how=B?'a':'one';f.page=A.pg[k];}
+  else if(a&&!bOk){f.v=a;f.how=B?(B.to?'to':'a'):'one';f.page=A.pg[k];}
   else if(!a&&bOk){f.v=b;f.how='b';f.page=B.pg[k];}
-  else if(a&&bOk){let r=null;if(aiOn()){if(say) say('Settling '+(grp.no||grp.ti)+': '+k);try{r=await arbitrate(grp,k,a,b);}catch(e){}}
-   if(r){f.v=r.v;f.how='arb';f.page=r.page;f.quote=r.quote;}else{f.v=a;f.how='dispute';f.page=A.pg[k];}}
+  else if(a&&bOk){let r=null;if(aiOn()){if(say) say('Settling '+(grp.no||grp.ti)+': '+k);try{r=await arbitrate(grp,k,a,b);}catch(e){if(e&&e.timeout) r={to:true};}}
+   if(r&&r.to){f.v=a;f.how='to';f.page=A.pg[k];}else if(r){f.v=r.v;f.how='arb';f.page=r.page;f.quote=r.quote;}else{f.v=a;f.how='dispute';f.page=A.pg[k];}}
   else{f.v='';f.how='';}
   if(/^(N\/?A|NONE|TBD|-+)$/i.test(String(f.v||'').trim())){f.v='';f.how='';}
+  if(k==='cost'&&f.v) f.v=costAppr(f.v);
   F[k]=f;}
+ const au=A.o.auth||(B&&B.o&&B.o.auth)||'';F.auth={v:au,how:''};
  return F;}
-function matchOf(it){const ID=window.CorbelID;if(ID){const ti=it.F.title.v,insv=it.F.installation.v;const nums=[ID.num(it.F.number.v)].concat(ID.numsIn(ti)).filter(Boolean);
+// Budget books label the same project differently each year: "PDI: AIRFIELD DEVELOPMENT PHASE 1, INC 3". The labels are dropped before comparing.
+function bookTitle(t){return String(t||'').replace(/^\s*(?:PDI|EDI|CTC|ERI|EUCOM|INDOPACOM)\s*:\s*/i,'').replace(/[,;(]?\s*\bINC(?:REMENT)?\b\.?\s*(?:\d+|[IVX]+)?\s*\)?\s*$/i,'').replace(/\bINC(?:REMENT)?\s+\d+\b/ig,' ').replace(/\s+/g,' ').trim();}
+function incOf(t){const m=String(t||'').match(/\bINC(?:REMENT)?\.?\s*(\d+|[IVX]+)\b/i);return m?m[1]:'';}
+// Every word of the book's title is in the project's name (a book abbreviation such as PIPELN counts for PIPELINE), and the book adds no number the name lacks.
+function coversT(name,ti){const STOP={the:1,and:1,of:1,for:1,at:1,to:1,in:1,on:1,a:1,an:1,w:1,with:1,phase:1,ph:1,project:1,facility:1,facilities:1,inc:1,increment:1};const W=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>(w.length>1||/\d/.test(w))&&!STOP[w]);
+ const B=W(ti),L=W(name);if(B.filter(w=>!/^\d+$/.test(w)).length<2) return false;const sub=(a,b)=>{let i=0;for(const c of b){if(c===a[i]) i++;}return i===a.length;};
+ const hit=w=>L.some(x=>x===w||(/^\d+$/.test(w)?false:(w.length>=3&&x.indexOf(w)===0)||(w.length>=4&&x[0]===w[0]&&x.length>w.length&&sub(w,x))));return B.every(hit);}
+function matchOf(it){const ID=window.CorbelID;if(ID){const ti=bookTitle(it.F.title.v),insv=it.F.installation.v;const nums=[ID.num(it.F.number.v)].concat(ID.numsIn(ti)).filter(Boolean);
  const sameI=p=>insv?ID.sameInst(p.installation,insv):false;
  let M=nums.length?P.projects.filter(p=>{const pn=ID.num(p.number);return (pn&&nums.includes(pn))||ID.numsIn(p.name).some(x=>nums.includes(x));}):[];if(M.length>1){const M2=M.filter(sameI);if(M2.length) M=M2;}
  // A different project number on both sides means a different project, however alike the titles.
  const numOk=p=>{const pn=ID.num(p.number);return !nums.length||!pn||nums.includes(pn);};
- if(!M.length&&ti) M=P.projects.filter(p=>numOk(p)&&sameI(p)&&(nzI(p.name)===nzI(ti)||ID.titleSim(p.name,ti)>=.75));
- if(!M.length&&ti&&!insv){const M3=P.projects.filter(p=>numOk(p)&&ID.titleSim(p.name,ti)>=.9);if(M3.length===1) M=M3;}return M;}
+ if(!M.length&&ti) M=P.projects.filter(p=>numOk(p)&&sameI(p)&&(nzI(bookTitle(p.name))===nzI(ti)||ID.titleSim(bookTitle(p.name),ti)>=.75));
+ if(!M.length&&ti&&insv) M=P.projects.filter(p=>numOk(p)&&sameI(p)&&coversT(p.name,ti));
+ if(!M.length&&ti&&!insv){const M3=P.projects.filter(p=>numOk(p)&&ID.titleSim(bookTitle(p.name),ti)>=.9);if(M3.length===1) M=M3;}return M;}
  return matchOf0(it);}
 function matchOf0(it){const no=numI(it.F.number.v),ins=nzI(it.F.installation.v),ti=nzI(it.F.title.v);const insHit=p=>{const a=nzI(p.installation);if(!a||!ins) return false;const w=a.split(' ').filter(x=>x.length>3);return w.some(x=>ins.includes(x));};
  let M_=no?P.projects.filter(p=>numI(p.number)===no&&insHit(p)):[];if(!M_.length&&ti) M_=P.projects.filter(p=>nzI(p.name)===ti&&insHit(p));return M_;}
 function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const all=it.text||'';const pr=it.pages?(it.pages[0]+(it.pages.length>1?'–'+it.pages[it.pages.length-1]:'')):'';const src=it.file+(pr?', page '+pr:'');
+ if(it.to) R.push(['warn','The second reading took too long, so these are the first reader’s values. Check them against the page.',src]);
  IMF.forEach(([k,l])=>{if(F[k]&&F[k].how==='dispute') R.push(['bad','Readers disagree on '+l.toLowerCase()+': “'+F[k].a+'” or “'+F[k].b+'”. Pick one before adding.',src]);});
  IMKEY.forEach(k=>{if(!v(k)&&(k!=='number'||it.kind==='1391')) R.push(['bad','No '+(IMF.find(f=>f[0]===k)[1]).toLowerCase()+' found on the form.',src]);});
  if(it.kind==='1391'){[['REQUIREMENT\\s*:','Requirement'],['CURRENT\\s+SITUATION\\s*:','Current situation'],['IMPACT\\s+IF\\s+NOT\\s+PROVIDED\\s*:','Impact if not provided']].forEach(([re,l])=>{if(all&&!new RegExp(re,'i').test(all)) R.push(['warn','Block 11 has no “'+l+'” paragraph.',src]);});
@@ -2029,16 +2046,18 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
  return R;}
 // ---- read files ----
-async function impFiles(files,pasted){const say=t=>{const e=$('#imSt');if(e) e.textContent=t;};IMP=IMP||{files:[],items:[],at:new Date().toISOString()};
- try{for(const f of files){let pages;if(f.pasted) pages=[{n:1,t:f.text,items:[]}];else if(/\.pdf$/i.test(f.name)){pages=await pdfRead(f,say);}else{pages=[{n:1,t:await f.text(),items:[]}];}
+async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading is already under way. Wait for it to finish, then add more.');
+ // progress lives with the import, so it shows again when the page is reopened
+ const say=t=>{if(IMP) IMP.st=t;const e=$('#imSt');if(e) e.textContent=t;};IMP=IMP||{files:[],items:[],at:new Date().toISOString()};IMP.busy=true;
+ try{for(const f of files){const bk={name:f.name,n0:IMP.items.length,st:'reading',err:''};(IMP.books=IMP.books||[]).push(bk);try{let pages;if(f.pasted) pages=[{n:1,t:f.text,items:[]}];else if(/\.pdf$/i.test(f.name)){pages=await pdfRead(f,say);}else{pages=[{n:1,t:await f.text(),items:[]}];}
    const url=f.pasted?'':URL.createObjectURL(f);IMP.files.push({name:f.name,url,n:pages.length});
    const G=groups(pages,f.name);const pdi=/Pacific\s+Deterrence\s+Initiative/i.test(pages.slice(0,6).map(p=>p.t).join(' '));
-   if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){}}
+   if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){if(e&&e.timeout){B={o:{},pg:{},to:true};bk.to=(bk.to||0)+1;}}}
      const F=await settle(g,A,B,say);const prog=/^VARIOUS$/i.test(String(F.number.v||'').trim())||/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(String(F.title.v||'').trim());
-     IMP.items.push({id:uid(),kind:'1391',file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!B,unit:'thousands',sel:!prog,prog});}}
-   else{if(!aiOn()){IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
+     IMP.items.push({id:uid(),kind:'1391',file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!(B&&!B.to),to:!!(B&&B.to)||IMF.some(([k])=>F[k]&&F[k].how==='to'),unit:'thousands',sel:!prog,prog});}}
+   else{if(!aiOn()){bk.st='skipped';bk.err='no DD 1391 pages; reading a table needs the CARL sign-in';IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
     const cand=pages.filter(p=>/\d{1,3}(,\d{3})+|\d{4,}/.test(p.t)).slice(0,40);for(let s=0;s<cand.length;s+=4){const ch=cand.slice(s,s+4);say('Reading the table in '+f.name+' with two readers: pages '+ch[0].n+'–'+ch[ch.length-1].n);
-     const src=ch.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n');let A,B;try{[A,B]=await Promise.all([CARLAI.ask('claude',RTAB_SYS,src,null,{fresh:true}),CARLAI.ask('gemini',RTAB_SYS,src,null,{fresh:true})]);}catch(e){IMP.notes=(IMP.notes||[]).concat([f.name+': the table could not be read ('+e.message+').']);continue;}
+     const src=ch.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n');let A,B;try{[A,B]=await Promise.all([askT('claude',RTAB_SYS,src),askT('gemini',RTAB_SYS,src)]);}catch(e){bk.miss=(bk.miss||0)+1;IMP.notes=(IMP.notes||[]).concat([f.name+': the table could not be read ('+e.message+').']);continue;}
      const unit=/million/i.test(A.unit||'')?'millions':'thousands';const key=r=>nzI(r.title)+'|'+nzI(r.installation).split(' ')[0];const BM=new Map((B.rows||[]).map(r=>[key(r),r]));
      // the second reader's row for the same project may carry the number in its title ("Hydrant Fuel System Replacement (AJJY 29-1001)"): match it by number, or by a close title at the same installation, so one project is one row
      const IDm=window.CorbelID;const nOf=r=>IDm?IDm.numsIn(String(r.title||'')+' '+String(r.number||'')):[];
@@ -2051,9 +2070,11 @@ async function impFiles(files,pasted){const say=t=>{const e=$('#imSt');if(e) e.t
       IMP.items.push({id:uid(),kind:'table',file:f.name,pages:[pgN],text:pt,F,pdi,two:true,unit,sel:true});});
      BM.forEach(r=>{const pgN=ch.some(p=>p.n===N(r.page))?N(r.page):ch[0].n;const F={};const mk=(k,bv)=>{F[k]=bv&&(!['cost','fy'].includes(k)||onPage(bv,src))?{v:bv,a:'',b:bv,how:'b',page:pgN}:{v:'',how:''};};
       mk('title',r.title);mk('installation',r.installation);mk('component',r.component&&SVCN(r.component));mk('fy',digI(r.fy));mk('cost',digI(r.amount));['number','pe','catcode','dpct','d35','dc'].forEach(k=>F[k]={v:'',how:''});
-      IMP.items.push({id:uid(),kind:'table',file:f.name,pages:[pgN],text:(ch.find(p=>p.n===pgN)||ch[0]).t,F,pdi,two:true,unit,sel:true});});}}}
+      IMP.items.push({id:uid(),kind:'table',file:f.name,pages:[pgN],text:(ch.find(p=>p.n===pgN)||ch[0]).t,F,pdi,two:true,unit,sel:true});});}}
+   bk.st=bk.st==='reading'?'done':bk.st;}catch(e){bk.st='failed';bk.err=String(e&&e.message||e);}finally{bk.rows=IMP.items.length-bk.n0;}}
   impMatch();log('Budget documents read',files.map(f=>f.name).join(', ')+': '+IMP.items.length+' projects');}
  catch(e){alert('Could not read the document: '+e.message);}
+ finally{IMP.busy=false;}
  say('');vImp();}
 function impMatch(){const seen={};IMP.items.forEach(it=>{const k=numI(it.F.number.v)+'|'+nzI(it.F.installation.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');it.dupe=!!seen[k]&&!!it.F.number.v;seen[k]=1;
  if(it.mset) return;const M_=matchOf(it);it.cands=M_.map(p=>p.id);it.match=M_.length===1?M_[0].id:'';});impTwins();}
@@ -2083,9 +2104,11 @@ function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return al
   const fill=(k,val)=>{if(val!==''&&val!=null&&(p[k]===''||p[k]==null)) p[k]=val;};
   fill('name',v('title')?v('title').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase()):'');fill('number',v('number'));fill('installation',v('installation')?(ID?ID.inst(v('installation')):v('installation').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase())):'');fill('service',ID?ID.svc(v('component')):v('component'));fill('fy',v('fy'));
   if(!p.lat){const g=locate(p.installation);if(g){p.lat=g[0];p.lon=g[1];if(!p.country) p.country=g[2];}}
-  if(it.useCost&&amt) p.programmed=amt;else fill('programmed',amt||'');if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
+  if(it.useCost&&amt) p.programmed=amt;else if(isNew||!incOf(v('title'))) fill('programmed',amt||'');if(isNew&&N(F.auth&&F.auth.v)) fill('authorized',N(F.auth.v)*1e3);if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
   if(isNew) p.phase=4;
-  if(amt&&N(v('fy'))&&(isNew||!p.fy||String(p.fy)===String(v('fy')))){p.funds=ownFunds(p);if(!p.funds.some(l=>N(l.fy)===N(v('fy'))&&l.stage==='requested'&&!isHN(l))) p.funds.push({id:uid(),fy:N(v('fy')),src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost')});}
+  if(amt&&N(v('fy'))){p.funds=ownFunds(p);const fy=N(v('fy')),inc=incOf(v('title')),bn=numI(v('number'));
+   // one line per book project and year: two projects in one year's book (airfield and apron) are two lines; the same project read again is not
+   if(!p.funds.some(l=>N(l.fy)===fy&&!isHN(l)&&(bn&&l.bnum?l.bnum===bn:N(l.amt)===amt||(!bn&&l.stage==='requested')))) p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});}
   if(isNew) p.prog_status='pb';
   if(v('dpct')!==''&&!dPct(p)){p.gates={...(p.gates||{})};const g=p.gates.design||{};if(g.pct===undefined) p.gates.design={...g,pct:N(v('dpct')),date:g.date||(v('d35')?v('d35')+'-01':''),src:pg('dpct')};}
   if(it.pdi){p.posture={...(p.posture||{}),pdi:true};pd++;}
@@ -2093,9 +2116,9 @@ function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return al
   it.done=isNew?'Added':'Updated';it.pid=p.id;isNew?a++:u++;it.sel=false;});
  log('Projects added from budget documents',a+' added, '+u+' updated'+(pd?', '+pd+' marked PDI':'')+(sk?', '+sk+' PDI row'+(sk>1?'s':'')+' not added (no matching project)':''));save();renderSteps();vImp();}
 // ---- outputs ----
-const HOW={agree:'Both readers agree',a:'Layout reader only (AI reading not on the page)',b:'AI reader only',one:'One reader (sign in for the second)',arb:'Settled by the arbiter',dispute:'Readers disagree',you:'Set by the reviewer','':''};
+const HOW={to:'First reader only – the second reading took too long; check it',agree:'Both readers agree',a:'Layout reader only (AI reading not on the page)',b:'AI reader only',one:'One reader (sign in for the second)',arb:'Settled by the arbiter',dispute:'Readers disagree',you:'Set by the reviewer','':''};
 function impBook(){const I=IMP.items;const mt=it=>it.done?it.done+' '+((P.projects.find(p=>p.id===it.pid)||{}).name||''):it.twin?'Same project as the 1391 “'+((IMP.items.find(x=>x.id===it.twin)||{F:{title:{}}}).F.title.v||'')+'” in this upload':it.match?'Matches '+((P.projects.find(p=>p.id===it.match)||{}).name||''):(it.cands||[]).length>1?'Several possible matches':'New';
- return [{name:'Projects',rows:[['Project','Number','Installation','Component','FY','Program element','Category code','Cost ($000)','Design %','35% design','Design complete','PDI','Match','Fields needing a check','File','Pages']].concat(I.map(it=>{const v=k=>it.F[k]?it.F[k].v:'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1000:1);return [v('title'),v('number'),v('installation'),v('component'),v('fy')?N(v('fy')):'',v('pe'),v('catcode'),amt||'',v('dpct')!==''?N(v('dpct')):'',v('d35'),v('dc'),it.pdi?'Yes':'',mt(it),IMF.filter(([k])=>it.F[k]&&['dispute','b','one'].includes(it.F[k].how)).map(f=>f[1]).join(', '),it.file,it.pages.join(', ')];}))},
+ return [{name:'Projects',rows:[['Project','Number','Installation','Component','FY','Program element','Category code','Cost ($000)','Design %','35% design','Design complete','PDI','Match','Fields needing a check','File','Pages']].concat(I.map(it=>{const v=k=>it.F[k]?it.F[k].v:'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1000:1);return [v('title'),v('number'),v('installation'),v('component'),v('fy')?N(v('fy')):'',v('pe'),v('catcode'),amt||'',v('dpct')!==''?N(v('dpct')):'',v('d35'),v('dc'),it.pdi?'Yes':'',mt(it),IMF.filter(([k])=>it.F[k]&&['dispute','b','one','to'].includes(it.F[k].how)).map(f=>f[1]).join(', '),it.file,it.pages.join(', ')];}))},
   {name:'Findings',rows:[['Project','Severity','Finding','Source']].concat(I.flatMap(it=>itemFindings(it).map(f=>[it.F.title.v||'(no title)',{bad:'Fix',warn:'Check',info:'Note'}[f[0]],f[1],f[2]])))},
   {name:'How each field was read',rows:[['Project','Field','Value','How it was read','Layout reader','AI reader','File','Page','Arbiter quote']].concat(I.flatMap(it=>IMF.filter(([k])=>it.F[k]&&(it.F[k].v||it.F[k].a||it.F[k].b)).map(([k,l])=>{const f=it.F[k];return [it.F.title.v,l,f.v,HOW[f.how]||'',f.a||'',(f.b||'')+(f.bDropped?' (not on the page – dropped)':''),it.file,f.page||'',f.quote||''];})))}];}
 function impMemo(){const I=IMP.items;const fs=[...new Set(I.map(it=>it.file))];const FN=I.flatMap(it=>itemFindings(it).map(f=>({it,f})));const fix=FN.filter(x=>x.f[0]==='bad'),chk=FN.filter(x=>x.f[0]==='warn');
@@ -2113,7 +2136,7 @@ function impMemo(){const I=IMP.items;const fs=[...new Set(I.map(it=>it.file))];c
  return cdDoc('Budget Document Review',[b]);}
 // ---- the screen ----
 function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
- const dot=f=>!f||!f.how?'':'<span title="'+esc(HOW[f.how]+(f.quote?' – “'+f.quote+'”':'')+(f.bDropped?' – the AI reading was not on the page and was dropped':''))+'" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:'+({agree:'#2e7d32',arb:'#2e7d32',you:'#2e7d32',a:'#c98a00',b:'#c98a00',one:'#c98a00',dispute:'#b3261e'}[f.how]||'#999')+'"></span>';
+ const dot=f=>!f||!f.how?'':'<span title="'+esc(HOW[f.how]+(f.quote?' – “'+f.quote+'”':'')+(f.bDropped?' – the AI reading was not on the page and was dropped':''))+'" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:'+({agree:'#2e7d32',arb:'#2e7d32',you:'#2e7d32',a:'#c98a00',b:'#c98a00',one:'#c98a00',to:'#c98a00',dispute:'#b3261e'}[f.how]||'#999')+'"></span>';
  const fileUrl=it=>(IMP.files.find(f=>f.name===it.file)||{}).url;
  const cell=(it,k,w)=>{const f=it.F[k]||{};const pick=f.how==='dispute'?'<div class="small">'+[f.a,f.b].map((x,i)=>'<button class="sm" data-ipk="'+it.id+'|'+k+'|'+i+'">'+esc(x)+'</button>').join(' ')+'</div>':'';
   return '<td><div style="display:flex;align-items:center"><input data-if="'+it.id+'|'+k+'" value="'+esc(f.v||'')+'" style="width:'+(w||120)+'px"'+(it.done?' disabled':'')+'>'+dot(f)+'</div>'+pick+'</td>';};
@@ -2122,9 +2145,10 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
  v.innerHTML='<div class="panel"><h2>Import budget documents</h2><p class="lead">Drop in a justification book, single DD 1391s or a budget exhibit such as the Pacific Deterrence Initiative display. Each 1391 is read twice and the readings compared; every value keeps the page it came from. Review the table, then add or update the projects in one step. Nothing changes in the portfolio until you do.</p>'+
   '<div id="imDrop" style="border:2px dashed #9DB4C3;border-radius:10px;padding:18px;text-align:center;margin:10px 0"><button class="go" id="imPick">Choose PDFs</button> <span class="small">or drop them here. Several files at once is fine.</span><input type="file" id="imF" accept=".pdf,.txt" multiple hidden></div>'+
   '<details><summary class="small" style="cursor:pointer">No PDF? Paste the text of a 1391 instead</summary><textarea id="imTx" rows="6" style="width:100%;margin-top:6px" placeholder="Paste the text of one DD 1391, header block included"></textarea><button class="sm" id="imTxGo">Read pasted text</button></details>'+
-  '<p class="small" id="imSt" style="color:#1F4E5F;font-weight:600"></p>'+(signed?'':'<p class="small">Signed out: 1391s are read by the layout reader alone and every field is marked for a check. Sign in again (Face ID) for the second reader, the arbiter and tables.</p>')+
+  '<p class="small" id="imSt" style="color:#1F4E5F;font-weight:600">'+esc(IMP&&IMP.busy?IMP.st||'Reading…':'')+'</p>'+(signed?'':'<p class="small">Signed out: 1391s are read by the layout reader alone and every field is marked for a check. Sign in again (Face ID) for the second reader, the arbiter and tables.</p>')+
   ((IMP&&IMP.notes||[]).map(n=>'<p class="small" style="color:#9b2c2c">'+esc(n)+'</p>').join(''))+'</div>'+
-  (I.length?'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Review '+I.length+' project'+(I.length>1?'s':'')+'</h3><div><button class="sm" id="imXl">Download review workbook</button> <button class="sm" id="imDoc">Download review memo</button> '+(signed?'<button class="sm" id="imAI">'+(IMP.ai?'Run the AI review again':'Add the AI review')+'</button> ':'')+'<button class="sm" id="imClr">Clear</button></div></div>'+
+  ((IMP&&IMP.books||[]).length||I.length?'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Review '+I.length+' project'+(I.length!==1?'s':'')+'</h3><div><button class="sm" id="imXl">Download review workbook</button> <button class="sm" id="imDoc">Download review memo</button> '+(signed?'<button class="sm" id="imAI">'+(IMP.ai?'Run the AI review again':'Add the AI review')+'</button> ':'')+'<button class="sm" id="imClr">Clear</button></div></div>'+
+   ((IMP.books||[]).length?'<table class="ptable" style="margin:8px 0"><thead><tr><th>Book</th><th>Rows</th><th>Result</th></tr></thead><tbody>'+IMP.books.map(b=>'<tr><td>'+esc(b.name)+'</td><td>'+(b.st==='reading'?'…':N(b.rows))+'</td><td'+(b.st==='failed'?' style="color:#9b2c2c"':'')+'>'+({reading:'Reading now',done:'Read',failed:'Failed – '+esc(b.err),skipped:'Not read – '+esc(b.err)}[b.st]||'')+(b.to?' <span style="color:#7a5600">· '+b.to+' project'+(b.to>1?'s':'')+' with the first reader only (time limit)</span>':'')+(b.miss?' <span style="color:#7a5600">· '+b.miss+' table section'+(b.miss>1?'s':'')+' not read</span>':'')+'</td></tr>').join('')+'</tbody></table>':'')+
    '<p class="small">Green: both readers agree, or the arbiter settled it from the page. Amber: one reader only – check it. Red: the readers disagree – pick a value. Hover a dot for how it was read.'+(nFix?' <b style="color:#9b2c2c">'+nFix+' row'+(nFix>1?'s need':' needs')+' a fix.</b>':'')+'</p>'+
    '<div style="overflow:auto"><table class="ptable"><thead><tr><th><input type="checkbox" id="imAll" style="width:auto"'+(I.every(it=>it.sel||it.done)?' checked':'')+'></th><th>Project</th><th>Number</th><th>Installation</th><th>FY</th><th>Cost ($000)</th><th>Design %</th><th>Portfolio</th></tr></thead><tbody>'+
    FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
@@ -2136,7 +2160,7 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
  $('#imPick').onclick=()=>$('#imF').click();$('#imF').onchange=e=>{const fs=[...e.target.files];e.target.value='';go(fs);};
  const dz=$('#imDrop');dz.ondragover=e=>{e.preventDefault();dz.style.background='#eef4f7';};dz.ondragleave=()=>dz.style.background='';dz.ondrop=e=>{e.preventDefault();dz.style.background='';go([...e.dataTransfer.files]);};
  $('#imTxGo').onclick=()=>{const t=$('#imTx').value.trim();if((t.match(/\S+/g)||[]).length<15) return alert('Paste the whole 1391 text, header block included.');impFiles([{pasted:true,name:'Pasted text',text:t}]);};
- if(!I.length) return;
+ if(!I.length){const c=$('#imClr');if(c) c.onclick=()=>{IMP=null;vImp();};return;}
  const IT=id=>IMP.items.find(x=>x.id===id);
  v.querySelectorAll('[data-if]').forEach(el=>el.onchange=()=>{const [id,k]=el.dataset.if.split('|');const it=IT(id);it.F[k]={...(it.F[k]||{}),v:el.value.trim(),how:'you'};if(['number','installation','title'].includes(k)) impMatch();vImp();});
  v.querySelectorAll('[data-ipk]').forEach(b=>b.onclick=()=>{const [id,k,i]=b.dataset.ipk.split('|');const it=IT(id);const f=it.F[k];f.v=i==='0'?f.a:f.b;f.how='you';impMatch();vImp();});
