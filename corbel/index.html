@@ -23,7 +23,7 @@
    if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons','vera_assess'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -69,7 +69,7 @@
   if(r.subst) return {date:r.subst.date,kind:'actual',src:'Substantial completion, from HANK'};
   if(r.pis) return {date:r.pis.date,kind:'actual',src:'Placed in service, from '+(r.pis.src.indexOf('HANK')===0?'HANK':'PAULA')};
   if(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')) return {date:p.seq.finish,kind:'projected',src:'PAULA projected completion'};
-  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast'};
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast',yr:p.forecast_prec==='year'};
   if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish,kind:'baseline',src:'PAULA baseline'};
   return null;}
  // Dates that cannot all be true.
@@ -111,7 +111,7 @@
   var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
   if(sq&&ok(sq.finish,'The projection')) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
   var m=bod(p);
-  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:p.forecast_prec==='year'?'Forecast completion, year only (counted as 31 Dec)':'Forecast completion',est:false,yr:p.forecast_prec==='year'};
   if(m&&ISO.test(m.forecast||'')&&ok(m.forecast,'The forecast beneficial occupancy')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
   if(ISO.test(p.baseline_finish||'')&&ok(p.baseline_finish,'The baseline completion')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
   if(m&&ISO.test(m.baseline||'')&&ok(m.baseline,'The baseline beneficial occupancy')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
@@ -140,24 +140,26 @@
  // ---------- capacity as well as date: one rule, read the same way by ADAM, PAULA and the briefs ----------
  // r.caps: [{id,measure,ac,unit,need,src,deliv:[{pid,n}]}]. Each project's date comes from projFinish. Numbers are only what was entered.
  var CAPM=[['parking','Aircraft parking spots','spots'],['rwlen','Runway length','ft'],['pcn','Runway strength','PCN'],['fuel','Fuel storage','bbl'],['thru','Fuel throughput','gal/day'],['hyd','Hydrant outlets','outlets'],['berthl','Berth length','ft'],['berthd','Berth depth','ft'],['pier','Pier or wharf count','piers'],['other','Other','']];
+ // A year-only forecast is counted as 31 Dec of that year and shown as the year.
+ function fyo(d,yr){return yr&&/^\d{4}/.test(d||'')?d.slice(0,4)+' (year only)':fmy(d);}
  function fmy(d){var m=/^(\d{4})-(\d{2})/.exec(d||'');return m?MON[+m[2]-1]+' '+m[1]:'';}
  function capMeta(c){var m=CAPM.filter(function(x){return x[0]===c.measure;})[0]||CAPM[CAPM.length-1];return {key:m[0],name:c.measure==='other'?(c.label||'Other'):m[1]+(c.measure==='parking'&&c.ac?' ('+c.ac+')':''),unit:c.unit||m[2]};}
  function capacity(r,byId,live,H){var out=[];(r.caps||[]).forEach(function(c){var need=+c.need||0,M=capMeta(c);if(!need) return;
-   var rows=(c.deliv||[]).map(function(d){var p=byId(d.pid);if(!p||!(+d.n>0)) return null;var f=projFinish(p,live?live(p.id):null,H);return {p:p,n:+d.n,date:f?f.date:'',est:!!(f&&f.est)};}).filter(Boolean);
+   var rows=(c.deliv||[]).map(function(d){var p=byId(d.pid);if(!p||!(+d.n>0)) return null;var f=projFinish(p,live?live(p.id):null,H);return {p:p,n:+d.n,date:f?f.date:'',est:!!(f&&f.est),yr:!!(f&&f.yr)};}).filter(Boolean);
    rows.sort(function(a,b){return !a.date?1:!b.date?-1:a.date<b.date?-1:a.date>b.date?1:0;});
-   var cum=0,steps=[],full='',byNeed=0,nd=r.need?dD(r.need):'',undated=0;rows.forEach(function(x){if(!x.date){undated+=x.n;return;}cum+=x.n;steps.push({date:x.date,cum:cum,p:x.p.name});if(!full&&cum>=need) full=x.date;if(nd&&x.date<=nd) byNeed+=x.n;});
+   var cum=0,steps=[],full='',fyr=false,byNeed=0,nd=r.need?dD(r.need):'',undated=0;rows.forEach(function(x){if(!x.date){undated+=x.n;return;}cum+=x.n;steps.push({date:x.date,cum:cum,p:x.p.name});if(!full&&cum>=need){full=x.date;fyr=x.yr;}if(nd&&x.date<=nd) byNeed+=x.n;});
    var total=cum+undated,u=M.unit?' '+M.unit:'',L={cap:c,name:M.name,unit:M.unit,need:need,steps:steps,full:full,byNeed:byNeed,total:total,undated:undated,src:c.src||''};
    if(!rows.length){L.st='none';L.text=M.name+': '+need+u+' needed; no project delivers it yet';}
    else if(!full){L.st='partial';L.share=Math.min(1,(nd?byNeed:cum)/need);L.text=(nd?byNeed:cum)+' of '+need+u+(nd?' by the need date':'')+'; full capacity not yet planned ('+total+u+' in all'+(undated?', '+undated+' with no date':'')+')';}
-   else if(!nd){L.st='ok';L.text='Full capacity by '+fmy(full)+' (no need date)';}
-   else if(full<=nd){var sp=-gapMo(full,nd);L.st='ok';L.text='Full capacity by '+fmy(full)+(sp>0?' ('+sp+' mo spare)':' (on the date)');}
-   else if(byNeed>0){L.st='partial';L.share=byNeed/need;L.text=byNeed+' of '+need+u+' by the need date; full capacity '+fmy(full);}
-   else{var g=gapMo(full,nd);L.st=capStD(full,nd);L.text='Full capacity by '+fmy(full)+' (+'+g+' mo late)';}
+   else if(!nd){L.st='ok';L.text='Full capacity by '+fyo(full,fyr)+' (no need date)';}
+   else if(full<=nd){var sp=-gapMo(full,nd);L.st='ok';L.text='Full capacity by '+fyo(full,fyr)+(sp>0?' ('+sp+' mo spare)':' (on the date)');}
+   else if(byNeed>0){L.st='partial';L.share=byNeed/need;L.text=byNeed+' of '+need+u+' by the need date; full capacity '+fyo(full,fyr);}
+   else{var g=gapMo(full,nd);L.st=capStD(full,nd);L.text='Full capacity by '+fyo(full,fyr)+' (+'+g+' mo late)';}
    L.line=M.name+': '+L.text;out.push(L);});
   var part=out.filter(function(x){return x.st==='partial';});return {lines:out,partial:part.length>0,share:part.length?Math.min.apply(null,part.map(function(x){return x.share||0;})):1,any:out.length>0};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capacity:capacity,CAPM:CAPM,capMeta:capMeta,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,fyo:fyo,fmy:fmy,capability:capability,capacity:capacity,CAPM:CAPM,capMeta:capMeta,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -272,8 +274,8 @@
 </script>
 <script id="corbel-nt">// ---------- No tool names in what leaves the suite ----------
 // Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
-window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
- const R=[[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|VERA|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bFrom VERA:\s*/g,'From the assessment: '],[/\bfrom VERA\b/g,'from the assessment'],[/\bVERA\b/g,'the assessment'],[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
   [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'as reviewed'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
   [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
  R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
@@ -290,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel116',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel117',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -406,6 +408,15 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  window.CorbelIssues={used:used,open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
 })();
 </script>
+
+
+
+
+
+
+
+
+
 
 
 
@@ -985,6 +996,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
     var q=J('quinn_project');var qAny=q&&(q.registry||[]).some(mine);if(q&&(to||qAny)){var bl=(q.registry||[]).filter(mine).map(function(r){return r.building;});var rs=(q.records||[]).filter(function(r){return bl.indexOf(r.building)>=0;}),od=(q.issues||[]).filter(function(i){return bl.indexOf(i.building)>=0&&i.status!=='closed';});o.quinn=rs.length?rs.length+' inspection reports, '+od.length+' open deficienc'+(od.length===1?'y':'ies'):'No inspection reports yet';}else o.quinn=to?'No inspection reports yet':'Linked once the project has a task order';
     var ad=J('adam_portfolio');var ar=ad&&ad.reqs?ad.reqs.filter(function(r){return (r.links||[]).some(function(l){return l.pid===id;});}):[];o.adam=ar.length?'Serves '+ar.length+' posture requirement'+(ar.length===1?'':'s'):'Not linked to a posture requirement';
     var hk=J('hank_portfolio');var hr=hk&&hk.items?hk.items[id]:null;o.hank=hr?(hr.dd&&hr.dd.finalDate?'Final DD Form 1354 done':hr.dates&&hr.dates.final?'Final acceptance '+hr.dates.final:hr.dates&&hr.dates.pis?'Placed in service '+hr.dates.pis:'Close-out started'):'Not in close-out yet';
+    var va=J('vera_assess');var vf=[];((va&&va.assessments)||[]).forEach(function(a){(a.findings||[]).forEach(function(f){if(f.pid===id&&['closed','notacc'].indexOf(f.status||'open')<0) vf.push(f);});});var vr=function(r){return vf.filter(function(f){return (f.ev&&f.ev.length?f.rating:'unk')===r;}).length;};o.vera=vf.length?[vr('problem')&&vr('problem')+' problem'+(vr('problem')>1?'s':''),vr('concern')&&vr('concern')+' concern'+(vr('concern')>1?'s':''),vr('sound')&&vr('sound')+' sound'].filter(Boolean).join(', ')||vf.length+' not yet known':'Not assessed yet';
     o.paula=c.priority&&!/^\s*1 of 1\b|not scored/i.test(c.priority)?'Priority: '+c.priority:c.priority?'Not scored':'Tracked in the portfolio';
     var pq=((J('paula_project')||{}).projects||[]).filter(function(x){return x.id===id;})[0]||{};var ph=+(c.phase||pq.phase||0),SO=['programmed','requested','authorized','appropriated','obligated'],top=(pq.funds||c.funds||[]).reduce(function(m,l){return Math.max(m,SO.indexOf(l.stage||''));},-1),ps=String(c.prog_status||pq.prog_status||(top>=0?SO[top]:(+(c.programmed||pq.programmed)>0?'programmed':''))),PSN={pb:'in the President’s Budget',requested:'in the President’s Budget',authorized:'authorized',appropriated:'appropriated',obligated:'obligated'},fun=!!PSN[ps];
     var next=ph>=8?['hank','Close it out in Hank']:(ph===7||+(c.award||pq.award)>0)?['irma','Review submittals and RFIs in Irma; update status in Paula']:(!n&&(fun||ph>=5))?['paula','Track it in Paula – '+(PSN[ps]?'already '+PSN[ps]:'phase '+ph)]:(!n&&ps==='programmed')?['piper','Review its 1391 in Piper – already programmed']:!n?['nora','Define the requirement in Nora']:!ev['Requirement validated']&&!(rc.earl&&rc.earl.recommended)&&!(n.requirements||[]).length?['nora','Finish the requirement in Nora']:!(rc.earl&&rc.earl.recommended)?['earl','Weigh the alternatives in Earl']:!(rc.piper&&(rc.piper.rounded||rc.piper.total))?['piper','Build the 1391 in Piper']:!ss.length?['sophie','Write the SOW in Sophie']:!ev['SOW final']?['sophie','Finish the SOW in Sophie']:!to?['scott','Set the acquisition in Scott']:['paula','Update status in Paula'];
@@ -992,10 +1004,10 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    var TH={adam:1,paula:1,earl:1,piper:1,vera:1};
    function role(){try{return localStorage.getItem('corbel_role')||'theater';}catch(e){return 'theater';}}
    // A theater advisor is pointed only at theater tools: project-tool steps become the theater step that follows them.
-   function theaterNext(n){if(role()!=='theater'||TH[n[0]]) return n;var M={nora:['earl','Weigh the alternatives in Earl'],sophie:['paula','Track it in Paula'],scott:['paula','Track it in Paula'],cora:['paula','Track it in Paula'],irma:['paula','Update status in Paula'],quinn:['paula','Update status in Paula'],hank:['paula','Update status in Paula']};return M[n[0]]||['paula','Track it in Paula'];}
+   function theaterNext(n){if(role()!=='theater'||TH[n[0]]) return n;var M={nora:['earl','Weigh the alternatives in Earl'],sophie:['paula','Track it in Paula'],scott:['paula','Track it in Paula'],cora:['paula','Track it in Paula'],irma:['vera','Assess execution in Vera; update status in Paula'],quinn:['vera','Assess execution in Vera; update status in Paula'],hank:['paula','Update status in Paula']};return M[n[0]]||['paula','Track it in Paula'];}
    function show(){var id=sel.value,s=status(id);s.next=theaterNext(s.next);nx.style.display='';nx.textContent='Next: '+s.next[1];nx.href='/corbel/'+s.next[0]+'.html';
     nt.textContent=[s.c.service,s.c.fy?'FY'+s.c.fy:'',s.c.programmed?M(s.c.programmed)+' programmed':'',s.c.to?'Task order '+s.c.to:''].filter(Boolean).join('  ·  ')||'Every tool opens this project.';
-    ['adam','nora','earl','piper','sophie','irma','quinn','hank','paula'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
+    ['adam','nora','earl','piper','sophie','irma','quinn','hank','paula','vera'].forEach(function(t){var sec=document.getElementById(t);if(!sec) return;var m=sec.querySelector('.tool-meta');if(!m) return;var d=m.querySelector('.tool-proj');if(!d){d=document.createElement('div');d.className='tool-proj';d.style.cssText="font-family:'Lora',Georgia,serif;font-size:13px;color:var(--ink-soft);margin-top:10px;max-width:240px";m.appendChild(d);}
      d.textContent=s.o[t];d.style.fontWeight=s.next[0]===t?'700':'400';});}
    sel.onchange=function(){st=J('milcon_store')||st;st.active=sel.value;try{localStorage.setItem('milcon_store',JSON.stringify(st));}catch(e){}show();};
    if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',show);else show();})();
@@ -1100,12 +1112,12 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
       <div class="tool-meta">
         <div class="tool-name">Vera</div>
         <div class="tool-descriptor">Verification, Evaluation, and Risk Assessment</div>
-        <div class="tool-status">Coming in the next release</div>
+        <div class="tool-status ready">Ready to use</div>
       </div>
       <div class="tool-body">
         <p class="tool-pitch">Assesses execution across a multi-site program: what is right and what is wrong, site by site, each finding traced to its evidence, rated and given a recommendation. It reads the portfolio, posture, 1391 and alternatives records, adds site visits and a schedule health check, and writes the assessment report and briefing.</p>
         <div class="tool-buttons">
-          <span class="btn btn-primary" aria-disabled="true" style="opacity:.55;cursor:default">Program assessment – VERA</span>
+          <a href="/corbel/vera.html" class="btn btn-primary">Program assessment – VERA</a>
         </div>
       </div>
     </div>

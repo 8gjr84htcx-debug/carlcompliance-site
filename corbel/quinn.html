@@ -23,7 +23,7 @@
    if(SEEDED[id]&&!g.call(ls,'pf:'+id+':corbel_seeded')) return seed(id).then(go);go();return Promise.resolve();},
   reset:function(id){return seed(id||'test');},
   // One file holding every Corbel tool's data for the current portfolio, and the way back.
-  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons'],
+  TOOLKEYS:['milcon_store','milcon_record','nora_project','earl_project','piper_project','scott_project','sophie_project','sophie_to_scott','ccs_project','ccs_import','ccs_by_pid','cora_selection','scott_last','irma_project','quinn_project','paula_project','adam_portfolio','hank_portfolio','corbel_lessons','vera_assess'],
   backup:function(){var c=cur(),o={schema:'corbel-backup-1',portfolio:NAMES[c]||c||'My portfolio',saved:new Date().toISOString(),keys:{}},n=0;
    this.TOOLKEYS.forEach(function(k){var v=g.call(ls,nk(k));if(v!=null){o.keys[k]=v;n++;}});
    var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(o)],{type:'application/json'}));a.download=(c?'TEST_':'')+'Corbel_Backup_'+new Date().toLocaleDateString('en-CA')+'.json';document.body.appendChild(a);a.click();setTimeout(function(){a.remove();},300);return n;},
@@ -69,7 +69,7 @@
   if(r.subst) return {date:r.subst.date,kind:'actual',src:'Substantial completion, from HANK'};
   if(r.pis) return {date:r.pis.date,kind:'actual',src:'Placed in service, from '+(r.pis.src.indexOf('HANK')===0?'HANK':'PAULA')};
   if(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')) return {date:p.seq.finish,kind:'projected',src:'PAULA projected completion'};
-  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast'};
+  if(ISO.test(p.forecast_finish||'')) return {date:p.forecast_finish,kind:'forecast',src:'PAULA forecast',yr:p.forecast_prec==='year'};
   if(ISO.test(p.baseline_finish||'')) return {date:p.baseline_finish,kind:'baseline',src:'PAULA baseline'};
   return null;}
  // Dates that cannot all be true.
@@ -111,7 +111,7 @@
   var sq=live&&live.slip>0&&ISO.test(live.pf||'')?{finish:live.pf,slip:live.slip}:(p.seq&&p.seq.slip>0&&ISO.test(p.seq.finish||'')?p.seq:null);
   if(sq&&ok(sq.finish,'The projection')) return {date:String(sq.finish).slice(0,10),kind:'projected',src:'Projected completion, '+Math.round(sq.slip/30.4)+' months past its forecast'+(p.seq&&p.seq.chain?': '+p.seq.chain:''),est:false};
   var m=bod(p);
-  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:'Forecast completion',est:false};
+  if(ISO.test(p.forecast_finish||'')&&ok(p.forecast_finish,'The forecast completion')) return {date:p.forecast_finish.slice(0,10),kind:'forecast',src:p.forecast_prec==='year'?'Forecast completion, year only (counted as 31 Dec)':'Forecast completion',est:false,yr:p.forecast_prec==='year'};
   if(m&&ISO.test(m.forecast||'')&&ok(m.forecast,'The forecast beneficial occupancy')) return {date:m.forecast.slice(0,10),kind:'forecast',src:'Forecast beneficial occupancy',est:false};
   if(ISO.test(p.baseline_finish||'')&&ok(p.baseline_finish,'The baseline completion')) return {date:p.baseline_finish.slice(0,10),kind:'baseline',src:'Baseline completion',est:false};
   if(m&&ISO.test(m.baseline||'')&&ok(m.baseline,'The baseline beneficial occupancy')) return {date:m.baseline.slice(0,10),kind:'baseline',src:'Baseline beneficial occupancy',est:false};
@@ -140,24 +140,26 @@
  // ---------- capacity as well as date: one rule, read the same way by ADAM, PAULA and the briefs ----------
  // r.caps: [{id,measure,ac,unit,need,src,deliv:[{pid,n}]}]. Each project's date comes from projFinish. Numbers are only what was entered.
  var CAPM=[['parking','Aircraft parking spots','spots'],['rwlen','Runway length','ft'],['pcn','Runway strength','PCN'],['fuel','Fuel storage','bbl'],['thru','Fuel throughput','gal/day'],['hyd','Hydrant outlets','outlets'],['berthl','Berth length','ft'],['berthd','Berth depth','ft'],['pier','Pier or wharf count','piers'],['other','Other','']];
+ // A year-only forecast is counted as 31 Dec of that year and shown as the year.
+ function fyo(d,yr){return yr&&/^\d{4}/.test(d||'')?d.slice(0,4)+' (year only)':fmy(d);}
  function fmy(d){var m=/^(\d{4})-(\d{2})/.exec(d||'');return m?MON[+m[2]-1]+' '+m[1]:'';}
  function capMeta(c){var m=CAPM.filter(function(x){return x[0]===c.measure;})[0]||CAPM[CAPM.length-1];return {key:m[0],name:c.measure==='other'?(c.label||'Other'):m[1]+(c.measure==='parking'&&c.ac?' ('+c.ac+')':''),unit:c.unit||m[2]};}
  function capacity(r,byId,live,H){var out=[];(r.caps||[]).forEach(function(c){var need=+c.need||0,M=capMeta(c);if(!need) return;
-   var rows=(c.deliv||[]).map(function(d){var p=byId(d.pid);if(!p||!(+d.n>0)) return null;var f=projFinish(p,live?live(p.id):null,H);return {p:p,n:+d.n,date:f?f.date:'',est:!!(f&&f.est)};}).filter(Boolean);
+   var rows=(c.deliv||[]).map(function(d){var p=byId(d.pid);if(!p||!(+d.n>0)) return null;var f=projFinish(p,live?live(p.id):null,H);return {p:p,n:+d.n,date:f?f.date:'',est:!!(f&&f.est),yr:!!(f&&f.yr)};}).filter(Boolean);
    rows.sort(function(a,b){return !a.date?1:!b.date?-1:a.date<b.date?-1:a.date>b.date?1:0;});
-   var cum=0,steps=[],full='',byNeed=0,nd=r.need?dD(r.need):'',undated=0;rows.forEach(function(x){if(!x.date){undated+=x.n;return;}cum+=x.n;steps.push({date:x.date,cum:cum,p:x.p.name});if(!full&&cum>=need) full=x.date;if(nd&&x.date<=nd) byNeed+=x.n;});
+   var cum=0,steps=[],full='',fyr=false,byNeed=0,nd=r.need?dD(r.need):'',undated=0;rows.forEach(function(x){if(!x.date){undated+=x.n;return;}cum+=x.n;steps.push({date:x.date,cum:cum,p:x.p.name});if(!full&&cum>=need){full=x.date;fyr=x.yr;}if(nd&&x.date<=nd) byNeed+=x.n;});
    var total=cum+undated,u=M.unit?' '+M.unit:'',L={cap:c,name:M.name,unit:M.unit,need:need,steps:steps,full:full,byNeed:byNeed,total:total,undated:undated,src:c.src||''};
    if(!rows.length){L.st='none';L.text=M.name+': '+need+u+' needed; no project delivers it yet';}
    else if(!full){L.st='partial';L.share=Math.min(1,(nd?byNeed:cum)/need);L.text=(nd?byNeed:cum)+' of '+need+u+(nd?' by the need date':'')+'; full capacity not yet planned ('+total+u+' in all'+(undated?', '+undated+' with no date':'')+')';}
-   else if(!nd){L.st='ok';L.text='Full capacity by '+fmy(full)+' (no need date)';}
-   else if(full<=nd){var sp=-gapMo(full,nd);L.st='ok';L.text='Full capacity by '+fmy(full)+(sp>0?' ('+sp+' mo spare)':' (on the date)');}
-   else if(byNeed>0){L.st='partial';L.share=byNeed/need;L.text=byNeed+' of '+need+u+' by the need date; full capacity '+fmy(full);}
-   else{var g=gapMo(full,nd);L.st=capStD(full,nd);L.text='Full capacity by '+fmy(full)+' (+'+g+' mo late)';}
+   else if(!nd){L.st='ok';L.text='Full capacity by '+fyo(full,fyr)+' (no need date)';}
+   else if(full<=nd){var sp=-gapMo(full,nd);L.st='ok';L.text='Full capacity by '+fyo(full,fyr)+(sp>0?' ('+sp+' mo spare)':' (on the date)');}
+   else if(byNeed>0){L.st='partial';L.share=byNeed/need;L.text=byNeed+' of '+need+u+' by the need date; full capacity '+fyo(full,fyr);}
+   else{var g=gapMo(full,nd);L.st=capStD(full,nd);L.text='Full capacity by '+fyo(full,fyr)+' (+'+g+' mo late)';}
    L.line=M.name+': '+L.text;out.push(L);});
   var part=out.filter(function(x){return x.st==='partial';});return {lines:out,partial:part.length>0,share:part.length?Math.min.apply(null,part.map(function(x){return x.share||0;})):1,any:out.length>0};}
  // A logged time in this computer's local time zone (logs are stored in UTC).
  function lt(iso){var d=new Date(iso);if(isNaN(d)) return String(iso||'').slice(0,16).replace('T',' ');var z=function(n){return String(n).padStart(2,'0');};return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())+' '+z(d.getHours())+':'+z(d.getMinutes());}
- window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,capability:capability,capacity:capacity,CAPM:CAPM,capMeta:capMeta,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
+ window.CorbelDates={ORDER:ORDER,NAME:NAME,read:read,finish:finish,check:check,pick:pick,fd:fd,lt:lt,projFinish:projFinish,fyo:fyo,fmy:fmy,capability:capability,capacity:capacity,CAPM:CAPM,capMeta:capMeta,capSt:capSt,capStD:capStD,gapMo:gapMo,ruleText:ruleText,KIND:KIND,adamT:adamT};
 })();
 </script>
 <script id="corbel-id">/* Corbel identity: one Service name, one installation name and one project number form across every tool,
@@ -272,8 +274,8 @@
 </script>
 <script id="corbel-nt">// ---------- No tool names in what leaves the suite ----------
 // Exports carry the record's own words (the posture record, the 1391, the close-out record), never the tool that holds them.
-window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|Corbel|CORBEL)\b/.test(s)) return s;
- const R=[[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
+window.CorbelDeTool=window.CorbelDeTool||function(s){if(typeof s!=='string'||!/\b(ADAM|PAULA|NORA|EARL|PIPER|SOPHIE|IRMA|QUINN|HANK|CORA|SCOTT|VERA|Corbel|CORBEL)\b/.test(s)) return s;
+ const R=[[/\bFrom VERA:\s*/g,'From the assessment: '],[/\bfrom VERA\b/g,'from the assessment'],[/\bVERA\b/g,'the assessment'],[/\bRebuilt by PIPER\b/g,'Rebuilt'],[/\bEARL alternative\b/g,'Economic analysis alternative'],[/\bEARL[’']s\b/g,'the economic analysis’s'],[/\s*\((?:NORA|PIPER|CORA|SOPHIE|EARL|SCOTT|IRMA|QUINN|HANK)\)/g,''],[/\bPAULA project data\b/g,'project data'],[/\bPAULA milestone\b/g,'milestone'],[/\bPAULA[’']s forecast\b/g,'the portfolio forecast'],[/\b(?:passed )?to PAULA\b/g,m=>m.replace('PAULA','the portfolio ranking')],[/\bfor PAULA\b/g,'for the portfolio ranking'],
   [/\bPAULA leaves\b/g,'The portfolio ranking leaves'],[/\bread in PIPER review\b/g,'as reviewed'],[/\bPIPER 1391\b/g,'1391'],[/\bfrom EARL\b/g,'from the economic analysis'],[/\bfrom HANK\b/g,'from the close-out record'],[/\bin ADAM\b/g,'in the posture record'],[/\bfrom ADAM\b/gi,m=>m[0]==='F'?'From the posture record':'from the posture record'],[/\(ADAM\)/g,'(posture record)'],
   [/\bADAM\b/g,'the posture record'],[/\bPAULA\b/g,'the portfolio record'],[/\bNORA\b/g,'the requirements record'],[/\bEARL\b/g,'the economic analysis'],[/\bPIPER\b/g,'the 1391 review'],[/\bSOPHIE\b/g,'the SOW'],[/\bIRMA\b/g,'the RFI and submittal log'],[/\bQUINN\b/g,'the inspection record'],[/\bHANK\b/g,'the close-out record'],[/\bCORA\b/g,'the criteria list'],[/\bSCOTT\b/g,'the acquisition plan'],[/\bCorbel\b|\bCORBEL\b/g,'']];
  R.forEach(([a,b])=>{s=s.replace(a,b);});return s.replace(/(^|[.!?]\s+|>\s*)the /g,(m,p)=>p+'The ');};
@@ -290,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel116',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel117',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -492,7 +494,7 @@ function piperReviewCost(s){if(s.mode!=='review') return {};const n=v=>Number(St
  const sk={programmed:'PIPER rebuild (Service 1391 '+(flag?'block 9 total':'block 8')+', rounded)'};return notes.length?{programmed:R,_srck:sk,_ask:{programmed:'Offered: $'+(R/1e6).toFixed(1)+'M. '+notes.join(' ')}}:{programmed:R,_srck:sk};}
 // ---- the facts one record owns: cost, scope basis, primary quantity with its unit, and need date ----
 // A tool fills an empty fact, or updates one it set itself; anything else waits in core.pending for a person to choose.
-const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date',to:'Task order or contract'};
+const OWN=['programmed','scope','qty','need_date'];const OWNL={programmed:'Programmed cost',scope:'Scope',qty:'Primary quantity',need_date:'Need date',to:'Task order or contract',forecast_finish:'Forecast completion'};
 function qtyStr(q,u){const n=Number(String(q).replace(/[^\d.]/g,''));if(!n) return undefined;return n.toLocaleString('en-US')+' '+String(u||'').trim().toUpperCase();}
 function scopeOf(type,text){const t=String(type||'').toLowerCase(),x=String(text||'').toLowerCase();if(/^(new|replace|addition)$/.test(t)) return 'New or replacement construction';if(/^(renovate|repair|modernize|alter|alteration)$/.test(t)) return 'Renovation or repair';if(t&&!/^(status_quo)$/.test(t)) return t.replace(/_/g,' ').replace(/^./,c=>c.toUpperCase());
  if(/\b(renovat|repair|moderniz|upgrade|rehabilitat|restor|alter)/.test(x)) return 'Renovation or repair';if(/\b(replac|new |construct|addition|build)/.test(x)) return 'New or replacement construction';return undefined;}
@@ -504,7 +506,7 @@ function ownSet(core,k,v,src,direct,tool,ask){tool=tool||src;core.facts=core.fac
  if(ownEq(k,cur,v)) return false;if(core.kept[k]&&core.kept[k].some(x=>ownEq(k,x,v))) return false;
  // one waiting value per tool and fact: a tool's newer value replaces its older one
  const i=core.pending.findIndex(p=>p.k===k&&(p.tool||p.src)===tool);const it={k,v,src,tool,at:today()};if(i>=0){if(ownEq(k,core.pending[i].v,v)&&core.pending[i].src===src) return false;core.pending[i]=it;}else core.pending.push(it);return true;}
-const PAULA_F=['delivery','scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','pct'];
+const PAULA_F=['delivery','scope','qty','need_date','priority','priority_rank','appropriation','funds','authority','prog_status','posture','hn','gates','ext','name','number','to','service','installation','country','fy','pm','programmed','authorized','award','cwe','obligated','expended','ntp','baseline_finish','forecast_finish','forecast_prec','pct'];
 const same=(a,b)=>(a&&typeof a==='object')||(b&&typeof b==='object')?JSON.stringify(a??null)===JSON.stringify(b??null):String(a??'')===String(b??'');
 // Cost and quantity belong to a scope. A cost priced for replacement cannot become the programmed cost of a renovation (or the reverse) without a person confirming the mismatch.
 const scClass=t=>/renovat|repair/i.test(String(t||''))?'reno':/new|replac/i.test(String(t||''))?'new':'';
@@ -563,7 +565,9 @@ function paulaOut(St,pa){let ch=false;(pa.projects||[]).forEach(pp=>{if(pp.sampl
   const o={};PAULA_F.forEach(f=>o[f]=pp[f]);if(mergeCore(p.core,o,'PAULA',true)) ch=true;});if(ch) saveStore(St);}
 
 // ---- public helpers ----
-window.MS={propose:(id,k,v,src,note)=>{const s=loadStore();const p=s.projects[id];if(!p||!(OWN.includes(k)||k==='to')||!has(v)) return false;const c=p.core;if(ownEq(k,c[k],v)) return false;const r=ownSet(c,k,v,src,false,src,note||(src+' differs from the record'));if(r) saveStore(s);return r;},store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
+window.MS={propose:(id,k,v,src,note)=>{const s=loadStore();let p=s.projects[id];
+  // a project PAULA holds but the record has not seen yet joins the record with PAULA's values, so the proposal has somewhere to wait
+  if(!p){try{const pa=JSON.parse(ls.getItem('paula_project')||'null');const pp=pa&&(pa.projects||[]).find(x=>x.id===id&&has(x.name)&&(!x.sample||(window.CorbelPF&&CorbelPF.cur())));if(pp){p=s.projects[id]={id,core:{},tools:{},created:today()};const o={};PAULA_F.forEach(f=>o[f]=pp[f]);mergeCore(p.core,o,'PAULA',true);}}catch(e){}}if(!p||!(OWN.includes(k)||k==='to'||k==='forecast_finish')||!has(v)) return false;const c=p.core;if(ownEq(k,c[k],v)) return false;const r=ownSet(c,k,v,src,false,src,note||(src+' differs from the record'));if(r) saveStore(s);return r;},store:()=>loadStore(),active:()=>{const s=loadStore();return s.projects[s.active]||null;},has:id=>!!loadStore().projects[id],OWN,OWNL,ownEq,
  pending:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?(p.core.pending||[]).filter(x=>!ownEq(x.k,p.core[x.k],x.v)).map(x=>({...x,cur:p.core[x.k],curSrc:(p.core.facts||{})[x.k]?.src||''})):[];},
  facts:id=>{const s=loadStore();const p=s.projects[id||s.active];return p?OWN.map(k=>({k,label:OWNL[k],v:p.core[k],src:(p.core.facts||{})[k]?.src||''})):[];},
  resolve:(id,k,src,use)=>{const s=loadStore();const p=s.projects[id||s.active];if(!p) return false;const c=p.core;const i=(c.pending||[]).findIndex(x=>x.k===k&&x.src===src);if(i<0) return false;const it=c.pending[i];c.pending.splice(i,1);
@@ -693,7 +697,7 @@ function refresh(){const d=document.getElementById('msbar');if(!d) return;const 
  d.querySelector('#msmore').onclick=manage;const lb=d.querySelector('#mslaw');if(lb) lb.onclick=lawDlg;const pb=d.querySelector('#mspend');if(pb) pb.onclick=settle;}
 // New project, in the page (embedded browsers drop native prompts). It starts empty: nothing is copied from the open
 // project – no money, dates, scope or task order. Installation and Service are copied only if the user ticks the box.
-function newProjDlg(){const old=document.getElementById('msnewdlg');if(old) old.remove();const cur=(()=>{const s=loadStore();return s.projects[s.active]||null;})();const cc=(cur&&cur.core)||{};
+function newProjDlg(opts){const cb=opts&&typeof opts.onMade==='function'?opts.onMade:null;const old=document.getElementById('msnewdlg');if(old) old.remove();const cur=(()=>{const s=loadStore();return s.projects[s.active]||null;})();const cc=(cur&&cur.core)||{};
  const dl=document.createElement('div');dl.id='msnewdlg';dl.setAttribute('role','dialog');dl.setAttribute('aria-label','New project');
  dl.style.cssText='position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.35);display:flex;align-items:flex-start;justify-content:center;font:14px system-ui,-apple-system,Segoe UI,sans-serif;color:#222';
  const same=(cc.installation||cc.service)?'<label style="display:flex;gap:8px;align-items:flex-start;margin-top:12px;font-weight:400"><input type="checkbox" id="msnSame" style="width:auto;margin-top:3px"><span>Same installation and Service as '+esc(cc.name||'the open project')+' ('+esc([cc.installation,cc.service].filter(Boolean).join(', '))+')<\/span><\/label>':'';
@@ -704,9 +708,9 @@ function newProjDlg(){const old=document.getElementById('msnewdlg');if(old) old.
  const close=()=>dl.remove();dl.querySelector('#msnX').onclick=close;dl.addEventListener('click',e=>{if(e.target===dl) close();});dl.addEventListener('keydown',e=>{if(e.key==='Escape') close();if(e.key==='Enter'&&e.target===nm) go();});
  const go=()=>{const n=nm.value.trim();if(!n){dl.querySelector('#msnMsg').textContent='Give it a name first.';nm.focus();return;}
   const s2=loadStore();flush(s2);const id=uid();const core={name:n};const sm=dl.querySelector('#msnSame');if(sm&&sm.checked){if(cc.installation) core.installation=cc.installation;if(cc.service) core.service=cc.service;}
-  s2.projects[id]={id,core,tools:{},created:today()};s2.active=id;saveStore(s2);location.reload();};
+  s2.projects[id]={id,core,tools:{},created:today()};s2.active=id;saveStore(s2);if(cb){close();cb(id,core);}else location.reload();};
  dl.querySelector('#msnGo').onclick=go;}
-window.MSnewProject=newProjDlg;
+window.MSnewProject=o=>newProjDlg(o);
 // One place to settle what two tools disagree on: the record's value, the other tool's value, choose one.
 window.MSsettle=()=>settle();
 // NORA's open "sources disagree" items belong in the same settlement prompt, with both speakers and their authority.
@@ -1349,7 +1353,7 @@ const DX=(function(){
    else{put(LC[src[i]],LL[src[i]]);i++;}}
   put(LC[256],LL[256]);if(bc>0){if(op>=out.length) grow();out[op++]=bb&255;}return out.subarray(0,op);}
  function zip(files,type){const parts=[],cen=[];let off=0;const dt=new Date();const time=(dt.getHours()<<11)|(dt.getMinutes()<<5)|(dt.getSeconds()>>1),date=((dt.getFullYear()-1980)<<9)|((dt.getMonth()+1)<<5)|dt.getDate();
-  files.forEach(([name,str])=>{const nb=enc.encode(name),db=enc.encode(str),crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
+  files.forEach(([name,str])=>{const nb=enc.encode(name),db=typeof str==='string'?enc.encode(str):str,crc=crc32(db),cb=deflateRaw(db),zp=cb.length<db.length,dd=zp?cb:db,me=zp?8:0;const h=new DataView(new ArrayBuffer(30));
    h.setUint32(0,0x04034b50,true);h.setUint16(4,20,true);h.setUint16(6,0x0800,true);h.setUint16(8,me,true);h.setUint16(10,time,true);h.setUint16(12,date,true);h.setUint32(14,crc,true);h.setUint32(18,dd.length,true);h.setUint32(22,db.length,true);h.setUint16(26,nb.length,true);h.setUint16(28,0,true);
    parts.push(new Uint8Array(h.buffer),nb,dd);const c=new DataView(new ArrayBuffer(46));c.setUint32(0,0x02014b50,true);c.setUint16(4,20,true);c.setUint16(6,20,true);c.setUint16(8,0x0800,true);c.setUint16(10,me,true);c.setUint16(12,time,true);c.setUint16(14,date,true);c.setUint32(16,crc,true);c.setUint32(20,dd.length,true);c.setUint32(24,db.length,true);c.setUint16(28,nb.length,true);c.setUint32(42,off,true);
    cen.push(new Uint8Array(c.buffer),nb);off+=30+nb.length+dd.length;});
@@ -1396,7 +1400,8 @@ const DX=(function(){
   if(r.color) s+='<w:color w:val="'+r.color+'"/>';if(r.ls) s+='<w:spacing w:val="'+Math.round(r.ls*20)+'"/>';if(r.sz) s+='<w:sz w:val="'+Math.max(2,Math.round(r.sz*2))+'"/><w:szCs w:val="'+Math.max(2,Math.round(r.sz*2))+'"/>';
   if(r.hl) s+='<w:shd w:val="clear" w:color="auto" w:fill="'+r.hl+'"/>';if(r.u) s+='<w:u w:val="single"/>';if(r.va) s+='<w:vertAlign w:val="'+r.va+'"/>';return s?'<w:rPr>'+s+'</w:rPr>':'';}
  function run(text,r){if(r.hide||text==='') return '';return '<w:r>'+rPr(r)+'<w:t xml:space="preserve">'+x(text)+'</w:t></w:r>';}
- function conv(html){
+ let MEDIA=[];
+ function conv(html){MEDIA=[];
   const doc=new DOMParser().parseFromString(html,'text/html');
   const styleText=[...doc.querySelectorAll('style')].map(s=>s.textContent).join('\n');
   // Simple tag rules from the <style> block (p{...}, td{...}, body{...}).
@@ -1424,7 +1429,7 @@ const DX=(function(){
    if(node.nodeType!==1) return;const t=node.tagName;if(t==='SCRIPT'||t==='STYLE'||t==='TITLE'||t==='HEAD') return;
    if(t==='BR'){acc.push({br:true,r});return;}
    if(t==='INPUT'){const ty=(node.getAttribute('type')||'').toLowerCase();if(ty==='checkbox'||ty==='radio') acc.push({t:node.checked||node.hasAttribute('checked')?'☒ ':'☐ ',r});else acc.push({t:node.value||node.getAttribute('value')||'',r});return;}
-   if(t==='IMG'){if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
+   if(t==='IMG'){const m=/^data:image\/(jpeg|png);base64,(.+)$/.exec(node.getAttribute('src')||'');if(m){const wpx=+node.getAttribute('width')||320,hpx=+node.getAttribute('height')||240;try{const bin=atob(m[2]);const b=new Uint8Array(bin.length);for(let k=0;k<bin.length;k++) b[k]=bin.charCodeAt(k);MEDIA.push({ext:m[1]==='jpeg'?'jpeg':'png',b});acc.push({img:{n:MEDIA.length,cx:Math.round(wpx*9525),cy:Math.round(hpx*9525),alt:node.getAttribute('alt')||''},r});}catch(e){}return;}if(node.getAttribute('alt')) acc.push({t:node.getAttribute('alt'),r});return;}
    const s=st(node);const rr=runCtx(r,node,s);for(const c of node.childNodes) inl(c,rr,acc);}
   function para(acc,s,extra){// acc: [{t,r}|{br}]
    let i=0;while(i<acc.length&&!acc[i].br&&acc[i].t!=null&&!acc[i].t.trim()){i++;}let j=acc.length-1;while(j>=i&&!acc[j].br&&acc[j].t!=null&&!acc[j].t.trim()) j--;
@@ -1434,14 +1439,15 @@ const DX=(function(){
      const wid=(ls,z)=>longest*(z*(r.caps?0.8:0.6)+ls);if(wid(r.ls||0,sz)<=fw) return;const nr=Object.assign({},r0);
      nr.ls=Math.max(0,(fw/longest)-sz*(r.caps?0.8:0.6));if(wid(nr.ls,sz)>fw||nr.ls<0.2){nr.ls=0;nr.sz=Math.max(5.5,fw/(longest*(r.caps?0.8:0.6)));}items[k]=Object.assign({},it,{r:nr});});}
    const mark=(acc[0]&&acc[0].r)||extra&&extra.r0;
-   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else rs+=run(it.t,it.r);}
+   let rs='';for(const it of items){if(it.br) rs+='<w:r>'+rPr(it.r)+'<w:br/></w:r>';else if(it.img) rs+=drawing(it.img);else rs+=run(it.t,it.r);}
    return '<w:p>'+pPr(s,Object.assign({},extra,{mark}))+rs+'</w:p>';}
+  function drawing(g){const id=g.n;return '<w:r><w:drawing><wp:inline distT="0" distB="0" distL="0" distR="0"><wp:extent cx="'+g.cx+'" cy="'+g.cy+'"/><wp:docPr id="'+id+'" name="Picture '+id+'" descr="'+x(g.alt)+'"/><a:graphic xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:pic xmlns:pic="http://schemas.openxmlformats.org/drawingml/2006/picture"><pic:nvPicPr><pic:cNvPr id="'+id+'" name="img'+id+'"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip r:embed="rIdImg'+id+'"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="'+g.cx+'" cy="'+g.cy+'"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline></w:drawing></w:r>';}
   // Is this element's content purely inline?
   function hasBlock(el){for(const c of el.children){if(BLOCK.has(c.tagName)) return true;if(c.tagName==='BR'&&/page-break-before/.test(c.getAttribute('style')||'')) return true;if(!BLOCK.has(c.tagName)&&hasBlock(c)) return true;}return false;}
   const isPB=el=>el.tagName==='BR'&&/page-break-before\s*:\s*always|mso-break-type\s*:\s*page-break/i.test(el.getAttribute('style')||'');
   // Block walker: returns an array of body-level XML strings.
   function blocks(el,r,ps,ctx){const out=[];let acc=[];let pendPB=false;
-   const flush=()=>{if(acc.some(a=>a.br||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
+   const flush=()=>{if(acc.some(a=>a.br||a.img||(a.t&&a.t.trim()))){out.push(para(acc,ps,{pb:pendPB,inCell:ctx.inCell,fitW:ctx.inCell?ctx.width:0}));pendPB=false;}acc=[];};
    for(const c of el.childNodes){
     if(c.nodeType===3){acc.push({t:c.nodeValue.replace(/[\t\n\r ]+/g,' '),r});continue;}
     if(c.nodeType!==1) continue;const t=c.tagName;
@@ -1460,7 +1466,7 @@ const DX=(function(){
     if(hasBlock(c)){const sub=blocks(c,rr,s,ctx);if(pendPB&&sub.length){sub[0]=sub[0].replace('<w:pPr>','<w:pPr><w:pageBreakBefore/>');pendPB=false;}out.push(...sub);}
     else{const a=[];for(const k of c.childNodes) inl(k,rr,a);const ex={pb:pendPB,inCell:ctx.inCell,r0:rr,keep:/^H\d$/.test(t),fitW:ctx.inCell?ctx.width:0};
      if(/^H\d$/.test(t)&&!s['margin-top']) s['margin-top']='10pt';if(/^H\d$/.test(t)&&!s['margin-bottom']) s['margin-bottom']='4pt';
-     if(!a.some(q=>q.br||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
+     if(!a.some(q=>q.br||q.img||(q.t&&q.t.trim()))){if(t==='P'||t==='DIV'){const sz=rr.sz||10.5;const lh=s['line-height'];if(lh||sz<6||t==='P') out.push(para([],s,ex));}}
      else out.push(para(a,s,ex));pendPB=false;}
    }
    flush();return out;}
@@ -1543,17 +1549,18 @@ const DX=(function(){
   const sect='<w:sectPr><w:pgSz w:w="'+twip(pageW)+'" w:h="'+twip(pageH)+'"'+(land?' w:orient="landscape"':'')+'/><w:pgMar w:top="'+twip(mg[0])+'" w:right="'+twip(mg[1])+'" w:bottom="'+twip(mg[2])+'" w:left="'+twip(mg[3])+'" w:header="360" w:footer="360" w:gutter="0"/></w:sectPr>';
   const title=(doc.title||'').trim();
   const font=(R0.font||'Georgia');const sz=Math.round((R0.sz||10.5)*2);const color=R0.color||'1A1410';
-  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"';
+  const W='xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" xmlns:wp="http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing"';
   const files=[
-   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
+   ['[Content_Types].xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/>'+(MEDIA.some(m=>m.ext==='jpeg')?'<Default Extension="jpeg" ContentType="image/jpeg"/>':'')+(MEDIA.some(m=>m.ext==='png')?'<Default Extension="png" ContentType="image/png"/>':'')+'<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml"/><Override PartName="/word/settings.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.settings+xml"/><Override PartName="/docProps/core.xml" ContentType="application/vnd.openxmlformats-package.core-properties+xml"/></Types>'],
    ['_rels/.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/package/2006/relationships/metadata/core-properties" Target="docProps/core.xml"/></Relationships>'],
    ['docProps/core.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:dcterms="http://purl.org/dc/terms/" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"><dc:title>'+x(title)+'</dc:title><dc:creator>Corbel</dc:creator><dcterms:created xsi:type="dcterms:W3CDTF">'+new Date().toISOString().slice(0,19)+'Z</dcterms:created></cp:coreProperties>'],
-   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/></Relationships>'],
+   ['word/_rels/document.xml.rels','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings" Target="settings.xml"/>'+MEDIA.map((m,i)=>'<Relationship Id="rIdImg'+(i+1)+'" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image'+(i+1)+'.'+m.ext+'"/>').join('')+'</Relationships>'],
    ['word/settings.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:settings '+W+'><w:zoom w:percent="100"/><w:defaultTabStop w:val="360"/><w:compat><w:compatSetting w:name="compatibilityMode" w:uri="http://schemas.microsoft.com/office/word" w:val="15"/></w:compat></w:settings>'],
    ['word/styles.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:styles '+W+'><w:docDefaults><w:rPrDefault><w:rPr><w:rFonts w:ascii="'+x(font)+'" w:hAnsi="'+x(font)+'" w:eastAsia="'+x(font)+'" w:cs="'+x(font)+'"/><w:color w:val="'+color+'"/><w:sz w:val="'+sz+'"/><w:szCs w:val="'+sz+'"/><w:lang w:val="en-US"/></w:rPr></w:rPrDefault><w:pPrDefault><w:pPr><w:spacing w:before="0" w:after="0" w:line="240" w:lineRule="auto"/></w:pPr></w:pPrDefault></w:docDefaults>'+
     '<w:style w:type="paragraph" w:default="1" w:styleId="Normal"><w:name w:val="Normal"/><w:qFormat/></w:style>'+
     '<w:style w:type="table" w:default="1" w:styleId="TableNormal"><w:name w:val="Normal Table"/><w:uiPriority w:val="99"/><w:semiHidden/><w:tblPr><w:tblInd w:w="0" w:type="dxa"/><w:tblCellMar><w:top w:w="0" w:type="dxa"/><w:left w:w="0" w:type="dxa"/><w:bottom w:w="0" w:type="dxa"/><w:right w:w="0" w:type="dxa"/></w:tblCellMar></w:tblPr></w:style></w:styles>'],
    ['word/document.xml','<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document '+W+'><w:body>'+parts.join('')+sect+'</w:body></w:document>']];
+  MEDIA.forEach((m,i)=>files.push(['word/media/image'+(i+1)+'.'+m.ext,m.b]));
   return zip(files,'application/vnd.openxmlformats-officedocument.wordprocessingml.document');}
  function save(name,html){if(window.CorbelDeTool) html=window.CorbelDeTool(html);const b=conv(html);const a=document.createElement('a');a.href=URL.createObjectURL(b);a.download=String(name).replace(/\.doc$/i,'')+(/\.docx$/i.test(name)?'':'.docx');document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove();},4000);}
  // Every tool saves Word files through dl(name, html, 'application/msword'): route those to a real .docx.
