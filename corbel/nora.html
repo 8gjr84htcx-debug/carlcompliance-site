@@ -292,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel117',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel118',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -408,6 +408,8 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  window.CorbelIssues={used:used,open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
 })();
 </script>
+
+
 
 
 
@@ -789,7 +791,7 @@ function noraRuleAny(id,c){if(TOOL==='nora'&&typeof window.noraRule==='function'
   if(c==='b'&&x.kind==='need'&&x.applied&&has(x.b)){const cc=p.core;cc.need_date=x.b;cc.facts=cc.facts||{};cc.facts.need_date={src:'NORA ruling (settlement prompt)',at:today(),chosen:true};cc.pending=(cc.pending||[]).filter(q=>!(q.k==='need_date'&&ownEq('need_date',q.v,x.b)));}
   saveStore(s);}return true;}
 function settle(){const s=loadStore();const P=s.projects[s.active];if(!P) return;const L=MS.pending(P.id);const NC=noraOpen();if(!L.length&&!NC.length) return;const dlg=document.createElement('dialog');dlg.style.cssText='border:none;border-radius:12px;padding:0;max-width:720px;width:94vw';
- dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Settle conflicting values<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">The project record holds one programmed cost, scope, primary quantity and need date for every tool. These tools disagree with it. Nothing changes until you choose.<\/p>'+
+ dlg.innerHTML='<div style="padding:20px 22px;font:14px \'Segoe UI\',system-ui,sans-serif;color:#10303F"><h2 style="margin:0 0 4px;font:600 20px Bahnschrift,Segoe UI,sans-serif">Settle conflicting values<\/h2><p style="margin:0 0 12px;color:#4f6873;font-size:13.5px">The project record holds one programmed cost, scope, primary quantity, need date and forecast completion for every tool. These tools disagree with it. Nothing changes until you choose.<\/p>'+
  L.map((x,i)=>'<div style="border:1px solid #c9d6d3;border-radius:8px;padding:10px 12px;margin-top:8px"><b>'+esc(OWNL[x.k])+'<\/b><div style="margin-top:4px">Record: <b>'+esc(MS.fmt(x.k,x.cur))+'<\/b> <span style="color:#4f6873">('+esc(x.curSrc||'record')+')<\/span><br>'+esc(x.src)+': <b>'+esc(MS.fmt(x.k,x.v))+'<\/b>'+(x.note?'<div style="margin-top:4px;color:#8A2B1E;font-size:13px">'+esc(x.note)+'<\/div>':'')+'<\/div><div style="display:flex;gap:8px;margin-top:8px"><button data-r="'+i+'|1" style="font-size:13px">'+(has(x.cur)?'Replace '+esc(MS.fmt(x.k,x.cur))+' with ':'Use ')+esc(MS.fmt(x.k,x.v))+'<\/button><button data-r="'+i+'|0" style="font-size:13px">'+(has(x.cur)?'Keep '+esc(MS.fmt(x.k,x.cur)):'Leave it empty')+'<\/button><\/div><\/div>').join('')+
  (NC.length?'<h3 style="margin:16px 0 0;font:600 16px Bahnschrift,Segoe UI,sans-serif">Sources disagree (NORA)<\/h3><p style="margin:2px 0 0;color:#4f6873;font-size:13px">Who said what, with their authority. NORA\u2019s Gate 1 stays open until each is ruled.<\/p>'+NC.map(x=>'<div style="border:1px solid #c9d6d3;border-radius:8px;padding:10px 12px;margin-top:8px"><b>'+esc(x.what)+'<\/b><div style="margin-top:4px;font-size:13px">'+esc((needSpeaker(x)?withAuth(needSpeaker(x))+' (record)':'')||withAuth(x.src_a)||'Record')+': <b>'+esc(x.a)+'<\/b>'+(x.quote_a?' \u201c'+esc(String(x.quote_a).slice(0,200))+'\u201d':'')+'<br>'+esc(withAuth(x.src_b)||'Source')+': <b>'+esc(x.b)+'<\/b>'+(x.quote_b?' \u201c'+esc(String(x.quote_b).slice(0,200))+'\u201d':'')+'<\/div><div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap"><button data-nc="'+x.id+'|a" style="font-size:13px">Use '+esc(x.a)+'<\/button><button data-nc="'+x.id+'|b" style="font-size:13px">Use '+esc(x.b)+'<\/button><button data-nc="'+x.id+'|both" style="font-size:13px">Both stand (different things)<\/button><\/div><\/div>').join(''):'')+
  '<div style="margin-top:14px;text-align:right"><button id="msclose">Close<\/button><\/div><\/div>';document.body.appendChild(dlg);dlg.showModal();
