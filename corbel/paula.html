@@ -294,7 +294,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel124',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel125',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -1990,7 +1990,7 @@ function groups(pages,file){const out=[];let cur=null;
   const h=hdrPos(pg);const no=numI(h.number||hdrText(pg.t).number||'');const ti=nzI(h.title||hdrText(pg.t).title||'');
   // the same P-number at another installation is another project (Navy books reuse numbers across bases)
   const ins=nzI(h.installation||hdrText(pg.t).installation||'');const W=t=>String(t).split(' ').filter(w=>w.length>=4);const other=ins&&cur&&cur.ins&&!W(ins).some(w=>W(cur.ins).includes(w));
-  if(cur&&((no&&no===cur.no&&!other)||(!no&&ti&&ti===cur.ti))){cur.pages.push(pg);return;}
+  if(cur&&((no&&no===cur.no&&!other&&!(no==='VARIOUS'&&ti&&cur.ti&&ti!==cur.ti))||(!no&&ti&&ti===cur.ti))){cur.pages.push(pg);return;}
   cur={file,no,ti,ins,pages:[pg],loose:0};out.push(cur);});
  return out;}
 const R1391_SYS=`You read DD Form 1391 pages from a U.S. military construction budget justification book. Return ONLY JSON:
@@ -2031,7 +2031,7 @@ const DONP=/^P\d{2,4}[A-Z]{0,2}$/;
 function locG(s){const ID=window.CorbelID;const c=String(ID?ID.inst(s):(s||'')).replace(/\([^)]*\)/g,' ');const t=c.toLowerCase();if(/\bcnmi\b|\btinian\b|\bsaipan\b|\brota\b|northern mariana/.test(t)) return 'cnmi';if(/\bguam\b|\bmarianas\b/.test(t)) return 'guam';if(/\bokinawa\b/.test(t)) return 'okinawa';if(/\bpalau\b/.test(t)) return 'palau';if(/\byap\b|\bpohnpei\b|\bchuuk\b|\bkosrae\b|federated states|\bfsm\b/.test(t)) return 'fsm';
  // elsewhere: the state or country after the last comma, letters only, so a stray character on one page or a different base name in another year's book does not split one project
  const L=c.split(',').pop().toLowerCase().replace(/[^a-z]/g,'');return L||nzI(c);}
-function pKey(n,ins){n=numI(n);if(!n) return '';return DONP.test(n)?n.replace(/(\d)[A-Z]+$/,'$1')+'@'+locG(ins):n;}
+function pKey(n,ins){n=numI(n);if(!n||n==='VARIOUS') return '';return DONP.test(n)?n.replace(/(\d)[A-Z]+$/,'$1')+'@'+locG(ins):n;}
 // The parts of a Navy book: active-force MILCON, mandatory (reconciliation) MILCON, host-nation funded or in-kind construction, and family housing. Each part starts with its own cover or heading page.
 function donSecs(pages){let s='mcon',seen=false;return pages.map(pg=>{const h=String(pg.t||'').slice(0,400);if(is1391(pg)) seen=true;
  if(seen){if(/JUSTIFICATION OF ESTIMATES/i.test(h)&&/Family Housing/i.test(h)) s='fh';else if(/JUSTIFICATION OF ESTIMATES|BUDGET ESTIMATES/i.test(h)&&/\bMANDATORY\b/i.test(h)) s='mand';else if(/Host Nation Funded Construction|Host Country In-Kind/i.test(h)) s='hn';}return s;});}
@@ -2084,7 +2084,7 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
  if(it.sec==='mand') R.push(['info','Mandatory (reconciliation) funding – a separate total from the book’s discretionary MILCON total.',src]);
  if(F.component&&F.component.svcWhy) R.push(['info','Block 1 reads NAVY; set to Marine Corps from the '+F.component.svcWhy+'.',src]);
  if(it.reads>1) R.push([IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?'bad':'info','This project and year were read '+it.reads+' times in this upload; shown once.'+(IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?' The readings differ – pick the value.':''),src]);
- if(!digI(v('cost'))&&!digI(v('fy'))&&!it.done) R.push(['warn','No amount on this page – check it.',src]);
+ if(!N(digI(v('cost')))&&!it.done) R.push(['warn',digI(v('cost'))===''?'No amount on this page – check it.':'The amount on this page is 0 – check it.',src]);
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
  return R;}
 // ---- read files ----
@@ -2132,7 +2132,8 @@ function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=pKey(it
    return;}
   if(bn) seen[k]=it;it.dupe=false;
   it.incr=!!bn&&yrs[bn].size>1;
-  if(!digI(it.F.cost.v)&&!digI(it.F.fy.v)&&!it.noAmtSeen){it.sel=false;it.noAmtSeen=true;}
+  // no amount, or an amount of 0 (a Navy 1391 can print 0 in block 8): unticked and amber
+  if(!N(digI(it.F.cost.v))&&!it.noAmtSeen){it.sel=false;it.noAmtSeen=true;}
  if(it.mset) return;const M_=matchOf(it);it.cands=M_.map(p=>p.id);it.match=M_.length===1?M_[0].id:'';});impTwins();}
 // A budget-table row (the PDI display, a project list) that describes a 1391 in the same upload is the same project, not a new one.
 function impTwins(){const ID=window.CorbelID;if(!ID) return;const L=IMP.items.filter(x=>x.kind==='1391');
