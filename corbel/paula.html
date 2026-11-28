@@ -292,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel120',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel121',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -2051,7 +2051,8 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
  const m=it.match&&P.projects.find(p=>p.id===it.match);if(m){const was=N(m.authorized)||N(m.programmed);if(c&&was&&Math.abs(c-was)/was>.05) R.push(['warn','The document shows '+M(c)+'; PAULA has '+M(was)+' ('+(c>was?'+':'')+Math.round((c-was)/was*100)+'%).',src]);
   if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);}
  if(it.prog) R.push(['info','A program line (design or minor construction), not a single project – left unticked.',src]);
- if(it.dupe) R.push(['warn','The same project number and installation appear more than once in this import.',src]);
+ if(it.dupe) R.push(['warn','Duplicate: the same project number, installation and fiscal year appear earlier in this import – left unticked.',src]);
+ if(!it.dupe&&!digI(v('cost'))&&!digI(v('fy'))&&!it.done) R.push(['warn','No amount on this page – nothing will be added from this row.',src]);
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
  return R;}
 // ---- read files ----
@@ -2086,7 +2087,10 @@ async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading 
  catch(e){alert('Could not read the document: '+e.message);}
  finally{IMP.busy=false;}
  say('');vImp();}
-function impMatch(){const seen={};IMP.items.forEach(it=>{const k=numI(it.F.number.v)+'|'+nzI(it.F.installation.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');it.dupe=!!seen[k]&&!!it.F.number.v;seen[k]=1;
+// A duplicate is the same project, installation and fiscal year read twice; the same project in another year's book is that year's increment.
+function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=numI(it.F.number.v);if(bn) (yrs[bn]=yrs[bn]||new Set()).add(digI(it.F.fy.v));});
+ IMP.items.forEach(it=>{const bn=numI(it.F.number.v);const k=bn+'|'+nzI(it.F.installation.v)+'|'+digI(it.F.fy.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');it.dupe=!!seen[k]&&!!bn;seen[k]=1;
+ it.incr=!it.dupe&&!!bn&&yrs[bn].size>1;if(it.dupe&&!it.dupeSeen){it.sel=false;it.dupeSeen=true;}
  if(it.mset) return;const M_=matchOf(it);it.cands=M_.map(p=>p.id);it.match=M_.length===1?M_[0].id:'';});impTwins();}
 // A budget-table row (the PDI display, a project list) that describes a 1391 in the same upload is the same project, not a new one.
 function impTwins(){const ID=window.CorbelID;if(!ID) return;const L=IMP.items.filter(x=>x.kind==='1391');
@@ -2107,8 +2111,9 @@ async function impAI(){if(!aiOn()) return alert('Sign in again (Face ID) to add 
 function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return alert('Tick at least one row.');const bad=L.filter(it=>IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')||IMKEY.some(k=>!it.F[k]||!it.F[k].v)&&it.kind==='1391');
  if(bad.length&&!confirm(bad.length+' ticked row'+(bad.length>1?'s have':' has')+' a reader disagreement or a missing key field. Add '+(bad.length>1?'them':'it')+' anyway?')) return;
  let a=0,u=0,pd=0,sk=0;const today_=today();const ID=window.CorbelID;
- L.sort((x,y)=>(x.kind==='table')-(y.kind==='table'));
- L.forEach(it=>{if(it.twin&&!it.match){const t=IMP.items.find(x=>x.id===it.twin);if(t&&t.pid) it.match=t.pid;}
+ L.sort((x,y)=>(x.kind==='table')-(y.kind==='table')||N(digI(x.F.fy.v))-N(digI(y.F.fy.v)));const made={};IMP.items.forEach(x=>{const bn=numI(x.F.number.v);if(x.pid&&bn) made[bn]=x.pid;});let nz=0;
+ L.forEach(it=>{if(!digI(it.F.cost.v)&&!digI(it.F.fy.v)){it.done='Nothing added – no amount on this page';it.sel=false;nz++;return;}
+  {const bn=numI(it.F.number.v);if(!it.match&&bn&&made[bn]&&P.projects.some(x=>x.id===made[bn])) it.match=made[bn];}if(it.twin&&!it.match){const t=IMP.items.find(x=>x.id===it.twin);if(t&&t.pid) it.match=t.pid;}
   if(it.kind==='table'&&it.pdi&&!it.match){it.done='Not added – the PDI display only marks projects already in the portfolio. Add the project from its 1391.';it.sel=false;sk++;return;}const F=it.F,v=k=>F[k]?String(F[k].v||'').trim():'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1e6:1e3);const pg=k=>it.file+(F[k]&&F[k].page?' p.'+F[k].page:'');
   let p=it.match&&P.projects.find(x=>x.id===it.match);const isNew=!p;if(!p){p=blankProj();P.projects.push(p);}
   const fill=(k,val)=>{if(val!==''&&val!=null&&(p[k]===''||p[k]==null)) p[k]=val;};
@@ -2118,13 +2123,16 @@ function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return al
   if(isNew) p.phase=4;
   if(amt&&N(v('fy'))){p.funds=ownFunds(p);const fy=N(v('fy')),inc=incOf(v('title')),bn=numI(v('number'));
    // one line per book project and year: two projects in one year's book (airfield and apron) are two lines; the same project read again is not
-   if(!p.funds.some(l=>N(l.fy)===fy&&!isHN(l)&&(bn&&l.bnum?l.bnum===bn:N(l.amt)===amt||(!bn&&l.stage==='requested')))) p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});}
+   // one line per project per year: a line already there for this year keeps its values and gains the page; a second book project in the same year (airfield and apron) gets its own line
+   const ex=p.funds.find(l=>N(l.fy)===fy&&!isHN(l)&&(!(bn&&l.bnum)||l.bnum===bn));
+   if(ex){if(!ex.from) ex.from=pg('cost');if(bn&&!ex.bnum) ex.bnum=bn;if(N(ex.amt)!==amt) it.kept='FY'+fy+' already has '+M(N(ex.amt))+'; the book shows '+M(amt)+' – left as it was.';}
+   else p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});}
   if(isNew) p.prog_status='pb';
   if(v('dpct')!==''&&!dPct(p)){p.gates={...(p.gates||{})};const g=p.gates.design||{};if(g.pct===undefined) p.gates.design={...g,pct:N(v('dpct')),date:g.date||(v('d35')?v('d35')+'-01':''),src:pg('dpct')};}
   if(it.pdi){p.posture={...(p.posture||{}),pdi:true};pd++;}
   p.docsrc=(p.docsrc||[]).concat([{file:it.file,pages:it.pages,read:today_,fields:Object.fromEntries(IMF.filter(([k])=>F[k]&&F[k].v).map(([k])=>[k,{v:F[k].v,how:F[k].how,page:F[k].page}]))}]).slice(-6);
-  it.done=isNew?'Added':'Updated';it.pid=p.id;isNew?a++:u++;it.sel=false;});
- log('Projects added from budget documents',a+' added, '+u+' updated'+(pd?', '+pd+' marked PDI':'')+(sk?', '+sk+' PDI row'+(sk>1?'s':'')+' not added (no matching project)':''));save();renderSteps();vImp();}
+  it.done=(isNew?'Added':'Updated')+(it.kept?' – '+it.kept:'');it.pid=p.id;{const bn=numI(v('number'));if(bn) made[bn]=p.id;}isNew?a++:u++;it.sel=false;});
+ log('Projects added from budget documents',a+' added, '+u+' updated'+(pd?', '+pd+' marked PDI':'')+(sk?', '+sk+' PDI row'+(sk>1?'s':'')+' not added (no matching project)':'')+(nz?', '+nz+' row'+(nz>1?'s':'')+' with no amount':''));save();renderSteps();vImp();}
 // ---- outputs ----
 const HOW={to:'First reader only – the second reading took too long; check it',agree:'Both readers agree',a:'Layout reader only (AI reading not on the page)',b:'AI reader only',one:'One reader (sign in for the second)',arb:'Settled by the arbiter',dispute:'Readers disagree',you:'Set by the reviewer','':''};
 function impBook(){const I=IMP.items;const mt=it=>it.done?it.done+' '+((P.projects.find(p=>p.id===it.pid)||{}).name||''):it.twin?'Same project as the 1391 “'+((IMP.items.find(x=>x.id===it.twin)||{F:{title:{}}}).F.title.v||'')+'” in this upload':it.match?'Matches '+((P.projects.find(p=>p.id===it.match)||{}).name||''):(it.cands||[]).length>1?'Several possible matches':'New';
@@ -2163,7 +2171,7 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
    '<div style="overflow:auto"><table class="ptable"><thead><tr><th><input type="checkbox" id="imAll" style="width:auto"'+(I.every(it=>it.sel||it.done)?' checked':'')+'></th><th>Project</th><th>Number</th><th>Installation</th><th>FY</th><th>Cost ($000)</th><th>Design %</th><th>Portfolio</th></tr></thead><tbody>'+
    FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
     return '<tr'+(it.done?' style="opacity:.6"':'')+' style="border-bottom:none"><td><input type="checkbox" data-isel="'+it.id+'" style="width:auto"'+(it.sel?' checked':'')+(it.done?' disabled':'')+'></td>'+cell(it,'title',200)+cell(it,'number',70)+cell(it,'installation',160)+cell(it,'fy',52)+cell(it,'cost',80)+cell(it,'dpct',44)+
-     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
+     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.incr?'<div class="small" style="color:#1F4E5F"><b>Increment</b> – FY'+esc(digI(it.F.fy.v)||'?')+' of a project in more than one year of this upload</div>':'')+(it.dupe?'<div class="small" style="color:#7a5600"><b>Duplicate</b> – same project and year earlier in this upload</div>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
      '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page'+(it.pages.length>1?'s '+it.pages[0]+'–'+it.pages[it.pages.length-1]:' '+it.pages[0])+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
    '<div class="row"><button class="go" id="imGo">Add or update the ticked projects</button></div></div>':'');
  const go=fs=>{if(!fs.length) return;impFiles(fs);};
