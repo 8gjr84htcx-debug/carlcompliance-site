@@ -292,7 +292,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel121',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel122',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -2051,8 +2051,8 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
  const m=it.match&&P.projects.find(p=>p.id===it.match);if(m){const was=N(m.authorized)||N(m.programmed);if(c&&was&&Math.abs(c-was)/was>.05) R.push(['warn','The document shows '+M(c)+'; PAULA has '+M(was)+' ('+(c>was?'+':'')+Math.round((c-was)/was*100)+'%).',src]);
   if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);}
  if(it.prog) R.push(['info','A program line (design or minor construction), not a single project – left unticked.',src]);
- if(it.dupe) R.push(['warn','Duplicate: the same project number, installation and fiscal year appear earlier in this import – left unticked.',src]);
- if(!it.dupe&&!digI(v('cost'))&&!digI(v('fy'))&&!it.done) R.push(['warn','No amount on this page – nothing will be added from this row.',src]);
+ if(it.reads>1) R.push([IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?'bad':'info','This project and year were read '+it.reads+' times in this upload; shown once.'+(IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?' The readings differ – pick the value.':''),src]);
+ if(!digI(v('cost'))&&!digI(v('fy'))&&!it.done) R.push(['warn','No amount on this page – check it.',src]);
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
  return R;}
 // ---- read files ----
@@ -2088,9 +2088,16 @@ async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading 
  finally{IMP.busy=false;}
  say('');vImp();}
 // A duplicate is the same project, installation and fiscal year read twice; the same project in another year's book is that year's increment.
-function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=numI(it.F.number.v);if(bn) (yrs[bn]=yrs[bn]||new Set()).add(digI(it.F.fy.v));});
- IMP.items.forEach(it=>{const bn=numI(it.F.number.v);const k=bn+'|'+nzI(it.F.installation.v)+'|'+digI(it.F.fy.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');it.dupe=!!seen[k]&&!!bn;seen[k]=1;
- it.incr=!it.dupe&&!!bn&&yrs[bn].size>1;if(it.dupe&&!it.dupeSeen){it.sel=false;it.dupeSeen=true;}
+function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=numI(it.F.number.v);if(bn&&!it.merged) (yrs[bn]=yrs[bn]||new Set()).add(digI(it.F.fy.v));});
+ IMP.items.forEach(it=>{if(it.merged) return;const bn=numI(it.F.number.v);const k=bn+'|'+digI(it.F.fy.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');
+  const first=bn&&seen[k];if(first){// read twice: one row; if the readings differ, the first row turns red and offers both values
+   it.merged=first.id;it.sel=false;first.reads=(first.reads||1)+1;
+   {const a=first.F.cost||{},b=it.F.cost||{};if(a.how!=='you'&&digI(a.v)!==digI(b.v)&&(digI(a.v)||digI(b.v))) first.F.cost={...a,v:digI(a.v)||digI(b.v),a:digI(a.v)||'(blank)',b:digI(b.v)||'(blank)',how:'dispute'};}
+   if(!digI(first.F.auth&&first.F.auth.v)&&digI(it.F.auth&&it.F.auth.v)) first.F.auth={...it.F.auth};
+   return;}
+  if(bn) seen[k]=it;it.dupe=false;
+  it.incr=!!bn&&yrs[bn].size>1;
+  if(!digI(it.F.cost.v)&&!digI(it.F.fy.v)&&!it.noAmtSeen){it.sel=false;it.noAmtSeen=true;}
  if(it.mset) return;const M_=matchOf(it);it.cands=M_.map(p=>p.id);it.match=M_.length===1?M_[0].id:'';});impTwins();}
 // A budget-table row (the PDI display, a project list) that describes a 1391 in the same upload is the same project, not a new one.
 function impTwins(){const ID=window.CorbelID;if(!ID) return;const L=IMP.items.filter(x=>x.kind==='1391');
@@ -2119,14 +2126,19 @@ function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return al
   const fill=(k,val)=>{if(val!==''&&val!=null&&(p[k]===''||p[k]==null)) p[k]=val;};
   fill('name',v('title')?v('title').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase()):'');fill('number',v('number'));fill('installation',v('installation')?(ID?ID.inst(v('installation')):v('installation').replace(/\b([A-Z])([A-Z']{3,})\b/g,(m,x,y)=>x+y.toLowerCase())):'');fill('service',ID?ID.svc(v('component')):v('component'));fill('fy',v('fy'));
   if(!p.lat){const g=locate(p.installation);if(g){p.lat=g[0];p.lon=g[1];if(!p.country) p.country=g[2];}}
-  if(it.useCost&&amt) p.programmed=amt;else if(isNew||!incOf(v('title'))) fill('programmed',amt||'');if(isNew&&N(F.auth&&F.auth.v)) fill('authorized',N(F.auth.v)*1e3);if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
+  if(it.useCost&&amt) p.programmed=amt;else if(isNew||!incOf(v('title'))) fill('programmed',amt||'');if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
   if(isNew) p.phase=4;
-  if(amt&&N(v('fy'))){p.funds=ownFunds(p);const fy=N(v('fy')),inc=incOf(v('title')),bn=numI(v('number'));
+  // a budget book is a request: its amounts enter as requests, never as authorized or appropriated
+  if(isNew&&!(p.funds||[]).length) p.funds=[];
+  if(amt&&N(v('fy'))){p.funds=isNew?(p.funds||[]):ownFunds(p);const fy=N(v('fy')),inc=incOf(v('title')),bn=numI(v('number'));
    // one line per book project and year: two projects in one year's book (airfield and apron) are two lines; the same project read again is not
    // one line per project per year: a line already there for this year keeps its values and gains the page; a second book project in the same year (airfield and apron) gets its own line
-   const ex=p.funds.find(l=>N(l.fy)===fy&&!isHN(l)&&(!(bn&&l.bnum)||l.bnum===bn));
-   if(ex){if(!ex.from) ex.from=pg('cost');if(bn&&!ex.bnum) ex.bnum=bn;if(N(ex.amt)!==amt) it.kept='FY'+fy+' already has '+M(N(ex.amt))+'; the book shows '+M(amt)+' – left as it was.';}
-   else p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});}
+   const ex=p.funds.find(l=>N(l.fy)===fy&&!isHN(l)&&l.stage!=='authreq'&&(!(bn&&l.bnum)||l.bnum===bn));
+   // the book's page is attached only to a line still at a request stage; an authorized or appropriated line keeps its own source
+   if(ex){if(!ex.from&&SI(ex.stage)<=SI('requested')) ex.from=pg('cost');if(bn&&!ex.bnum&&SI(ex.stage)<=SI('requested')) ex.bnum=bn;if(N(ex.amt)!==amt) it.kept='FY'+fy+' already has '+M(N(ex.amt))+'; the book shows '+M(amt)+' – left as it was.';}
+   else p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});
+   const au=N(digI(F.auth&&F.auth.v))*(it.unit==='millions'?1e6:1e3);
+   if(au&&!p.funds.some(l=>l.stage==='authreq'&&N(l.fy)===fy&&(!(bn&&l.bnum)||l.bnum===bn))) p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'authreq',amt:au,from:pg('cost'),...(bn?{bnum:bn}:{})});}
   if(isNew) p.prog_status='pb';
   if(v('dpct')!==''&&!dPct(p)){p.gates={...(p.gates||{})};const g=p.gates.design||{};if(g.pct===undefined) p.gates.design={...g,pct:N(v('dpct')),date:g.date||(v('d35')?v('d35')+'-01':''),src:pg('dpct')};}
   if(it.pdi){p.posture={...(p.posture||{}),pdi:true};pd++;}
@@ -2153,7 +2165,7 @@ function impMemo(){const I=IMP.items;const fs=[...new Set(I.map(it=>it.file))];c
  b+=cdFoot('Prepared  ·  '+fd(today())+'  ·  Advisory review; the Service and its design agent own the 1391.');
  return cdDoc('Budget Document Review',[b]);}
 // ---- the screen ----
-function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
+function vImp(){const v=$('#view');const I=IMP?IMP.items.filter(it=>!it.merged):[];const signed=aiOn();
  const dot=f=>!f||!f.how?'':'<span title="'+esc(HOW[f.how]+(f.quote?' – “'+f.quote+'”':'')+(f.bDropped?' – the AI reading was not on the page and was dropped':''))+'" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:'+({agree:'#2e7d32',arb:'#2e7d32',you:'#2e7d32',a:'#c98a00',b:'#c98a00',one:'#c98a00',to:'#c98a00',dispute:'#b3261e'}[f.how]||'#999')+'"></span>';
  const fileUrl=it=>(IMP.files.find(f=>f.name===it.file)||{}).url;
  const cell=(it,k,w)=>{const f=it.F[k]||{};const pick=f.how==='dispute'?'<div class="small">'+[f.a,f.b].map((x,i)=>'<button class="sm" data-ipk="'+it.id+'|'+k+'|'+i+'">'+esc(x)+'</button>').join(' ')+'</div>':'';
@@ -2171,7 +2183,7 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items:[];const signed=aiOn();
    '<div style="overflow:auto"><table class="ptable"><thead><tr><th><input type="checkbox" id="imAll" style="width:auto"'+(I.every(it=>it.sel||it.done)?' checked':'')+'></th><th>Project</th><th>Number</th><th>Installation</th><th>FY</th><th>Cost ($000)</th><th>Design %</th><th>Portfolio</th></tr></thead><tbody>'+
    FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
     return '<tr'+(it.done?' style="opacity:.6"':'')+' style="border-bottom:none"><td><input type="checkbox" data-isel="'+it.id+'" style="width:auto"'+(it.sel?' checked':'')+(it.done?' disabled':'')+'></td>'+cell(it,'title',200)+cell(it,'number',70)+cell(it,'installation',160)+cell(it,'fy',52)+cell(it,'cost',80)+cell(it,'dpct',44)+
-     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.incr?'<div class="small" style="color:#1F4E5F"><b>Increment</b> – FY'+esc(digI(it.F.fy.v)||'?')+' of a project in more than one year of this upload</div>':'')+(it.dupe?'<div class="small" style="color:#7a5600"><b>Duplicate</b> – same project and year earlier in this upload</div>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
+     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.incr?'<div class="small" style="color:#1F4E5F"><b>Increment</b> – FY'+esc(digI(it.F.fy.v)||'?')+' of a project in more than one year of this upload</div>':'')+(it.reads>1?'<div class="small" style="color:#7a5600">Read '+it.reads+' times in this upload; shown once</div>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
      '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page'+(it.pages.length>1?'s '+it.pages[0]+'–'+it.pages[it.pages.length-1]:' '+it.pages[0])+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
    '<div class="row"><button class="go" id="imGo">Add or update the ticked projects</button></div></div>':'');
  const go=fs=>{if(!fs.length) return;impFiles(fs);};
@@ -2851,13 +2863,16 @@ const ACCTS=[['MCON-A','MILCON, Army','us',5,MCA],['MCON-N','MILCON, Navy and Ma
 const LEGACY={'P&D':'PD','FSRM':'OM','HN':'HN-OTH','Other':'OTH'};
 function acctKey(l,p){let k=l.src||'';if(LEGACY[k]) return LEGACY[k];if(k==='MILCON'){const s=String((p&&p.service)||'').toLowerCase();return s==='army'?'MCON-A':/navy|marine/.test(s)?'MCON-N':/air|space/.test(s)?'MCON-AF':'MCON-DW';}return k||'OTH';}
 const ACC=k=>ACCTS.find(a=>a[0]===k)||ACCTS[ACCTS.length-1];
-const STAGES=[['programmed','Programmed','#C9D6DE'],['requested','In the budget request','#9DB4C3'],['authorized','Authorized','#6E8FA5'],['appropriated','Appropriated','#3F6B85'],['obligated','Obligated','#1F4E5F']];
+const STAGES=[['programmed','Programmed','#C9D6DE'],['requested','Appropriation requested','#9DB4C3'],['authreq','Authorization requested','#B7C7D2'],['authorized','Authorized','#6E8FA5'],['appropriated','Appropriated','#3F6B85'],['obligated','Obligated','#1F4E5F']];
 const HNSTAGES=[['proposed','Proposed'],['agreed','Agreed'],['funded','Funded by the host nation'],['executing','Executing'],['complete','Complete']];
 const SI=k=>STAGES.findIndex(x=>x[0]===k);
+const MSTAGES=STAGES.filter(x=>x[0]!=='authreq');
 const curFY=()=>{const d=new Date();return d.getMonth()>=9?d.getFullYear()+1:d.getFullYear();};
 function funds(p){if(!p.funds||!p.funds.length){const fy=N(p.fy);const amt=N(p.authorized)||N(p.programmed);if(!fy||!amt) return [];
   const st=N(p.obligated)||N(p.award)?'obligated':N(p.authorized)?'authorized':'programmed';const ak={om_frsm:'OM',host_nation_funded:'HN-OTH',other:'OTH'}[p.appropriation]||acctKey({src:'MILCON'},p);return [{id:'auto',fy,src:ak,stage:st,amt:st==='obligated'?(N(p.obligated)||N(p.award)):amt,auto:true}];}
- return p.funds.map(l=>({...l,src:acctKey(l,p)}));}
+ // an authorization request is the ceiling asked for, not money: it is shown with the lines but kept out of every sum
+ return p.funds.filter(l=>l.stage!=='authreq').map(l=>({...l,src:acctKey(l,p)}));}
+const authReqs=p=>(p.funds||[]).filter(l=>l.stage==='authreq');
 const isHN=l=>ACC(l.src)[2]==='hn';
 function fundSum(p,fn){return funds(p).filter(fn||(()=>true)).reduce((a,l)=>a+N(l.amt),0);}
 // Construction authority, separate from the appropriation. Scope summaries from the U.S. Code, checked on the date shown.
@@ -2932,23 +2947,23 @@ function bySrc(L){const G={};L.forEach(p=>{const F=funds(p);const ks=F.length?[.
  return Object.values(G).map(g=>({...g,ex:[...g.ex]})).sort((a,b)=>(a.k==='Not yet funded')-(b.k==='Not yet funded')||b.amt-a.amt);}
 function vFund(){const v=$('#view');const L=filtered();const ys=fyWin(L);const cf=curFY();
  const by=(y,st)=>L.reduce((a,p)=>a+fundSum(p,l=>!isHN(l)&&N(l.fy)===y&&l.stage===st),0);
- const series=STAGES.map(([k,n,c])=>({n,c,v:ys.map(y=>by(y,k))}));const cats=ys.map(y=>({k:'FY'+String(y).slice(-2),k2:y===cf?'current':'',full:'FY'+y}));
+ const series=MSTAGES.map(([k,n,c])=>({n,c,v:ys.map(y=>by(y,k))}));const cats=ys.map(y=>({k:'FY'+String(y).slice(-2),k2:y===cf?'current':'',full:'FY'+y}));
  const FL=L.flatMap(p=>fundFlags(p).map(f=>({p,f}))).sort((a,b)=>b.f[0]-a.f[0]);const apNot=L.reduce((a,p)=>a+fundSum(p,l=>!isHN(l)&&l.stage==='appropriated'),0);
  const cy=k=>L.reduce((a,p)=>a+fundSum(p,l=>!isHN(l)&&N(l.fy)===cf&&l.stage===k),0);const HNP=L.filter(p=>funds(p).some(isHN));
  v.innerHTML=filterRow()+'<div class="panel"><h2>Funding</h2><p class="lead">Where each project’s money stands by fiscal year and appropriation, from programmed through obligated, with the statutory and expiry flags that need action. Host-nation funded work is shown on its own path below, outside the US pipeline. Open a project below to edit its lines; set authority, programming status and readiness gates on the project’s Programming tab.</p>'+
   '<div class="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px">'+t('FY'+String(cf).slice(-2)+' programmed or requested',M(cy('programmed')+cy('requested')))+t('FY'+String(cf).slice(-2)+' authorized or appropriated',M(cy('authorized')+cy('appropriated')))+t('Appropriated, not yet obligated',M(apNot))+t('Funding flags',String(FL.filter(x=>x.f[0]>0).length))+'</div>'+
-  '<div class="card2" style="margin-top:12px"><h3>US appropriations by fiscal year and stage</h3>'+stackCols(cats,series,{W:760,H:280,fmt:M})+legend(STAGES.map(([k,n,c])=>[c,n]))+'</div></div>'+
+  '<div class="card2" style="margin-top:12px"><h3>US appropriations by fiscal year and stage</h3>'+stackCols(cats,series,{W:760,H:280,fmt:M})+legend(MSTAGES.map(([k,n,c])=>[c,n]))+'</div></div>'+
   (()=>{const G=bySrc(L);return '<div class="panel"><h3 style="margin-top:0">By funding source</h3><p class="small">Every project, grouped by where its money comes from – MILCON, O&amp;M, exercise-related, host nation, other DoD and non-DoD money, and work not yet funded – with who builds it.</p><table class="ptable"><thead><tr><th>Funding source</th><th style="text-align:right">Projects</th><th style="text-align:right">Amount</th><th>Executing units</th><th>Troop labor</th></tr></thead><tbody>'+G.map(g=>'<tr><td><b>'+esc(g.k)+'</b></td><td style="text-align:right">'+g.n+'</td><td style="text-align:right">'+(g.amt?M(g.amt):'–')+'</td><td>'+esc(g.ex.join(', ')||'–')+'</td><td>'+(g.troop||'–')+'</td></tr>').join('')+'</tbody></table></div>';})()+
   (HNP.length?'<div class="panel"><h3 style="margin-top:0">Host-nation path</h3><p class="small">Host-nation funded work does not follow the US programming, authorization and appropriation pipeline, so it is not in the chart above.</p><table class="ptable"><thead><tr><th>Project</th><th>Source</th><th>FY</th><th>Stage</th><th style="text-align:right">Amount</th><th>Arrangement</th></tr></thead><tbody>'+HNP.flatMap(p=>funds(p).filter(isHN).map(l=>'<tr class="clk" data-fp="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc(p.installation||'')+'</div></td><td>'+esc(ACC(l.src)[1])+'</td><td>'+esc(String(l.fy))+'</td><td>'+esc((HNSTAGES.find(x=>x[0]===l.hnst)||HNSTAGES[0])[1])+'</td><td style="text-align:right">'+M(N(l.amt))+'</td><td>'+esc((p.hn||{}).arrangement||'–')+'</td></tr>')).join('')+'</tbody></table></div>':'')+
   '<div class="panel"><h3 style="margin-top:0">Flags</h3>'+(FL.length?FL.slice(0,30).map(({p,f})=>'<div class="find" style="display:flex;gap:10px;align-items:flex-start;border-left:4px solid '+['#7a8a99','var(--watch)','var(--crit)'][f[0]]+';padding:7px 10px;margin:6px 0"><span style="flex:1"><b>'+esc(p.name)+'</b> – '+esc(f[1])+(f[2]?' <span class="small">('+esc(f[2])+')</span>':'')+'</span><button class="sm" data-ff="'+p.id+'">Open</button></div>').join(''):'<p class="small">No funding flags.</p>')+'</div>'+
   '<div class="panel"><h3 style="margin-top:0">Projects by fiscal year (US appropriations)</h3><div style="overflow-x:auto"><table class="ptable" id="fT"><thead><tr><th>Project</th>'+ys.map(y=>'<th style="text-align:right">FY'+String(y).slice(-2)+'</th>').join('')+'<th style="text-align:right">Total</th></tr></thead><tbody>'+
   L.filter(p=>funds(p).length||N(p.programmed)).map(p=>{const us=funds(p).filter(l=>!isHN(l));let h='<tr class="clk" data-fp="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="small">'+esc([p.installation,PROGN(progOf(p)),p.authority?'10 U.S.C. '+p.authority:''].filter(x=>x&&x!=='Not set').join(' · '))+(funds(p).some(l=>l.auto)?' · <i>line from the project’s FY and amounts</i>':'')+(funds(p).some(isHN)?' · <b>host-nation funded</b>':'')+'</div></td>'+
    ys.map(y=>{const ls=us.filter(l=>N(l.fy)===y);if(!ls.length) return '<td></td>';const top=ls.reduce((a,l)=>SI(l.stage)>SI(a.stage)?l:a);return '<td style="text-align:right;white-space:nowrap" title="'+esc(ls.map(l=>ACC(l.src)[1]+' '+M(N(l.amt))+' – '+STAGES[SI(l.stage)][1]).join('\n'))+'"><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:'+STAGES[SI(top.stage)][2]+';margin-right:4px"></span>'+M(ls.reduce((a,l)=>a+N(l.amt),0))+'</td>';}).join('')+
-   '<td style="text-align:right">'+M(us.reduce((a,l)=>a+N(l.amt),0))+'</td></tr>';if(FX===p.id) h+='<tr><td colspan="'+(ys.length+2)+'">'+fEditor(p)+'</td></tr>';return h;}).join('')+'</tbody></table></div>'+legend(STAGES.map(([k,n,c])=>[c,n]))+'</div>';
+   '<td style="text-align:right">'+M(us.reduce((a,l)=>a+N(l.amt),0))+'</td></tr>';if(FX===p.id) h+='<tr><td colspan="'+(ys.length+2)+'">'+fEditor(p)+'</td></tr>';return h;}).join('')+'</tbody></table></div>'+legend(MSTAGES.map(([k,n,c])=>[c,n]))+'</div>';
  bindFilters();v.querySelectorAll('[data-ff]').forEach(b=>b.onclick=()=>{FX=b.dataset.ff;vFund();const r=document.querySelector('#fT [data-fp="'+FX+'"]');if(r) r.scrollIntoView({block:'center'});});
  v.querySelectorAll('[data-fp]').forEach(tr=>tr.onclick=()=>{FX=FX===tr.dataset.fp?null:tr.dataset.fp;vFund();});bindFE();
  function t(l,val){return '<div class="tile"><div class="lab">'+l+'</div><div class="val" style="font-size:20px">'+val+'</div></div>';}}
-function fEditor(p){const L=funds(p);return '<div style="background:#f6f8f9;border-radius:8px;padding:10px 12px"><table class="ptable" style="margin:0"><tr><th>FY</th><th>Appropriation or source</th><th>Stage</th><th style="text-align:right">Amount ($)</th><th></th></tr>'+
+function fEditor(p){const L=(p.funds&&p.funds.length)?p.funds.map(l=>({...l,src:acctKey(l,p)})):funds(p);return '<div style="background:#f6f8f9;border-radius:8px;padding:10px 12px"><table class="ptable" style="margin:0"><tr><th>FY</th><th>Appropriation or source</th><th>Stage</th><th style="text-align:right">Amount ($)</th><th></th></tr>'+
  L.map((l,i)=>'<tr><td><input data-fe="'+p.id+'|'+i+'|fy" value="'+esc(String(l.fy))+'" style="width:70px"></td><td><select data-fe="'+p.id+'|'+i+'|src">'+ACCTS.map(([k,n])=>'<option value="'+k+'" '+(l.src===k?'selected':'')+'>'+esc(n)+'</option>').join('')+'</select></td><td>'+(isHN(l)?'<select data-fe="'+p.id+'|'+i+'|hnst">'+HNSTAGES.map(([k,n])=>'<option value="'+k+'" '+((l.hnst||'proposed')===k?'selected':'')+'>'+n+'</option>').join('')+'</select>':'<select data-fe="'+p.id+'|'+i+'|stage">'+STAGES.map(([k,n])=>'<option value="'+k+'" '+(l.stage===k?'selected':'')+'>'+n+'</option>').join('')+'</select>')+'</td><td><input data-fe="'+p.id+'|'+i+'|amt" value="'+Math.round(N(l.amt))+'" inputmode="numeric" style="width:130px;text-align:right"></td><td><button class="sm" data-fdel="'+p.id+'|'+i+'">Remove</button></td></tr>').join('')+
  '</table><div class="row" style="margin-top:8px;gap:8px;flex-wrap:wrap"><button class="sm go" data-fadd="'+p.id+'">Add a line</button>'+(piperEst(p)&&!(p.funds||[]).length?'<button class="sm" data-fpip="'+p.id+'">Start from the PIPER 1391 ('+M(piperEst(p))+')</button>':'')+'<span class="small">Estimate '+M(est(p)||value(p))+(N(p.authorized)?' · authorized '+M(N(p.authorized)):'')+'. A line moves through the stages as the money does; keep one line per FY and appropriation.</span></div></div>';}
 function ownFunds(p){if(!p.funds||!p.funds.length) p.funds=funds(p).map(l=>({...l,id:uid(),auto:false}));return p.funds;}
