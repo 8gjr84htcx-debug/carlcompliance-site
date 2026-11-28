@@ -294,7 +294,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel123',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel124',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -2042,6 +2042,11 @@ function donRow(sec,F,txt){const n=numI(F.number&&F.number.v);const h=String(txt
 function donSvc(F,all){const c=SVCN(String(F.component&&F.component.v||''));if(c&&!/^(Navy|Marine Corps)$/.test(c)) return;const pe=String(F.pe&&F.pe.v||'').trim();const u=(String(all||'').match(/UIC\s*:?\s*([MN])\d{4,5}/i)||[])[1]||'';
  const m=/\d{5,7}M$/i.test(pe)||(!/\d{5,7}N$/i.test(pe)&&/^M$/i.test(u));const v=m?'Marine Corps':'Navy';const f=F.component||{};if(c===v){F.component={...f,dsvc:1};return;}F.component={...f,v,how:f.how||'a',page:f.page,dsvc:1,svcWhy:m?'program element '+pe+(u?', UIC '+u:''):''};}
 function hnAcct(ins){const t=String(ins||'').toLowerCase();return /korea|pohang|yecheon|chinhae|pyeongtaek|humphreys|osan|kunsan/.test(t)?'HN-KOR':/japan|okinawa|iwakuni|yokosuka|sasebo|atsugi/.test(t)?'HN-GOJ':'HN-OTH';}
+// A program line (design, planning and design, unspecified minor construction), not a single project. Navy books print the design line as "PLANNING /DESIGN Design" at "DESIGN UNSPECIFIED, WORLDWIDE LOCATIONS"; either reader's title counts.
+function isProg(F,don,sec){const T=[F.title.v,F.title.a,F.title.b].map(x=>String(x||'').trim()).filter(Boolean);if(/^VARIOUS$/i.test(String(F.number.v||'').trim())) return true;
+ if(T.some(t=>/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(t))) return true;
+ if(!don||sec==='fh'||sec==='hn') return false;const ins=[F.installation.v,F.installation.a,F.installation.b].join(' ');
+ return T.some(t=>/unspecified\s+minor\s+construction|^planning\s*(and|&|\/)\s*design\b/i.test(t))||(/\bunspecified\b.*\bworldwide\b/i.test(ins)&&T.some(t=>/\bdesign\b|\bminor\s+construction\b/i.test(t)));}
 function incOf(t){const m=String(t||'').match(/\bINC(?:REMENT)?\.?\s*(\d+|[IVX]+)\b/i);return m?m[1]:'';}
 // Every word of the book's title is in the project's name (a book abbreviation such as PIPELN counts for PIPELINE), and the book adds no number the name lacks.
 function coversT(name,ti){const STOP={the:1,and:1,of:1,for:1,at:1,to:1,in:1,on:1,a:1,an:1,w:1,with:1,phase:1,ph:1,project:1,facility:1,facilities:1,inc:1,increment:1};const W=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>(w.length>1||/\d/.test(w))&&!STOP[w]);
@@ -2093,7 +2098,7 @@ async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading 
    const G=groups(pages,f.name);const pdi=/Pacific\s+Deterrence\s+Initiative/i.test(pages.slice(0,6).map(p=>p.t).join(' '));
    if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){if(e&&e.timeout){B={o:{},pg:{},to:true};bk.to=(bk.to||0)+1;}}}
      const F=await settle(g,A,B,say);let sec='';if(SEC){sec=donRow(SEC[g.pages[0].n-1],F,g.pages[0].t);donSvc(F,g.pages.map(p=>p.t).join('\n'));}
-     const prog=(don&&sec!=='fh'&&sec!=='hn'&&/unspecified\s+minor\s+construction/i.test(String(F.title.v||'')))||/^VARIOUS$/i.test(String(F.number.v||'').trim())||/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(String(F.title.v||'').trim());
+     const prog=isProg(F,don,sec);
      const scanPg=[];g.pages.forEach(p=>{if(p.scan) scanPg.push(p.n);});{let n=g.pages[g.pages.length-1].n+1;while(pages[n-1]&&pages[n-1].scan){scanPg.push(n);n++;}}
      IMP.items.push({id:uid(),kind:'1391',scanPg,file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!(B&&!B.to),to:!!(B&&B.to)||IMF.some(([k])=>F[k]&&F[k].how==='to'),unit:'thousands',sel:!prog&&sec!=='fh'&&sec!=='hn',prog,sec});}}
    else{if(!aiOn()){bk.st='skipped';bk.err='no DD 1391 pages; reading a table needs the CARL sign-in';IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
