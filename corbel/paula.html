@@ -172,10 +172,12 @@
  var INST=[
   ['Andersen AFB, Guam',/\bandersen\b|\baafb\b|\bnsa andersen\b|\bandy south\b/],
   ['Naval Base Guam',/\bnaval base guam\b|\bnavbase guam\b|\bnbg\b|\bapra harbor\b/],
-  ['Camp Blaz, Guam',/\bcamp blaz\b|\bmcb camp blaz\b|\bfinegayan\b/],
+  ['Camp Blaz, Guam',/\bcamp blaz\b|\bmcb camp blaz\b|\bmcb guam\b|\bfinegayan\b/],
   ['Tinian, CNMI',/\btinian\b/],
   ['Saipan, CNMI',/\bsaipan\b/],
+  ['Joint Region Marianas, Guam',/\bjoint region marianas\b|\bjrm\b/],
   ['Kadena AB, Okinawa',/\bkadena\b/],
+  ['Camp Butler, Okinawa',/\bcamp (s\.? ?d\.? |smedley )?butler\b|\bmcb butler\b/],
   ['Camp Hansen, Okinawa',/\bcamp hansen\b/],
   ['Camp Schwab, Okinawa',/\bcamp schwab\b/],
   ['Camp Foster, Okinawa',/\bcamp foster\b/],
@@ -292,7 +294,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel122',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel123',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -1986,8 +1988,10 @@ function readerA(grp){const first=grp.pages[0];let h=hdrPos(first);if(Object.key
 function groups(pages,file){const out=[];let cur=null;
  pages.forEach(pg=>{if(!is1391(pg)){if(cur&&!/INDEX|TABLE OF CONTENTS|DD\s*FORM\s*1390|1390\b/i.test(pg.t.slice(0,400))&&/^(\s*\d{1,2}\.|\s*[A-Z(])/m.test(pg.t)&&pg.t.length>200&&cur.loose<1){cur.pages.push(pg);cur.loose++;}else cur=null;return;}
   const h=hdrPos(pg);const no=numI(h.number||hdrText(pg.t).number||'');const ti=nzI(h.title||hdrText(pg.t).title||'');
-  if(cur&&((no&&no===cur.no)||(!no&&ti&&ti===cur.ti))){cur.pages.push(pg);return;}
-  cur={file,no,ti,pages:[pg],loose:0};out.push(cur);});
+  // the same P-number at another installation is another project (Navy books reuse numbers across bases)
+  const ins=nzI(h.installation||hdrText(pg.t).installation||'');const W=t=>String(t).split(' ').filter(w=>w.length>=4);const other=ins&&cur&&cur.ins&&!W(ins).some(w=>W(cur.ins).includes(w));
+  if(cur&&((no&&no===cur.no&&!other)||(!no&&ti&&ti===cur.ti))){cur.pages.push(pg);return;}
+  cur={file,no,ti,ins,pages:[pg],loose:0};out.push(cur);});
  return out;}
 const R1391_SYS=`You read DD Form 1391 pages from a U.S. military construction budget justification book. Return ONLY JSON:
 {"title":"","number":"","installation":"","component":"","fy":"","pe":"","catcode":"","cost":"","auth":"","dpct":"","d35":"","dc":"","pages":{"title":0,"number":0,"installation":0,"component":0,"fy":0,"pe":0,"catcode":0,"cost":0,"dpct":0,"d35":0,"dc":0}}
@@ -2022,16 +2026,34 @@ async function settle(grp,A,B,say){const F={};const all=grp.pages.map(p=>p.t).jo
  return F;}
 // Budget books label the same project differently each year: "PDI: AIRFIELD DEVELOPMENT PHASE 1, INC 3". The labels are dropped before comparing.
 function bookTitle(t){return String(t||'').replace(/^\s*(?:PDI|EDI|CTC|ERI|EUCOM|INDOPACOM)\s*:\s*/i,'').replace(/[,;(]?\s*\bINC(?:REMENT)?\b\.?\s*(?:\d+|[IVX]+)?\s*\)?\s*$/i,'').replace(/\bINC(?:REMENT)?\s+\d+\b/ig,' ').replace(/\s+/g,' ').trim();}
+// Navy and Marine Corps books use the same P-number at different bases, and an increment adds a letter (P614, P614C). One project is its number without the letter, at its installation; never the number alone.
+const DONP=/^P\d{2,4}[A-Z]{0,2}$/;
+function locG(s){const ID=window.CorbelID;const c=String(ID?ID.inst(s):(s||'')).replace(/\([^)]*\)/g,' ');const t=c.toLowerCase();if(/\bcnmi\b|\btinian\b|\bsaipan\b|\brota\b|northern mariana/.test(t)) return 'cnmi';if(/\bguam\b|\bmarianas\b/.test(t)) return 'guam';if(/\bokinawa\b/.test(t)) return 'okinawa';if(/\bpalau\b/.test(t)) return 'palau';if(/\byap\b|\bpohnpei\b|\bchuuk\b|\bkosrae\b|federated states|\bfsm\b/.test(t)) return 'fsm';
+ // elsewhere: the state or country after the last comma, letters only, so a stray character on one page or a different base name in another year's book does not split one project
+ const L=c.split(',').pop().toLowerCase().replace(/[^a-z]/g,'');return L||nzI(c);}
+function pKey(n,ins){n=numI(n);if(!n) return '';return DONP.test(n)?n.replace(/(\d)[A-Z]+$/,'$1')+'@'+locG(ins):n;}
+// The parts of a Navy book: active-force MILCON, mandatory (reconciliation) MILCON, host-nation funded or in-kind construction, and family housing. Each part starts with its own cover or heading page.
+function donSecs(pages){let s='mcon',seen=false;return pages.map(pg=>{const h=String(pg.t||'').slice(0,400);if(is1391(pg)) seen=true;
+ if(seen){if(/JUSTIFICATION OF ESTIMATES/i.test(h)&&/Family Housing/i.test(h)) s='fh';else if(/JUSTIFICATION OF ESTIMATES|BUDGET ESTIMATES/i.test(h)&&/\bMANDATORY\b/i.test(h)) s='mand';else if(/Host Nation Funded Construction|Host Country In-Kind/i.test(h)) s='hn';}return s;});}
+function donRow(sec,F,txt){const n=numI(F.number&&F.number.v);const h=String(txt||'').slice(0,500);
+ if(/^[MN]\d{2}R\d+$/.test(n)||/Republic of Korea Funded|Host Nation Funded|Host Country In-Kind|Government of Japan Funded/i.test(h)) return 'hn';
+ if(sec==='fh'||/^0808/.test(String(F.pe&&F.pe.v||''))) return 'fh';return sec||'mcon';}
+// DON 1391s print NAVY in block 1 for Marine Corps projects too: a program element ending in M, or a Marine Corps UIC, makes it Marine Corps.
+function donSvc(F,all){const c=SVCN(String(F.component&&F.component.v||''));if(c&&!/^(Navy|Marine Corps)$/.test(c)) return;const pe=String(F.pe&&F.pe.v||'').trim();const u=(String(all||'').match(/UIC\s*:?\s*([MN])\d{4,5}/i)||[])[1]||'';
+ const m=/\d{5,7}M$/i.test(pe)||(!/\d{5,7}N$/i.test(pe)&&/^M$/i.test(u));const v=m?'Marine Corps':'Navy';const f=F.component||{};if(c===v){F.component={...f,dsvc:1};return;}F.component={...f,v,how:f.how||'a',page:f.page,dsvc:1,svcWhy:m?'program element '+pe+(u?', UIC '+u:''):''};}
+function hnAcct(ins){const t=String(ins||'').toLowerCase();return /korea|pohang|yecheon|chinhae|pyeongtaek|humphreys|osan|kunsan/.test(t)?'HN-KOR':/japan|okinawa|iwakuni|yokosuka|sasebo|atsugi/.test(t)?'HN-GOJ':'HN-OTH';}
 function incOf(t){const m=String(t||'').match(/\bINC(?:REMENT)?\.?\s*(\d+|[IVX]+)\b/i);return m?m[1]:'';}
 // Every word of the book's title is in the project's name (a book abbreviation such as PIPELN counts for PIPELINE), and the book adds no number the name lacks.
 function coversT(name,ti){const STOP={the:1,and:1,of:1,for:1,at:1,to:1,in:1,on:1,a:1,an:1,w:1,with:1,phase:1,ph:1,project:1,facility:1,facilities:1,inc:1,increment:1};const W=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]+/g,' ').split(' ').filter(w=>(w.length>1||/\d/.test(w))&&!STOP[w]);
  const B=W(ti),L=W(name);if(B.filter(w=>!/^\d+$/.test(w)).length<2) return false;const sub=(a,b)=>{let i=0;for(const c of b){if(c===a[i]) i++;}return i===a.length;};
  const hit=w=>L.some(x=>x===w||(/^\d+$/.test(w)?false:(w.length>=3&&x.indexOf(w)===0)||(w.length>=4&&x[0]===w[0]&&x.length>w.length&&sub(w,x))));return B.every(hit);}
 function matchOf(it){const ID=window.CorbelID;if(ID){const ti=bookTitle(it.F.title.v),insv=it.F.installation.v;const nums=[ID.num(it.F.number.v)].concat(ID.numsIn(ti)).filter(Boolean);
- const sameI=p=>insv?ID.sameInst(p.installation,insv):false;
- let M=nums.length?P.projects.filter(p=>{const pn=ID.num(p.number);return (pn&&nums.includes(pn))||ID.numsIn(p.name).some(x=>nums.includes(x));}):[];if(M.length>1){const M2=M.filter(sameI);if(M2.length) M=M2;}
+ const don=DONP.test(numI(it.F.number.v));const dk=don?pKey(it.F.number.v,insv):'';
+ const sameI=p=>insv?(don?locG(p.installation)===locG(insv):ID.sameInst(p.installation,insv)):false;
+ let M;if(don) M=P.projects.filter(p=>pKey(p.number,p.installation)===dk||ID.numsIn(p.name).some(x=>pKey(x,p.installation)===dk));
+ else{M=nums.length?P.projects.filter(p=>{const pn=ID.num(p.number);return (pn&&nums.includes(pn))||ID.numsIn(p.name).some(x=>nums.includes(x));}):[];if(M.length>1){const M2=M.filter(sameI);if(M2.length) M=M2;}}
  // A different project number on both sides means a different project, however alike the titles.
- const numOk=p=>{const pn=ID.num(p.number);return !nums.length||!pn||nums.includes(pn);};
+ const numOk=p=>{const pn=ID.num(p.number);return !nums.length||!pn||(don?pKey(pn,p.installation)===dk:nums.includes(pn));};
  if(!M.length&&ti) M=P.projects.filter(p=>numOk(p)&&sameI(p)&&(nzI(bookTitle(p.name))===nzI(ti)||ID.titleSim(bookTitle(p.name),ti)>=.75));
  if(!M.length&&ti&&insv) M=P.projects.filter(p=>numOk(p)&&sameI(p)&&coversT(p.name,ti));
  if(!M.length&&ti&&!insv){const M3=P.projects.filter(p=>numOk(p)&&ID.titleSim(bookTitle(p.name),ti)>=.9);if(M3.length===1) M=M3;}return M;}
@@ -2049,8 +2071,13 @@ function itemFindings(it){const R=[];const F=it.F;const v=k=>F[k]&&F[k].v;const 
   if(!v('dpct')) R.push(['warn','No design percent complete found in block 12.',src]);}
  const c=N(v('cost'))*(it.unit==='millions'?1e6:1e3);if(c&&c<=LAW.umc.v) R.push(['info','At '+M(c)+' it is at or under the '+M(LAW.umc.v)+' minor construction ceiling; it could go as unspecified minor construction instead of a line item.',LAW.umc.cite]);
  const m=it.match&&P.projects.find(p=>p.id===it.match);if(m){const was=N(m.authorized)||N(m.programmed);if(c&&was&&Math.abs(c-was)/was>.05) R.push(['warn','The document shows '+M(c)+'; PAULA has '+M(was)+' ('+(c>was?'+':'')+Math.round((c-was)/was*100)+'%).',src]);
-  if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);}
+  if(v('fy')&&m.fy&&String(m.fy)!==String(v('fy'))) R.push(['warn','The document shows FY'+v('fy')+'; PAULA has FY'+m.fy+'.',src]);
+  if(F.component&&F.component.dsvc&&m.service&&v('component')&&window.CorbelID&&CorbelID.svc(v('component'))!==CorbelID.svc(m.service)) R.push(['warn','The book shows '+CorbelID.svc(v('component'))+(F.component.svcWhy?' ('+F.component.svcWhy+')':'')+'; PAULA has '+m.service+'. The project keeps '+m.service+'.',src]);}
  if(it.prog) R.push(['info','A program line (design or minor construction), not a single project – left unticked.',src]);
+ if(it.sec==='fh') R.push(['info','Family housing (Part 2 of the book), not MILCON – left unticked; if added it goes to the family housing account.',src]);
+ if(it.sec==='hn') R.push(['info','Host-nation funded or in-kind construction – left unticked; if added its funding line is host nation, never a US MILCON request.',src]);
+ if(it.sec==='mand') R.push(['info','Mandatory (reconciliation) funding – a separate total from the book’s discretionary MILCON total.',src]);
+ if(F.component&&F.component.svcWhy) R.push(['info','Block 1 reads NAVY; set to Marine Corps from the '+F.component.svcWhy+'.',src]);
  if(it.reads>1) R.push([IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?'bad':'info','This project and year were read '+it.reads+' times in this upload; shown once.'+(IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')?' The readings differ – pick the value.':''),src]);
  if(!digI(v('cost'))&&!digI(v('fy'))&&!it.done) R.push(['warn','No amount on this page – check it.',src]);
  (it.ai||[]).forEach(x=>R.push([x.s,'AI review: '+x.t+(x.d?' – '+x.d:''),src+(x.q?' (“'+x.q+'”)':'')]));
@@ -2061,11 +2088,14 @@ async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading 
  const say=t=>{if(IMP) IMP.st=t;const e=$('#imSt');if(e) e.textContent=t;};IMP=IMP||{files:[],items:[],at:new Date().toISOString()};IMP.busy=true;
  try{for(const f of files){const bk={name:f.name,n0:IMP.items.length,st:'reading',err:''};(IMP.books=IMP.books||[]).push(bk);try{let pages;if(f.pasted) pages=[{n:1,t:f.text,items:[]}];else if(/\.pdf$/i.test(f.name)){bk.scan={skip:IMP_SKIP};pages=await pdfRead(f,say,bk.scan);}else{pages=[{n:1,t:await f.text(),items:[]}];}
    const url=f.pasted?'':URL.createObjectURL(f);IMP.files.push({name:f.name,url,n:pages.length});
+   const don=/DEPARTMENT OF THE NAVY/i.test(pages.slice(0,12).map(p=>p.t).join(' '));const SEC=don?donSecs(pages):null;bk.don=don;
+   bk.tot=[];if(don) pages.forEach((p,ix)=>{const m=String(p.t||'').match(/Total\s*[-–]\s*FY\s*(20\d\d)\s+Military Construction\s+([\d,]+)\s+([\d,]+)/i);if(m&&/Summary of Locations/i.test(p.t)) bk.tot.push({pg:p.n,sec:SEC[ix],fy:m[1],auth:N(m[2].replace(/,/g,'')),appr:N(m[3].replace(/,/g,''))});});
    const G=groups(pages,f.name);const pdi=/Pacific\s+Deterrence\s+Initiative/i.test(pages.slice(0,6).map(p=>p.t).join(' '));
    if(G.length){let i=0;for(const g of G){i++;say('Reading '+f.name+': project '+i+' of '+G.length+(aiOn()?' with two readers':''));const A=readerA(g);let B=null;if(aiOn()){try{B=await aiRead(g);}catch(e){if(e&&e.timeout){B={o:{},pg:{},to:true};bk.to=(bk.to||0)+1;}}}
-     const F=await settle(g,A,B,say);const prog=/^VARIOUS$/i.test(String(F.number.v||'').trim())||/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(String(F.title.v||'').trim());
+     const F=await settle(g,A,B,say);let sec='';if(SEC){sec=donRow(SEC[g.pages[0].n-1],F,g.pages[0].t);donSvc(F,g.pages.map(p=>p.t).join('\n'));}
+     const prog=(don&&sec!=='fh'&&sec!=='hn'&&/unspecified\s+minor\s+construction/i.test(String(F.title.v||'')))||/^VARIOUS$/i.test(String(F.number.v||'').trim())||/^(PDI:\s*|EDI:\s*)?(design|planning\s*(and|&)\s*design|unspecified\s+minor\s+construction|.*planning\s+and\s+design)$/i.test(String(F.title.v||'').trim());
      const scanPg=[];g.pages.forEach(p=>{if(p.scan) scanPg.push(p.n);});{let n=g.pages[g.pages.length-1].n+1;while(pages[n-1]&&pages[n-1].scan){scanPg.push(n);n++;}}
-     IMP.items.push({id:uid(),kind:'1391',scanPg,file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!(B&&!B.to),to:!!(B&&B.to)||IMF.some(([k])=>F[k]&&F[k].how==='to'),unit:'thousands',sel:!prog,prog});}}
+     IMP.items.push({id:uid(),kind:'1391',scanPg,file:f.name,pages:g.pages.map(p=>p.n),text:g.pages.map(p=>p.t).join('\n'),F,pdi:pdi||/^PDI:/i.test(F.title.v||''),two:!!(B&&!B.to),to:!!(B&&B.to)||IMF.some(([k])=>F[k]&&F[k].how==='to'),unit:'thousands',sel:!prog&&sec!=='fh'&&sec!=='hn',prog,sec});}}
    else{if(!aiOn()){bk.st='skipped';bk.err='no DD 1391 pages; reading a table needs the CARL sign-in';IMP.notes=(IMP.notes||[]).concat([f.name+': no DD 1391 pages found. Reading a table needs the CARL sign-in.']);continue;}
     const cand=pages.filter(p=>/\d{1,3}(,\d{3})+|\d{4,}/.test(p.t)).slice(0,40);for(let s=0;s<cand.length;s+=4){const ch=cand.slice(s,s+4);say('Reading the table in '+f.name+' with two readers: pages '+ch[0].n+'–'+ch[ch.length-1].n);
      const src=ch.map(p=>'[Page '+p.n+']\n'+p.t).join('\n\n');let A,B;try{[A,B]=await Promise.all([askT('claude',RTAB_SYS,src),askT('gemini',RTAB_SYS,src)]);}catch(e){bk.miss=(bk.miss||0)+1;IMP.notes=(IMP.notes||[]).concat([f.name+': the table could not be read ('+e.message+').']);continue;}
@@ -2088,8 +2118,8 @@ async function impFiles(files,pasted){if(IMP&&IMP.busy) return alert('A reading 
  finally{IMP.busy=false;}
  say('');vImp();}
 // A duplicate is the same project, installation and fiscal year read twice; the same project in another year's book is that year's increment.
-function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=numI(it.F.number.v);if(bn&&!it.merged) (yrs[bn]=yrs[bn]||new Set()).add(digI(it.F.fy.v));});
- IMP.items.forEach(it=>{if(it.merged) return;const bn=numI(it.F.number.v);const k=bn+'|'+digI(it.F.fy.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');
+function impMatch(){const seen={},yrs={};IMP.items.forEach(it=>{const bn=pKey(it.F.number.v,it.F.installation.v);if(bn&&!it.merged) (yrs[bn]=yrs[bn]||new Set()).add(digI(it.F.fy.v));});
+ IMP.items.forEach(it=>{if(it.merged) return;const bn=pKey(it.F.number.v,it.F.installation.v);const k=bn+'|'+digI(it.F.fy.v)+'|'+(it.kind==='table'?nzI(it.F.title.v):'');
   const first=bn&&seen[k];if(first){// read twice: one row; if the readings differ, the first row turns red and offers both values
    it.merged=first.id;it.sel=false;first.reads=(first.reads||1)+1;
    {const a=first.F.cost||{},b=it.F.cost||{};if(a.how!=='you'&&digI(a.v)!==digI(b.v)&&(digI(a.v)||digI(b.v))) first.F.cost={...a,v:digI(a.v)||digI(b.v),a:digI(a.v)||'(blank)',b:digI(b.v)||'(blank)',how:'dispute'};}
@@ -2118,9 +2148,9 @@ async function impAI(){if(!aiOn()) return alert('Sign in again (Face ID) to add 
 function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return alert('Tick at least one row.');const bad=L.filter(it=>IMF.some(([k])=>it.F[k]&&it.F[k].how==='dispute')||IMKEY.some(k=>!it.F[k]||!it.F[k].v)&&it.kind==='1391');
  if(bad.length&&!confirm(bad.length+' ticked row'+(bad.length>1?'s have':' has')+' a reader disagreement or a missing key field. Add '+(bad.length>1?'them':'it')+' anyway?')) return;
  let a=0,u=0,pd=0,sk=0;const today_=today();const ID=window.CorbelID;
- L.sort((x,y)=>(x.kind==='table')-(y.kind==='table')||N(digI(x.F.fy.v))-N(digI(y.F.fy.v)));const made={};IMP.items.forEach(x=>{const bn=numI(x.F.number.v);if(x.pid&&bn) made[bn]=x.pid;});let nz=0;
+ L.sort((x,y)=>(x.kind==='table')-(y.kind==='table')||N(digI(x.F.fy.v))-N(digI(y.F.fy.v)));const made={};IMP.items.forEach(x=>{const bn=pKey(x.F.number.v,x.F.installation.v);if(x.pid&&bn) made[bn]=x.pid;});let nz=0;
  L.forEach(it=>{if(!digI(it.F.cost.v)&&!digI(it.F.fy.v)){it.done='Nothing added – no amount on this page';it.sel=false;nz++;return;}
-  {const bn=numI(it.F.number.v);if(!it.match&&bn&&made[bn]&&P.projects.some(x=>x.id===made[bn])) it.match=made[bn];}if(it.twin&&!it.match){const t=IMP.items.find(x=>x.id===it.twin);if(t&&t.pid) it.match=t.pid;}
+  {const bn=pKey(it.F.number.v,it.F.installation.v);if(!it.match&&bn&&made[bn]&&P.projects.some(x=>x.id===made[bn])) it.match=made[bn];}if(it.twin&&!it.match){const t=IMP.items.find(x=>x.id===it.twin);if(t&&t.pid) it.match=t.pid;}
   if(it.kind==='table'&&it.pdi&&!it.match){it.done='Not added – the PDI display only marks projects already in the portfolio. Add the project from its 1391.';it.sel=false;sk++;return;}const F=it.F,v=k=>F[k]?String(F[k].v||'').trim():'';const amt=N(digI(v('cost')))*(it.unit==='millions'?1e6:1e3);const pg=k=>it.file+(F[k]&&F[k].page?' p.'+F[k].page:'');
   let p=it.match&&P.projects.find(x=>x.id===it.match);const isNew=!p;if(!p){p=blankProj();P.projects.push(p);}
   const fill=(k,val)=>{if(val!==''&&val!=null&&(p[k]===''||p[k]==null)) p[k]=val;};
@@ -2128,22 +2158,24 @@ function impApply(){const L=IMP.items.filter(it=>it.sel);if(!L.length) return al
   if(!p.lat){const g=locate(p.installation);if(g){p.lat=g[0];p.lon=g[1];if(!p.country) p.country=g[2];}}
   if(it.useCost&&amt) p.programmed=amt;else if(isNew||!incOf(v('title'))) fill('programmed',amt||'');if(v('pe')&&!p.pe) p.pe=v('pe');if(v('catcode')&&!p.catcode) p.catcode=v('catcode');
   if(isNew) p.phase=4;
+  // family housing and host-nation rows are not MILCON requests: family housing goes to its own account, host-nation construction to the host nation
+  const lsrc=it.sec==='fh'?'FHC':it.sec==='hn'?hnAcct(v('installation')):acctKey({src:'MILCON'},p);if(isNew&&it.sec==='hn') p.appropriation='host_nation_funded';
   // a budget book is a request: its amounts enter as requests, never as authorized or appropriated
   if(isNew&&!(p.funds||[]).length) p.funds=[];
   if(amt&&N(v('fy'))){p.funds=isNew?(p.funds||[]):ownFunds(p);const fy=N(v('fy')),inc=incOf(v('title')),bn=numI(v('number'));
    // one line per book project and year: two projects in one year's book (airfield and apron) are two lines; the same project read again is not
    // one line per project per year: a line already there for this year keeps its values and gains the page; a second book project in the same year (airfield and apron) gets its own line
-   const ex=p.funds.find(l=>N(l.fy)===fy&&!isHN(l)&&l.stage!=='authreq'&&(!(bn&&l.bnum)||l.bnum===bn));
+   const ex=p.funds.find(l=>N(l.fy)===fy&&(it.sec==='hn'?isHN(l):!isHN(l))&&(l.src==='FHC')===(lsrc==='FHC')&&l.stage!=='authreq'&&(!(bn&&l.bnum)||l.bnum===bn));
    // the book's page is attached only to a line still at a request stage; an authorized or appropriated line keeps its own source
    if(ex){if(!ex.from&&SI(ex.stage)<=SI('requested')) ex.from=pg('cost');if(bn&&!ex.bnum&&SI(ex.stage)<=SI('requested')) ex.bnum=bn;if(N(ex.amt)!==amt) it.kept='FY'+fy+' already has '+M(N(ex.amt))+'; the book shows '+M(amt)+' – left as it was.';}
-   else p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc?{note:'Increment '+inc}:{})});
+   else p.funds.push({id:uid(),fy,src:lsrc,stage:'requested',amt,from:pg('cost'),...(bn?{bnum:bn}:{}),...(inc||it.sec==='mand'?{note:[inc?'Increment '+inc:'',it.sec==='mand'?'Mandatory (reconciliation)':''].filter(Boolean).join('; ')}:{})});
    const au=N(digI(F.auth&&F.auth.v))*(it.unit==='millions'?1e6:1e3);
-   if(au&&!p.funds.some(l=>l.stage==='authreq'&&N(l.fy)===fy&&(!(bn&&l.bnum)||l.bnum===bn))) p.funds.push({id:uid(),fy,src:acctKey({src:'MILCON'},p),stage:'authreq',amt:au,from:pg('cost'),...(bn?{bnum:bn}:{})});}
+   if(au&&it.sec!=='hn'&&!p.funds.some(l=>l.stage==='authreq'&&N(l.fy)===fy&&(!(bn&&l.bnum)||l.bnum===bn))) p.funds.push({id:uid(),fy,src:lsrc,stage:'authreq',amt:au,from:pg('cost'),...(bn?{bnum:bn}:{})});}
   if(isNew) p.prog_status='pb';
   if(v('dpct')!==''&&!dPct(p)){p.gates={...(p.gates||{})};const g=p.gates.design||{};if(g.pct===undefined) p.gates.design={...g,pct:N(v('dpct')),date:g.date||(v('d35')?v('d35')+'-01':''),src:pg('dpct')};}
   if(it.pdi){p.posture={...(p.posture||{}),pdi:true};pd++;}
   p.docsrc=(p.docsrc||[]).concat([{file:it.file,pages:it.pages,read:today_,fields:Object.fromEntries(IMF.filter(([k])=>F[k]&&F[k].v).map(([k])=>[k,{v:F[k].v,how:F[k].how,page:F[k].page}]))}]).slice(-6);
-  it.done=(isNew?'Added':'Updated')+(it.kept?' – '+it.kept:'');it.pid=p.id;{const bn=numI(v('number'));if(bn) made[bn]=p.id;}isNew?a++:u++;it.sel=false;});
+  it.done=(isNew?'Added':'Updated')+(it.kept?' – '+it.kept:'');it.pid=p.id;{const bn=pKey(v('number'),v('installation'));if(bn) made[bn]=p.id;}isNew?a++:u++;it.sel=false;});
  log('Projects added from budget documents',a+' added, '+u+' updated'+(pd?', '+pd+' marked PDI':'')+(sk?', '+sk+' PDI row'+(sk>1?'s':'')+' not added (no matching project)':'')+(nz?', '+nz+' row'+(nz>1?'s':'')+' with no amount':''));save();renderSteps();vImp();}
 // ---- outputs ----
 const HOW={to:'First reader only – the second reading took too long; check it',agree:'Both readers agree',a:'Layout reader only (AI reading not on the page)',b:'AI reader only',one:'One reader (sign in for the second)',arb:'Settled by the arbiter',dispute:'Readers disagree',you:'Set by the reviewer','':''};
@@ -2164,6 +2196,11 @@ function impMemo(){const I=IMP.items;const fs=[...new Set(I.map(it=>it.file))];c
  b+=cdH('Method')+cdP('Each DD 1391 was read twice: once from the position of the header boxes on the page and once by AI. Where the two agreed the value was taken; where they differed a second AI engine was asked to decide and to quote the page, and its answer was used only if the quote is on the page. Any number not printed on its page was dropped. Tables such as the Pacific Deterrence Initiative display were read by two AI engines and compared row by row. Block 11 and block 12 were checked for the parts a reviewer expects. Nothing is added to the portfolio until the reviewer approves it, and an update fills empty fields only. The workbook lists how every field was read and the page it came from.'+(IMP.ai?' The AI review findings are advisory and quote the page they are about.':''));
  b+=cdFoot('Prepared  ·  '+fd(today())+'  ·  Advisory review; the Service and its design agent own the 1391.');
  return cdDoc('Budget Document Review',[b]);}
+// Navy books: the ticked MILCON rows plus design and minor construction must equal the book's "Total – FY 20xx Military Construction".
+function bookSums(b){const I=IMP.items.filter(it=>it.file===b.name&&!it.merged&&it.kind==='1391');const on=it=>it.sel||/^(Added|Updated)/.test(it.done||'');const k=it=>N(digI(it.F.cost.v));const S=f=>I.filter(f).reduce((a,it)=>a+k(it),0);const f=n=>Math.round(n).toLocaleString('en-US');
+ const tk=S(it=>on(it)&&!it.prog&&(it.sec||'mcon')==='mcon'),pd=S(it=>it.prog&&(it.sec||'mcon')==='mcon'),mt=S(it=>on(it)&&!it.prog&&it.sec==='mand'),mp=S(it=>it.prog&&it.sec==='mand'),fh=S(it=>it.sec==='fh'),hn=S(it=>it.sec==='hn');
+ const T=(b.tot||[]).find(t=>t.sec==='mcon'),TM=(b.tot||[]).find(t=>t.sec==='mand');const ok=(a,t)=>t?(a===t.appr?' <span style="color:#2e7d32">= book total '+f(t.appr)+' (p.'+t.pg+')</span>':' <span style="color:#9b2c2c">book total '+f(t.appr)+' (p.'+t.pg+'): differs by '+f(a-t.appr)+'</span>'):' <span style="color:#7a5600">no book total found</span>';
+ return '<div class="small" style="margin:2px 0 6px">'+esc(b.name)+' ($000): ticked MILCON '+f(tk)+' + design and minor construction '+f(pd)+' = '+f(tk+pd)+ok(tk+pd,T)+(mt||mp||TM?' · mandatory '+f(mt)+(mp?' + design '+f(mp):'')+' = '+f(mt+mp)+ok(mt+mp,TM):'')+(fh?' · family housing, not MILCON '+f(fh):'')+(hn?' · host nation, not MILCON '+f(hn):'')+'</div>';}
 // ---- the screen ----
 function vImp(){const v=$('#view');const I=IMP?IMP.items.filter(it=>!it.merged):[];const signed=aiOn();
  const dot=f=>!f||!f.how?'':'<span title="'+esc(HOW[f.how]+(f.quote?' – “'+f.quote+'”':'')+(f.bDropped?' – the AI reading was not on the page and was dropped':''))+'" style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-left:5px;background:'+({agree:'#2e7d32',arb:'#2e7d32',you:'#2e7d32',a:'#c98a00',b:'#c98a00',one:'#c98a00',to:'#c98a00',dispute:'#b3261e'}[f.how]||'#999')+'"></span>';
@@ -2178,12 +2215,12 @@ function vImp(){const v=$('#view');const I=IMP?IMP.items.filter(it=>!it.merged):
   '<p class="small" id="imSt" style="color:#1F4E5F;font-weight:600">'+esc(IMP&&IMP.busy?IMP.st||'Reading…':'')+'</p>'+(signed?'':'<p class="small">Signed out: 1391s are read by the layout reader alone and every field is marked for a check. Sign in again (Face ID) for the second reader, the arbiter and tables.</p>')+
   ((IMP&&IMP.notes||[]).map(n=>'<p class="small" style="color:#9b2c2c">'+esc(n)+'</p>').join(''))+'</div>'+
   ((IMP&&IMP.books||[]).length||I.length?'<div class="panel"><div class="row" style="margin-top:0;justify-content:space-between;flex-wrap:wrap;gap:8px"><h3 style="margin:0">Review '+I.length+' project'+(I.length!==1?'s':'')+'</h3><div><button class="sm" id="imXl">Download review workbook</button> <button class="sm" id="imDoc">Download review memo</button> '+(signed?'<button class="sm" id="imAI">'+(IMP.ai?'Run the AI review again':'Add the AI review')+'</button> ':'')+'<button class="sm" id="imClr">Clear</button></div></div>'+
-   ((IMP.books||[]).length?'<table class="ptable" style="margin:8px 0"><thead><tr><th>Book</th><th>Rows</th><th>Result</th></tr></thead><tbody>'+IMP.books.map(b=>'<tr><td>'+esc(b.name)+'</td><td>'+(b.st==='reading'?'…':N(b.rows))+'</td><td'+(b.st==='failed'?' style="color:#9b2c2c"':'')+'>'+({reading:'Reading now',done:'Read',failed:'Failed – '+esc(b.err),skipped:'Not read – '+esc(b.err)}[b.st]||'')+(b.to?' <span style="color:#7a5600">· '+b.to+' project'+(b.to>1?'s':'')+' with the first reader only (time limit)</span>':'')+(b.miss?' <span style="color:#7a5600">· '+b.miss+' table section'+(b.miss>1?'s':'')+' not read</span>':'')+(b.scan&&b.scan.n?' <span style="color:#52514e">· '+b.scan.n+' scanned page'+(b.scan.n>1?'s':'')+': '+[(b.scan.done||0)+' transcribed',(b.scan.skipped||0)+' skipped',(b.scan.timeout||0)+' timed out'].join(', ')+'</span>':'')+'</td></tr>').join('')+'</tbody></table>':'')+
+   ((IMP.books||[]).length?'<table class="ptable" style="margin:8px 0"><thead><tr><th>Book</th><th>Rows</th><th>Result</th></tr></thead><tbody>'+IMP.books.map(b=>'<tr><td>'+esc(b.name)+'</td><td>'+(b.st==='reading'?'…':N(b.rows))+'</td><td'+(b.st==='failed'?' style="color:#9b2c2c"':'')+'>'+({reading:'Reading now',done:'Read',failed:'Failed – '+esc(b.err),skipped:'Not read – '+esc(b.err)}[b.st]||'')+(b.to?' <span style="color:#7a5600">· '+b.to+' project'+(b.to>1?'s':'')+' with the first reader only (time limit)</span>':'')+(b.miss?' <span style="color:#7a5600">· '+b.miss+' table section'+(b.miss>1?'s':'')+' not read</span>':'')+(b.scan&&b.scan.n?' <span style="color:#52514e">· '+b.scan.n+' scanned page'+(b.scan.n>1?'s':'')+': '+[(b.scan.done||0)+' transcribed',(b.scan.skipped||0)+' skipped',(b.scan.timeout||0)+' timed out'].join(', ')+'</span>':'')+'</td></tr>').join('')+'</tbody></table>'+IMP.books.filter(b=>b.don&&b.st==='done').map(bookSums).join(''):'')+
    '<p class="small">Green: both readers agree, or the arbiter settled it from the page. Amber: one reader only – check it. Red: the readers disagree – pick a value. Hover a dot for how it was read.'+(nFix?' <b style="color:#9b2c2c">'+nFix+' row'+(nFix>1?'s need':' needs')+' a fix.</b>':'')+'</p>'+
    '<div style="overflow:auto"><table class="ptable"><thead><tr><th><input type="checkbox" id="imAll" style="width:auto"'+(I.every(it=>it.sel||it.done)?' checked':'')+'></th><th>Project</th><th>Number</th><th>Installation</th><th>FY</th><th>Cost ($000)</th><th>Design %</th><th>Portfolio</th></tr></thead><tbody>'+
    FN.map(([it,fn])=>{const m=it.match&&P.projects.find(p=>p.id===it.match);const was=m?(N(m.authorized)||N(m.programmed)):0;const c=N(digI(it.F.cost.v))*(it.unit==='millions'?1e6:1e3);const u=fileUrl(it);
     return '<tr'+(it.done?' style="opacity:.6"':'')+' style="border-bottom:none"><td><input type="checkbox" data-isel="'+it.id+'" style="width:auto"'+(it.sel?' checked':'')+(it.done?' disabled':'')+'></td>'+cell(it,'title',200)+cell(it,'number',70)+cell(it,'installation',160)+cell(it,'fy',52)+cell(it,'cost',80)+cell(it,'dpct',44)+
-     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.incr?'<div class="small" style="color:#1F4E5F"><b>Increment</b> – FY'+esc(digI(it.F.fy.v)||'?')+' of a project in more than one year of this upload</div>':'')+(it.reads>1?'<div class="small" style="color:#7a5600">Read '+it.reads+' times in this upload; shown once</div>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
+     '<td>'+mt(it)+(m&&!it.done&&c&&was&&Math.abs(c-was)/was>.05?'<label class="small" style="display:flex;gap:4px;align-items:center;margin-top:4px"><input type="checkbox" data-iuse="'+it.id+'" style="width:auto"'+(it.useCost?' checked':'')+'> Replace '+M(was)+' with '+M(c)+'</label>':'')+(it.sec&&it.sec!=='mcon'?'<div class="small" style="color:#1F4E5F"><b>'+({fh:'Family housing',hn:'Host nation',mand:'Mandatory'}[it.sec])+'</b> – '+({fh:'not MILCON; family housing account',hn:'host-nation funded; no US funding line',mand:'reconciliation funding, counted apart from the discretionary total'}[it.sec])+'</div>':'')+(it.incr?'<div class="small" style="color:#1F4E5F"><b>Increment</b> – FY'+esc(digI(it.F.fy.v)||'?')+' of a project in more than one year of this upload</div>':'')+(it.reads>1?'<div class="small" style="color:#7a5600">Read '+it.reads+' times in this upload; shown once</div>':'')+(it.pdi?'<div class="small">PDI display</div>':'')+(it.unitFix?'<div class="small" style="color:#7a5600">Read as $ millions: '+esc(it.unitFix)+'. Check the table heading.</div>':'')+'</td>'+
      '</tr><tr'+(it.done?' style="opacity:.6"':'')+'><td></td><td colspan="7" class="small" style="padding-top:0">'+(u?'<a href="'+u+'#page='+it.pages[0]+'" target="_blank" rel="noopener">'+esc(it.file)+', page'+(it.pages.length>1?'s '+it.pages[0]+'–'+it.pages[it.pages.length-1]:' '+it.pages[0])+'</a>':esc(it.file))+(fn.length?fn.map(f=>'<div style="color:'+({bad:'#9b2c2c',warn:'#7a5600',info:'#52514e'}[f[0]])+'">'+esc(f[1])+'</div>').join(''):' · no findings')+'</td></tr>';}).join('')+'</tbody></table></div>'+
    '<div class="row"><button class="go" id="imGo">Add or update the ticked projects</button></div></div>':'');
  const go=fs=>{if(!fs.length) return;impFiles(fs);};

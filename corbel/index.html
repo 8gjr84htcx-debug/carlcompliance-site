@@ -172,10 +172,12 @@
  var INST=[
   ['Andersen AFB, Guam',/\bandersen\b|\baafb\b|\bnsa andersen\b|\bandy south\b/],
   ['Naval Base Guam',/\bnaval base guam\b|\bnavbase guam\b|\bnbg\b|\bapra harbor\b/],
-  ['Camp Blaz, Guam',/\bcamp blaz\b|\bmcb camp blaz\b|\bfinegayan\b/],
+  ['Camp Blaz, Guam',/\bcamp blaz\b|\bmcb camp blaz\b|\bmcb guam\b|\bfinegayan\b/],
   ['Tinian, CNMI',/\btinian\b/],
   ['Saipan, CNMI',/\bsaipan\b/],
+  ['Joint Region Marianas, Guam',/\bjoint region marianas\b|\bjrm\b/],
   ['Kadena AB, Okinawa',/\bkadena\b/],
+  ['Camp Butler, Okinawa',/\bcamp (s\.? ?d\.? |smedley )?butler\b|\bmcb butler\b/],
   ['Camp Hansen, Okinawa',/\bcamp hansen\b/],
   ['Camp Schwab, Okinawa',/\bcamp schwab\b/],
   ['Camp Foster, Okinawa',/\bcamp foster\b/],
@@ -292,7 +294,7 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
    so a portfolio reset never clears it. Never written to a project record, never sent to the AI or a server. */
 (function(){
  if(window.CorbelIssues) return;
- var BUILD='corbel122',KEY='corbel_issues',CAP=200,ERRS=[];
+ var BUILD='corbel123',KEY='corbel_issues',CAP=200,ERRS=[];
  window.addEventListener('error',function(e){ERRS.push({at:new Date().toISOString(),msg:String((e&&e.message)||e),where:(e&&e.filename?String(e.filename).split('/').pop()+':'+e.lineno:'')});if(ERRS.length>5) ERRS.shift();});
  window.addEventListener('unhandledrejection',function(e){var r=e&&e.reason;ERRS.push({at:new Date().toISOString(),msg:'Unhandled: '+String((r&&r.message)||r),where:''});if(ERRS.length>5) ERRS.shift();});
  var LS=window.localStorage,G=Storage.prototype.getItem,S=Storage.prototype.setItem;
@@ -408,6 +410,10 @@ window.CorbelDeToolDeep=window.CorbelDeToolDeep||function(x){const f=window.Corb
  window.CorbelIssues={used:used,open:openPanel,log:openLog,load:load,build:BUILD,snapshot:snapshot,_errs:ERRS};
 })();
 </script>
+
+
+
+
 
 
 
